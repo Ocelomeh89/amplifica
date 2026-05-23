@@ -40,11 +40,11 @@ export const useStore = create<StoreState>((set, get) => ({
   loaded: false,
 
   loadFromDB: async () => {
-    const loaded = await loadPortfolio();
-    const p = loaded ?? defaultPortfolio();
+    const existing = await loadPortfolio();
+    const p = existing ?? defaultPortfolio();
     const { active, baseline } = recompute(p);
     set({ portfolio: p, active, baseline, loaded: true });
-    if (!loaded) {
+    if (!existing) {
       scheduleSave(p);
     }
   },
