@@ -4,7 +4,7 @@ import type { MonthlyState } from "@engine/index";
 
 function findFirstHitMonth(rows: MonthlyState[], pred: (m: MonthlyState) => boolean): number | null {
   const i = rows.findIndex(pred);
-  return i === -1 ? null : i;
+  return i === -1 ? null : rows[i].monthIndex;
 }
 
 export default function StatsRow() {
@@ -28,16 +28,23 @@ export default function StatsRow() {
       ? findFirstHitMonth(active, (m) => m.netWorth >= netWorthTarget)
       : null;
 
-  const stats = [
+  const nwDelta = lastBase ? last.netWorth - lastBase.netWorth : null;
+  const cfDelta = lastBase ? last.investmentCashIn - lastBase.investmentCashIn : null;
+
+  const stats: { label: string; value: string; delta: { text: string; positive: boolean } | string | null }[] = [
     {
       label: `Net worth @ mo ${portfolio.horizonMonths}`,
       value: fmtCurrency(last.netWorth),
-      delta: lastBase ? `${last.netWorth >= lastBase.netWorth ? "+" : ""}${fmtCurrency(last.netWorth - lastBase.netWorth)} vs baseline` : null,
+      delta: nwDelta !== null
+        ? { text: `${nwDelta >= 0 ? "+" : ""}${fmtCurrency(nwDelta)} vs baseline`, positive: nwDelta >= 0 }
+        : null,
     },
     {
       label: `Mo cash flow @ mo ${portfolio.horizonMonths}`,
       value: fmtCurrency(last.investmentCashIn),
-      delta: lastBase ? `${last.investmentCashIn >= lastBase.investmentCashIn ? "+" : ""}${fmtCurrency(last.investmentCashIn - lastBase.investmentCashIn)} vs baseline` : null,
+      delta: cfDelta !== null
+        ? { text: `${cfDelta >= 0 ? "+" : ""}${fmtCurrency(cfDelta)} vs baseline`, positive: cfDelta >= 0 }
+        : null,
     },
     {
       label: "Cash flow target",
@@ -57,7 +64,15 @@ export default function StatsRow() {
         <div key={s.label} className="bg-white border border-zinc-200 rounded-lg px-3 py-2.5">
           <div className="text-[10px] text-sub uppercase tracking-wide">{s.label}</div>
           <div className="text-xl font-bold">{s.value}</div>
-          {s.delta && <div className="text-[11px] text-emerald-700">{s.delta}</div>}
+          {s.delta && (
+            <div className={
+              typeof s.delta === "string"
+                ? "text-[11px] text-sub"
+                : `text-[11px] ${s.delta.positive ? "text-emerald-700" : "text-red-700"}`
+            }>
+              {typeof s.delta === "string" ? s.delta : s.delta.text}
+            </div>
+          )}
         </div>
       ))}
     </div>

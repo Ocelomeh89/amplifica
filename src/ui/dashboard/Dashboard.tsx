@@ -12,12 +12,16 @@ export default function Dashboard() {
 
   const cfTarget = portfolio.targets.cashFlow;
   const nwTarget = portfolio.targets.netWorth;
-  const cfHit =
-    cfTarget !== undefined
-      ? active.findIndex((m) => m.investmentCashIn >= cfTarget)
-      : -1;
-  const nwHit =
-    nwTarget !== undefined ? active.findIndex((m) => m.netWorth >= nwTarget) : -1;
+
+  const cfHitIdx = cfTarget !== undefined
+    ? active.findIndex((m) => m.investmentCashIn >= cfTarget)
+    : -1;
+  const cfHit = cfHitIdx === -1 ? null : active[cfHitIdx].monthIndex;
+
+  const nwHitIdx = nwTarget !== undefined
+    ? active.findIndex((m) => m.netWorth >= nwTarget)
+    : -1;
+  const nwHit = nwHitIdx === -1 ? null : active[nwHitIdx].monthIndex;
 
   return (
     <div className="max-w-5xl">
@@ -43,7 +47,7 @@ export default function Dashboard() {
         baseline={baseline}
         pick={(m) => m.netWorth}
         target={nwTarget}
-        hitMonth={nwHit === -1 ? null : nwHit}
+        hitMonth={nwHit}
       />
 
       <ProjectionChart
@@ -52,7 +56,7 @@ export default function Dashboard() {
         baseline={baseline}
         pick={(m) => m.investmentCashIn}
         target={cfTarget}
-        hitMonth={cfHit === -1 ? null : cfHit}
+        hitMonth={cfHit}
       />
     </div>
   );
