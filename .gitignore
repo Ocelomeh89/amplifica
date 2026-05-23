@@ -5,5 +5,8 @@ node_modules/
 .DS_Store
 dist/
 build/
+*.tsbuildinfo
+vite.config.d.ts
+vite.config.js
 .next/
 .vercel/
