@@ -33,7 +33,7 @@ export function project(portfolio: Portfolio): MonthlyState[] {
 
   let cashBalance = portfolio.startingCash;
   let locLimit = portfolio.loc.initialLimit;
-  let locBalance = portfolio.loc.initialBalance;
+  const locBalance = portfolio.loc.initialBalance;
 
   const monthlyGrowthFactor = 1 + portfolio.loc.growthRatePctYr / 12;
   const out: MonthlyState[] = [];
