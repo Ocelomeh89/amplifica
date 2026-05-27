@@ -24,6 +24,7 @@ export type Database = {
           monthly_cashflow_goal?: number;
           external_net_worth?: number;
         };
+        Relationships: [];
       };
       amplicons: {
         Row: {
@@ -55,6 +56,7 @@ export type Database = {
           interest_pct?: number;
           start_date?: string;
         };
+        Relationships: [];
       };
       locs: {
         Row: {
@@ -82,8 +84,12 @@ export type Database = {
           utilization?: number;
           utilization_updated_at?: string;
         };
+        Relationships: [];
       };
     };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
   };
 };
 
