@@ -2,9 +2,16 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { fmtCurrency, fmtKUSD, fmtMUSD } from "@/lib/format";
 import { isoToYearMonth, currentYearMonth } from "@/lib/finance/dates";
-import { monthlyPayoutOf, isActiveAt, pvAtMonth, type AmpliconLite } from "@/lib/finance/projection";
+import {
+  monthlyPayoutOf,
+  isActiveAt,
+  pvAtMonth,
+  buildSeries,
+  type AmpliconLite,
+} from "@/lib/finance/projection";
 import Card from "@/components/Card";
 import InfoBox from "@/components/InfoBox";
+import ChartPair from "./ChartPair";
 
 export default async function DashboardPage() {
   const supabase = createClient();
@@ -28,17 +35,28 @@ export default async function DashboardPage() {
   const activeNow = lites.filter((a) => isActiveAt(a, todayMonth));
   const currentMonthlyCashflow = activeNow.reduce((s, a) => s + monthlyPayoutOf(a), 0);
 
-  // external_net_worth stored as MUSD → convert to USD; net_worth_goal stored as MUSD
   const externalNWUSD = (profile?.external_net_worth ?? 0) * 1_000_000;
   const totalPVUSD = lites.reduce((s, a) => s + pvAtMonth(a, todayMonth), 0);
   const currentTotalNetWorth = externalNWUSD + totalPVUSD;
 
-  // monthly_cashflow_goal stored as kUSD → convert to USD; net_worth_goal stored as MUSD
   const cashflowGoalUSD = (profile?.monthly_cashflow_goal ?? 0) * 1_000;
   const netWorthGoalUSD = (profile?.net_worth_goal ?? 0) * 1_000_000;
 
   const ampliconsCount = lites.length;
   const monthlyContribution = profile?.monthly_savings_contribution ?? 0;
+
+  const inceptionSeries = buildSeries({
+    amplicons: lites,
+    externalNetWorth: externalNWUSD,
+    range: "inception",
+    today: todayMonth,
+  });
+  const currentSeries = buildSeries({
+    amplicons: lites,
+    externalNetWorth: externalNWUSD,
+    range: "current",
+    today: todayMonth,
+  });
 
   return (
     <div className="max-w-5xl">
@@ -71,9 +89,12 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      <Card>
-        <p className="text-sm text-sub">Charts coming in next task.</p>
-      </Card>
+      <ChartPair
+        inceptionSeries={inceptionSeries}
+        currentSeries={currentSeries}
+        cashflowTargetUSD={cashflowGoalUSD}
+        netWorthTargetUSD={netWorthGoalUSD}
+      />
     </div>
   );
 }
