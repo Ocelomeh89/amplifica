@@ -40,12 +40,12 @@ Stored properties:
 - `Name` — string
 - `LOC_Type` — enum: `HELOC | PLOC`
 - `Size` — USD (the credit limit)
-- `Utilization` — USD (current drawn amount)
+- `Utilization` — USD (current drawn amount, **user-managed** — the user updates this manually roughly once a month)
 
 Derived:
 - `UtilizationPct` = `Utilization / Size`, displayed as %
 
-Multiple LOCs per user are supported (each has its own name and type).
+Multiple LOCs per user are supported (each has its own name and type). Amplicons do not auto-draw down a LOC's Utilization in MVP — the LOC record is an independent ledger maintained by the user.
 
 ### 3.3 Personal Settings (user-level)
 
@@ -56,7 +56,9 @@ Multiple LOCs per user are supported (each has its own name and type).
 
 ### 3.4 User / auth
 
-- Users sign up and log in (via Supabase Auth).
+- Users sign up and log in via Supabase Auth.
+- **Primary:** email + password.
+- **Alternative:** magic link (passwordless email).
 - All objects above are scoped to the signed-in user. No sharing in MVP.
 
 ## 4. Display units
@@ -82,7 +84,7 @@ Five numbers, left to right:
 
 - X-axis: months
 - Y-axis: monthly cash flow
-- Series: aggregate monthly cash flow over time from all active and scheduled AmortizedInvestments
+- Series: aggregate monthly cash flow over time from all active and scheduled AmortizedInvestments, plotted as a **smoothed curve** (not a stepped/bar series)
 - Cash flow target line drawn as dashes at `Settings.MonthlyCashflowGoal`
 
 ### 5.3 Net worth chart
@@ -96,6 +98,28 @@ Five numbers, left to right:
 
 - **Inception** — start at the date of the earliest AmortizedInvestment
 - **Current month** — start at today
+
+### 5.5 Lines of Credit page
+
+A dedicated page that lists every LOC the user has created. The user must be able to see all available credit and current utilization at a glance.
+
+**Per-LOC row:** Name, Type (HELOC/PLOC), Size, Utilization, Utilization %, last-updated timestamp, edit/delete controls. Inline editing of Utilization is the primary action (the user touches this once a month).
+
+**Totals row** (computed across all LOCs):
+- **Total Size** — Σ `Size`
+- **Total Utilization** — Σ `Utilization`
+- **Total Available** — `Total Size − Total Utilization`
+- **Aggregate Utilization %** — `Total Utilization / Total Size`
+
+A subtle "last touched" reminder is acceptable — e.g. flag any LOC whose Utilization hasn't been updated in 30+ days — but is not strictly required for MVP.
+
+### 5.6 Amplicons page
+
+A dedicated page that lists every AmortizedInvestment. Add / edit / delete. Columns: Name, AI_Type, FaceValue, Interest, Term, StartDate, EndDate (derived), MonthlyPayout (derived), Active (derived).
+
+### 5.7 Settings page
+
+Form for the Personal Settings (§3.3): `MonthlySavingsContribution`, `NetWorthGoal`, `MonthlyCashflowGoal`, `ExternalNetWorth`.
 
 ## 6. Calculations
 
@@ -120,7 +144,7 @@ PV(today) = MonthlyPayout × (1 − (1+r)^−n_remaining) / r
 
 where `n_remaining` is the number of payments still to come.
 
-If a stakeholder wants to use a separate discount rate later, replace `r` here without touching MonthlyPayout. MVP uses the loan rate.
+If a stakeholder wants to use a separate discount rate later, replace `r` here without touching MonthlyPayout. **MVP uses each loan's own `Interest` as the discount rate**, which means PV equals the outstanding amortization balance. The dashboard's Net Worth stat surfaces a small info-box tooltip on hover explaining: *"Present Value is computed using each loan's own interest as the discount rate. PV therefore equals the loan's outstanding amortization balance."*
 
 ### 6.3 Net worth at month `m`
 
@@ -148,13 +172,13 @@ Anything not on this page. Notably:
 - Per-month savings overrides
 - Configurable projection horizon (chart x-axis is driven by inception → last EndDate of any AmortizedInvestment, or current → last EndDate)
 
-## 8. Open questions for v2
+## 8. Resolved decisions log
 
-These were not specified in the ClickUp source and will need an answer before implementation:
+Items not specified in the ClickUp source that have been resolved by the user (2026-05-27):
 
-1. **Linking AmortizedInvestments to LOCs.** The PRD lists both objects but doesn't say how funding from a LOC affects a LOC's `Utilization`. MVP assumption: `Utilization` is a manual number the user sets per LOC. Amplicons do not automatically draw down LOCs. Confirm.
-2. **LOC display.** No surface is specified for LOCs beyond their object definition. MVP assumption: a "Lines of credit" page lists all LOCs with their name / type / size / utilization / utilization %.
-3. **Charts: monthly granularity for the cash flow series.** Should the cash flow chart show one bar/point per month (`Σ payouts active that month`), or a smoother accrued running average? MVP assumption: one point per month.
-4. **Net worth chart: stepwise or continuous?** Net worth drops in steps as Amplicons mature and PV falls to zero. MVP assumption: monthly granularity, plotted as a continuous line.
-5. **Discount rate for PV.** MVP uses each loan's own `Interest`. Stakeholder confirmation needed before changing.
-6. **Authentication mode.** Email + magic link? Email + password? OAuth? MVP assumption: email + magic link via Supabase Auth (lowest friction).
+1. **LOC utilization is user-managed.** Amplicons don't auto-draw against a LOC. The user updates `Utilization` manually, roughly once a month.
+2. **Lines of Credit page exists** (§5.5). Lists all LOCs and shows Total Size, Total Available, Total Utilization.
+3. **Cash flow chart is smoothed** (§5.2). Not stepped, not bar.
+4. **Net worth chart granularity:** monthly, continuous line (still stands as the simplest default).
+5. **PV discount rate = each loan's own `Interest`** in MVP, with an info-box tooltip on the Net Worth stat explaining the choice.
+6. **Auth: email + password primary, magic link as alternative** (§3.4).
