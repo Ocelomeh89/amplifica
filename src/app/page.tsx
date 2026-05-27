@@ -1,3 +1,8 @@
-export default function Home() {
-  return <div className="p-8 text-lg">amplifica v2 scaffold OK</div>;
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+
+export default async function Home() {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  redirect(user ? "/dashboard" : "/login");
 }
