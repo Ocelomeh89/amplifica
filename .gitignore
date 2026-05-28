@@ -7,3 +7,16 @@ dist/
 build/
 .next/
 .vercel/
+
+# Next.js
+.next/
+next-env.d.ts
+*.tsbuildinfo
+
+# Supabase
+supabase/.branches
+supabase/.temp
+
+# Legacy vite artifacts (parked branch)
+vite.config.js
+vite.config.d.ts
