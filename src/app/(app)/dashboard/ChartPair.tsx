@@ -58,7 +58,7 @@ export default function ChartPair({
           <ResponsiveContainer>
             <LineChart data={series}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-              <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+              <XAxis dataKey="month" tick={{ fontSize: 10 }} interval={2} />
               <YAxis tickFormatter={fmtCurrency} tick={{ fontSize: 10 }} />
               <Tooltip
                 formatter={(v: number) => fmtCurrency(v)}
@@ -91,7 +91,7 @@ export default function ChartPair({
           <ResponsiveContainer>
             <LineChart data={series}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-              <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+              <XAxis dataKey="month" tick={{ fontSize: 10 }} interval={2} />
               <YAxis tickFormatter={fmtCurrency} tick={{ fontSize: 10 }} />
               <Tooltip
                 formatter={(v: number) => fmtCurrency(v)}

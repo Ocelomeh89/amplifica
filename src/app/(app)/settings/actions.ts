@@ -28,4 +28,5 @@ export async function saveSettings(formData: FormData) {
 
   revalidatePath("/dashboard");
   revalidatePath("/settings");
+  redirect("/settings?saved=1");
 }

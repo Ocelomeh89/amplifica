@@ -50,12 +50,14 @@ export default async function DashboardPage() {
     externalNetWorth: externalNWUSD,
     range: "inception",
     today: todayMonth,
+    minMonthsAhead: 36,
   });
   const currentSeries = buildSeries({
     amplicons: lites,
     externalNetWorth: externalNWUSD,
     range: "current",
     today: todayMonth,
+    minMonthsAhead: 36,
   });
 
   return (

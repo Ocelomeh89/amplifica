@@ -14,6 +14,10 @@ export interface ProjectionInput {
   externalNetWorth: number;
   range: "inception" | "current";
   today: YearMonth;
+  // Optional. Ensure the series extends at least this many months past `today`,
+  // padding past the last active Amplicon with flat constants (cash flow 0,
+  // net worth = externalNetWorth) if needed. Defaults to 0 (no padding).
+  minMonthsAhead?: number;
 }
 
 export interface ProjectionPoint {
@@ -46,19 +50,40 @@ export function pvAtMonth(inv: AmpliconLite, month: YearMonth): number {
 
 export function buildSeries(input: ProjectionInput): ProjectionPoint[] {
   const { amplicons, externalNetWorth, range, today } = input;
+  const minMonthsAhead = input.minMonthsAhead ?? 0;
 
   if (amplicons.length === 0) {
-    return [{ month: today, monthIndex: 0, cashFlow: 0, netWorth: externalNetWorth }];
+    if (minMonthsAhead <= 0) {
+      return [{ month: today, monthIndex: 0, cashFlow: 0, netWorth: externalNetWorth }];
+    }
+    const out: ProjectionPoint[] = [];
+    for (let i = 0; i < minMonthsAhead; i++) {
+      out.push({
+        month: addMonths(today, i),
+        monthIndex: i,
+        cashFlow: 0,
+        netWorth: externalNetWorth,
+      });
+    }
+    return out;
   }
 
   const earliestStart = amplicons.reduce<YearMonth>((acc, inv) => {
     return monthsBetween(inv.startMonth, acc) > 0 ? inv.startMonth : acc;
   }, amplicons[0].startMonth);
 
-  const latestEnd = amplicons.reduce<YearMonth>((acc, inv) => {
+  let latestEnd = amplicons.reduce<YearMonth>((acc, inv) => {
     const end = addMonths(inv.startMonth, inv.termMonths);
     return monthsBetween(end, acc) > 0 ? end : acc;
   }, addMonths(amplicons[0].startMonth, amplicons[0].termMonths));
+
+  // Ensure the series extends at least `minMonthsAhead` past today.
+  if (minMonthsAhead > 0) {
+    const minEnd = addMonths(today, minMonthsAhead);
+    if (monthsBetween(latestEnd, minEnd) > 0) {
+      latestEnd = minEnd;
+    }
+  }
 
   const lastActiveMonth = addMonths(latestEnd, -1);
   const startMonth: YearMonth = range === "inception" ? earliestStart : today;

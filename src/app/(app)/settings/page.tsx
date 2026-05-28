@@ -5,7 +5,11 @@ import Field from "@/components/Field";
 import NumberInput from "@/components/NumberInput";
 import { saveSettings } from "./actions";
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: { saved?: string };
+}) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -19,6 +23,12 @@ export default async function SettingsPage() {
   return (
     <div className="max-w-2xl">
       <h1 className="text-xl font-semibold mb-4">Settings</h1>
+
+      {searchParams.saved && (
+        <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded p-2 mb-4">
+          Settings saved.
+        </div>
+      )}
 
       <form action={saveSettings}>
         <Card title="Personal settings">
