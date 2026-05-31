@@ -61,6 +61,31 @@ Multiple LOCs per user are supported (each has its own name and type). Amplicons
 - **Alternative:** magic link (passwordless email).
 - All objects above are scoped to the signed-in user. No sharing in MVP.
 
+### 3.5 Projection (transient)
+
+A **Projection** is a what-if simulation of a leveraged-investing flywheel. The user enters six knobs, the engine runs a 40-year monthly simulation, and two charts visualize the trajectory. A projection is **not persisted in MVP** — it lives only for the current page session. Inputs default from Settings where applicable but do not write back to Settings.
+
+**Inputs:**
+
+| Input | Range | Step | Default | Unit |
+|---|---|---|---|---|
+| `MSC` (Monthly Savings Contribution) | ≥ 0 | 1 | `Settings.MonthlySavingsContribution` | USD |
+| `InvestmentSizeFactor` | 3 – 6 | 0.01 | (user picks) | × MSC |
+| `Term` | 24 – 48 | 1 | (user picks) | months |
+| `InvestmentInterest` | 0 – 20 | 1 | (user picks) | % annual |
+| `LineOfCreditIncrease` | 1.2 – 2.0 | 0.05 | (user picks) | multiplier |
+| `LineOfCreditInterest` | ≥ 0 | 0.1 (assumed) | (user picks) | % annual |
+
+**Derived (displayed before the run):**
+- `InitialInvestmentSize` = `MSC × InvestmentSizeFactor` — the size of the first investment AND the initial draw on the Line of Credit
+
+**Engine state (one Projection has one of each):**
+- `OutstandingAmount` — running balance of LoC debt (USD). Starts at `InitialInvestmentSize`.
+- `CurrentInvestmentSize` — size of the *next* investment to purchase (USD). Starts at `InitialInvestmentSize`. May grow via the upgrade rule.
+- A list of `ActiveInvestments` — each with its own `FaceValue`, `Term` (= input Term), `Interest` (= InvestmentInterest), `StartMonth`, and an internal amortization schedule.
+
+**Out of scope for the Projection:** Settings goals, ExternalNetWorth, real-world LOCs, real-world Amplicons. A Projection is fully self-contained.
+
 ## 4. Display units
 
 - **Most monetary values** — USD
@@ -121,6 +146,23 @@ A dedicated page that lists every AmortizedInvestment. Add / edit / delete. Colu
 
 Form for the Personal Settings (§3.3): `MonthlySavingsContribution`, `NetWorthGoal`, `MonthlyCashflowGoal`, `ExternalNetWorth`.
 
+### 5.8 Projections page
+
+A new sidebar entry below Settings (or wherever the user prefers). The page has two regions:
+
+**Left/top: input form** — the six inputs from §3.5. Sliders or number inputs; up to the implementer. `MSC` defaults from Settings; the rest the user picks each session. A read-only field shows `InitialInvestmentSize = MSC × InvestmentSizeFactor`.
+
+**Right/bottom: two charts** (same visual treatment as Dashboard — smoothed lines, x-axis every N months, tooltips):
+
+1. **Monthly cash flow** — Σ MonthlyPayout from active simulated investments at each month, over 40 years (480 months).
+2. **Net worth** — `Σ PV(active simulated investments) − OutstandingAmount` at each month, over 40 years.
+
+Above the charts: a small summary (number of investments launched, final InvestmentSize reached, total months in debt, etc. — final exact set TBD by the engineer).
+
+Charts update reactively when any input changes (debounced; the engine is pure and fast).
+
+The PRD's Dashboard goal lines (cash flow / net worth) are NOT shown on the Projection charts — a Projection is a simulation, not a real position.
+
 ## 6. Calculations
 
 ### 6.1 MonthlyPayout
@@ -158,6 +200,69 @@ NetWorth(m) = ExternalNetWorth + Σ PV_m(inv) for inv active at month m
 CashFlow(m) = Σ MonthlyPayout(inv) for inv active at month m
 ```
 
+### 6.5 Projection mechanics
+
+The Projection engine runs a monthly loop for 40 years (480 months). At month 0 it executes one bootstrap step, then iterates 479 more months.
+
+#### Initial state (month 0 bootstrap)
+
+```
+CurrentInvestmentSize ← MSC × InvestmentSizeFactor
+Purchase Investment₀ with FaceValue = CurrentInvestmentSize, Term = Term, Interest = InvestmentInterest
+OutstandingAmount ← CurrentInvestmentSize
+ActiveInvestments ← [Investment₀]
+LastInvestmentStartMonth ← 0
+```
+
+#### Per-month step (for month m = 0, 1, ..., 479)
+
+The order of operations each month is:
+
+1. **Accrue LoC interest** on the outstanding debt:
+   ```
+   OutstandingAmount ← OutstandingAmount × (1 + LineOfCreditInterest / 12)
+   ```
+
+2. **Collect monthly cash inflow:**
+   ```
+   monthlyInflow ← MSC + Σ MonthlyPayout(inv) for inv ∈ ActiveInvestments where inv is active at month m
+   ```
+
+3. **Apply inflow to debt** (clamped at zero):
+   ```
+   OutstandingAmount ← max(0, OutstandingAmount − monthlyInflow)
+   ```
+   Any surplus (inflow > OutstandingAmount) does NOT accumulate as cash — it's simply absorbed when the next investment is purchased in the same month (see step 4). The model assumes all cash is immediately deployed.
+
+4. **If OutstandingAmount has reached 0, start a new investment:**
+   - Compute how many months the just-paid-off investment took: `monthsToPayoff = m − LastInvestmentStartMonth`
+   - **Upgrade rule:** if `monthsToPayoff < InvestmentSizeFactor` then
+     ```
+     CurrentInvestmentSize ← CurrentInvestmentSize × LineOfCreditIncrease
+     ```
+   - Purchase the next investment with FaceValue = `CurrentInvestmentSize`, Term, InvestmentInterest. Append to `ActiveInvestments`.
+   - `OutstandingAmount ← OutstandingAmount + CurrentInvestmentSize` (i.e., draw the new investment's principal from the LoC).
+   - `LastInvestmentStartMonth ← m`
+
+5. **Record monthly metrics** (emitted to the series):
+   - `month` (0..479)
+   - `cashFlow` = the `monthlyInflow` from step 2 (i.e., MSC + investment payouts collected this month; this is what the chart displays)
+   - `outstandingAmount` = post-step-3 (or post-step-4 if a new investment started)
+   - `netWorth` = `(Σ remaining amortization balance of all ActiveInvestments at month m+1) − OutstandingAmount`
+   - `currentInvestmentSize`, `activeInvestmentCount` (for the summary panel)
+
+#### Termination
+
+After month 479, the engine emits the final series. ActiveInvestments and OutstandingAmount may still be positive — the simulation does not "settle" beyond 40 years.
+
+#### Net worth in a Projection
+
+Equivalent to the dashboard's net worth formula minus the LoC liability:
+```
+NetWorth(m) = Σ remainingBalance(inv, m) − OutstandingAmount(m)
+```
+where `remainingBalance(inv, m)` is the outstanding amortization balance of `inv` at month `m` (= PV using the loan's own interest as discount rate, same as the dashboard). External NetWorth from Settings is intentionally excluded — the chart shows wealth generated by the leverage flywheel itself.
+
 ## 7. Out of scope for MVP
 
 Anything not on this page. Notably:
@@ -182,3 +287,19 @@ Items not specified in the ClickUp source that have been resolved by the user (2
 4. **Net worth chart granularity:** monthly, continuous line (still stands as the simplest default).
 5. **PV discount rate = each loan's own `Interest`** in MVP, with an info-box tooltip on the Net Worth stat explaining the choice.
 6. **Auth: email + password primary, magic link as alternative** (§3.4).
+7. **Dashboard charts project 3 years past today**, both for inception and current-month range (2026-05-27).
+8. **Dashboard x-axis ticks every 3 months** (2026-05-27).
+
+## 9. Open assumptions on Projections (§3.5, §5.8, §6.5)
+
+These were not explicitly stated in the user's brief and have been resolved by reasonable assumption — they need user confirmation before implementation:
+
+A. **`LineOfCreditIncrease` is multiplicative.** When the upgrade rule fires, `CurrentInvestmentSize *= LineOfCreditIncrease`. Given the input range (1.2 – 2.0), additive would not make physical sense at scale.
+B. **Payoff time is measured between investments.** The upgrade rule compares `m − LastInvestmentStartMonth` against `InvestmentSizeFactor`. The unit on the right is treated as raw months (so `factor = 4.5` ⇒ "less than 4.5 months").
+C. **No cash bucket.** All cash inflow (MSC + investment payouts) is applied directly to OutstandingAmount. When OutstandingAmount = 0 mid-month, a new investment is drawn the same month and any surplus inflow that month is implicitly absorbed.
+D. **External Net Worth is excluded** from the Projection's net-worth series (the dashboard already shows that; the Projection shows wealth from the leverage flywheel alone).
+E. **Projections are not persisted** — they live for the page session only. No save/load.
+F. **Outstanding amount is implicit, not a separate chart.** The user wrote *"Show Outstanding amount on chart"* — assumed to mean it is reflected in the net-worth chart (as the liability term), not as a third standalone chart. Optional: overlay as a secondary line on the cash-flow or net-worth chart.
+G. **X-axis tick interval for 40 years:** assumed **every 24 months** (yearly would be 40 ticks, semi-annual = 80 — 24-month gives 20 ticks and is readable). Not specified by the user.
+H. **Goal lines (cash flow / net worth targets) are NOT drawn on Projection charts** — a Projection is a hypothetical, not a current position.
+I. **No targets / goals in Projection inputs.** The user did not request any.
