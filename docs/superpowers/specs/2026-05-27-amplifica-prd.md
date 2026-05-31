@@ -61,9 +61,14 @@ Multiple LOCs per user are supported (each has its own name and type). Amplicons
 - **Alternative:** magic link (passwordless email).
 - All objects above are scoped to the signed-in user. No sharing in MVP.
 
-### 3.5 Projection (transient)
+### 3.5 Projection (persisted, named)
 
-A **Projection** is a what-if simulation of a leveraged-investing flywheel. The user enters six knobs, the engine runs a 40-year monthly simulation, and two charts visualize the trajectory. A projection is **not persisted in MVP** — it lives only for the current page session. Inputs default from Settings where applicable but do not write back to Settings.
+A **Projection** is a what-if simulation of a leveraged-investing flywheel. The user enters six knobs, the engine runs a 40-year monthly simulation, and two charts visualize the trajectory. Projections are **saved as named records** scoped to the user (Supabase, RLS-scoped, same pattern as Amplicons / LoCs). Inputs default from Settings where applicable but do not write back to Settings.
+
+**Stored properties:**
+- `Name` — string (user-given, e.g. "Aggressive flywheel")
+- The six inputs from the table below
+- `created_at`, `updated_at`
 
 **Inputs:**
 
@@ -146,22 +151,24 @@ A dedicated page that lists every AmortizedInvestment. Add / edit / delete. Colu
 
 Form for the Personal Settings (§3.3): `MonthlySavingsContribution`, `NetWorthGoal`, `MonthlyCashflowGoal`, `ExternalNetWorth`.
 
-### 5.8 Projections page
+### 5.8 Projections — list and editor
 
-A new sidebar entry below Settings (or wherever the user prefers). The page has two regions:
+A new sidebar entry called **Projections** between Settings (or wherever the user prefers). Two routes:
 
-**Left/top: input form** — the six inputs from §3.5. Sliders or number inputs; up to the implementer. `MSC` defaults from Settings; the rest the user picks each session. A read-only field shows `InitialInvestmentSize = MSC × InvestmentSizeFactor`.
+**`/projections`** — list view. Table of saved projections (Name, MSC, Factor, Term, Interest, LoC inc, LoC int, updated). "+ New projection" button creates a blank one and navigates to its editor. Per-row delete.
 
-**Right/bottom: two charts** (same visual treatment as Dashboard — smoothed lines, x-axis every N months, tooltips):
+**`/projections/[id]`** — editor + visualizer for a single saved projection. Two regions:
 
-1. **Monthly cash flow** — Σ MonthlyPayout from active simulated investments at each month, over 40 years (480 months).
-2. **Net worth** — `Σ PV(active simulated investments) − OutstandingAmount` at each month, over 40 years.
+- **Top: input form** — the six inputs from §3.5 + a Name field. Number inputs (sliders later if desired). `MSC` defaults from Settings on first creation; the rest the user picks. A read-only field shows `InitialInvestmentSize = MSC × InvestmentSizeFactor`. Charts update **live** as inputs change (debounced ~200ms; the engine is pure and fast). A **Save** button persists the current input values to the DB.
 
-Above the charts: a small summary (number of investments launched, final InvestmentSize reached, total months in debt, etc. — final exact set TBD by the engineer).
+- **Bottom: two charts** (same visual treatment as Dashboard — smoothed lines, tooltips, **x-axis tick every 24 months**):
 
-Charts update reactively when any input changes (debounced; the engine is pure and fast).
+  1. **Monthly cash flow** — Σ MonthlyPayout from active simulated investments at each month, over 40 years (480 months).
+  2. **Net worth** — `Σ PV(active simulated investments) − OutstandingAmount` at each month, over 40 years. OutstandingAmount is the implicit liability term in this line.
 
-The PRD's Dashboard goal lines (cash flow / net worth) are NOT shown on the Projection charts — a Projection is a simulation, not a real position.
+A small summary block above the charts: number of investments launched, final InvestmentSize, peak OutstandingAmount.
+
+The Dashboard's goal lines (cash flow / net worth) are NOT shown — a Projection is a simulation, not a real position.
 
 ## 6. Calculations
 
@@ -290,16 +297,17 @@ Items not specified in the ClickUp source that have been resolved by the user (2
 7. **Dashboard charts project 3 years past today**, both for inception and current-month range (2026-05-27).
 8. **Dashboard x-axis ticks every 3 months** (2026-05-27).
 
-## 9. Open assumptions on Projections (§3.5, §5.8, §6.5)
+## 9. Resolved questions on Projections (§3.5, §5.8, §6.5)
 
-These were not explicitly stated in the user's brief and have been resolved by reasonable assumption — they need user confirmation before implementation:
+Items not explicitly in the user's original brief, resolved 2026-05-31:
 
-A. **`LineOfCreditIncrease` is multiplicative.** When the upgrade rule fires, `CurrentInvestmentSize *= LineOfCreditIncrease`. Given the input range (1.2 – 2.0), additive would not make physical sense at scale.
-B. **Payoff time is measured between investments.** The upgrade rule compares `m − LastInvestmentStartMonth` against `InvestmentSizeFactor`. The unit on the right is treated as raw months (so `factor = 4.5` ⇒ "less than 4.5 months").
-C. **No cash bucket.** All cash inflow (MSC + investment payouts) is applied directly to OutstandingAmount. When OutstandingAmount = 0 mid-month, a new investment is drawn the same month and any surplus inflow that month is implicitly absorbed.
-D. **External Net Worth is excluded** from the Projection's net-worth series (the dashboard already shows that; the Projection shows wealth from the leverage flywheel alone).
-E. **Projections are not persisted** — they live for the page session only. No save/load.
-F. **Outstanding amount is implicit, not a separate chart.** The user wrote *"Show Outstanding amount on chart"* — assumed to mean it is reflected in the net-worth chart (as the liability term), not as a third standalone chart. Optional: overlay as a secondary line on the cash-flow or net-worth chart.
-G. **X-axis tick interval for 40 years:** assumed **every 24 months** (yearly would be 40 ticks, semi-annual = 80 — 24-month gives 20 ticks and is readable). Not specified by the user.
-H. **Goal lines (cash flow / net worth targets) are NOT drawn on Projection charts** — a Projection is a hypothetical, not a current position.
-I. **No targets / goals in Projection inputs.** The user did not request any.
+A. **`LineOfCreditIncrease` is multiplicative.** When the upgrade rule fires, `CurrentInvestmentSize *= LineOfCreditIncrease`. *(Confirmed by user.)*
+B. **Payoff time is measured between investments.** The upgrade rule compares `m − LastInvestmentStartMonth` against `InvestmentSizeFactor` (raw months: `factor = 4.5` ⇒ "less than 4.5 months").
+C. **No cash bucket.** All cash inflow (MSC + investment payouts) is applied directly to OutstandingAmount. When OutstandingAmount = 0 mid-month, a new investment is drawn the **same** month. *(Confirmed by user.)*
+D. **External Net Worth is excluded** from the Projection's net-worth series — the chart shows wealth from the leverage flywheel alone.
+E. **Projections are persisted as named records** scoped to user via Supabase + RLS, same pattern as Amplicons / LoCs. *(Confirmed by user; supersedes earlier "transient" wording.)*
+F. **Outstanding amount is implicit in the net-worth chart**, not a separate or overlaid chart. *(Confirmed by user.)*
+G. **X-axis ticks every 24 months** on Projection charts. *(Confirmed by user.)*
+H. **Goal lines are NOT drawn on Projection charts** — a Projection is a hypothetical, not a current position.
+I. **No targets / goals in Projection inputs** — outside the user's brief.
+J. **Live updates.** Charts recompute on every input change, debounced ~200ms. Save is an explicit action. *(Confirmed by user.)*
