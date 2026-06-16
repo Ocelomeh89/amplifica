@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   monthlyPayoutOf,
   pvAtMonth,
+  remainingValueAtMonth,
   isActiveAt,
   buildSeries,
   type ProjectionInput,
@@ -52,6 +53,32 @@ describe("pvAtMonth", () => {
   });
 });
 
+describe("remainingValueAtMonth (global discount rate)", () => {
+  it("rate 0 (default) at startMonth = nominal sum of all payments (payment × term)", () => {
+    expect(remainingValueAtMonth(inv25k36mo, "2026-05")).toBeCloseTo(
+      monthlyPayoutOf(inv25k36mo) * 36,
+      2
+    );
+  });
+  it("rate 0 six months in = payment × remaining payments (30)", () => {
+    expect(remainingValueAtMonth(inv25k36mo, "2026-11")).toBeCloseTo(
+      monthlyPayoutOf(inv25k36mo) * 30,
+      2
+    );
+  });
+  it("before startMonth and at/after endMonth = 0", () => {
+    expect(remainingValueAtMonth(inv25k36mo, "2026-04")).toBe(0);
+    expect(remainingValueAtMonth(inv25k36mo, "2029-05")).toBe(0);
+  });
+  it("a positive global rate discounts below nominal (and below face value)", () => {
+    const nominal = remainingValueAtMonth(inv25k36mo, "2026-05", 0);
+    const discounted = remainingValueAtMonth(inv25k36mo, "2026-05", 0.08);
+    expect(discounted).toBeLessThan(nominal);
+    // At the loan's own rate the annuity PV collapses to face value.
+    expect(discounted).toBeCloseTo(25000, 0);
+  });
+});
+
 describe("buildSeries", () => {
   it("returns months from earliest startMonth through last active month", () => {
     const input: ProjectionInput = {
@@ -87,14 +114,15 @@ describe("buildSeries", () => {
     expect(series[0].cashFlow).toBeCloseTo(783.41, 2);
   });
 
-  it("netWorth at startMonth = externalNetWorth + faceValue", () => {
+  it("netWorth at startMonth = externalNetWorth + nominal value of remaining payments", () => {
     const series = buildSeries({
       amplicons: [inv25k36mo],
       externalNetWorth: 100000,
       range: "inception",
       today: "2026-05",
     });
-    expect(series[0].netWorth).toBeCloseTo(125000, 1);
+    // Nominal (default rate 0): 100000 + payment × 36 months.
+    expect(series[0].netWorth).toBeCloseTo(100000 + monthlyPayoutOf(inv25k36mo) * 36, 1);
   });
 
   it("multiple amplicons: additive at each month", () => {

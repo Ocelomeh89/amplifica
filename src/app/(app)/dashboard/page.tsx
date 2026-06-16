@@ -5,8 +5,9 @@ import { isoToYearMonth, currentYearMonth } from "@/lib/finance/dates";
 import {
   monthlyPayoutOf,
   isActiveAt,
-  pvAtMonth,
+  remainingValueAtMonth,
   buildSeries,
+  GLOBAL_DISCOUNT_RATE_PCT,
   type AmpliconLite,
 } from "@/lib/finance/projection";
 import InfoBox from "@/components/InfoBox";
@@ -35,8 +36,13 @@ export default async function DashboardPage() {
   const currentMonthlyCashflow = activeNow.reduce((s, a) => s + monthlyPayoutOf(a), 0);
 
   const externalNWUSD = (profile?.external_net_worth ?? 0) * 1_000_000;
-  const totalPVUSD = lites.reduce((s, a) => s + pvAtMonth(a, todayMonth), 0);
-  const currentTotalNetWorth = externalNWUSD + totalPVUSD;
+  // Net worth = external NW + nominal value of all remaining Amplicon payments,
+  // valued at the global discount rate (0 = nominal). Never per-Amplicon.
+  const totalRemainingUSD = lites.reduce(
+    (s, a) => s + remainingValueAtMonth(a, todayMonth, GLOBAL_DISCOUNT_RATE_PCT),
+    0
+  );
+  const currentTotalNetWorth = externalNWUSD + totalRemainingUSD;
 
   const cashflowGoalUSD = (profile?.monthly_cashflow_goal ?? 0) * 1_000;
   const netWorthGoalUSD = (profile?.net_worth_goal ?? 0) * 1_000_000;
@@ -52,6 +58,7 @@ export default async function DashboardPage() {
     range: "inception",
     today: todayMonth,
     minMonthsAhead: 36,
+    discountRatePct: GLOBAL_DISCOUNT_RATE_PCT,
   });
   const currentSeries = buildSeries({
     amplicons: lites,
@@ -59,6 +66,7 @@ export default async function DashboardPage() {
     range: "current",
     today: todayMonth,
     minMonthsAhead: 36,
+    discountRatePct: GLOBAL_DISCOUNT_RATE_PCT,
   });
 
   return (
@@ -104,7 +112,7 @@ export default async function DashboardPage() {
             <div className="p-4 flex flex-col">
               <div className="text-[10px] text-sub uppercase tracking-wide">
                 Net worth
-                <InfoBox message="Present Value uses each loan's own interest as the discount rate. PV therefore equals each loan's outstanding amortization balance." />
+                <InfoBox message="Net worth is the nominal dollar value of all remaining Amplicon payments — the face value of future cash flow, with no discounting (global rate 0). The discount rate is global, not per-Amplicon, and may become configurable later." />
               </div>
               <div className="text-xl font-bold text-aqua mt-auto pt-3">{fmtKUSD(currentTotalNetWorth)}</div>
             </div>

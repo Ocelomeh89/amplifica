@@ -9,6 +9,14 @@ export interface AmpliconLite {
   startMonth: YearMonth;
 }
 
+// Global discount rate for valuing future cash flows, as an annual decimal.
+// 0 = nominal dollars (no discounting): net worth is the face value of all
+// remaining payments. This is a GLOBAL knob, intentionally NOT per-Amplicon —
+// a loan's own interest only sets its payment amount, never the valuation.
+// Eventually this constant will be replaced by a value sourced from a global
+// (profile-level) setting; for now it is the single source of truth.
+export const GLOBAL_DISCOUNT_RATE_PCT = 0;
+
 export interface ProjectionInput {
   amplicons: AmpliconLite[];
   externalNetWorth: number;
@@ -18,6 +26,9 @@ export interface ProjectionInput {
   // padding past the last active Amplicon with flat constants (cash flow 0,
   // net worth = externalNetWorth) if needed. Defaults to 0 (no padding).
   minMonthsAhead?: number;
+  // Optional global discount rate (annual decimal). Defaults to
+  // GLOBAL_DISCOUNT_RATE_PCT (0 = nominal). Applies to every Amplicon uniformly.
+  discountRatePct?: number;
 }
 
 export interface ProjectionPoint {
@@ -48,9 +59,29 @@ export function pvAtMonth(inv: AmpliconLite, month: YearMonth): number {
   );
 }
 
+// Value of an Amplicon's remaining payments at `month`, discounted at the GLOBAL
+// `discountRatePct` (annual decimal). At rate 0 this is the nominal sum of the
+// remaining payments (face value of future cash flow); at rate r it is the
+// present value of that annuity. The discount rate is global — never the loan's
+// own interest, which only determines the payment amount.
+export function remainingValueAtMonth(
+  inv: AmpliconLite,
+  month: YearMonth,
+  discountRatePct: number = GLOBAL_DISCOUNT_RATE_PCT
+): number {
+  const elapsed = monthsBetween(inv.startMonth, month);
+  if (elapsed < 0 || elapsed >= inv.termMonths) return 0;
+  const remainingPayments = inv.termMonths - elapsed;
+  const payment = monthlyPayoutOf(inv);
+  if (discountRatePct === 0) return payment * remainingPayments;
+  const r = discountRatePct / 12;
+  return (payment * (1 - Math.pow(1 + r, -remainingPayments))) / r;
+}
+
 export function buildSeries(input: ProjectionInput): ProjectionPoint[] {
   const { amplicons, externalNetWorth, range, today } = input;
   const minMonthsAhead = input.minMonthsAhead ?? 0;
+  const discountRatePct = input.discountRatePct ?? GLOBAL_DISCOUNT_RATE_PCT;
 
   if (amplicons.length === 0) {
     if (minMonthsAhead <= 0) {
@@ -97,16 +128,16 @@ export function buildSeries(input: ProjectionInput): ProjectionPoint[] {
   for (let i = 0; i < length; i++) {
     const month = addMonths(startMonth, i);
     let cashFlow = 0;
-    let pvTotal = 0;
+    let valueTotal = 0;
     for (const inv of amplicons) {
       if (isActiveAt(inv, month)) cashFlow += monthlyPayoutOf(inv);
-      pvTotal += pvAtMonth(inv, month);
+      valueTotal += remainingValueAtMonth(inv, month, discountRatePct);
     }
     series.push({
       month,
       monthIndex: i,
       cashFlow,
-      netWorth: externalNetWorth + pvTotal,
+      netWorth: externalNetWorth + valueTotal,
     });
   }
   return series;
