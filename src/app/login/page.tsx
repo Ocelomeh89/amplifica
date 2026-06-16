@@ -10,7 +10,7 @@ export default function LoginPage({
   return (
     <main className="min-h-screen flex items-center justify-center p-8 bg-cream">
       <div className="w-full max-w-md bg-white border border-zinc-200 rounded-lg p-6">
-        <h1 className="text-2xl font-semibold mb-1">Log in to Amplifica</h1>
+        <h1 className="text-2xl font-semibold mb-1">Log in to The Amplifier</h1>
         <p className="text-sm text-sub mb-5">Engineer your future. Amplify your wealth. Live your way.</p>
 
         {searchParams.error && (

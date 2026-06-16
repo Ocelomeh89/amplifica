@@ -18,7 +18,7 @@ const sora = Sora({
 });
 
 export const metadata: Metadata = {
-  title: "Amplifica Wealth",
+  title: "The Amplifier",
   description: "Engineer your future. Amplify your wealth. Live your way.",
 };
 

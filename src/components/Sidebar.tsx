@@ -76,7 +76,7 @@ export default function Sidebar({ email }: { email: string }) {
         {!collapsed && (
           <div className="flex items-center gap-2">
             <AmplitudeMark />
-            <span className="text-white font-display text-lg leading-none">Amplifica</span>
+            <span className="text-white font-display text-lg leading-none">The Amplifier</span>
           </div>
         )}
         <button
