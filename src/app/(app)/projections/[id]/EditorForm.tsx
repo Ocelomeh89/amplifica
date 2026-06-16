@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
 import type { Projection } from "@/lib/supabase/database.types";
 import Card from "@/components/Card";
 import Field from "@/components/Field";
 import { updateProjection, deleteProjection } from "../actions";
+import { runSimulation } from "@/lib/finance/projection-sim";
 import { fmtCurrency } from "@/lib/format";
+import SimCharts from "./SimCharts";
+import FlywheelExplainer from "./FlywheelExplainer";
 
 interface Props {
   projection: Projection;
@@ -24,11 +27,36 @@ export default function EditorForm({ projection, justSaved }: Props) {
   const [locIncrease, setLocIncrease] = useState(projection.loc_increase);
   const [locInterestPct, setLocInterestPct] = useState(projection.loc_interest_pct * 100);
 
+  const [debounced, setDebounced] = useState({ msc, factor, term, invInterestPct, locIncrease, locInterestPct });
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebounced({ msc, factor, term, invInterestPct, locIncrease, locInterestPct });
+    }, 200);
+    return () => clearTimeout(t);
+  }, [msc, factor, term, invInterestPct, locIncrease, locInterestPct]);
+
+  const result = useMemo(
+    () =>
+      runSimulation({
+        msc: debounced.msc,
+        investmentSizeFactor: debounced.factor,
+        termMonths: debounced.term,
+        investmentInterestPct: debounced.invInterestPct / 100,
+        locIncrease: debounced.locIncrease,
+        locInterestPct: debounced.locInterestPct / 100,
+      }),
+    [debounced]
+  );
+
   const initialInvestmentSize = msc * factor;
 
   return (
     <>
-      <h1 className="text-xl font-semibold mb-4">Projection editor</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-xl font-semibold">Projection editor</h1>
+        <FlywheelExplainer />
+      </div>
 
       {justSaved && (
         <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded p-2 mb-4">
@@ -78,9 +106,28 @@ export default function EditorForm({ projection, justSaved }: Props) {
         </div>
       </form>
 
-      <Card title="Charts">
-        <p className="text-sm text-sub">Charts wired in the next task.</p>
+      <Card title="Summary">
+        <div className="grid grid-cols-4 gap-3 text-sm">
+          <div>
+            <div className="text-[10px] text-sub uppercase tracking-wide">Initial investment</div>
+            <div className="text-base font-bold">{fmtCurrency(result.initialInvestmentSize)}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-sub uppercase tracking-wide">Final investment size</div>
+            <div className="text-base font-bold">{fmtCurrency(result.finalInvestmentSize)}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-sub uppercase tracking-wide">Investments launched</div>
+            <div className="text-base font-bold">{result.investmentsLaunched}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-sub uppercase tracking-wide">Peak outstanding</div>
+            <div className="text-base font-bold">{fmtCurrency(result.peakOutstanding)}</div>
+          </div>
+        </div>
       </Card>
+
+      <SimCharts series={result.series} />
 
       <form action={deleteProjection} className="mt-2">
         <input type="hidden" name="id" value={projection.id} />
