@@ -64,7 +64,7 @@ export default function Sidebar({ email }: { email: string }) {
   return (
     <aside
       className={clsx(
-        "bg-plum text-white/70 py-5 flex-shrink-0 flex flex-col min-h-screen transition-all duration-200",
+        "bg-plum text-white/70 py-5 flex-shrink-0 flex flex-col sticky top-0 self-start h-screen overflow-y-auto transition-all duration-200",
         collapsed ? "w-16 px-2 items-center" : "w-56 px-3"
       )}
     >
