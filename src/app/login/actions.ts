@@ -30,6 +30,24 @@ export async function requestMagicLink(formData: FormData) {
   redirect("/login?sent=1");
 }
 
+export async function requestPasswordReset(formData: FormData) {
+  const supabase = createClient();
+  const email = String(formData.get("email") ?? "").trim();
+  const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+  if (!email) {
+    redirect("/login?error=Enter your email above, then click Forgot password.");
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/callback?next=/reset-password`,
+  });
+  if (error) {
+    redirect(`/login?error=${encodeURIComponent(error.message)}`);
+  }
+  redirect("/login?reset=sent");
+}
+
 export async function logout() {
   const supabase = createClient();
   await supabase.auth.signOut();

@@ -1,7 +1,12 @@
-import { login, requestMagicLink } from "./actions";
+import { login, requestMagicLink, requestPasswordReset } from "./actions";
+import PasswordInput from "@/components/PasswordInput";
 import Link from "next/link";
 
-export default function LoginPage({ searchParams }: { searchParams: { error?: string; sent?: string } }) {
+export default function LoginPage({
+  searchParams,
+}: {
+  searchParams: { error?: string; sent?: string; reset?: string };
+}) {
   return (
     <main className="min-h-screen flex items-center justify-center p-8 bg-cream">
       <div className="w-full max-w-md bg-white border border-zinc-200 rounded-lg p-6">
@@ -16,6 +21,11 @@ export default function LoginPage({ searchParams }: { searchParams: { error?: st
             Magic link sent. Check your email.
           </p>
         )}
+        {searchParams.reset && (
+          <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded p-2 mb-4">
+            Password reset link sent. Check your email.
+          </p>
+        )}
 
         <form action={login} className="space-y-3">
           <label className="block">
@@ -24,9 +34,17 @@ export default function LoginPage({ searchParams }: { searchParams: { error?: st
           </label>
           <label className="block">
             <span className="block text-[11px] text-sub uppercase tracking-wide mb-1">Password</span>
-            <input name="password" type="password" required className="w-full border border-zinc-300 rounded px-2 py-1.5 text-sm" />
+            <PasswordInput name="password" required autoComplete="current-password" />
           </label>
           <button type="submit" className="w-full bg-purple hover:bg-purple/90 transition-colors text-white text-sm py-2 rounded">Log in</button>
+          <button
+            type="submit"
+            formAction={requestPasswordReset}
+            formNoValidate
+            className="w-full text-xs text-sub hover:text-ink transition-colors"
+          >
+            Forgot password? Send a reset link
+          </button>
         </form>
 
         <div className="my-4 flex items-center gap-2">

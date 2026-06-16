@@ -1,4 +1,5 @@
 import { signup } from "./actions";
+import PasswordInput from "@/components/PasswordInput";
 import Link from "next/link";
 
 export default function SignupPage({ searchParams }: { searchParams: { error?: string; sent?: string } }) {
@@ -24,7 +25,7 @@ export default function SignupPage({ searchParams }: { searchParams: { error?: s
           </label>
           <label className="block">
             <span className="block text-[11px] text-sub uppercase tracking-wide mb-1">Password</span>
-            <input name="password" type="password" required minLength={8} className="w-full border border-zinc-300 rounded px-2 py-1.5 text-sm" />
+            <PasswordInput name="password" required minLength={8} autoComplete="new-password" />
           </label>
           <button type="submit" className="w-full bg-purple hover:bg-purple/90 transition-colors text-white text-sm py-2 rounded">Sign up</button>
         </form>
