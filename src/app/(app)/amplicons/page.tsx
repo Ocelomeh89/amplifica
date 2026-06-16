@@ -1,12 +1,10 @@
-import { Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { isoToYearMonth, addMonths } from "@/lib/finance/dates";
 import { monthlyPayoutOf, isActiveAt } from "@/lib/finance/projection";
-import { fmtCurrency, fmtPct, fmtDate } from "@/lib/format";
 import Card from "@/components/Card";
 import NewAmpliconForm from "./NewAmpliconForm";
-import { deleteAmplicon } from "./actions";
+import AmpliconRow from "./AmpliconRow";
 
 export default async function AmpliconsPage() {
   const supabase = createClient();
@@ -59,31 +57,21 @@ export default async function AmpliconsPage() {
                 const monthly = monthlyPayoutOf(lite);
                 const active = isActiveAt(lite, todayMonth);
                 return (
-                  <tr key={a.id} className="border-b border-zinc-100">
-                    <td className="py-2">{a.name}</td>
-                    <td>{a.ai_type || "—"}</td>
-                    <td>{fmtCurrency(a.face_value)}</td>
-                    <td>{fmtPct(a.interest_pct, 2)}</td>
-                    <td>{a.term_months} mo</td>
-                    <td>{fmtDate(a.start_date)}</td>
-                    <td>{endMonth}</td>
-                    <td>{fmtCurrency(monthly)}</td>
-                    <td className={active ? "text-emerald-700" : "text-sub"}>
-                      {active ? "Active" : "Inactive"}
-                    </td>
-                    <td>
-                      <form action={deleteAmplicon}>
-                        <input type="hidden" name="id" value={a.id} />
-                        <button
-                          type="submit"
-                          className="text-zinc-500 hover:text-red-600"
-                          aria-label="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </form>
-                    </td>
-                  </tr>
+                  <AmpliconRow
+                    key={a.id}
+                    amplicon={{
+                      id: a.id,
+                      name: a.name,
+                      ai_type: a.ai_type,
+                      face_value: a.face_value,
+                      interest_pct: a.interest_pct,
+                      term_months: a.term_months,
+                      start_date: a.start_date,
+                    }}
+                    monthly={monthly}
+                    endMonth={endMonth}
+                    active={active}
+                  />
                 );
               })}
             </tbody>
