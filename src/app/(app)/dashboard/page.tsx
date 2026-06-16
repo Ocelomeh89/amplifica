@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { fmtCurrency, fmtKUSD, fmtMUSD } from "@/lib/format";
+import { fmtUSD0, fmtKUSD } from "@/lib/format";
 import { isoToYearMonth, currentYearMonth } from "@/lib/finance/dates";
 import {
   monthlyPayoutOf,
@@ -9,7 +9,6 @@ import {
   buildSeries,
   type AmpliconLite,
 } from "@/lib/finance/projection";
-import Card from "@/components/Card";
 import InfoBox from "@/components/InfoBox";
 import ChartPair from "./ChartPair";
 
@@ -43,6 +42,8 @@ export default async function DashboardPage() {
   const netWorthGoalUSD = (profile?.net_worth_goal ?? 0) * 1_000_000;
 
   const ampliconsCount = lites.length;
+  // Active = producing cashflow today (within its term). Matured Amplicons no longer count.
+  const activeAmpliconsCount = activeNow.length;
   const monthlyContribution = profile?.monthly_savings_contribution ?? 0;
 
   const inceptionSeries = buildSeries({
@@ -64,31 +65,57 @@ export default async function DashboardPage() {
     <div className="max-w-5xl">
       <h1 className="text-xl font-semibold mb-4">Dashboard</h1>
 
-      <div className="grid grid-cols-5 gap-3 mb-4">
-        <Card>
-          <div className="text-[10px] text-sub uppercase tracking-wide">Monthly contribution</div>
-          <div className="text-xl font-bold">{fmtCurrency(monthlyContribution)}</div>
-        </Card>
-        <Card>
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-3 mb-4 items-stretch">
+        {/* Amplicons — total created */}
+        <div className="bg-white border border-zinc-200 rounded-lg p-4">
           <div className="text-[10px] text-sub uppercase tracking-wide">Amplicons</div>
           <div className="text-xl font-bold">{ampliconsCount}</div>
-        </Card>
-        <Card>
-          <div className="text-[10px] text-sub uppercase tracking-wide">Current monthly cashflow</div>
-          <div className="text-xl font-bold">{fmtKUSD(currentMonthlyCashflow)}</div>
-        </Card>
-        <Card>
-          <div className="text-[10px] text-sub uppercase tracking-wide">Monthly cashflow target</div>
-          <div className="text-xl font-bold">{fmtKUSD(cashflowGoalUSD)}</div>
-        </Card>
-        <Card>
-          <div className="text-[10px] text-sub uppercase tracking-wide">
-            Current total net worth
-            <InfoBox message="Present Value uses each loan's own interest as the discount rate. PV therefore equals each loan's outstanding amortization balance." />
+        </div>
+
+        {/* Active Amplicons — currently producing cashflow */}
+        <div className="bg-white border border-zinc-200 rounded-lg p-4">
+          <div className="text-[10px] text-sub uppercase tracking-wide">Active Amplicons</div>
+          <div className="text-xl font-bold">{activeAmpliconsCount}</div>
+        </div>
+
+        {/* Monthly contribution — plain dollars */}
+        <div className="bg-white border border-zinc-200 rounded-lg p-4">
+          <div className="text-[10px] text-sub uppercase tracking-wide">Monthly contribution</div>
+          <div className="text-xl font-bold">{fmtUSD0(monthlyContribution)}</div>
+        </div>
+
+        {/* Current — live cashflow ($) + net worth (k$) */}
+        <div className="md:col-span-2 bg-white border border-zinc-200 rounded-lg p-4">
+          <div className="text-[10px] text-sub uppercase tracking-wide mb-2">Current</div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-[10px] text-sub uppercase tracking-wide">Monthly cashflow</div>
+              <div className="text-xl font-bold text-aqua">{fmtUSD0(currentMonthlyCashflow)}</div>
+            </div>
+            <div>
+              <div className="text-[10px] text-sub uppercase tracking-wide">
+                Net worth
+                <InfoBox message="Present Value uses each loan's own interest as the discount rate. PV therefore equals each loan's outstanding amortization balance." />
+              </div>
+              <div className="text-xl font-bold text-aqua">{fmtKUSD(currentTotalNetWorth)}</div>
+            </div>
           </div>
-          <div className="text-xl font-bold">{fmtMUSD(currentTotalNetWorth)}</div>
-          <div className="text-[11px] text-sub mt-0.5">Target: {fmtMUSD(netWorthGoalUSD)}</div>
-        </Card>
+        </div>
+
+        {/* Target — goals, same units as Current for comparison */}
+        <div className="md:col-span-2 bg-white border border-zinc-200 rounded-lg p-4">
+          <div className="text-[10px] text-sub uppercase tracking-wide mb-2">Target</div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-[10px] text-sub uppercase tracking-wide">Monthly cashflow</div>
+              <div className="text-xl font-bold">{fmtUSD0(cashflowGoalUSD)}</div>
+            </div>
+            <div>
+              <div className="text-[10px] text-sub uppercase tracking-wide">Net worth</div>
+              <div className="text-xl font-bold">{fmtKUSD(netWorthGoalUSD)}</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <ChartPair

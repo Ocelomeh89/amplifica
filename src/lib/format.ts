@@ -8,6 +8,13 @@ export function fmtCurrency(n: number): string {
   return `${sign}$${v.toFixed(0)}`;
 }
 
+// Plain dollars with thousands separators, no k/M abbreviation (e.g. "$5,000").
+export function fmtUSD0(n: number): string {
+  if (!isFinite(n)) return "—";
+  const sign = n < 0 ? "−" : "";
+  return `${sign}$${Math.round(Math.abs(n)).toLocaleString("en-US")}`;
+}
+
 export function fmtMUSD(usd: number): string {
   if (!isFinite(usd)) return "—";
   return `$${(usd / 1_000_000).toFixed(2)}M`;
