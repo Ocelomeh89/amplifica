@@ -27,7 +27,7 @@ export default function ChartPair({
   cashflowTargetUSD,
   netWorthTargetUSD,
 }: Props) {
-  const [range, setRange] = useState<"inception" | "current">("inception");
+  const [range, setRange] = useState<"inception" | "current">("current");
   const series = range === "inception" ? inceptionSeries : currentSeries;
 
   return (

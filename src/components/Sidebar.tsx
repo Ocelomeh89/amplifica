@@ -19,7 +19,6 @@ const items = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/amplicons", label: "Amplicons", icon: Coins },
   { to: "/loc", label: "Lines of Credit", icon: CreditCard },
-  { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
 // The Amplitude Mark — five bars on an exponential curve (height ratio ≈ 1.7× per
@@ -113,6 +112,18 @@ export default function Sidebar({ email }: { email: string }) {
       })}
 
       <div className="mt-auto">
+        <Link
+          href="/settings"
+          title={collapsed ? "Settings" : undefined}
+          className={clsx(
+            "flex items-center gap-2 rounded text-sm mb-0.5 transition-colors",
+            collapsed ? "justify-center w-10 h-10" : "px-2 py-1.5",
+            pathname.startsWith("/settings") ? "bg-purple text-white" : "hover:bg-white/10 hover:text-white"
+          )}
+        >
+          <SettingsIcon className="w-4 h-4 flex-shrink-0" />
+          {!collapsed && <span>Settings</span>}
+        </Link>
         <form action={logout}>
           <button
             type="submit"

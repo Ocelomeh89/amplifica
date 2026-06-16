@@ -96,12 +96,12 @@ export default async function DashboardPage() {
         {/* Current — live cashflow ($) + net worth (k$) */}
         <div className="md:col-span-2 flex flex-col">
           <div className="text-[10px] text-sub uppercase tracking-wide font-semibold mb-1 h-4">Current</div>
-          <div className="flex-1 grid grid-cols-2 rounded-lg overflow-hidden border border-zinc-200 divide-x divide-zinc-200">
-            <div className="bg-white p-4 flex flex-col">
+          <div className="flex-1 grid grid-cols-2 rounded-lg border border-zinc-200 divide-x divide-zinc-200 bg-white">
+            <div className="p-4 flex flex-col">
               <div className="text-[10px] text-sub uppercase tracking-wide">Monthly cashflow</div>
               <div className="text-xl font-bold text-aqua mt-auto pt-3">{fmtUSD0(currentMonthlyCashflow)}</div>
             </div>
-            <div className="bg-white p-4 flex flex-col">
+            <div className="p-4 flex flex-col">
               <div className="text-[10px] text-sub uppercase tracking-wide">
                 Net worth
                 <InfoBox message="Present Value uses each loan's own interest as the discount rate. PV therefore equals each loan's outstanding amortization balance." />
@@ -114,12 +114,12 @@ export default async function DashboardPage() {
         {/* Target — goals, same units as Current for comparison */}
         <div className="md:col-span-2 flex flex-col">
           <div className="text-[10px] text-sub uppercase tracking-wide font-semibold mb-1 h-4">Target</div>
-          <div className="flex-1 grid grid-cols-2 rounded-lg overflow-hidden border border-zinc-200 divide-x divide-zinc-200">
-            <div className="bg-white p-4 flex flex-col">
+          <div className="flex-1 grid grid-cols-2 rounded-lg border border-zinc-200 divide-x divide-zinc-200 bg-white">
+            <div className="p-4 flex flex-col">
               <div className="text-[10px] text-sub uppercase tracking-wide">Monthly cashflow</div>
               <div className="text-xl font-bold mt-auto pt-3">{fmtUSD0(cashflowGoalUSD)}</div>
             </div>
-            <div className="bg-white p-4 flex flex-col">
+            <div className="p-4 flex flex-col">
               <div className="text-[10px] text-sub uppercase tracking-wide">Net worth</div>
               <div className="text-xl font-bold mt-auto pt-3">{fmtKUSD(netWorthGoalUSD)}</div>
             </div>
