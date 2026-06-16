@@ -38,7 +38,7 @@ export default function UtilizationCell({ id, value }: { id: string; value: numb
         min={0}
         className="w-24 border border-zinc-300 rounded px-1 py-0.5 text-sm"
       />
-      <button type="submit" className="text-xs text-blue-700 hover:underline">Save</button>
+      <button type="submit" className="text-xs text-purple hover:underline">Save</button>
       <button
         type="button"
         onClick={() => { setLocalValue(value); setEditing(false); }}

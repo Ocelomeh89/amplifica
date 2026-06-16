@@ -68,7 +68,7 @@ export default async function SettingsPage({
           </div>
         </Card>
 
-        <button type="submit" className="bg-ink text-white text-sm px-4 py-2 rounded">
+        <button type="submit" className="bg-purple hover:bg-purple/90 transition-colors text-white text-sm px-4 py-2 rounded">
           Save settings
         </button>
       </form>

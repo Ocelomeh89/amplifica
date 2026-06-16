@@ -37,7 +37,7 @@ export default function ChartPair({
         <button
           onClick={() => setRange("inception")}
           className={`text-xs px-2 py-1 rounded ${
-            range === "inception" ? "bg-ink text-white" : "bg-zinc-100 text-sub"
+            range === "inception" ? "bg-purple text-white" : "bg-zinc-100 text-sub"
           }`}
         >
           Since inception
@@ -45,7 +45,7 @@ export default function ChartPair({
         <button
           onClick={() => setRange("current")}
           className={`text-xs px-2 py-1 rounded ${
-            range === "current" ? "bg-ink text-white" : "bg-zinc-100 text-sub"
+            range === "current" ? "bg-purple text-white" : "bg-zinc-100 text-sub"
           }`}
         >
           From current month

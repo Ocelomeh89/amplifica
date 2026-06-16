@@ -14,7 +14,7 @@ export default function NewAmpliconForm() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="bg-ink text-white text-sm px-3 py-1.5 rounded inline-flex items-center gap-1 mb-4"
+        className="bg-purple hover:bg-purple/90 transition-colors text-white text-sm px-3 py-1.5 rounded inline-flex items-center gap-1 mb-4"
       >
         <Plus className="w-4 h-4" /> Add Amplicon
       </button>
@@ -57,7 +57,7 @@ export default function NewAmpliconForm() {
           </Field>
         </div>
         <div className="flex gap-2 mt-2">
-          <button type="submit" className="bg-ink text-white text-sm px-4 py-1.5 rounded">
+          <button type="submit" className="bg-purple hover:bg-purple/90 transition-colors text-white text-sm px-4 py-1.5 rounded">
             Add Amplicon
           </button>
           <button
