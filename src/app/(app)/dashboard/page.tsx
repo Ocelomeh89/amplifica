@@ -67,52 +67,61 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-7 gap-3 mb-4 items-stretch">
         {/* Amplicons — total created */}
-        <div className="bg-white border border-zinc-200 rounded-lg p-4">
-          <div className="text-[10px] text-sub uppercase tracking-wide">Amplicons</div>
-          <div className="text-xl font-bold">{ampliconsCount}</div>
+        <div className="flex flex-col">
+          <div className="text-[10px] uppercase tracking-wide font-semibold mb-1 h-4">&nbsp;</div>
+          <div className="flex-1 bg-white border border-zinc-200 rounded-lg p-4 flex flex-col">
+            <div className="text-[10px] text-sub uppercase tracking-wide">Amplicons</div>
+            <div className="text-xl font-bold mt-auto pt-3">{ampliconsCount}</div>
+          </div>
         </div>
 
         {/* Active Amplicons — currently producing cashflow */}
-        <div className="bg-white border border-zinc-200 rounded-lg p-4">
-          <div className="text-[10px] text-sub uppercase tracking-wide">Active Amplicons</div>
-          <div className="text-xl font-bold">{activeAmpliconsCount}</div>
+        <div className="flex flex-col">
+          <div className="text-[10px] uppercase tracking-wide font-semibold mb-1 h-4">&nbsp;</div>
+          <div className="flex-1 bg-white border border-zinc-200 rounded-lg p-4 flex flex-col">
+            <div className="text-[10px] text-sub uppercase tracking-wide">Active Amplicons</div>
+            <div className="text-xl font-bold mt-auto pt-3">{activeAmpliconsCount}</div>
+          </div>
         </div>
 
         {/* Monthly contribution — plain dollars */}
-        <div className="bg-white border border-zinc-200 rounded-lg p-4">
-          <div className="text-[10px] text-sub uppercase tracking-wide">Monthly contribution</div>
-          <div className="text-xl font-bold">{fmtUSD0(monthlyContribution)}</div>
+        <div className="flex flex-col">
+          <div className="text-[10px] uppercase tracking-wide font-semibold mb-1 h-4">&nbsp;</div>
+          <div className="flex-1 bg-white border border-zinc-200 rounded-lg p-4 flex flex-col">
+            <div className="text-[10px] text-sub uppercase tracking-wide">Monthly contribution</div>
+            <div className="text-xl font-bold mt-auto pt-3">{fmtUSD0(monthlyContribution)}</div>
+          </div>
         </div>
 
         {/* Current — live cashflow ($) + net worth (k$) */}
-        <div className="md:col-span-2 bg-white border border-zinc-200 rounded-lg p-4">
-          <div className="text-[10px] text-sub uppercase tracking-wide mb-2">Current</div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
+        <div className="md:col-span-2 flex flex-col">
+          <div className="text-[10px] text-sub uppercase tracking-wide font-semibold mb-1 h-4">Current</div>
+          <div className="flex-1 grid grid-cols-2 rounded-lg overflow-hidden border border-zinc-200 divide-x divide-zinc-200">
+            <div className="bg-white p-4 flex flex-col">
               <div className="text-[10px] text-sub uppercase tracking-wide">Monthly cashflow</div>
-              <div className="text-xl font-bold text-aqua">{fmtUSD0(currentMonthlyCashflow)}</div>
+              <div className="text-xl font-bold text-aqua mt-auto pt-3">{fmtUSD0(currentMonthlyCashflow)}</div>
             </div>
-            <div>
+            <div className="bg-white p-4 flex flex-col">
               <div className="text-[10px] text-sub uppercase tracking-wide">
                 Net worth
                 <InfoBox message="Present Value uses each loan's own interest as the discount rate. PV therefore equals each loan's outstanding amortization balance." />
               </div>
-              <div className="text-xl font-bold text-aqua">{fmtKUSD(currentTotalNetWorth)}</div>
+              <div className="text-xl font-bold text-aqua mt-auto pt-3">{fmtKUSD(currentTotalNetWorth)}</div>
             </div>
           </div>
         </div>
 
         {/* Target — goals, same units as Current for comparison */}
-        <div className="md:col-span-2 bg-white border border-zinc-200 rounded-lg p-4">
-          <div className="text-[10px] text-sub uppercase tracking-wide mb-2">Target</div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
+        <div className="md:col-span-2 flex flex-col">
+          <div className="text-[10px] text-sub uppercase tracking-wide font-semibold mb-1 h-4">Target</div>
+          <div className="flex-1 grid grid-cols-2 rounded-lg overflow-hidden border border-zinc-200 divide-x divide-zinc-200">
+            <div className="bg-white p-4 flex flex-col">
               <div className="text-[10px] text-sub uppercase tracking-wide">Monthly cashflow</div>
-              <div className="text-xl font-bold">{fmtUSD0(cashflowGoalUSD)}</div>
+              <div className="text-xl font-bold mt-auto pt-3">{fmtUSD0(cashflowGoalUSD)}</div>
             </div>
-            <div>
+            <div className="bg-white p-4 flex flex-col">
               <div className="text-[10px] text-sub uppercase tracking-wide">Net worth</div>
-              <div className="text-xl font-bold">{fmtKUSD(netWorthGoalUSD)}</div>
+              <div className="text-xl font-bold mt-auto pt-3">{fmtKUSD(netWorthGoalUSD)}</div>
             </div>
           </div>
         </div>
