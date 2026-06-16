@@ -86,6 +86,41 @@ export type Database = {
         };
         Relationships: [];
       };
+      projections: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          msc: number;
+          investment_size_factor: number;
+          term_months: number;
+          investment_interest_pct: number;
+          loc_increase: number;
+          loc_interest_pct: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          name?: string;
+          msc?: number;
+          investment_size_factor?: number;
+          term_months?: number;
+          investment_interest_pct?: number;
+          loc_increase?: number;
+          loc_interest_pct?: number;
+        };
+        Update: {
+          name?: string;
+          msc?: number;
+          investment_size_factor?: number;
+          term_months?: number;
+          investment_interest_pct?: number;
+          loc_increase?: number;
+          loc_interest_pct?: number;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -101,3 +136,6 @@ export type LoCInsert = Database["public"]["Tables"]["locs"]["Insert"];
 export type LoCUpdate = Database["public"]["Tables"]["locs"]["Update"];
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
+export type Projection = Database["public"]["Tables"]["projections"]["Row"];
+export type ProjectionInsert = Database["public"]["Tables"]["projections"]["Insert"];
+export type ProjectionUpdate = Database["public"]["Tables"]["projections"]["Update"];
