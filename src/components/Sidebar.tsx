@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Coins,
   CreditCard,
+  TrendingUp,
   Settings as SettingsIcon,
   LogOut,
   PanelLeftClose,
@@ -19,6 +20,7 @@ const items = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/amplicons", label: "Amplicons", icon: Coins },
   { to: "/loc", label: "Lines of Credit", icon: CreditCard },
+  { to: "/projections", label: "Projections", icon: TrendingUp },
 ];
 
 // The Amplitude Mark — five bars on an exponential curve (height ratio ≈ 1.7× per

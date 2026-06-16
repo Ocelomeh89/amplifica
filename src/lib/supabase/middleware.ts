@@ -30,6 +30,7 @@ export async function updateSession(request: NextRequest) {
     path.startsWith("/dashboard") ||
     path.startsWith("/amplicons") ||
     path.startsWith("/loc") ||
+    path.startsWith("/projections") ||
     path.startsWith("/settings");
   if (isProtected && !user) {
     const loginUrl = new URL("/login", request.url);
