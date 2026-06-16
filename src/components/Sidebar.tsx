@@ -2,7 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Coins, CreditCard, Settings as SettingsIcon, LogOut } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  LayoutDashboard,
+  Coins,
+  CreditCard,
+  Settings as SettingsIcon,
+  LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
+} from "lucide-react";
 import clsx from "clsx";
 import { logout } from "@/app/login/actions";
 
@@ -37,36 +46,84 @@ function AmplitudeMark() {
 
 export default function Sidebar({ email }: { email: string }) {
   const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Restore the saved preference after mount (avoids a hydration mismatch).
+  useEffect(() => {
+    if (localStorage.getItem("sidebar-collapsed") === "1") setCollapsed(true);
+  }, []);
+
+  const toggle = () =>
+    setCollapsed((c) => {
+      const next = !c;
+      localStorage.setItem("sidebar-collapsed", next ? "1" : "0");
+      return next;
+    });
+
   return (
-    <aside className="w-56 bg-plum text-white/70 px-3 py-5 flex-shrink-0 flex flex-col min-h-screen">
-      <div className="flex items-center gap-2 mb-1 px-2">
-        <AmplitudeMark />
-        <span className="text-white font-display text-lg leading-none">Amplifica</span>
+    <aside
+      className={clsx(
+        "bg-plum text-white/70 py-5 flex-shrink-0 flex flex-col min-h-screen transition-all duration-200",
+        collapsed ? "w-16 px-2 items-center" : "w-56 px-3"
+      )}
+    >
+      {/* Brand + collapse toggle */}
+      <div
+        className={clsx(
+          "flex items-center mb-1",
+          collapsed ? "justify-center" : "justify-between px-2"
+        )}
+      >
+        {!collapsed && (
+          <div className="flex items-center gap-2">
+            <AmplitudeMark />
+            <span className="text-white font-display text-lg leading-none">Amplifica</span>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="text-white/60 hover:text-white p-1 rounded hover:bg-white/10 transition-colors"
+        >
+          {collapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+        </button>
       </div>
-      <div className="text-xs text-white/40 mb-6 px-2 truncate">{email}</div>
+
+      {!collapsed && <div className="text-xs text-white/40 mb-6 px-2 truncate">{email}</div>}
+      {collapsed && <div className="mb-6" />}
+
       {items.map((item) => {
         const isActive = pathname.startsWith(item.to);
         return (
           <Link
             key={item.to}
             href={item.to}
+            title={collapsed ? item.label : undefined}
             className={clsx(
-              "flex items-center gap-2 px-2 py-1.5 rounded text-sm mb-0.5 transition-colors",
+              "flex items-center gap-2 rounded text-sm mb-0.5 transition-colors",
+              collapsed ? "justify-center w-10 h-10" : "px-2 py-1.5",
               isActive ? "bg-purple text-white" : "hover:bg-white/10 hover:text-white"
             )}
           >
-            <item.icon className="w-4 h-4" />
-            <span>{item.label}</span>
+            <item.icon className="w-4 h-4 flex-shrink-0" />
+            {!collapsed && <span>{item.label}</span>}
           </Link>
         );
       })}
+
       <div className="mt-auto">
         <form action={logout}>
           <button
             type="submit"
-            className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full hover:bg-white/10 hover:text-white transition-colors"
+            title={collapsed ? "Log out" : undefined}
+            className={clsx(
+              "flex items-center gap-2 rounded text-sm transition-colors hover:bg-white/10 hover:text-white",
+              collapsed ? "justify-center w-10 h-10" : "px-2 py-1.5 w-full"
+            )}
           >
-            <LogOut className="w-4 h-4" /> Log out
+            <LogOut className="w-4 h-4 flex-shrink-0" />
+            {!collapsed && <span>Log out</span>}
           </button>
         </form>
       </div>
