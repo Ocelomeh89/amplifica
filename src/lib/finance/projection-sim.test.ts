@@ -40,14 +40,11 @@ describe("runSimulation — bootstrap", () => {
   });
 });
 
-describe("runSimulation — stable size, upgrade only when payoff < 3 months", () => {
-  it("upgrades ×LineOfCreditIncrease exactly 4 times on the base inputs (20000→101250)", () => {
-    expect(runSimulation(baseInput).finalInvestmentSize).toBe(101250);
-  });
-
-  it("finalInvestmentSize > initialInvestmentSize (it does grow)", () => {
-    const r = runSimulation(baseInput);
-    expect(r.finalInvestmentSize).toBeGreaterThan(r.initialInvestmentSize);
+describe("runSimulation — cash bucket accelerates growth (no plateau)", () => {
+  it("size steps up many times (13 upgrades → 20000 × 1.5^13 ≈ $3.89M) on the base inputs", () => {
+    // Banked cash pays down each new draw, so payoffs stay fast and the < 3-month
+    // upgrade fires far more than the stable-size rule alone (which gave 4).
+    expect(runSimulation(baseInput).finalInvestmentSize).toBeCloseTo(20000 * 1.5 ** 13, 0);
   });
 
   it("currentInvestmentSize never decreases over the series", () => {
@@ -57,6 +54,21 @@ describe("runSimulation — stable size, upgrade only when payoff < 3 months", (
         r.series[i - 1].currentInvestmentSize
       );
     }
+  });
+
+  it("net worth keeps climbing across the horizon — no plateau", () => {
+    const r = runSimulation(baseInput);
+    const at = (m: number) => r.series[m].netWorth;
+    expect(at(120)).toBeGreaterThan(at(60));
+    expect(at(240)).toBeGreaterThan(at(120));
+    expect(at(479)).toBeGreaterThan(at(240));
+    // Ends in the millions, not the ~$0.5M stable-size plateau.
+    expect(at(479)).toBeGreaterThan(10_000_000);
+  });
+
+  it("cash is always banked (never negative) and counted in net worth", () => {
+    const r = runSimulation(baseInput);
+    expect(r.series.every((s) => s.cash >= 0 && Number.isFinite(s.cash))).toBe(true);
   });
 });
 
@@ -74,8 +86,8 @@ describe("runSimulation — degenerate MSC = 0", () => {
   });
 });
 
-describe("runSimulation — net worth (nominal − outstanding)", () => {
-  it("month 0 net worth = nominal remaining of inv0 (35 payments) − outstanding(0)", () => {
+describe("runSimulation — net worth (nominal + cash − outstanding)", () => {
+  it("month 0 net worth = nominal remaining of inv0 (35 payments) − outstanding(0) (cash is 0)", () => {
     const r = runSimulation(baseInput);
     const pmt = monthlyPayment(20000, 0.08, 36);
     const expected = pmt * 35 - r.series[0].outstandingAmount;

@@ -20,6 +20,7 @@ export interface ProjectionSimPoint {
   cashFlow: number;
   outstandingAmount: number;
   netWorth: number;
+  cash: number;
   currentInvestmentSize: number;
   activeInvestmentCount: number;
 }
@@ -63,6 +64,7 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
 
   let currentInvestmentSize = initialInvestmentSize;
   let outstandingAmount = initialInvestmentSize;
+  let cash = 0; // surplus inflow banked here; counts toward net worth
   let lastInvStartMonth = 0;
   let peakOutstanding = initialInvestmentSize;
 
@@ -88,8 +90,13 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
       if (isActive(inv, m)) cashFlow += monthlyPayoutOf(inv);
     }
 
-    // 3. Apply inflow to debt (clamped at zero).
-    outstandingAmount = Math.max(0, outstandingAmount - cashFlow);
+    // 3. Apply inflow to debt; bank any surplus as cash (never discard it).
+    if (cashFlow >= outstandingAmount) {
+      cash += cashFlow - outstandingAmount;
+      outstandingAmount = 0;
+    } else {
+      outstandingAmount -= cashFlow;
+    }
 
     // 4. If outstanding reached 0, start a new investment this month. Step the
     //    size up only when the just-paid loan was retired in < 3 months.
@@ -108,20 +115,28 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
       investmentsLaunched += 1;
       outstandingAmount = currentInvestmentSize;
       lastInvStartMonth = m + 1;
+
+      // Deploy banked cash to immediately pay down the fresh LoC draw. This
+      // shortens payoffs, which trips the < 3-month upgrade more often, so the
+      // flywheel accelerates instead of plateauing.
+      const fromCash = Math.min(cash, outstandingAmount);
+      outstandingAmount -= fromCash;
+      cash -= fromCash;
     }
 
     if (outstandingAmount > peakOutstanding) peakOutstanding = outstandingAmount;
 
-    // 5. Net worth = Σ nominal remaining payments (at m+1) − outstanding.
+    // 5. Net worth = Σ nominal remaining payments (at m+1) + cash − outstanding.
     let totalRemaining = 0;
     for (const inv of active) totalRemaining += remainingBalanceAt(inv, m + 1);
-    const netWorth = totalRemaining - outstandingAmount;
+    const netWorth = totalRemaining + cash - outstandingAmount;
 
     series.push({
       monthIndex: m,
       cashFlow,
       outstandingAmount,
       netWorth,
+      cash,
       currentInvestmentSize,
       activeInvestmentCount: active.filter((inv) => isActive(inv, m)).length,
     });
