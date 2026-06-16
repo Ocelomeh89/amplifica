@@ -57,7 +57,8 @@ export async function updateProjection(formData: FormData) {
       loc_increase,
       loc_interest_pct,
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", user.id);
   if (error) throw new Error(error.message);
 
   revalidatePath("/projections");
@@ -73,7 +74,11 @@ export async function deleteProjection(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
-  const { error } = await supabase.from("projections").delete().eq("id", id);
+  const { error } = await supabase
+    .from("projections")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
   if (error) throw new Error(error.message);
 
   revalidatePath("/projections");
