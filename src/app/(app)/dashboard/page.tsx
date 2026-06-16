@@ -77,7 +77,7 @@ export default async function DashboardPage() {
         {/* Amplicons — total created */}
         <div className="flex flex-col">
           <div className="text-[10px] uppercase tracking-wide font-semibold mb-1 h-4">&nbsp;</div>
-          <div className="flex-1 bg-white border border-zinc-200 rounded-lg p-4 flex flex-col">
+          <div className="flex-1 bg-card border border-edge rounded-lg p-4 flex flex-col">
             <div className="text-[10px] text-sub uppercase tracking-wide">Amplicons</div>
             <div className="text-xl font-bold mt-auto pt-3">{ampliconsCount}</div>
           </div>
@@ -86,7 +86,7 @@ export default async function DashboardPage() {
         {/* Active Amplicons — currently producing cashflow */}
         <div className="flex flex-col">
           <div className="text-[10px] uppercase tracking-wide font-semibold mb-1 h-4">&nbsp;</div>
-          <div className="flex-1 bg-white border border-zinc-200 rounded-lg p-4 flex flex-col">
+          <div className="flex-1 bg-card border border-edge rounded-lg p-4 flex flex-col">
             <div className="text-[10px] text-sub uppercase tracking-wide">Active Amplicons</div>
             <div className="text-xl font-bold mt-auto pt-3">{activeAmpliconsCount}</div>
           </div>
@@ -95,7 +95,7 @@ export default async function DashboardPage() {
         {/* Monthly contribution — plain dollars */}
         <div className="flex flex-col">
           <div className="text-[10px] uppercase tracking-wide font-semibold mb-1 h-4">&nbsp;</div>
-          <div className="flex-1 bg-white border border-zinc-200 rounded-lg p-4 flex flex-col">
+          <div className="flex-1 bg-card border border-edge rounded-lg p-4 flex flex-col">
             <div className="text-[10px] text-sub uppercase tracking-wide">Monthly contribution</div>
             <div className="text-xl font-bold mt-auto pt-3">{fmtUSD0(monthlyContribution)}</div>
           </div>
@@ -104,7 +104,7 @@ export default async function DashboardPage() {
         {/* Current — live cashflow ($) + net worth (k$) */}
         <div className="md:col-span-2 flex flex-col">
           <div className="text-[10px] text-sub uppercase tracking-wide font-semibold mb-1 h-4">Current</div>
-          <div className="flex-1 grid grid-cols-2 rounded-lg border border-zinc-200 divide-x divide-zinc-200 bg-white">
+          <div className="flex-1 grid grid-cols-2 rounded-lg border border-edge divide-x divide-edge bg-card">
             <div className="p-4 flex flex-col">
               <div className="text-[10px] text-sub uppercase tracking-wide">Monthly cashflow</div>
               <div className="text-xl font-bold text-aqua mt-auto pt-3">{fmtUSD0(currentMonthlyCashflow)}</div>
@@ -112,7 +112,7 @@ export default async function DashboardPage() {
             <div className="p-4 flex flex-col">
               <div className="text-[10px] text-sub uppercase tracking-wide">
                 Net worth
-                <InfoBox message="Net worth is the nominal dollar value of all remaining Amplicon payments — the face value of future cash flow, with no discounting (global rate 0). The discount rate is global, not per-Amplicon, and may become configurable later." />
+                <InfoBox message="Net worth is the nominal dollar value of all remaining Amplicon payments and any external net worth added in Settings." />
               </div>
               <div className="text-xl font-bold text-aqua mt-auto pt-3">{fmtKUSD(currentTotalNetWorth)}</div>
             </div>
@@ -122,7 +122,7 @@ export default async function DashboardPage() {
         {/* Target — goals, same units as Current for comparison */}
         <div className="md:col-span-2 flex flex-col">
           <div className="text-[10px] text-sub uppercase tracking-wide font-semibold mb-1 h-4">Target</div>
-          <div className="flex-1 grid grid-cols-2 rounded-lg border border-zinc-200 divide-x divide-zinc-200 bg-white">
+          <div className="flex-1 grid grid-cols-2 rounded-lg border border-edge divide-x divide-edge bg-card">
             <div className="p-4 flex flex-col">
               <div className="text-[10px] text-sub uppercase tracking-wide">Monthly cashflow</div>
               <div className="text-xl font-bold mt-auto pt-3">{fmtUSD0(cashflowGoalUSD)}</div>
