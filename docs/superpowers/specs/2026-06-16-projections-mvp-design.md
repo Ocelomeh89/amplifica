@@ -1,0 +1,149 @@
+# Projections MVP — Design
+
+**Date:** 2026-06-16
+**Branch:** `projections_mvp` (off current `main`)
+**Status:** Approved design, pre-implementation
+
+## Context
+
+A new **Projections** feature: a what-if simulator for the leverage-investing
+flywheel. The user enters six knobs, the engine runs a 40-year (480-month)
+monthly simulation, and two charts visualize the trajectory.
+
+A near-complete implementation already exists on the parked `continuous` branch
+(built off the older `main`). This MVP **ports that work** onto `projections_mvp`
+off current `main`, with two deliberate differences:
+
+1. **Stable investment size** (not cash-flow leverage). The investment size stays
+   constant until a loan pays off quickly, then steps up. Specifically: when a
+   loan is paid off in **fewer than 3 months** (a fixed threshold), the next
+   investment size is multiplied by `LineOfCreditIncrease`; otherwise it is
+   unchanged. This rule reaches a steady state (the active-investment count
+   stabilizes, cash flow flattens, upgrades stop) — that plateau is expected and
+   accepted for the MVP.
+2. **Brand + dark-mode styling.** The ported UI uses the current theme tokens
+   (`bg-card`, `border-edge`, `text-sub`, `purple`, `aqua`) so it works in light
+   and dark mode.
+
+The existing `Amplicons → projection.ts` dashboard engine is **not** touched —
+`projection-sim.ts` is a separate concept.
+
+## Persistence & routes
+
+- **Sidebar:** new **Projections** entry (TrendingUp icon) in the top group,
+  after Lines of Credit. `/projections*` is middleware-gated.
+- **Saved named projections** in a Supabase `projections` table, RLS-scoped to
+  the user (same pattern as Amplicons / LoCs). One DB migration
+  (`0002_projections.sql`) the user applies manually in Supabase.
+- Routes:
+  - `/projections` — list view (table of saved projections; "New projection";
+    per-row delete).
+  - `/projections/[id]` — editor for one projection (inputs + live charts + save
+    + delete + explainer).
+
+## Data model
+
+`supabase/migrations/0002_projections.sql` — `public.projections`:
+
+| Column | Type | Constraint / default |
+|---|---|---|
+| `id` | uuid | pk, `gen_random_uuid()` |
+| `user_id` | uuid | fk `auth.users`, on delete cascade |
+| `name` | text | default `'Untitled projection'` |
+| `msc` | numeric(14,2) | default 0, `>= 0` |
+| `investment_size_factor` | numeric(5,2) | default 4, `3..6` |
+| `term_months` | integer | default 36, `24..48` |
+| `investment_interest_pct` | numeric(5,4) | default 0.08, `0..0.20` |
+| `loc_increase` | numeric(4,2) | default 1.50, `1.2..2.0` |
+| `loc_interest_pct` | numeric(5,4) | default 0.10, `>= 0` |
+| `created_at`, `updated_at` | timestamptz | `now()`, touch trigger |
+
+RLS: self select/insert/update/delete (`auth.uid() = user_id`). TS types added to
+`src/lib/supabase/database.types.ts` (`Projection`, `ProjectionInsert`,
+`ProjectionUpdate`).
+
+## Inputs (editor)
+
+| Input | Range | Step | Default | Unit |
+|---|---|---|---|---|
+| MSC (Monthly Savings Contribution) | ≥ 0 | 100 | `Settings.monthly_savings_contribution` | USD |
+| InvestmentSizeFactor | 3 – 6 | 0.01 | 4 | × MSC |
+| Term | 24 – 48 | 1 | 36 | months |
+| Investment interest | 0 – 20 | 1 | 8 | % annual |
+| LineOfCreditIncrease | 1.2 – 2.0 | 0.05 | 1.5 | multiplier |
+| LineOfCreditInterest | ≥ 0 | 0.1 | 10 | % annual |
+
+- MSC defaults from Settings but is **independent** — editing it here does not
+  write back to Settings.
+- Derived, displayed read-only: **Initial investment size = MSC × InvestmentSizeFactor**.
+
+## Engine — `src/lib/finance/projection-sim.ts`
+
+Pure TS, framework-free, Vitest-tested. Runs `totalMonths` (default 480).
+
+**Constant:** `PAYOFF_UPGRADE_MONTHS = 3` (the fixed threshold; not an input).
+
+**Initial state:**
+```
+InvestmentSize = MSC × InvestmentSizeFactor
+Outstanding    = InvestmentSize
+active         = [ Investment(faceValue = InvestmentSize, term, interest, startMonth = 0) ]
+lastStartMonth = 0
+```
+
+**Per month m (0..479):**
+1. Accrue LoC interest: `Outstanding *= 1 + LineOfCreditInterest/12`.
+2. Collect cash inflow: `cashFlow = MSC + Σ monthlyPayout(inv) for active inv`.
+3. Pay down: `Outstanding = max(0, Outstanding − cashFlow)`.
+4. If `Outstanding == 0` and `InvestmentSize > 0` and `m < totalMonths-1`:
+   - `monthsToPayoff = m − lastStartMonth`
+   - if `monthsToPayoff < PAYOFF_UPGRADE_MONTHS`: `InvestmentSize *= LineOfCreditIncrease`
+   - buy new investment (faceValue = InvestmentSize, startMonth = m+1);
+     `Outstanding = InvestmentSize`; `lastStartMonth = m+1`.
+5. Record point: `{ monthIndex, cashFlow, outstandingAmount, netWorth,
+   currentInvestmentSize, activeInvestmentCount }`.
+
+**Net worth (pure flywheel):**
+`netWorth = Σ nominalRemaining(inv, m+1) − Outstanding`, where
+`nominalRemaining = monthlyPayout × (term − elapsed)` (face value of future cash
+flow; nominal, matching the dashboard's rate-0 basis). **External net worth is
+excluded** — the chart shows wealth generated by the flywheel alone.
+
+**Result summary:** `{ series, initialInvestmentSize, finalInvestmentSize,
+investmentsLaunched, peakOutstanding }`.
+
+**Tests:** bootstrap (initial size, month-0 dynamics, active count), the
+under-3-months upgrade (steps up on fast payoff; stable otherwise), MSC=0 guard
+(no runaway $0 launches), net-worth math, termination/length.
+
+## UI
+
+- `/projections/page.tsx` — server: load projections, render table +
+  `NewProjectionButton`. `actions.ts`: `createProjection` (defaults MSC from
+  profile, redirects to editor), `updateProjection`, `deleteProjection`.
+- `/projections/[id]/page.tsx` — server shell: load record → `EditorForm`.
+- `EditorForm.tsx` — client: input state, ~200ms-debounced `runSimulation`,
+  summary panel, `SimCharts`, save (server action) + delete, `FlywheelExplainer`.
+- `SimCharts.tsx` — client: **cash flow** chart; **net worth** chart with
+  **Outstanding overlaid** as a second line. Theme-neutral ticks/grid like the
+  dashboard `ChartPair`; lines use brand colours (net worth `aqua`/`purple`,
+  outstanding a muted tone).
+- `FlywheelExplainer.tsx` — client: "How it works" modal, text describing the
+  stable-size / under-3-months upgrade rule and the formulas.
+
+All surfaces use theme tokens for light + dark.
+
+## Out of scope (MVP)
+
+- External net worth in the projection's net worth.
+- Configurable payoff threshold (fixed at 3 months).
+- Per-investment term/interest variation; cash bucket; goal lines on projection
+  charts; JSON import/export.
+
+## Verification
+
+- `pnpm test` (engine), `pnpm typecheck`, `pnpm lint`, `pnpm build` — all clean.
+- User applies `0002_projections.sql` in the Supabase SQL editor.
+- Manual: create a projection → edit inputs → charts + summary recompute live →
+  Outstanding overlays net worth → save → appears in list → delete. Verify in
+  both light and dark mode.
