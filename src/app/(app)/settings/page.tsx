@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Card from "@/components/Card";
 import Field from "@/components/Field";
 import NumberInput from "@/components/NumberInput";
+import ThemeToggle from "./ThemeToggle";
 import { saveSettings } from "./actions";
 
 export default async function SettingsPage({
@@ -72,6 +73,12 @@ export default async function SettingsPage({
           Save settings
         </button>
       </form>
+
+      <div className="mt-4">
+        <Card title="Appearance">
+          <ThemeToggle />
+        </Card>
+      </div>
     </div>
   );
 }

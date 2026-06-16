@@ -30,7 +30,7 @@ export default async function AmpliconsPage() {
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-[11px] text-sub uppercase tracking-wide border-b border-zinc-200">
+              <tr className="text-left text-[11px] text-sub uppercase tracking-wide border-b border-edge">
                 <th className="py-2">Name</th>
                 <th>Type</th>
                 <th>Face value</th>

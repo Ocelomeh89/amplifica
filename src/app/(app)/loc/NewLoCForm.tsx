@@ -29,14 +29,14 @@ export default function NewLoCForm() {
             <input
               name="name"
               required
-              className="w-full border border-zinc-300 rounded px-2 py-1.5 text-sm"
+              className="w-full border border-edge rounded px-2 py-1.5 text-sm"
             />
           </Field>
           <Field label="Type">
             <select
               name="loc_type"
               required
-              className="w-full border border-zinc-300 rounded px-2 py-1.5 text-sm"
+              className="w-full border border-edge rounded px-2 py-1.5 text-sm"
               defaultValue="HELOC"
             >
               <option value="HELOC">HELOC</option>
@@ -57,7 +57,7 @@ export default function NewLoCForm() {
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="text-sm px-4 py-1.5 rounded text-sub hover:bg-zinc-100"
+            className="text-sm px-4 py-1.5 rounded text-sub hover:bg-edge"
           >
             Cancel
           </button>

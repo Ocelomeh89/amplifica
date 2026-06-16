@@ -32,7 +32,7 @@ export default function AmpliconRow({
 
   if (editing) {
     return (
-      <tr className="border-b border-zinc-100 bg-cream/40">
+      <tr className="border-b border-edge bg-cream/40">
         <td colSpan={10} className="py-3">
           <form
             action={async (fd) => {
@@ -48,14 +48,14 @@ export default function AmpliconRow({
                   name="name"
                   defaultValue={a.name}
                   required
-                  className="w-full border border-zinc-300 rounded px-2 py-1.5 text-sm"
+                  className="w-full border border-edge rounded px-2 py-1.5 text-sm"
                 />
               </Field>
               <Field label="Type" hint="e.g. Real Estate Note, Trust Deed">
                 <input
                   name="ai_type"
                   defaultValue={a.ai_type ?? ""}
-                  className="w-full border border-zinc-300 rounded px-2 py-1.5 text-sm"
+                  className="w-full border border-edge rounded px-2 py-1.5 text-sm"
                 />
               </Field>
               <Field label="Face value ($)">
@@ -73,7 +73,7 @@ export default function AmpliconRow({
                   type="date"
                   defaultValue={a.start_date.slice(0, 10)}
                   required
-                  className="w-full border border-zinc-300 rounded px-2 py-1.5 text-sm"
+                  className="w-full border border-edge rounded px-2 py-1.5 text-sm"
                 />
               </Field>
             </div>
@@ -87,7 +87,7 @@ export default function AmpliconRow({
               <button
                 type="button"
                 onClick={() => setEditing(false)}
-                className="text-sm px-4 py-1.5 rounded text-sub hover:bg-zinc-100"
+                className="text-sm px-4 py-1.5 rounded text-sub hover:bg-edge"
               >
                 Cancel
               </button>
@@ -99,7 +99,7 @@ export default function AmpliconRow({
   }
 
   return (
-    <tr className="border-b border-zinc-100">
+    <tr className="border-b border-edge">
       <td className="py-2">{a.name}</td>
       <td>{a.ai_type || "—"}</td>
       <td>{fmtCurrency(a.face_value)}</td>
@@ -114,20 +114,20 @@ export default function AmpliconRow({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="text-zinc-500 hover:text-purple"
+            className="text-sub hover:text-purple"
             aria-label="Edit"
           >
             <Pencil className="w-4 h-4" />
           </button>
           <form action={duplicateAmplicon}>
             <input type="hidden" name="id" value={a.id} />
-            <button type="submit" className="text-zinc-500 hover:text-purple" aria-label="Duplicate">
+            <button type="submit" className="text-sub hover:text-purple" aria-label="Duplicate">
               <Copy className="w-4 h-4" />
             </button>
           </form>
           <form action={deleteAmplicon}>
             <input type="hidden" name="id" value={a.id} />
-            <button type="submit" className="text-zinc-500 hover:text-red-600" aria-label="Delete">
+            <button type="submit" className="text-sub hover:text-red-600" aria-label="Delete">
               <Trash2 className="w-4 h-4" />
             </button>
           </form>

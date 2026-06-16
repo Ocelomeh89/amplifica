@@ -29,13 +29,13 @@ export default function NewAmpliconForm() {
             <input
               name="name"
               required
-              className="w-full border border-zinc-300 rounded px-2 py-1.5 text-sm"
+              className="w-full border border-edge rounded px-2 py-1.5 text-sm"
             />
           </Field>
           <Field label="Type" hint="e.g. Real Estate Note, Trust Deed">
             <input
               name="ai_type"
-              className="w-full border border-zinc-300 rounded px-2 py-1.5 text-sm"
+              className="w-full border border-edge rounded px-2 py-1.5 text-sm"
             />
           </Field>
           <Field label="Face value ($)">
@@ -52,7 +52,7 @@ export default function NewAmpliconForm() {
               name="start_date"
               type="date"
               required
-              className="w-full border border-zinc-300 rounded px-2 py-1.5 text-sm"
+              className="w-full border border-edge rounded px-2 py-1.5 text-sm"
             />
           </Field>
         </div>
@@ -63,7 +63,7 @@ export default function NewAmpliconForm() {
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="text-sm px-4 py-1.5 rounded text-sub hover:bg-zinc-100"
+            className="text-sm px-4 py-1.5 rounded text-sub hover:bg-edge"
           >
             Cancel
           </button>

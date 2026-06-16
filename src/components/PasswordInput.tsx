@@ -23,7 +23,7 @@ export default function PasswordInput({
         required={required}
         minLength={minLength}
         autoComplete={autoComplete}
-        className="w-full border border-zinc-300 rounded px-2 py-1.5 pr-9 text-sm"
+        className="w-full border border-edge rounded px-2 py-1.5 pr-9 text-sm"
       />
       <button
         type="button"

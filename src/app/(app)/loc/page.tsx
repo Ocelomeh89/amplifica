@@ -55,7 +55,7 @@ export default async function LoCPage() {
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-[11px] text-sub uppercase tracking-wide border-b border-zinc-200">
+              <tr className="text-left text-[11px] text-sub uppercase tracking-wide border-b border-edge">
                 <th className="py-2">Name</th>
                 <th>Type</th>
                 <th>Size</th>
@@ -71,7 +71,7 @@ export default async function LoCPage() {
                 const available = l.size - l.utilization;
                 const pct = l.size > 0 ? l.utilization / l.size : 0;
                 return (
-                  <tr key={l.id} className="border-b border-zinc-100">
+                  <tr key={l.id} className="border-b border-edge">
                     <td className="py-2">{l.name}</td>
                     <td>{l.loc_type}</td>
                     <td>{fmtCurrency(l.size)}</td>
@@ -88,7 +88,7 @@ export default async function LoCPage() {
                         <input type="hidden" name="id" value={l.id} />
                         <button
                           type="submit"
-                          className="text-zinc-500 hover:text-red-600"
+                          className="text-sub hover:text-red-600"
                           aria-label="Delete"
                         >
                           <Trash2 className="w-4 h-4" />

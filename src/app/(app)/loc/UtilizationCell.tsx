@@ -36,7 +36,7 @@ export default function UtilizationCell({ id, value }: { id: string; value: numb
         onChange={(e) => setLocalValue(Number(e.target.value))}
         step={100}
         min={0}
-        className="w-24 border border-zinc-300 rounded px-1 py-0.5 text-sm"
+        className="w-24 border border-edge rounded px-1 py-0.5 text-sm"
       />
       <button type="submit" className="text-xs text-purple hover:underline">Save</button>
       <button

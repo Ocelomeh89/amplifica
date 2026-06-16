@@ -2,9 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme tokens (space-separated RGB channels for Tailwind's <alpha-value>). */
+:root {
+  --cream: 246 241 234; /* Warm Cream page bg */
+  --ink: 34 19 56; /* Deep Plum text */
+  --sub: 141 130 149; /* Stone Mauve muted text */
+  --card: 255 255 255; /* white surfaces */
+  --edge: 228 228 231; /* zinc-200 borders */
+}
+.dark {
+  --cream: 24 18 34; /* deep plum page bg */
+  --ink: 240 236 230; /* cream text */
+  --sub: 159 149 169; /* lighter mauve */
+  --card: 38 29 52; /* raised plum surface */
+  --edge: 58 47 74; /* muted plum border */
+}
+
 body {
   font-family: var(--font-body), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   line-height: 1.65;
+}
+
+/* Form controls follow the theme tokens (default white inputs would glare on a
+   dark surface). Components can still override with an explicit bg-* class. */
+input,
+select,
+textarea {
+  background-color: rgb(var(--card));
+  color: rgb(var(--ink));
+}
+/* Surface the native date/number picker affordances in dark mode. */
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
 }
 
 /* Display face (Fraunces) for headings and the brand mark — sentence case, never all caps. */

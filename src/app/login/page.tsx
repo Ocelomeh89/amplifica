@@ -9,7 +9,7 @@ export default function LoginPage({
 }) {
   return (
     <main className="min-h-screen flex items-center justify-center p-8 bg-cream">
-      <div className="w-full max-w-md bg-white border border-zinc-200 rounded-lg p-6">
+      <div className="w-full max-w-md bg-card border border-edge rounded-lg p-6">
         <h1 className="text-2xl font-semibold mb-1">Log in to The Amplifier</h1>
         <p className="text-sm text-sub mb-5">Engineer your future. Amplify your wealth. Live your way.</p>
 
@@ -30,7 +30,7 @@ export default function LoginPage({
         <form action={login} className="space-y-3">
           <label className="block">
             <span className="block text-[11px] text-sub uppercase tracking-wide mb-1">Email</span>
-            <input name="email" type="email" required className="w-full border border-zinc-300 rounded px-2 py-1.5 text-sm" />
+            <input name="email" type="email" required className="w-full border border-edge rounded px-2 py-1.5 text-sm" />
           </label>
           <label className="block">
             <span className="block text-[11px] text-sub uppercase tracking-wide mb-1">Password</span>
@@ -48,17 +48,17 @@ export default function LoginPage({
         </form>
 
         <div className="my-4 flex items-center gap-2">
-          <div className="flex-1 h-px bg-zinc-200" />
+          <div className="flex-1 h-px bg-edge" />
           <span className="text-xs text-sub">or</span>
-          <div className="flex-1 h-px bg-zinc-200" />
+          <div className="flex-1 h-px bg-edge" />
         </div>
 
         <form action={requestMagicLink} className="space-y-3">
           <label className="block">
             <span className="block text-[11px] text-sub uppercase tracking-wide mb-1">Email for magic link</span>
-            <input name="email" type="email" required className="w-full border border-zinc-300 rounded px-2 py-1.5 text-sm" />
+            <input name="email" type="email" required className="w-full border border-edge rounded px-2 py-1.5 text-sm" />
           </label>
-          <button type="submit" className="w-full bg-zinc-100 hover:bg-zinc-200 text-sm py-2 rounded">Send magic link</button>
+          <button type="submit" className="w-full bg-edge hover:bg-edge text-sm py-2 rounded">Send magic link</button>
         </form>
 
         <p className="text-sm text-sub mt-5">

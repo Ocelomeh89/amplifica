@@ -37,7 +37,7 @@ export default function ChartPair({
         <button
           onClick={() => setRange("inception")}
           className={`text-xs px-2 py-1 rounded ${
-            range === "inception" ? "bg-purple text-white" : "bg-zinc-100 text-sub"
+            range === "inception" ? "bg-purple text-white" : "bg-edge text-sub"
           }`}
         >
           Since inception
@@ -45,21 +45,21 @@ export default function ChartPair({
         <button
           onClick={() => setRange("current")}
           className={`text-xs px-2 py-1 rounded ${
-            range === "current" ? "bg-purple text-white" : "bg-zinc-100 text-sub"
+            range === "current" ? "bg-purple text-white" : "bg-edge text-sub"
           }`}
         >
           From current month
         </button>
       </div>
 
-      <div className="bg-white border border-zinc-200 rounded-lg p-3 mb-3">
+      <div className="bg-card border border-edge rounded-lg p-3 mb-3">
         <div className="text-[11px] text-sub uppercase tracking-wide mb-2">Monthly cash flow</div>
         <div className="h-56">
           <ResponsiveContainer>
             <LineChart data={series}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-              <XAxis dataKey="month" tick={{ fontSize: 10 }} interval={2} />
-              <YAxis tickFormatter={fmtCurrency} tick={{ fontSize: 10 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#8d829533" />
+              <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#8D8295" }} interval={2} />
+              <YAxis tickFormatter={fmtCurrency} tick={{ fontSize: 10, fill: "#8D8295" }} />
               <Tooltip
                 formatter={(v: number) => fmtCurrency(v)}
                 labelFormatter={(l) => `Month ${l}`}
@@ -85,14 +85,14 @@ export default function ChartPair({
         </div>
       </div>
 
-      <div className="bg-white border border-zinc-200 rounded-lg p-3 mb-3">
+      <div className="bg-card border border-edge rounded-lg p-3 mb-3">
         <div className="text-[11px] text-sub uppercase tracking-wide mb-2">Net worth</div>
         <div className="h-56">
           <ResponsiveContainer>
             <LineChart data={series}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-              <XAxis dataKey="month" tick={{ fontSize: 10 }} interval={2} />
-              <YAxis tickFormatter={fmtCurrency} tick={{ fontSize: 10 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#8d829533" />
+              <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#8D8295" }} interval={2} />
+              <YAxis tickFormatter={fmtCurrency} tick={{ fontSize: 10, fill: "#8D8295" }} />
               <Tooltip
                 formatter={(v: number) => fmtCurrency(v)}
                 labelFormatter={(l) => `Month ${l}`}

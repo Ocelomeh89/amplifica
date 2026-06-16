@@ -5,7 +5,7 @@ import Link from "next/link";
 export default function SignupPage({ searchParams }: { searchParams: { error?: string; sent?: string } }) {
   return (
     <main className="min-h-screen flex items-center justify-center p-8 bg-cream">
-      <div className="w-full max-w-md bg-white border border-zinc-200 rounded-lg p-6">
+      <div className="w-full max-w-md bg-card border border-edge rounded-lg p-6">
         <h1 className="text-2xl font-semibold mb-1">Create your account</h1>
         <p className="text-sm text-sub mb-5">The Amplifier is single-tenant per user.</p>
 
@@ -21,7 +21,7 @@ export default function SignupPage({ searchParams }: { searchParams: { error?: s
         <form action={signup} className="space-y-3">
           <label className="block">
             <span className="block text-[11px] text-sub uppercase tracking-wide mb-1">Email</span>
-            <input name="email" type="email" required className="w-full border border-zinc-300 rounded px-2 py-1.5 text-sm" />
+            <input name="email" type="email" required className="w-full border border-edge rounded px-2 py-1.5 text-sm" />
           </label>
           <label className="block">
             <span className="block text-[11px] text-sub uppercase tracking-wide mb-1">Password</span>

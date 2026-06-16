@@ -19,7 +19,7 @@ export default function NumberInput({
       min={min}
       defaultValue={defaultValue}
       required={required}
-      className="w-full border border-zinc-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      className="w-full border border-edge rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
     />
   );
 }
