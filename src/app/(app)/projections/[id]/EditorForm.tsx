@@ -7,8 +7,10 @@ import Card from "@/components/Card";
 import Field from "@/components/Field";
 import { updateProjection, deleteProjection } from "../actions";
 import { runSimulation } from "@/lib/finance/projection-sim";
+import type { SweepBase } from "@/lib/finance/projection-sweep";
 import { fmtCurrency } from "@/lib/format";
 import SimCharts from "./SimCharts";
+import SweepHeatmap from "./SweepHeatmap";
 import FlywheelExplainer from "./FlywheelExplainer";
 
 interface Props {
@@ -27,28 +29,41 @@ export default function EditorForm({ projection, justSaved }: Props) {
   const [locIncrease, setLocIncrease] = useState(projection.loc_increase);
   const [locInterestPct, setLocInterestPct] = useState(projection.loc_interest_pct * 100);
   const [marketReturnPct, setMarketReturnPct] = useState(projection.market_return_pct * 100);
+  // Continuous-LoC model: step the size up on EVERY payoff, not just fast ones.
+  // Experimental, client-only (not persisted) — defaults ON for this branch.
+  const [continuous, setContinuous] = useState(true);
 
-  const [debounced, setDebounced] = useState({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct });
+  const [debounced, setDebounced] = useState({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous });
 
   useEffect(() => {
     const t = setTimeout(() => {
-      setDebounced({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct });
+      setDebounced({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous });
     }, 200);
     return () => clearTimeout(t);
-  }, [msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct]);
+  }, [msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous]);
+
+  // Everything the sim needs except the swept axes (term, factor). The heatmap
+  // reuses this so its grid matches the live editor exactly.
+  const sweepBase: SweepBase = useMemo(
+    () => ({
+      msc: debounced.msc,
+      investmentInterestPct: debounced.invInterestPct / 100,
+      locIncrease: debounced.locIncrease,
+      locInterestPct: debounced.locInterestPct / 100,
+      marketReturnPct: debounced.marketReturnPct / 100,
+      payoffUpgradeMonths: debounced.continuous ? Infinity : undefined,
+    }),
+    [debounced]
+  );
 
   const result = useMemo(
     () =>
       runSimulation({
-        msc: debounced.msc,
+        ...sweepBase,
         investmentSizeFactor: debounced.factor,
         termMonths: debounced.term,
-        investmentInterestPct: debounced.invInterestPct / 100,
-        locIncrease: debounced.locIncrease,
-        locInterestPct: debounced.locInterestPct / 100,
-        marketReturnPct: debounced.marketReturnPct / 100,
       }),
-    [debounced]
+    [sweepBase, debounced.factor, debounced.term]
   );
 
   const initialInvestmentSize = msc * factor;
@@ -104,6 +119,14 @@ export default function EditorForm({ projection, justSaved }: Props) {
               <input name="market_return_pct" type="number" value={marketReturnPct} onChange={(e) => setMarketReturnPct(Number(e.target.value))} min={0} step={0.5} className={inputClass} />
             </Field>
           </div>
+
+          <label className="flex items-center gap-2 mt-3 text-sm cursor-pointer select-none">
+            <input type="checkbox" checked={continuous} onChange={(e) => setContinuous(e.target.checked)} />
+            <span className="font-medium">Continuous LoC growth</span>
+            <span className="text-sub text-xs">
+              step the size up on every payoff, not just payoffs under 3 months (experimental, not saved)
+            </span>
+          </label>
         </Card>
 
         <div className="flex gap-2 mb-4">
@@ -156,6 +179,15 @@ export default function EditorForm({ projection, justSaved }: Props) {
       </Card>
 
       <SimCharts series={result.series} />
+
+      <Card title="Optimize: term × factor">
+        <p className="text-xs text-sub mb-3">
+          Each cell runs the full simulation at that term and starting contribution factor, holding
+          the other inputs fixed. The framed cell is the optimum for each objective. Net worth and
+          cashflow often peak at different settings — that&apos;s the leverage tradeoff.
+        </p>
+        <SweepHeatmap base={sweepBase} />
+      </Card>
 
       <form action={deleteProjection} className="mt-2">
         <input type="hidden" name="id" value={projection.id} />
