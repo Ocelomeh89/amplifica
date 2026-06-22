@@ -5,6 +5,11 @@ import { monthlyPayment } from "./amortization";
 // stable. (User-chosen constant, not an input.)
 export const PAYOFF_UPGRADE_MONTHS = 3;
 
+// Default annual return (decimal) for the stock-market benchmark: the same MSC,
+// dripped into an index fund instead of fed into the flywheel. Overridable per
+// projection via ProjectionSimInput.marketReturnPct.
+export const DEFAULT_MARKET_RETURN_PCT = 0.1;
+
 export interface ProjectionSimInput {
   msc: number;
   investmentSizeFactor: number;
@@ -12,6 +17,7 @@ export interface ProjectionSimInput {
   investmentInterestPct: number;
   locIncrease: number;
   locInterestPct: number;
+  marketReturnPct?: number;
   totalMonths?: number;
 }
 
@@ -23,6 +29,10 @@ export interface ProjectionSimPoint {
   cash: number;
   currentInvestmentSize: number;
   activeInvestmentCount: number;
+  // Cumulative MSC contributed through this month (the principal you put in).
+  contributedCapital: number;
+  // The same contributions dripped into the market at marketReturnPct instead.
+  marketBaseline: number;
 }
 
 export interface ProjectionSimResult {
@@ -31,6 +41,8 @@ export interface ProjectionSimResult {
   finalInvestmentSize: number;
   investmentsLaunched: number;
   peakOutstanding: number;
+  finalContributedCapital: number;
+  finalMarketBaseline: number;
 }
 
 interface ActiveInvestment {
@@ -60,6 +72,7 @@ function remainingBalanceAt(inv: ActiveInvestment, m: number): number {
 export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
   const totalMonths = input.totalMonths ?? 480;
   const monthlyLocRate = input.locInterestPct / 12;
+  const monthlyMarketRate = (input.marketReturnPct ?? DEFAULT_MARKET_RETURN_PCT) / 12;
   const initialInvestmentSize = input.msc * input.investmentSizeFactor;
 
   let currentInvestmentSize = initialInvestmentSize;
@@ -77,6 +90,11 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
     },
   ];
   let investmentsLaunched = 1;
+
+  // Benchmarks: same MSC, no leverage. `contributed` is the raw sum you put in;
+  // `marketBalance` is that stream compounded monthly at the market rate.
+  let contributed = 0;
+  let marketBalance = 0;
 
   const series: ProjectionSimPoint[] = [];
 
@@ -131,6 +149,10 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
     for (const inv of active) totalRemaining += remainingBalanceAt(inv, m + 1);
     const netWorth = totalRemaining + cash - outstandingAmount;
 
+    // 6. Roll the no-leverage benchmarks forward by one monthly contribution.
+    contributed += input.msc;
+    marketBalance = marketBalance * (1 + monthlyMarketRate) + input.msc;
+
     series.push({
       monthIndex: m,
       cashFlow,
@@ -139,6 +161,8 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
       cash,
       currentInvestmentSize,
       activeInvestmentCount: active.filter((inv) => isActive(inv, m)).length,
+      contributedCapital: contributed,
+      marketBaseline: marketBalance,
     });
   }
 
@@ -148,5 +172,7 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
     finalInvestmentSize: currentInvestmentSize,
     investmentsLaunched,
     peakOutstanding,
+    finalContributedCapital: contributed,
+    finalMarketBaseline: marketBalance,
   };
 }
