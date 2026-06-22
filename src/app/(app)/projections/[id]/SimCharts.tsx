@@ -50,6 +50,24 @@ export default function SimCharts({ series }: { series: ProjectionSimPoint[] }) 
           </ResponsiveContainer>
         </div>
       </div>
+
+      <div className="bg-card border border-edge rounded-lg p-3 mb-3">
+        <div className="text-[11px] text-sub uppercase tracking-wide mb-2">Flywheel vs market vs contributions</div>
+        <div className="h-56">
+          <ResponsiveContainer>
+            <LineChart data={series}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+              <XAxis dataKey="monthIndex" tick={TICK} interval={23} />
+              <YAxis tickFormatter={fmtCurrency} tick={TICK} />
+              <Tooltip formatter={(v: number) => fmtCurrency(v)} labelFormatter={(l) => `Month ${l}`} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Line type="monotone" dataKey="netWorth" name="Net worth (flywheel)" stroke="#3EC9C0" strokeWidth={2} dot={false} isAnimationActive={false} />
+              <Line type="monotone" dataKey="marketBaseline" name="Market (DCA)" stroke="#6C4BD3" strokeWidth={2} dot={false} isAnimationActive={false} />
+              <Line type="monotone" dataKey="contributedCapital" name="Contributed (MSC)" stroke="#8D8295" strokeWidth={2} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </div>
   );
 }

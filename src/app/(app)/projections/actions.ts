@@ -45,6 +45,7 @@ export async function updateProjection(formData: FormData) {
   const investment_interest_pct = Number(formData.get("investment_interest_pct") ?? 0) / 100;
   const loc_increase = Number(formData.get("loc_increase") ?? 1.5);
   const loc_interest_pct = Number(formData.get("loc_interest_pct") ?? 0) / 100;
+  const market_return_pct = Number(formData.get("market_return_pct") ?? 10) / 100;
 
   const { error } = await supabase
     .from("projections")
@@ -56,6 +57,7 @@ export async function updateProjection(formData: FormData) {
       investment_interest_pct,
       loc_increase,
       loc_interest_pct,
+      market_return_pct,
     })
     .eq("id", id)
     .eq("user_id", user.id);

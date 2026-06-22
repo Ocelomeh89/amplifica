@@ -97,6 +97,7 @@ export type Database = {
           investment_interest_pct: number;
           loc_increase: number;
           loc_interest_pct: number;
+          market_return_pct: number;
           created_at: string;
           updated_at: string;
         };
@@ -109,6 +110,7 @@ export type Database = {
           investment_interest_pct?: number;
           loc_increase?: number;
           loc_interest_pct?: number;
+          market_return_pct?: number;
         };
         Update: {
           name?: string;
@@ -118,6 +120,7 @@ export type Database = {
           investment_interest_pct?: number;
           loc_increase?: number;
           loc_interest_pct?: number;
+          market_return_pct?: number;
         };
         Relationships: [];
       };

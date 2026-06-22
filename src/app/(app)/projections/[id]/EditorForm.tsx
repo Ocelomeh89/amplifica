@@ -26,15 +26,16 @@ export default function EditorForm({ projection, justSaved }: Props) {
   const [invInterestPct, setInvInterestPct] = useState(projection.investment_interest_pct * 100);
   const [locIncrease, setLocIncrease] = useState(projection.loc_increase);
   const [locInterestPct, setLocInterestPct] = useState(projection.loc_interest_pct * 100);
+  const [marketReturnPct, setMarketReturnPct] = useState(projection.market_return_pct * 100);
 
-  const [debounced, setDebounced] = useState({ msc, factor, term, invInterestPct, locIncrease, locInterestPct });
+  const [debounced, setDebounced] = useState({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct });
 
   useEffect(() => {
     const t = setTimeout(() => {
-      setDebounced({ msc, factor, term, invInterestPct, locIncrease, locInterestPct });
+      setDebounced({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct });
     }, 200);
     return () => clearTimeout(t);
-  }, [msc, factor, term, invInterestPct, locIncrease, locInterestPct]);
+  }, [msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct]);
 
   const result = useMemo(
     () =>
@@ -45,11 +46,14 @@ export default function EditorForm({ projection, justSaved }: Props) {
         investmentInterestPct: debounced.invInterestPct / 100,
         locIncrease: debounced.locIncrease,
         locInterestPct: debounced.locInterestPct / 100,
+        marketReturnPct: debounced.marketReturnPct / 100,
       }),
     [debounced]
   );
 
   const initialInvestmentSize = msc * factor;
+  const finalNetWorth = result.series[result.series.length - 1]?.netWorth ?? 0;
+  const vsMarket = result.finalMarketBaseline > 0 ? finalNetWorth / result.finalMarketBaseline : null;
 
   return (
     <>
@@ -96,6 +100,9 @@ export default function EditorForm({ projection, justSaved }: Props) {
             <Field label="Line of credit interest (%)">
               <input name="loc_interest_pct" type="number" value={locInterestPct} onChange={(e) => setLocInterestPct(Number(e.target.value))} min={0} step={0.1} className={inputClass} />
             </Field>
+            <Field label="Market return (%)" hint="Stock-market benchmark, e.g. 10%">
+              <input name="market_return_pct" type="number" value={marketReturnPct} onChange={(e) => setMarketReturnPct(Number(e.target.value))} min={0} step={0.5} className={inputClass} />
+            </Field>
           </div>
         </Card>
 
@@ -123,6 +130,27 @@ export default function EditorForm({ projection, justSaved }: Props) {
           <div>
             <div className="text-[10px] text-sub uppercase tracking-wide">Peak outstanding</div>
             <div className="text-base font-bold">{fmtCurrency(result.peakOutstanding)}</div>
+          </div>
+        </div>
+      </Card>
+
+      <Card title="Flywheel vs market">
+        <div className="grid grid-cols-4 gap-3 text-sm">
+          <div>
+            <div className="text-[10px] text-sub uppercase tracking-wide">Total contributed (MSC)</div>
+            <div className="text-base font-bold">{fmtCurrency(result.finalContributedCapital)}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-sub uppercase tracking-wide">Net worth (flywheel)</div>
+            <div className="text-base font-bold text-aqua">{fmtCurrency(finalNetWorth)}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-sub uppercase tracking-wide">Market ({marketReturnPct}% DCA)</div>
+            <div className="text-base font-bold">{fmtCurrency(result.finalMarketBaseline)}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-sub uppercase tracking-wide">Flywheel vs market</div>
+            <div className="text-base font-bold">{vsMarket != null ? `${vsMarket.toFixed(1)}×` : "—"}</div>
           </div>
         </div>
       </Card>
