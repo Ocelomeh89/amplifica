@@ -1,8 +1,9 @@
 import { monthlyPayment } from "./amortization";
 
-// Fixed payoff threshold: when a loan is retired in FEWER than this many months,
-// the next investment steps up by LineOfCreditIncrease. Otherwise the size is
-// stable. (User-chosen constant, not an input.)
+// Default payoff threshold: when a loan is retired in FEWER than this many
+// months, the next investment steps up by LineOfCreditIncrease; otherwise the
+// size is stable. Overridable per projection via payoffUpgradeMonths — pass
+// Infinity for the "continuous" model where EVERY payoff steps the size up.
 export const PAYOFF_UPGRADE_MONTHS = 3;
 
 // Default annual return (decimal) for the stock-market benchmark: the same MSC,
@@ -18,6 +19,9 @@ export interface ProjectionSimInput {
   locIncrease: number;
   locInterestPct: number;
   marketReturnPct?: number;
+  // Payoff speed (months) below which the next investment steps up. Defaults to
+  // PAYOFF_UPGRADE_MONTHS. Infinity = continuous growth (step up on every payoff).
+  payoffUpgradeMonths?: number;
   totalMonths?: number;
 }
 
@@ -73,6 +77,7 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
   const totalMonths = input.totalMonths ?? 480;
   const monthlyLocRate = input.locInterestPct / 12;
   const monthlyMarketRate = (input.marketReturnPct ?? DEFAULT_MARKET_RETURN_PCT) / 12;
+  const payoffUpgradeMonths = input.payoffUpgradeMonths ?? PAYOFF_UPGRADE_MONTHS;
   const initialInvestmentSize = input.msc * input.investmentSizeFactor;
 
   let currentInvestmentSize = initialInvestmentSize;
@@ -121,7 +126,7 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
     //    Guard on size > 0 so MSC = 0 doesn't churn $0 investments forever.
     if (outstandingAmount === 0 && currentInvestmentSize > 0 && m < totalMonths - 1) {
       const monthsToPayoff = m - lastInvStartMonth;
-      if (monthsToPayoff < PAYOFF_UPGRADE_MONTHS) {
+      if (monthsToPayoff < payoffUpgradeMonths) {
         currentInvestmentSize *= input.locIncrease;
       }
       active.push({

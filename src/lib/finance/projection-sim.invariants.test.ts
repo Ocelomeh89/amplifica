@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { runSimulation, DEFAULT_MARKET_RETURN_PCT, type ProjectionSimInput } from "./projection-sim";
+import { runSimulation, DEFAULT_MARKET_RETURN_PCT, PAYOFF_UPGRADE_MONTHS, type ProjectionSimInput } from "./projection-sim";
 import { monthlyPayment } from "./amortization";
 
 // Invariant / property tests that validate the flywheel math itself, beyond the
@@ -190,5 +190,37 @@ describe("benchmarks — market DCA baseline", () => {
     const omitted = runSimulation(base);
     const explicit = runSimulation({ ...base, marketReturnPct: DEFAULT_MARKET_RETURN_PCT });
     expect(omitted.finalMarketBaseline).toBeCloseTo(explicit.finalMarketBaseline, 6);
+  });
+});
+
+describe("payoffUpgradeMonths — continuous vs gated growth", () => {
+  const base: ProjectionSimInput = {
+    msc: 5000, investmentSizeFactor: 4, termMonths: 36,
+    investmentInterestPct: 0.08, locIncrease: 1.5, locInterestPct: 0.1,
+  };
+
+  it("omitting it reproduces the default gate (=== PAYOFF_UPGRADE_MONTHS)", () => {
+    const omitted = runSimulation(base);
+    const explicit = runSimulation({ ...base, payoffUpgradeMonths: PAYOFF_UPGRADE_MONTHS });
+    expect(omitted.finalInvestmentSize).toBe(explicit.finalInvestmentSize);
+    expect(omitted.investmentsLaunched).toBe(explicit.investmentsLaunched);
+  });
+
+  it("continuous (Infinity) steps up on EVERY payoff: size grows by locIncrease per launch", () => {
+    const r = runSimulation({ ...base, payoffUpgradeMonths: Infinity });
+    // Every launch after the bootstrap multiplied the size once.
+    const expected = r.initialInvestmentSize * base.locIncrease ** (r.investmentsLaunched - 1);
+    expect(r.finalInvestmentSize).toBeCloseTo(expected, 4);
+  });
+
+  it("continuous never grows the size slower than the gated model", () => {
+    const gated = runSimulation({ ...base, payoffUpgradeMonths: 3 });
+    const continuous = runSimulation({ ...base, payoffUpgradeMonths: Infinity });
+    expect(continuous.finalInvestmentSize).toBeGreaterThanOrEqual(gated.finalInvestmentSize);
+  });
+
+  it("a gate of 0 disables upgrades entirely (size stays at the bootstrap)", () => {
+    const r = runSimulation({ ...base, payoffUpgradeMonths: 0 });
+    expect(r.finalInvestmentSize).toBe(r.initialInvestmentSize);
   });
 });
