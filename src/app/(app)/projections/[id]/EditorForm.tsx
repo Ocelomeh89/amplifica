@@ -42,15 +42,16 @@ export default function EditorForm({ projection, justSaved }: Props) {
   const [perpetualMixPct, setPerpetualMixPct] = useState(50);
   const [perpetualTrigger, setPerpetualTrigger] = useState(50000);
   const [monthlyWithdrawal, setMonthlyWithdrawal] = useState(4500);
+  const [stockAllocPct, setStockAllocPct] = useState(0);
 
-  const [debounced, setDebounced] = useState({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous, perpetualMixPct, perpetualTrigger, monthlyWithdrawal });
+  const [debounced, setDebounced] = useState({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous, perpetualMixPct, perpetualTrigger, monthlyWithdrawal, stockAllocPct });
 
   useEffect(() => {
     const t = setTimeout(() => {
-      setDebounced({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous, perpetualMixPct, perpetualTrigger, monthlyWithdrawal });
+      setDebounced({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous, perpetualMixPct, perpetualTrigger, monthlyWithdrawal, stockAllocPct });
     }, 200);
     return () => clearTimeout(t);
-  }, [msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous, perpetualMixPct, perpetualTrigger, monthlyWithdrawal]);
+  }, [msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous, perpetualMixPct, perpetualTrigger, monthlyWithdrawal, stockAllocPct]);
 
   // Everything the sim needs except the swept axes (term, factor). The heatmap
   // and FI solver reuse this so they match the live editor exactly.
@@ -65,6 +66,7 @@ export default function EditorForm({ projection, justSaved }: Props) {
       perpetualMix: debounced.perpetualMixPct / 100,
       perpetualTriggerSize: debounced.perpetualTrigger,
       monthlyWithdrawal: debounced.monthlyWithdrawal,
+      stockAllocPct: debounced.stockAllocPct / 100,
       totalMonths: MODEL_MONTHS,
     }),
     [debounced]
@@ -161,8 +163,11 @@ export default function EditorForm({ projection, justSaved }: Props) {
         </div>
       </form>
 
-      <Card title="Perpetuals & drawdown (experimental, not saved)">
-        <div className="grid grid-cols-3 gap-3">
+      <Card title="Perpetuals, stocks & drawdown (experimental, not saved)">
+        <div className="grid grid-cols-4 gap-3">
+          <Field label="Stock allocation (%)" hint="share of MSC into stocks @ market return; rest feeds the flywheel">
+            <input type="number" value={stockAllocPct} onChange={(e) => setStockAllocPct(Number(e.target.value))} min={0} max={100} step={5} className={inputClass} />
+          </Field>
           <Field label="Perpetual mix (%)" hint="share of launches that go perpetual once size ≥ trigger">
             <input type="number" value={perpetualMixPct} onChange={(e) => setPerpetualMixPct(Number(e.target.value))} min={0} max={100} step={5} className={inputClass} />
           </Field>
@@ -179,7 +184,7 @@ export default function EditorForm({ projection, justSaved }: Props) {
         <div className="grid grid-cols-4 gap-3 text-sm">
           <div>
             <div className="text-[10px] text-sub uppercase tracking-wide">&nbsp;</div>
-            {["Net worth", "Steady income/mo", "Perpetual income/mo"].map((label) => (
+            {["Net worth", "Steady income/mo", "Perpetual income/mo", "Stock pot"].map((label) => (
               <div key={label} className="text-xs text-sub py-0.5">{label}</div>
             ))}
           </div>
@@ -189,6 +194,7 @@ export default function EditorForm({ projection, justSaved }: Props) {
               <div className="text-sm font-bold py-0.5">{fmtCurrency(atMonth(m).netWorth)}</div>
               <div className="text-sm py-0.5">{fmtCurrency(atMonth(m).cashFlow)}</div>
               <div className="text-sm py-0.5 text-aqua">{fmtCurrency(atMonth(m).perpetualIncome)}</div>
+              <div className="text-sm py-0.5">{fmtCurrency(atMonth(m).stockBalance)}</div>
             </div>
           ))}
         </div>

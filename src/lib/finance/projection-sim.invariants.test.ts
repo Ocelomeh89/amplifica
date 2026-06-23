@@ -288,3 +288,32 @@ describe("withdrawals — MSC cutoff and monthly draw", () => {
     expect(r.series[199].contributedCapital).toBeCloseTo(5000 * 100, 6); // unchanged after cutoff
   });
 });
+
+describe("stock sidecar — split MSC between stocks and the flywheel", () => {
+  const base: ProjectionSimInput = {
+    msc: 2000, investmentSizeFactor: 3, termMonths: 36,
+    investmentInterestPct: 0.08, locIncrease: 1.5, locInterestPct: 0.1,
+    marketReturnPct: 0.1, stockReturnPct: 0.1, payoffUpgradeMonths: Infinity, totalMonths: 180,
+  };
+
+  it("alloc 0 leaves the engine unchanged (no stock pot)", () => {
+    const r = runSimulation({ ...base, stockAllocPct: 0 });
+    expect(r.series.every((s) => s.stockBalance === 0)).toBe(true);
+  });
+
+  it("alloc 1 makes the flywheel inert: net worth equals the market benchmark", () => {
+    // All MSC goes to stocks at the same rate as the benchmark → identical.
+    const r = runSimulation({ ...base, stockAllocPct: 1 });
+    for (const s of r.series) expect(s.netWorth).toBeCloseTo(s.marketBaseline, 6);
+  });
+
+  it("net worth decomposes into a flywheel-on-the-remainder plus the stock pot", () => {
+    const split = runSimulation({ ...base, stockAllocPct: 0.3 });
+    // The flywheel sees 70% of MSC — identical to a pure run at msc × 0.7.
+    const flywheelOnly = runSimulation({ ...base, msc: base.msc * 0.7, stockAllocPct: 0 });
+    for (let i = 0; i < split.series.length; i++) {
+      const flywheelPart = split.series[i].netWorth - split.series[i].stockBalance;
+      expect(flywheelPart).toBeCloseTo(flywheelOnly.series[i].netWorth, 4);
+    }
+  });
+});

@@ -41,6 +41,11 @@ export interface ProjectionSimInput {
   // monthlyWithdrawal each month. Undefined = never (pure accumulation).
   withdrawalStartMonth?: number;
   monthlyWithdrawal?: number;
+  // Stock sidecar: split a fraction (0..1) of each MSC into a stock pot that
+  // compounds at stockReturnPct and counts toward net worth; the rest feeds the
+  // flywheel. 0 (default) = today's behavior (all MSC to the flywheel).
+  stockAllocPct?: number;
+  stockReturnPct?: number;
   totalMonths?: number;
 }
 
@@ -60,6 +65,8 @@ export interface ProjectionSimPoint {
   perpetualIncome: number;
   // Nominal value of remaining perpetual coupons on the books at this month.
   perpetualBookValue: number;
+  // Value of the stock sidecar (its share of MSC compounded at stockReturnPct).
+  stockBalance: number;
 }
 
 export interface ProjectionSimResult {
@@ -125,7 +132,10 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
   const perpetualMix = input.perpetualMix ?? 0;
   const perpetualTrigger = input.perpetualTriggerSize ?? DEFAULT_PERPETUAL_TRIGGER;
   const monthlyWithdrawal = input.monthlyWithdrawal ?? DEFAULT_MONTHLY_WITHDRAWAL;
-  const initialInvestmentSize = input.msc * input.investmentSizeFactor;
+  const stockAlloc = input.stockAllocPct ?? 0;
+  const monthlyStockRate = (input.stockReturnPct ?? DEFAULT_MARKET_RETURN_PCT) / 12;
+  // Only the flywheel's share of MSC drives the draw size.
+  const initialInvestmentSize = input.msc * (1 - stockAlloc) * input.investmentSizeFactor;
 
   let currentInvestmentSize = initialInvestmentSize;
   let outstandingAmount = initialInvestmentSize;
@@ -143,20 +153,25 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
   // `marketBalance` is that stream compounded monthly at the market rate.
   let contributed = 0;
   let marketBalance = 0;
+  // Stock sidecar: its share of MSC compounded at the stock rate. Part of the
+  // ACTUAL portfolio's net worth (unlike marketBalance, which is a benchmark).
+  let stockBalance = 0;
 
   const series: ProjectionSimPoint[] = [];
 
   for (let m = 0; m < totalMonths; m++) {
     const inDrawdown = input.withdrawalStartMonth != null && m >= input.withdrawalStartMonth;
-    const effMsc = inDrawdown ? 0 : input.msc;
+    const contribution = inDrawdown ? 0 : input.msc; // total MSC this month (0 once cut)
+    const flywheelMsc = contribution * (1 - stockAlloc);
+    const stockContribution = contribution * stockAlloc;
     const withdrawal = inDrawdown ? monthlyWithdrawal : 0;
 
     // 1. Accrue LoC interest.
     outstandingAmount *= 1 + monthlyLocRate;
 
-    // 2. Collect MSC + monthly payouts of active investments (tracking perpetual
-    //    coupon income separately).
-    let cashFlow = effMsc;
+    // 2. Collect the flywheel's MSC share + monthly payouts of active investments
+    //    (tracking perpetual coupon income separately).
+    let cashFlow = flywheelMsc;
     let perpetualIncome = 0;
     for (const inv of active) {
       if (!isActive(inv, m)) continue;
@@ -224,12 +239,12 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
       totalRemaining += rem;
       if (inv.kind === "perpetual") perpetualBookValue += rem;
     }
-    const netWorth = totalRemaining + cash - outstandingAmount;
-
-    // 6. Roll the no-leverage benchmarks forward by the actual contribution
-    //    (which is 0 once you've stopped saving in drawdown).
-    contributed += effMsc;
-    marketBalance = marketBalance * (1 + monthlyMarketRate) + effMsc;
+    // 6. Compound the stock sidecar and add it to net worth. Roll the no-leverage
+    //    benchmarks forward by the full contribution (0 once saving is cut).
+    stockBalance = stockBalance * (1 + monthlyStockRate) + stockContribution;
+    const netWorth = totalRemaining + cash - outstandingAmount + stockBalance;
+    contributed += contribution;
+    marketBalance = marketBalance * (1 + monthlyMarketRate) + contribution;
 
     series.push({
       monthIndex: m,
@@ -243,6 +258,7 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
       marketBaseline: marketBalance,
       perpetualIncome,
       perpetualBookValue,
+      stockBalance,
     });
   }
 
