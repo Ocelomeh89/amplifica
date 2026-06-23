@@ -224,3 +224,67 @@ describe("payoffUpgradeMonths — continuous vs gated growth", () => {
     expect(r.finalInvestmentSize).toBe(r.initialInvestmentSize);
   });
 });
+
+describe("perpetual investments — mix, trigger, and coupon", () => {
+  const base: ProjectionSimInput = {
+    msc: 5000, investmentSizeFactor: 4, termMonths: 36,
+    investmentInterestPct: 0.08, locIncrease: 1.5, locInterestPct: 0.1,
+    payoffUpgradeMonths: Infinity, totalMonths: 360,
+  };
+
+  it("mix 0 launches no perpetuals and leaves the series perpetual-free", () => {
+    const r = runSimulation({ ...base, perpetualMix: 0 });
+    expect(r.perpetualsLaunched).toBe(0);
+    expect(r.series.every((s) => s.perpetualIncome === 0 && s.perpetualBookValue === 0)).toBe(true);
+  });
+
+  it("more mix launches (weakly) more perpetuals and more coupon income", () => {
+    const counts = [0, 0.25, 0.5, 1].map((mix) => runSimulation({ ...base, perpetualMix: mix }));
+    for (let i = 1; i < counts.length; i++) {
+      expect(counts[i].perpetualsLaunched).toBeGreaterThanOrEqual(counts[i - 1].perpetualsLaunched);
+    }
+    expect(counts[counts.length - 1].perpetualsLaunched).toBeGreaterThan(0);
+    // Final perpetual income rises with the mix.
+    const inc = counts.map((r) => r.series[r.series.length - 1].perpetualIncome);
+    expect(inc[inc.length - 1]).toBeGreaterThan(inc[0]);
+  });
+
+  it("trigger 0 + mix 1 makes every non-bootstrap launch perpetual", () => {
+    const r = runSimulation({ ...base, perpetualMix: 1, perpetualTriggerSize: 0 });
+    expect(r.perpetualsLaunched).toBe(r.investmentsLaunched - 1);
+  });
+
+  it("perpetuals only kick in once the draw size reaches the trigger", () => {
+    // A trigger far above any size this run reaches → no perpetuals despite mix 1.
+    const r = runSimulation({ ...base, perpetualMix: 1, perpetualTriggerSize: 1e12 });
+    expect(r.perpetualsLaunched).toBe(0);
+  });
+});
+
+describe("withdrawals — MSC cutoff and monthly draw", () => {
+  it("with zero interest everywhere, net worth tracks contributions in then withdrawals out", () => {
+    // Conservation: before the switch netWorth = MSC×(m+1); from the switch month
+    // contributions stop (MSC→0) and 4500/mo is withdrawn, so each month nets −4500.
+    const input: ProjectionSimInput = {
+      msc: 5000, investmentSizeFactor: 4, termMonths: 36,
+      investmentInterestPct: 0, locIncrease: 1.5, locInterestPct: 0, marketReturnPct: 0,
+      totalMonths: 200, withdrawalStartMonth: 100, monthlyWithdrawal: 4500,
+    };
+    const r = runSimulation(input);
+    for (const s of r.series) {
+      const m = s.monthIndex;
+      const expected = m < 100 ? 5000 * (m + 1) : 5000 * 100 - 4500 * (m - 100 + 1);
+      expect(Math.abs(s.netWorth - expected)).toBeLessThan(1e-4 * Math.max(1, Math.abs(expected)));
+    }
+  });
+
+  it("contributions stop at the withdrawal month", () => {
+    const r = runSimulation({
+      msc: 5000, investmentSizeFactor: 4, termMonths: 36,
+      investmentInterestPct: 0.08, locIncrease: 1.5, locInterestPct: 0.1,
+      totalMonths: 200, withdrawalStartMonth: 100,
+    });
+    expect(r.series[99].contributedCapital).toBeCloseTo(5000 * 100, 6);
+    expect(r.series[199].contributedCapital).toBeCloseTo(5000 * 100, 6); // unchanged after cutoff
+  });
+});

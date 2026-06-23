@@ -49,3 +49,18 @@ describe("sweepTermAndFactor", () => {
     expect(result.bestByCashflow!.steadyCashflow).toBeCloseTo(maxCF, 6);
   });
 });
+
+describe("sweepTermAndFactor — perpetualMix axis & snapshots", () => {
+  it("expands the grid by the mix axis and records net-worth snapshots", () => {
+    const grid = { terms: [24, 36], factors: [3, 4], mixes: [0, 0.5, 1], snapshots: [30, 60] };
+    const r = sweepTermAndFactor(base, grid);
+    expect(r.cells).toHaveLength(2 * 2 * 3);
+
+    const cell = r.cells.find(
+      (c) => c.termMonths === 36 && c.investmentSizeFactor === 4 && c.perpetualMix === 0.5
+    )!;
+    const direct = runSimulation({ ...base, termMonths: 36, investmentSizeFactor: 4, perpetualMix: 0.5 });
+    expect(cell.netWorthAt[30]).toBeCloseTo(direct.series[30].netWorth, 4);
+    expect(cell.netWorthAt[60]).toBeCloseTo(direct.series[60].netWorth, 4);
+  });
+});
