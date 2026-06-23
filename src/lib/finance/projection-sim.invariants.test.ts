@@ -316,4 +316,15 @@ describe("stock sidecar — split MSC between stocks and the flywheel", () => {
       expect(flywheelPart).toBeCloseTo(flywheelOnly.series[i].netWorth, 4);
     }
   });
+
+  it("at drawdown the withdrawal is funded from the stock pot first", () => {
+    // Zero stock return so the pot only changes via contributions/withdrawals.
+    // Pot well exceeds the draw, so the whole $4,500 comes out of it each month.
+    const r = runSimulation({
+      ...base, stockAllocPct: 0.5, stockReturnPct: 0,
+      withdrawalStartMonth: 100, monthlyWithdrawal: 4500,
+    });
+    expect(r.series[100].stockBalance).toBeCloseTo(r.series[99].stockBalance - 4500, 4);
+    expect(r.series[101].stockBalance).toBeCloseTo(r.series[100].stockBalance - 4500, 4);
+  });
 });

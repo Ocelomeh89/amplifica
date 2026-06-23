@@ -179,9 +179,19 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
       if (inv.kind === "perpetual") perpetualIncome += inv.monthlyPayout;
     }
 
-    // 3. Apply net inflow (after any withdrawal) to debt; bank surplus as cash.
-    //    A shortfall is covered from cash first, then re-borrowed onto the LoC.
-    const netInflow = cashFlow - withdrawal;
+    // 2b. Compound the stock pot for the month (before it can be drawn on).
+    stockBalance = stockBalance * (1 + monthlyStockRate) + stockContribution;
+
+    // 3. Fund the withdrawal from the stock pot first — a liquid reserve you
+    //    spend down in retirement — so the flywheel keeps turning undisturbed.
+    //    Only a draw beyond the stock pot reaches the flywheel inflow.
+    const fromStock = Math.min(stockBalance, withdrawal);
+    stockBalance -= fromStock;
+    const flywheelWithdrawal = withdrawal - fromStock;
+
+    // Apply net flywheel inflow (after any leftover withdrawal) to debt; bank
+    //    surplus as cash. A shortfall is covered from cash, then re-borrowed.
+    const netInflow = cashFlow - flywheelWithdrawal;
     if (netInflow >= 0) {
       if (netInflow >= outstandingAmount) {
         cash += netInflow - outstandingAmount;
@@ -239,9 +249,9 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
       totalRemaining += rem;
       if (inv.kind === "perpetual") perpetualBookValue += rem;
     }
-    // 6. Compound the stock sidecar and add it to net worth. Roll the no-leverage
-    //    benchmarks forward by the full contribution (0 once saving is cut).
-    stockBalance = stockBalance * (1 + monthlyStockRate) + stockContribution;
+    // 6. Net worth = flywheel + stock pot (already compounded & drawn on above).
+    //    Roll the no-leverage benchmarks forward by the full contribution (0 once
+    //    saving is cut).
     const netWorth = totalRemaining + cash - outstandingAmount + stockBalance;
     contributed += contribution;
     marketBalance = marketBalance * (1 + monthlyMarketRate) + contribution;
