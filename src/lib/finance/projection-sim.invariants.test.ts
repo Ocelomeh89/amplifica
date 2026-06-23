@@ -328,3 +328,37 @@ describe("stock sidecar — split MSC between stocks and the flywheel", () => {
     expect(r.series[101].stockBalance).toBeCloseTo(r.series[100].stockBalance - 4500, 4);
   });
 });
+
+describe("retained-return pile — amortize below the true return", () => {
+  const base: ProjectionSimInput = {
+    msc: 2000, investmentSizeFactor: 4, termMonths: 36,
+    investmentInterestPct: 0.08, locIncrease: 1.5, locInterestPct: 0.1,
+    payoffUpgradeMonths: Infinity, totalMonths: 360,
+  };
+
+  it("no gap (return == amortization) keeps the pile at zero", () => {
+    const r = runSimulation({ ...base, investmentReturnPct: 0.08 });
+    expect(r.series.every((s) => s.surplusPile === 0)).toBe(true);
+  });
+
+  it("the pile is purely additive: it does not disturb the flywheel", () => {
+    // The flywheel distributes the 8% amortization regardless of the true return,
+    // so net worth minus the pile must equal a run with no return gap.
+    const withGap = runSimulation({ ...base, investmentReturnPct: 0.1 });
+    const noGap = runSimulation({ ...base, investmentReturnPct: 0.08 });
+    for (let i = 0; i < withGap.series.length; i++) {
+      expect(withGap.series[i].netWorth - withGap.series[i].surplusPile).toBeCloseTo(
+        noGap.series[i].netWorth,
+        4
+      );
+    }
+  });
+
+  it("the pile grows monotonically when return exceeds amortization (no drawdown)", () => {
+    const r = runSimulation({ ...base, investmentReturnPct: 0.1 });
+    for (let i = 1; i < r.series.length; i++) {
+      expect(r.series[i].surplusPile).toBeGreaterThanOrEqual(r.series[i - 1].surplusPile - 1e-9);
+    }
+    expect(r.series[r.series.length - 1].surplusPile).toBeGreaterThan(0);
+  });
+});

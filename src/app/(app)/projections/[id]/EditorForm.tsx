@@ -43,15 +43,18 @@ export default function EditorForm({ projection, justSaved }: Props) {
   const [perpetualTrigger, setPerpetualTrigger] = useState(50000);
   const [monthlyWithdrawal, setMonthlyWithdrawal] = useState(4500);
   const [stockAllocPct, setStockAllocPct] = useState(0);
+  // Actual return on term investments (>= amortization rate); the gap builds a
+  // retained-return pile. Defaults to the amortization rate (no gap).
+  const [invReturnPct, setInvReturnPct] = useState(projection.investment_interest_pct * 100);
 
-  const [debounced, setDebounced] = useState({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous, perpetualMixPct, perpetualTrigger, monthlyWithdrawal, stockAllocPct });
+  const [debounced, setDebounced] = useState({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous, perpetualMixPct, perpetualTrigger, monthlyWithdrawal, stockAllocPct, invReturnPct });
 
   useEffect(() => {
     const t = setTimeout(() => {
-      setDebounced({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous, perpetualMixPct, perpetualTrigger, monthlyWithdrawal, stockAllocPct });
+      setDebounced({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous, perpetualMixPct, perpetualTrigger, monthlyWithdrawal, stockAllocPct, invReturnPct });
     }, 200);
     return () => clearTimeout(t);
-  }, [msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous, perpetualMixPct, perpetualTrigger, monthlyWithdrawal, stockAllocPct]);
+  }, [msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous, perpetualMixPct, perpetualTrigger, monthlyWithdrawal, stockAllocPct, invReturnPct]);
 
   // Everything the sim needs except the swept axes (term, factor). The heatmap
   // and FI solver reuse this so they match the live editor exactly.
@@ -62,6 +65,7 @@ export default function EditorForm({ projection, justSaved }: Props) {
       locIncrease: debounced.locIncrease,
       locInterestPct: debounced.locInterestPct / 100,
       marketReturnPct: debounced.marketReturnPct / 100,
+      investmentReturnPct: debounced.invReturnPct / 100,
       payoffUpgradeMonths: debounced.continuous ? Infinity : undefined,
       perpetualMix: debounced.perpetualMixPct / 100,
       perpetualTriggerSize: debounced.perpetualTrigger,
@@ -164,7 +168,10 @@ export default function EditorForm({ projection, justSaved }: Props) {
       </form>
 
       <Card title="Perpetuals, stocks & drawdown (experimental, not saved)">
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-5 gap-3">
+          <Field label="Investment return (%)" hint="true return; gap over amortization builds a retained pile">
+            <input type="number" value={invReturnPct} onChange={(e) => setInvReturnPct(Number(e.target.value))} min={0} step={0.5} className={inputClass} />
+          </Field>
           <Field label="Stock allocation (%)" hint="share of MSC into stocks @ market return; rest feeds the flywheel">
             <input type="number" value={stockAllocPct} onChange={(e) => setStockAllocPct(Number(e.target.value))} min={0} max={100} step={5} className={inputClass} />
           </Field>
@@ -184,7 +191,7 @@ export default function EditorForm({ projection, justSaved }: Props) {
         <div className="grid grid-cols-4 gap-3 text-sm">
           <div>
             <div className="text-[10px] text-sub uppercase tracking-wide">&nbsp;</div>
-            {["Net worth", "Steady income/mo", "Perpetual income/mo", "Stock pot"].map((label) => (
+            {["Net worth", "Steady income/mo", "Perpetual income/mo", "Stock pot", "Retained pile"].map((label) => (
               <div key={label} className="text-xs text-sub py-0.5">{label}</div>
             ))}
           </div>
@@ -195,6 +202,7 @@ export default function EditorForm({ projection, justSaved }: Props) {
               <div className="text-sm py-0.5">{fmtCurrency(atMonth(m).cashFlow)}</div>
               <div className="text-sm py-0.5 text-aqua">{fmtCurrency(atMonth(m).perpetualIncome)}</div>
               <div className="text-sm py-0.5">{fmtCurrency(atMonth(m).stockBalance)}</div>
+              <div className="text-sm py-0.5">{fmtCurrency(atMonth(m).surplusPile)}</div>
             </div>
           ))}
         </div>

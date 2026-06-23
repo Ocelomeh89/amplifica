@@ -27,6 +27,10 @@ export interface ProjectionSimInput {
   investmentInterestPct: number;
   locIncrease: number;
   locInterestPct: number;
+  // Actual return on term investments. When it exceeds investmentInterestPct,
+  // the gap is retained (not distributed as cash) into a surplus pile that
+  // compounds at this rate. Defaults to investmentInterestPct (no surplus).
+  investmentReturnPct?: number;
   marketReturnPct?: number;
   // Payoff speed (months) below which the next investment steps up. Defaults to
   // PAYOFF_UPGRADE_MONTHS. Infinity = continuous growth (step up on every payoff).
@@ -67,6 +71,9 @@ export interface ProjectionSimPoint {
   perpetualBookValue: number;
   // Value of the stock sidecar (its share of MSC compounded at stockReturnPct).
   stockBalance: number;
+  // Retained-return pile: the (return − amortization) gap on term investments,
+  // accumulated and compounded at the return rate. Counts toward net worth.
+  surplusPile: number;
 }
 
 export interface ProjectionSimResult {
@@ -87,6 +94,9 @@ interface ActiveInvestment {
   // Precomputed level monthly payout (amortizing payment for term loans, flat
   // coupon for perpetuals) so the loop is agnostic to kind.
   monthlyPayout: number;
+  // Monthly retained return for term loans = (return − amortization)/12 × face.
+  // 0 for perpetuals (they distribute their whole yield).
+  surplusPayout: number;
   termMonths: number;
   startMonth: number;
 }
@@ -114,11 +124,14 @@ function makeInvestment(
   if (kind === "perpetual") {
     const termMonths = input.perpetualTermMonths ?? DEFAULT_PERPETUAL_TERM_MONTHS;
     const yieldPct = input.perpetualYieldPct ?? DEFAULT_PERPETUAL_YIELD_PCT;
-    return { kind, monthlyPayout: faceValue * (yieldPct / 12), termMonths, startMonth };
+    return { kind, monthlyPayout: faceValue * (yieldPct / 12), surplusPayout: 0, termMonths, startMonth };
   }
+  const returnPct = input.investmentReturnPct ?? input.investmentInterestPct;
+  const surplusGap = Math.max(0, returnPct - input.investmentInterestPct);
   return {
     kind: "term",
     monthlyPayout: monthlyPayment(faceValue, input.investmentInterestPct, input.termMonths),
+    surplusPayout: (surplusGap / 12) * faceValue,
     termMonths: input.termMonths,
     startMonth,
   };
@@ -134,6 +147,7 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
   const monthlyWithdrawal = input.monthlyWithdrawal ?? DEFAULT_MONTHLY_WITHDRAWAL;
   const stockAlloc = input.stockAllocPct ?? 0;
   const monthlyStockRate = (input.stockReturnPct ?? DEFAULT_MARKET_RETURN_PCT) / 12;
+  const monthlyReturnRate = (input.investmentReturnPct ?? input.investmentInterestPct) / 12;
   // Only the flywheel's share of MSC drives the draw size.
   const initialInvestmentSize = input.msc * (1 - stockAlloc) * input.investmentSizeFactor;
 
@@ -156,6 +170,9 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
   // Stock sidecar: its share of MSC compounded at the stock rate. Part of the
   // ACTUAL portfolio's net worth (unlike marketBalance, which is a benchmark).
   let stockBalance = 0;
+  // Retained-return pile: undistributed (return − amortization) on term loans,
+  // compounding at the return rate. Counts toward net worth.
+  let surplusPile = 0;
 
   const series: ProjectionSimPoint[] = [];
 
@@ -173,21 +190,29 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
     //    (tracking perpetual coupon income separately).
     let cashFlow = flywheelMsc;
     let perpetualIncome = 0;
+    let activeSurplus = 0; // retained (return − amortization) from active term loans
     for (const inv of active) {
       if (!isActive(inv, m)) continue;
       cashFlow += inv.monthlyPayout;
+      activeSurplus += inv.surplusPayout;
       if (inv.kind === "perpetual") perpetualIncome += inv.monthlyPayout;
     }
 
-    // 2b. Compound the stock pot for the month (before it can be drawn on).
+    // 2b. Compound the stock pot and the retained-return pile for the month
+    //     (before they can be drawn on).
     stockBalance = stockBalance * (1 + monthlyStockRate) + stockContribution;
+    surplusPile = surplusPile * (1 + monthlyReturnRate) + activeSurplus;
 
-    // 3. Fund the withdrawal from the stock pot first — a liquid reserve you
-    //    spend down in retirement — so the flywheel keeps turning undisturbed.
-    //    Only a draw beyond the stock pot reaches the flywheel inflow.
-    const fromStock = Math.min(stockBalance, withdrawal);
+    // 3. Fund the withdrawal from liquid reserves first — the retained-return
+    //    pile, then the stock pot — so the flywheel keeps turning undisturbed.
+    //    Only a draw beyond both reaches the flywheel inflow.
+    let remainingWithdrawal = withdrawal;
+    const fromSurplus = Math.min(surplusPile, remainingWithdrawal);
+    surplusPile -= fromSurplus;
+    remainingWithdrawal -= fromSurplus;
+    const fromStock = Math.min(stockBalance, remainingWithdrawal);
     stockBalance -= fromStock;
-    const flywheelWithdrawal = withdrawal - fromStock;
+    const flywheelWithdrawal = remainingWithdrawal - fromStock;
 
     // Apply net flywheel inflow (after any leftover withdrawal) to debt; bank
     //    surplus as cash. A shortfall is covered from cash, then re-borrowed.
@@ -249,10 +274,10 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
       totalRemaining += rem;
       if (inv.kind === "perpetual") perpetualBookValue += rem;
     }
-    // 6. Net worth = flywheel + stock pot (already compounded & drawn on above).
-    //    Roll the no-leverage benchmarks forward by the full contribution (0 once
-    //    saving is cut).
-    const netWorth = totalRemaining + cash - outstandingAmount + stockBalance;
+    // 6. Net worth = flywheel + stock pot + retained-return pile (the last two
+    //    already compounded & drawn on above). Roll the no-leverage benchmarks
+    //    forward by the full contribution (0 once saving is cut).
+    const netWorth = totalRemaining + cash - outstandingAmount + stockBalance + surplusPile;
     contributed += contribution;
     marketBalance = marketBalance * (1 + monthlyMarketRate) + contribution;
 
@@ -269,6 +294,7 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
       perpetualIncome,
       perpetualBookValue,
       stockBalance,
+      surplusPile,
     });
   }
 
