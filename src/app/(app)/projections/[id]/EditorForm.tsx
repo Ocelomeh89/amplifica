@@ -8,10 +8,16 @@ import Field from "@/components/Field";
 import { updateProjection, deleteProjection } from "../actions";
 import { runSimulation } from "@/lib/finance/projection-sim";
 import type { SweepBase } from "@/lib/finance/projection-sweep";
+import { earliestSustainableWithdrawal } from "@/lib/finance/projection-fi";
 import { fmtCurrency } from "@/lib/format";
 import SimCharts from "./SimCharts";
 import SweepHeatmap from "./SweepHeatmap";
 import FlywheelExplainer from "./FlywheelExplainer";
+
+// This branch models 30 years so perpetuals (30yr) and the drawdown have runway;
+// headline readouts are at 5/10/15 years.
+const MODEL_MONTHS = 360;
+const SNAPSHOTS = [60, 120, 180]; // 5 / 10 / 15 years
 
 interface Props {
   projection: Projection;
@@ -32,18 +38,22 @@ export default function EditorForm({ projection, justSaved }: Props) {
   // Continuous-LoC model: step the size up on EVERY payoff, not just fast ones.
   // Experimental, client-only (not persisted) — defaults ON for this branch.
   const [continuous, setContinuous] = useState(true);
+  // Perpetual-investment knobs + drawdown (all experimental / not persisted).
+  const [perpetualMixPct, setPerpetualMixPct] = useState(50);
+  const [perpetualTrigger, setPerpetualTrigger] = useState(50000);
+  const [monthlyWithdrawal, setMonthlyWithdrawal] = useState(4500);
 
-  const [debounced, setDebounced] = useState({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous });
+  const [debounced, setDebounced] = useState({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous, perpetualMixPct, perpetualTrigger, monthlyWithdrawal });
 
   useEffect(() => {
     const t = setTimeout(() => {
-      setDebounced({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous });
+      setDebounced({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous, perpetualMixPct, perpetualTrigger, monthlyWithdrawal });
     }, 200);
     return () => clearTimeout(t);
-  }, [msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous]);
+  }, [msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, continuous, perpetualMixPct, perpetualTrigger, monthlyWithdrawal]);
 
   // Everything the sim needs except the swept axes (term, factor). The heatmap
-  // reuses this so its grid matches the live editor exactly.
+  // and FI solver reuse this so they match the live editor exactly.
   const sweepBase: SweepBase = useMemo(
     () => ({
       msc: debounced.msc,
@@ -52,6 +62,10 @@ export default function EditorForm({ projection, justSaved }: Props) {
       locInterestPct: debounced.locInterestPct / 100,
       marketReturnPct: debounced.marketReturnPct / 100,
       payoffUpgradeMonths: debounced.continuous ? Infinity : undefined,
+      perpetualMix: debounced.perpetualMixPct / 100,
+      perpetualTriggerSize: debounced.perpetualTrigger,
+      monthlyWithdrawal: debounced.monthlyWithdrawal,
+      totalMonths: MODEL_MONTHS,
     }),
     [debounced]
   );
@@ -66,6 +80,17 @@ export default function EditorForm({ projection, justSaved }: Props) {
     [sweepBase, debounced.factor, debounced.term]
   );
 
+  // Earliest month you can cut MSC and draw the withdrawal while net worth grows.
+  const fi = useMemo(
+    () =>
+      earliestSustainableWithdrawal(
+        { ...sweepBase, investmentSizeFactor: debounced.factor, termMonths: debounced.term },
+        debounced.monthlyWithdrawal
+      ),
+    [sweepBase, debounced.factor, debounced.term, debounced.monthlyWithdrawal]
+  );
+
+  const atMonth = (m: number) => result.series[Math.min(m, result.series.length - 1)];
   const initialInvestmentSize = msc * factor;
   const finalNetWorth = result.series[result.series.length - 1]?.netWorth ?? 0;
   const vsMarket = result.finalMarketBaseline > 0 ? finalNetWorth / result.finalMarketBaseline : null;
@@ -135,6 +160,54 @@ export default function EditorForm({ projection, justSaved }: Props) {
           </button>
         </div>
       </form>
+
+      <Card title="Perpetuals & drawdown (experimental, not saved)">
+        <div className="grid grid-cols-3 gap-3">
+          <Field label="Perpetual mix (%)" hint="share of launches that go perpetual once size ≥ trigger">
+            <input type="number" value={perpetualMixPct} onChange={(e) => setPerpetualMixPct(Number(e.target.value))} min={0} max={100} step={5} className={inputClass} />
+          </Field>
+          <Field label="Perpetual trigger ($)" hint="draw size at which perpetuals merge in">
+            <input type="number" value={perpetualTrigger} onChange={(e) => setPerpetualTrigger(Number(e.target.value))} min={0} step={5000} className={inputClass} />
+          </Field>
+          <Field label="Monthly withdrawal ($)" hint="drawn once you cut MSC">
+            <input type="number" value={monthlyWithdrawal} onChange={(e) => setMonthlyWithdrawal(Number(e.target.value))} min={0} step={500} className={inputClass} />
+          </Field>
+        </div>
+      </Card>
+
+      <Card title="Key results @ 5 / 10 / 15 years">
+        <div className="grid grid-cols-4 gap-3 text-sm">
+          <div>
+            <div className="text-[10px] text-sub uppercase tracking-wide">&nbsp;</div>
+            {["Net worth", "Steady income/mo", "Perpetual income/mo"].map((label) => (
+              <div key={label} className="text-xs text-sub py-0.5">{label}</div>
+            ))}
+          </div>
+          {SNAPSHOTS.map((m) => (
+            <div key={m}>
+              <div className="text-[10px] text-sub uppercase tracking-wide">{m / 12} yr</div>
+              <div className="text-sm font-bold py-0.5">{fmtCurrency(atMonth(m).netWorth)}</div>
+              <div className="text-sm py-0.5">{fmtCurrency(atMonth(m).cashFlow)}</div>
+              <div className="text-sm py-0.5 text-aqua">{fmtCurrency(atMonth(m).perpetualIncome)}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 pt-3 border-t border-edge text-sm">
+          {fi.month != null ? (
+            <>
+              <span className="font-medium">Financial independence: </span>
+              cut MSC and draw {fmtCurrency(monthlyWithdrawal)}/mo from{" "}
+              <span className="font-bold text-aqua">month {fi.month} (~{(fi.month / 12).toFixed(1)} yr)</span>{" "}
+              — net worth still climbs to {fmtCurrency(fi.netWorthAtEnd ?? 0)} by year 30.
+            </>
+          ) : (
+            <>
+              <span className="font-medium">Financial independence: </span>
+              <span className="text-sub">not reachable within 30 years at {fmtCurrency(monthlyWithdrawal)}/mo with these inputs.</span>
+            </>
+          )}
+        </div>
+      </Card>
 
       <Card title="Summary">
         <div className="grid grid-cols-4 gap-3 text-sm">
