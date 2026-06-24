@@ -38,4 +38,18 @@ describe("earliestSustainableWithdrawal", () => {
     const fi = earliestSustainableWithdrawal({ ...profitable, perpetualMix: 0 }, 1e9);
     expect(fi.month).toBeNull();
   });
+
+  it("income FI (no growth required) is never later than wealth FI", () => {
+    // "Never dips below the switch" is a weaker bar than "ends strictly higher",
+    // so the income-funded date must come no later than the wealth-growth date.
+    const wealth = earliestSustainableWithdrawal(profitable, 4500, { requireGrowth: true });
+    const income = earliestSustainableWithdrawal(profitable, 4500, { requireGrowth: false });
+    expect(income.month).not.toBeNull();
+    expect(income.month!).toBeLessThanOrEqual(wealth.month ?? Infinity);
+
+    // And at the income-FI switch, net worth genuinely never erodes afterward.
+    const r = runSimulation({ ...profitable, withdrawalStartMonth: income.month!, monthlyWithdrawal: 4500 });
+    const start = r.series[income.month!].netWorth;
+    expect(r.series.slice(income.month!).every((s) => s.netWorth >= start - 1e-6 * Math.max(1, start))).toBe(true);
+  });
 });

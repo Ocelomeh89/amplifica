@@ -86,14 +86,20 @@ export default function EditorForm({ projection, justSaved }: Props) {
     [sweepBase, debounced.factor, debounced.term]
   );
 
-  // Earliest month you can cut MSC and draw the withdrawal while net worth grows.
+  // Two finish lines for cutting MSC and drawing the withdrawal:
+  //  • income FI — the draw is income-funded so net worth never erodes (flat OK)
+  //  • wealth FI — net worth keeps strictly growing on top of the draw
+  const fiInput = useMemo(
+    () => ({ ...sweepBase, investmentSizeFactor: debounced.factor, termMonths: debounced.term }),
+    [sweepBase, debounced.factor, debounced.term]
+  );
+  const incomeFi = useMemo(
+    () => earliestSustainableWithdrawal(fiInput, debounced.monthlyWithdrawal, { requireGrowth: false }),
+    [fiInput, debounced.monthlyWithdrawal]
+  );
   const fi = useMemo(
-    () =>
-      earliestSustainableWithdrawal(
-        { ...sweepBase, investmentSizeFactor: debounced.factor, termMonths: debounced.term },
-        debounced.monthlyWithdrawal
-      ),
-    [sweepBase, debounced.factor, debounced.term, debounced.monthlyWithdrawal]
+    () => earliestSustainableWithdrawal(fiInput, debounced.monthlyWithdrawal, { requireGrowth: true }),
+    [fiInput, debounced.monthlyWithdrawal]
   );
 
   const atMonth = (m: number) => result.series[Math.min(m, result.series.length - 1)];
@@ -206,20 +212,27 @@ export default function EditorForm({ projection, justSaved }: Props) {
             </div>
           ))}
         </div>
-        <div className="mt-3 pt-3 border-t border-edge text-sm">
-          {fi.month != null ? (
-            <>
-              <span className="font-medium">Financial independence: </span>
-              cut MSC and draw {fmtCurrency(monthlyWithdrawal)}/mo from{" "}
-              <span className="font-bold text-aqua">month {fi.month} (~{(fi.month / 12).toFixed(1)} yr)</span>{" "}
-              — net worth still climbs to {fmtCurrency(fi.netWorthAtEnd ?? 0)} by year 30.
-            </>
-          ) : (
-            <>
-              <span className="font-medium">Financial independence: </span>
-              <span className="text-sub">not reachable within 30 years at {fmtCurrency(monthlyWithdrawal)}/mo with these inputs.</span>
-            </>
-          )}
+        <div className="mt-3 pt-3 border-t border-edge text-sm space-y-1">
+          <div>
+            <span className="font-medium">Income FI</span>{" "}
+            <span className="text-sub text-xs">(draw is income-funded; net worth never erodes)</span>:{" "}
+            {incomeFi.month != null ? (
+              <span className="font-bold text-aqua">month {incomeFi.month} (~{(incomeFi.month / 12).toFixed(1)} yr)</span>
+            ) : (
+              <span className="text-sub">not within 30 yr</span>
+            )}{" "}
+            at {fmtCurrency(monthlyWithdrawal)}/mo
+          </div>
+          <div>
+            <span className="font-medium">Wealth FI</span>{" "}
+            <span className="text-sub text-xs">(net worth still grows on top of the draw)</span>:{" "}
+            {fi.month != null ? (
+              <span className="font-bold">month {fi.month} (~{(fi.month / 12).toFixed(1)} yr)</span>
+            ) : (
+              <span className="text-sub">not within 30 yr</span>
+            )}
+            {fi.month != null && ` — ends ${fmtCurrency(fi.netWorthAtEnd ?? 0)} by year 30`}
+          </div>
         </div>
       </Card>
 

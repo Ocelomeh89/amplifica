@@ -1,8 +1,8 @@
 import { runSimulation, DEFAULT_MONTHLY_WITHDRAWAL, type ProjectionSimInput } from "./projection-sim";
 
 export interface FiResult {
-  // Earliest month you can stop saving and draw the withdrawal while net worth
-  // keeps growing — or null if never within the horizon.
+  // Earliest month you can stop saving and draw the withdrawal sustainably — or
+  // null if never within the horizon.
   month: number | null;
   monthlyWithdrawal: number;
   // Net worth at the switch month and at the end, when a switch was found.
@@ -10,18 +10,26 @@ export interface FiResult {
   netWorthAtEnd: number | null;
 }
 
-// "The total keeps growing": from the switch month on, net worth never dips back
-// below its level at the switch, and finishes strictly higher. This tolerates
-// the flywheel's month-to-month saw-tooth (which a strict monotone test would
-// trip on) while still guaranteeing your base never erodes and the total climbs.
-function sustained(netWorths: number[], from: number): boolean {
+export interface FiOptions {
+  // true  → "wealth FI": net worth must keep GROWING through the horizon.
+  // false → "income FI": net worth must merely not ERODE (flat is fine) — i.e.
+  //         the draw is fully funded by income, principal left intact.
+  requireGrowth?: boolean;
+  minRunwayMonths?: number;
+}
+
+// From the switch month on, net worth never dips below its level at the switch
+// (the draw is income-funded, not eroding principal). With requireGrowth it must
+// also finish strictly higher. The "never dips" tolerates the flywheel saw-tooth
+// that a strict monotone test would trip on.
+function sustained(netWorths: number[], from: number, requireGrowth: boolean): boolean {
   if (from >= netWorths.length - 1) return false;
   const start = netWorths[from];
   const tol = 1e-6 * Math.max(1, Math.abs(start));
   for (let i = from + 1; i < netWorths.length; i++) {
     if (netWorths[i] < start - tol) return false;
   }
-  return netWorths[netWorths.length - 1] > start + tol;
+  return requireGrowth ? netWorths[netWorths.length - 1] > start + tol : true;
 }
 
 // Scan the switch month upward and return the earliest one that sustains. Later
@@ -29,14 +37,16 @@ function sustained(netWorths: number[], from: number): boolean {
 export function earliestSustainableWithdrawal(
   base: ProjectionSimInput,
   monthlyWithdrawal: number = base.monthlyWithdrawal ?? DEFAULT_MONTHLY_WITHDRAWAL,
-  minRunwayMonths = 12
+  options: FiOptions = {}
 ): FiResult {
+  const requireGrowth = options.requireGrowth ?? true;
+  const minRunwayMonths = options.minRunwayMonths ?? 12;
   const totalMonths = base.totalMonths ?? 480;
   const maxStart = totalMonths - minRunwayMonths;
   for (let t = 0; t <= maxStart; t++) {
     const r = runSimulation({ ...base, withdrawalStartMonth: t, monthlyWithdrawal });
     const nw = r.series.map((s) => s.netWorth);
-    if (sustained(nw, t)) {
+    if (sustained(nw, t, requireGrowth)) {
       return {
         month: t,
         monthlyWithdrawal,
