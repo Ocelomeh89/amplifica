@@ -361,4 +361,17 @@ describe("retained-return pile — amortize below the true return", () => {
     }
     expect(r.series[r.series.length - 1].surplusPile).toBeGreaterThan(0);
   });
+
+  it("income-ETF mode distributes the yield instead of compounding the pile", () => {
+    // Same spread either way, but in ETF mode the pile holds only accumulated
+    // principal (yield is paid out as cash), so it stays below the compounding
+    // pile — and that distributed cash lifts total cashflow.
+    const compound = runSimulation({ ...base, investmentReturnPct: 0.12 });
+    const etf = runSimulation({ ...base, investmentReturnPct: 0.12, spreadEtfYieldPct: 0.1 });
+    const last = base.totalMonths! - 1;
+    expect(etf.series[last].surplusPile).toBeGreaterThan(0);
+    expect(etf.series[last].surplusPile).toBeLessThan(compound.series[last].surplusPile);
+    const sumCf = (r: typeof etf) => r.series.reduce((a, s) => a + s.cashFlow, 0);
+    expect(sumCf(etf)).toBeGreaterThan(sumCf(compound));
+  });
 });

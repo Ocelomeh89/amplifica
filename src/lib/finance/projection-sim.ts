@@ -50,6 +50,10 @@ export interface ProjectionSimInput {
   // flywheel. 0 (default) = today's behavior (all MSC to the flywheel).
   stockAllocPct?: number;
   stockReturnPct?: number;
+  // If set, the retained spread is parked in an income ETF yielding this rate as
+  // monthly CASH that recycles into the flywheel (and funds the draw), instead of
+  // compounding silently inside the pile. Models "invest the spread in income ETFs".
+  spreadEtfYieldPct?: number;
   totalMonths?: number;
 }
 
@@ -198,10 +202,19 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
       if (inv.kind === "perpetual") perpetualIncome += inv.monthlyPayout;
     }
 
-    // 2b. Compound the stock pot and the retained-return pile for the month
-    //     (before they can be drawn on).
+    // The retained spread, if parked in an income ETF, throws off monthly cash
+    // (on last month's principal) that recycles straight into the flywheel inflow.
+    const etfIncome = input.spreadEtfYieldPct != null ? surplusPile * (input.spreadEtfYieldPct / 12) : 0;
+    cashFlow += etfIncome;
+
+    // 2b. Compound the stock pot. The retained pile either compounds internally
+    //     (default) or, as an income ETF, keeps only new spread as principal
+    //     (its yield was just distributed into cashFlow above).
     stockBalance = stockBalance * (1 + monthlyStockRate) + stockContribution;
-    surplusPile = surplusPile * (1 + monthlyReturnRate) + activeSurplus;
+    surplusPile =
+      input.spreadEtfYieldPct != null
+        ? surplusPile + activeSurplus
+        : surplusPile * (1 + monthlyReturnRate) + activeSurplus;
 
     // 3. Fund the withdrawal from liquid reserves first — the retained-return
     //    pile, then the stock pot — so the flywheel keeps turning undisturbed.
