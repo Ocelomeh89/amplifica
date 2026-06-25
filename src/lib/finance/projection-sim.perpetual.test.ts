@@ -34,6 +34,10 @@ describe("perpetual Amplicons", () => {
       expect(runs[i].perpetualsLaunched).toBeGreaterThanOrEqual(runs[i - 1].perpetualsLaunched);
     }
     expect(runs[runs.length - 1].perpetualsLaunched).toBeGreaterThan(0);
+    // The highest-mix run earns positive perpetual coupon income; mix 0 earns none.
+    const finalIncome = (r: typeof runs[number]) => r.series[r.series.length - 1].perpetualIncome;
+    expect(finalIncome(runs[runs.length - 1])).toBeGreaterThan(0);
+    expect(finalIncome(runs[0])).toBe(0);
   });
   it("trigger far above any reached size yields no perpetuals", () => {
     const r = runSimulation({ ...base, payoffUpgradeMonths: Infinity, perpetualMix: 1, perpetualTriggerSize: 1e12 });
