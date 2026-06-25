@@ -7,6 +7,7 @@ import Card from "@/components/Card";
 import Field from "@/components/Field";
 import { updateProjection, deleteProjection } from "../actions";
 import { runSimulation } from "@/lib/finance/projection-sim";
+import { earliestSustainableWithdrawal } from "@/lib/finance/projection-fi";
 import { fmtCurrency } from "@/lib/format";
 import SimCharts from "./SimCharts";
 import FlywheelExplainer from "./FlywheelExplainer";
@@ -64,6 +65,13 @@ export default function EditorForm({ projection, justSaved }: Props) {
     [debounced]
   );
   const result = useMemo(() => runSimulation(simInput), [simInput]);
+
+  const SNAPSHOTS = [60, 120, 180]; // 5 / 10 / 15 years
+  const at = (m: number) => result.series[Math.min(m, result.series.length - 1)];
+  const fi = useMemo(
+    () => earliestSustainableWithdrawal(simInput, simInput.monthlyWithdrawal, { requireGrowth: false }),
+    [simInput]
+  );
 
   const initialInvestmentSize = msc * factor;
   const finalNetWorth = result.series[result.series.length - 1]?.netWorth ?? 0;
@@ -192,6 +200,37 @@ export default function EditorForm({ projection, justSaved }: Props) {
             <div className="text-[10px] text-sub uppercase tracking-wide">Flywheel vs market</div>
             <div className="text-base font-bold">{vsMarket != null ? `${vsMarket.toFixed(1)}×` : "—"}</div>
           </div>
+        </div>
+      </Card>
+
+      <Card title="Key results @ 5 / 10 / 15 years">
+        <div className="grid grid-cols-4 gap-3 text-sm">
+          <div>
+            <div className="text-[10px] text-sub uppercase tracking-wide">&nbsp;</div>
+            {["Net worth", "Cash flow/mo", "Perpetual income/mo"].map((label) => (
+              <div key={label} className="text-xs text-sub py-0.5">{label}</div>
+            ))}
+          </div>
+          {SNAPSHOTS.map((m) => (
+            <div key={m}>
+              <div className="text-[10px] text-sub uppercase tracking-wide">{m / 12} yr</div>
+              <div className="text-sm font-bold py-0.5">{fmtCurrency(at(m).netWorth)}</div>
+              <div className="text-sm py-0.5">{fmtCurrency(at(m).cashFlow)}</div>
+              <div className="text-sm py-0.5 text-aqua">{fmtCurrency(at(m).perpetualIncome)}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 pt-3 border-t border-edge text-sm">
+          {fi.month != null ? (
+            <>
+              <span className="font-medium">Financial independence: </span>
+              stop saving and draw {fmtCurrency(withdrawalAmount)}/mo from{" "}
+              <span className="font-bold text-aqua">month {fi.month} (~{(fi.month / 12).toFixed(1)} yr)</span>{" "}
+              — net worth holds and ends {fmtCurrency(fi.netWorthAtEnd ?? 0)}.
+            </>
+          ) : (
+            <span className="text-sub">FI: drawing {fmtCurrency(withdrawalAmount)}/mo is not sustainable within 30 years at these inputs.</span>
+          )}
         </div>
       </Card>
 
