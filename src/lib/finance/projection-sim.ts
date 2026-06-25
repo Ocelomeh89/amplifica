@@ -10,6 +10,11 @@ export const PAYOFF_UPGRADE_MONTHS = 3;
 // projection via ProjectionSimInput.marketReturnPct.
 export const DEFAULT_MARKET_RETURN_PCT = 0.1;
 
+export const DEFAULT_PERPETUAL_YIELD_PCT = 0.1; // 10% cash-on-cash per year
+export const DEFAULT_PERPETUAL_TERM_MONTHS = 360; // "perpetual", capped at 30y
+export const DEFAULT_PERPETUAL_TRIGGER = 50000; // draw size at which they roll in
+export const DEFAULT_MONTHLY_WITHDRAWAL = 4500;
+
 export interface ProjectionSimInput {
   msc: number;
   investmentSizeFactor: number;
@@ -19,6 +24,18 @@ export interface ProjectionSimInput {
   locInterestPct: number;
   marketReturnPct?: number;
   totalMonths?: number;
+  // Payoff-speed gate; Infinity = continuous (step up on every payoff).
+  payoffUpgradeMonths?: number;
+  // Long-term Amplicons: a fraction of launches go perpetual once size >= trigger.
+  perpetualMix?: number;
+  perpetualTriggerSize?: number;
+  perpetualYieldPct?: number;
+  perpetualTermMonths?: number;
+  // Stop MSC at this month (undefined = never). Independent of withdrawal.
+  mscEndMonth?: number;
+  // Withdraw monthlyWithdrawal from this month (undefined = never).
+  withdrawalStartMonth?: number;
+  monthlyWithdrawal?: number;
 }
 
 export interface ProjectionSimPoint {
@@ -33,6 +50,8 @@ export interface ProjectionSimPoint {
   contributedCapital: number;
   // The same contributions dripped into the market at marketReturnPct instead.
   marketBaseline: number;
+  perpetualIncome: number;
+  perpetualBookValue: number;
 }
 
 export interface ProjectionSimResult {
@@ -43,12 +62,15 @@ export interface ProjectionSimResult {
   peakOutstanding: number;
   finalContributedCapital: number;
   finalMarketBaseline: number;
+  perpetualsLaunched: number;
 }
 
+type InvestmentKind = "term" | "perpetual";
+
 interface ActiveInvestment {
-  faceValue: number;
+  kind: InvestmentKind;
+  monthlyPayout: number; // amortizing payment (term) or flat coupon (perpetual)
   termMonths: number;
-  interestPct: number;
   startMonth: number;
 }
 
@@ -57,86 +79,107 @@ function isActive(inv: ActiveInvestment, m: number): boolean {
   return elapsed >= 0 && elapsed < inv.termMonths;
 }
 
-function monthlyPayoutOf(inv: ActiveInvestment): number {
-  return monthlyPayment(inv.faceValue, inv.interestPct, inv.termMonths);
-}
-
-// Nominal sum of remaining monthly payments owed by this investment at month m —
-// face value of future cash flow, not a discounted PV.
 function remainingBalanceAt(inv: ActiveInvestment, m: number): number {
   const elapsed = m - inv.startMonth;
   if (elapsed < 0 || elapsed >= inv.termMonths) return 0;
-  return monthlyPayoutOf(inv) * (inv.termMonths - elapsed);
+  return inv.monthlyPayout * (inv.termMonths - elapsed);
+}
+
+function makeInvestment(
+  kind: InvestmentKind,
+  faceValue: number,
+  startMonth: number,
+  input: ProjectionSimInput
+): ActiveInvestment {
+  if (kind === "perpetual") {
+    const termMonths = input.perpetualTermMonths ?? DEFAULT_PERPETUAL_TERM_MONTHS;
+    const yieldPct = input.perpetualYieldPct ?? DEFAULT_PERPETUAL_YIELD_PCT;
+    return { kind, monthlyPayout: faceValue * (yieldPct / 12), termMonths, startMonth };
+  }
+  return {
+    kind: "term",
+    monthlyPayout: monthlyPayment(faceValue, input.investmentInterestPct, input.termMonths),
+    termMonths: input.termMonths,
+    startMonth,
+  };
 }
 
 export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
   const totalMonths = input.totalMonths ?? 480;
   const monthlyLocRate = input.locInterestPct / 12;
   const monthlyMarketRate = (input.marketReturnPct ?? DEFAULT_MARKET_RETURN_PCT) / 12;
+  const payoffUpgradeMonths = input.payoffUpgradeMonths ?? PAYOFF_UPGRADE_MONTHS;
+  const perpetualMix = input.perpetualMix ?? 0;
+  const perpetualTrigger = input.perpetualTriggerSize ?? DEFAULT_PERPETUAL_TRIGGER;
+  const monthlyWithdrawal = input.monthlyWithdrawal ?? DEFAULT_MONTHLY_WITHDRAWAL;
   const initialInvestmentSize = input.msc * input.investmentSizeFactor;
 
   let currentInvestmentSize = initialInvestmentSize;
   let outstandingAmount = initialInvestmentSize;
-  let cash = 0; // surplus inflow banked here; counts toward net worth
+  let cash = 0;
   let lastInvStartMonth = 0;
   let peakOutstanding = initialInvestmentSize;
+  let mixAcc = 0;
 
-  const active: ActiveInvestment[] = [
-    {
-      faceValue: initialInvestmentSize,
-      termMonths: input.termMonths,
-      interestPct: input.investmentInterestPct,
-      startMonth: 0,
-    },
-  ];
+  const active: ActiveInvestment[] = [makeInvestment("term", initialInvestmentSize, 0, input)];
   let investmentsLaunched = 1;
+  let perpetualsLaunched = 0;
 
-  // Benchmarks: same MSC, no leverage. `contributed` is the raw sum you put in;
-  // `marketBalance` is that stream compounded monthly at the market rate.
   let contributed = 0;
   let marketBalance = 0;
 
   const series: ProjectionSimPoint[] = [];
 
   for (let m = 0; m < totalMonths; m++) {
-    // 1. Accrue LoC interest.
+    const mscActive = input.mscEndMonth == null || m < input.mscEndMonth;
+    const effMsc = mscActive ? input.msc : 0;
+    const withdrawing = input.withdrawalStartMonth != null && m >= input.withdrawalStartMonth;
+    const withdrawal = withdrawing ? monthlyWithdrawal : 0;
+
     outstandingAmount *= 1 + monthlyLocRate;
 
-    // 2. Collect MSC + monthly payouts of active investments.
-    let cashFlow = input.msc;
+    let cashFlow = effMsc;
+    let perpetualIncome = 0;
     for (const inv of active) {
-      if (isActive(inv, m)) cashFlow += monthlyPayoutOf(inv);
+      if (!isActive(inv, m)) continue;
+      cashFlow += inv.monthlyPayout;
+      if (inv.kind === "perpetual") perpetualIncome += inv.monthlyPayout;
     }
 
-    // 3. Apply inflow to debt; bank any surplus as cash (never discard it).
-    if (cashFlow >= outstandingAmount) {
-      cash += cashFlow - outstandingAmount;
-      outstandingAmount = 0;
+    const netInflow = cashFlow - withdrawal;
+    if (netInflow >= 0) {
+      if (netInflow >= outstandingAmount) {
+        cash += netInflow - outstandingAmount;
+        outstandingAmount = 0;
+      } else {
+        outstandingAmount -= netInflow;
+      }
     } else {
-      outstandingAmount -= cashFlow;
+      const shortfall = -netInflow;
+      const fromCash = Math.min(cash, shortfall);
+      cash -= fromCash;
+      outstandingAmount += shortfall - fromCash;
     }
 
-    // 4. If outstanding reached 0, start a new investment this month. Step the
-    //    size up only when the just-paid loan was retired in < 3 months.
-    //    Guard on size > 0 so MSC = 0 doesn't churn $0 investments forever.
     if (outstandingAmount === 0 && currentInvestmentSize > 0 && m < totalMonths - 1) {
       const monthsToPayoff = m - lastInvStartMonth;
-      if (monthsToPayoff < PAYOFF_UPGRADE_MONTHS) {
+      if (monthsToPayoff < payoffUpgradeMonths) {
         currentInvestmentSize *= input.locIncrease;
       }
-      active.push({
-        faceValue: currentInvestmentSize,
-        termMonths: input.termMonths,
-        interestPct: input.investmentInterestPct,
-        startMonth: m + 1,
-      });
+      let kind: InvestmentKind = "term";
+      if (perpetualMix > 0 && currentInvestmentSize >= perpetualTrigger) {
+        mixAcc += perpetualMix;
+        if (mixAcc >= 1) {
+          kind = "perpetual";
+          mixAcc -= 1;
+          perpetualsLaunched += 1;
+        }
+      }
+      active.push(makeInvestment(kind, currentInvestmentSize, m + 1, input));
       investmentsLaunched += 1;
       outstandingAmount = currentInvestmentSize;
       lastInvStartMonth = m + 1;
 
-      // Deploy banked cash to immediately pay down the fresh LoC draw. This
-      // shortens payoffs, which trips the < 3-month upgrade more often, so the
-      // flywheel accelerates instead of plateauing.
       const fromCash = Math.min(cash, outstandingAmount);
       outstandingAmount -= fromCash;
       cash -= fromCash;
@@ -144,14 +187,17 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
 
     if (outstandingAmount > peakOutstanding) peakOutstanding = outstandingAmount;
 
-    // 5. Net worth = Σ nominal remaining payments (at m+1) + cash − outstanding.
     let totalRemaining = 0;
-    for (const inv of active) totalRemaining += remainingBalanceAt(inv, m + 1);
+    let perpetualBookValue = 0;
+    for (const inv of active) {
+      const rem = remainingBalanceAt(inv, m + 1);
+      totalRemaining += rem;
+      if (inv.kind === "perpetual") perpetualBookValue += rem;
+    }
     const netWorth = totalRemaining + cash - outstandingAmount;
 
-    // 6. Roll the no-leverage benchmarks forward by one monthly contribution.
-    contributed += input.msc;
-    marketBalance = marketBalance * (1 + monthlyMarketRate) + input.msc;
+    contributed += effMsc;
+    marketBalance = marketBalance * (1 + monthlyMarketRate) + effMsc;
 
     series.push({
       monthIndex: m,
@@ -163,6 +209,8 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
       activeInvestmentCount: active.filter((inv) => isActive(inv, m)).length,
       contributedCapital: contributed,
       marketBaseline: marketBalance,
+      perpetualIncome,
+      perpetualBookValue,
     });
   }
 
@@ -171,6 +219,7 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
     initialInvestmentSize,
     finalInvestmentSize: currentInvestmentSize,
     investmentsLaunched,
+    perpetualsLaunched,
     peakOutstanding,
     finalContributedCapital: contributed,
     finalMarketBaseline: marketBalance,

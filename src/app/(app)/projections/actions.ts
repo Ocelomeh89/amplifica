@@ -45,6 +45,14 @@ export async function updateProjection(formData: FormData) {
   const investment_interest_pct = Number(formData.get("investment_interest_pct") ?? 0) / 100;
   const loc_increase = Number(formData.get("loc_increase") ?? 1.5);
   const loc_interest_pct = Number(formData.get("loc_interest_pct") ?? 0) / 100;
+  const payoff_upgrade_months = Number(formData.get("payoff_upgrade_months") ?? 3);
+  const continuous_growth = formData.get("continuous_growth") === "on";
+  const perpetual_mix = Number(formData.get("perpetual_mix") ?? 0) / 100;
+  const perpetual_yield_pct = Number(formData.get("perpetual_yield_pct") ?? 10) / 100;
+  const perpetual_trigger_size = Number(formData.get("perpetual_trigger_size") ?? 50000);
+  const mscEndRaw = String(formData.get("msc_end_month") ?? "").trim();
+  const msc_end_month = mscEndRaw === "" ? null : Number(mscEndRaw);
+  const withdrawal_amount = Number(formData.get("withdrawal_amount") ?? 4500);
   const market_return_pct = Number(formData.get("market_return_pct") ?? 10) / 100;
 
   const { error } = await supabase
@@ -57,6 +65,13 @@ export async function updateProjection(formData: FormData) {
       investment_interest_pct,
       loc_increase,
       loc_interest_pct,
+      payoff_upgrade_months,
+      continuous_growth,
+      perpetual_mix,
+      perpetual_yield_pct,
+      perpetual_trigger_size,
+      msc_end_month,
+      withdrawal_amount,
       market_return_pct,
     })
     .eq("id", id)

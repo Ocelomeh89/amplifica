@@ -98,6 +98,13 @@ export type Database = {
           loc_increase: number;
           loc_interest_pct: number;
           market_return_pct: number;
+          payoff_upgrade_months: number;
+          continuous_growth: boolean;
+          perpetual_mix: number;
+          perpetual_yield_pct: number;
+          perpetual_trigger_size: number;
+          msc_end_month: number | null;
+          withdrawal_amount: number;
           created_at: string;
           updated_at: string;
         };
@@ -111,6 +118,13 @@ export type Database = {
           loc_increase?: number;
           loc_interest_pct?: number;
           market_return_pct?: number;
+          payoff_upgrade_months?: number;
+          continuous_growth?: boolean;
+          perpetual_mix?: number;
+          perpetual_yield_pct?: number;
+          perpetual_trigger_size?: number;
+          msc_end_month?: number | null;
+          withdrawal_amount?: number;
         };
         Update: {
           name?: string;
@@ -121,6 +135,13 @@ export type Database = {
           loc_increase?: number;
           loc_interest_pct?: number;
           market_return_pct?: number;
+          payoff_upgrade_months?: number;
+          continuous_growth?: boolean;
+          perpetual_mix?: number;
+          perpetual_yield_pct?: number;
+          perpetual_trigger_size?: number;
+          msc_end_month?: number | null;
+          withdrawal_amount?: number;
         };
         Relationships: [];
       };
