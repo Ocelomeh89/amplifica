@@ -203,7 +203,7 @@ export default function EditorForm({ projection, justSaved }: Props) {
         </div>
       </Card>
 
-      <Card title="Key results @ 5 / 10 / 15 years">
+      <Card title="Key results @ 5 / 10 / 15 years (accumulation)">
         <div className="grid grid-cols-4 gap-3 text-sm">
           <div>
             <div className="text-[10px] text-sub uppercase tracking-wide">&nbsp;</div>
