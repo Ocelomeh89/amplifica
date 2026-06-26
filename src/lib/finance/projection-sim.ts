@@ -42,7 +42,7 @@ export interface ProjectionSimPoint {
   monthIndex: number;
   cashFlow: number;
   outstandingAmount: number;
-  netWorth: number;
+  expectedFuturePayments: number;
   cash: number;
   currentInvestmentSize: number;
   activeInvestmentCount: number;
@@ -194,7 +194,7 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
       totalRemaining += rem;
       if (inv.kind === "perpetual") perpetualBookValue += rem;
     }
-    const netWorth = totalRemaining + cash - outstandingAmount;
+    const expectedFuturePayments = totalRemaining + cash - outstandingAmount;
 
     contributed += effMsc;
     marketBalance = marketBalance * (1 + monthlyMarketRate) + effMsc;
@@ -203,7 +203,7 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
       monthIndex: m,
       cashFlow,
       outstandingAmount,
-      netWorth,
+      expectedFuturePayments,
       cash,
       currentInvestmentSize,
       activeInvestmentCount: active.filter((inv) => isActive(inv, m)).length,

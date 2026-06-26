@@ -74,8 +74,8 @@ export default function EditorForm({ projection, justSaved }: Props) {
   );
 
   const initialInvestmentSize = msc * factor;
-  const finalNetWorth = result.series[result.series.length - 1]?.netWorth ?? 0;
-  const vsMarket = result.finalMarketBaseline > 0 ? finalNetWorth / result.finalMarketBaseline : null;
+  const finalExpectedFuturePayments = result.series[result.series.length - 1]?.expectedFuturePayments ?? 0;
+  const vsMarket = result.finalMarketBaseline > 0 ? finalExpectedFuturePayments / result.finalMarketBaseline : null;
 
   return (
     <>
@@ -189,8 +189,8 @@ export default function EditorForm({ projection, justSaved }: Props) {
             <div className="text-base font-bold">{fmtCurrency(result.finalContributedCapital)}</div>
           </div>
           <div>
-            <div className="text-[10px] text-sub uppercase tracking-wide">Net worth (flywheel)</div>
-            <div className="text-base font-bold text-aqua">{fmtCurrency(finalNetWorth)}</div>
+            <div className="text-[10px] text-sub uppercase tracking-wide">Expected future payments</div>
+            <div className="text-base font-bold text-aqua">{fmtCurrency(finalExpectedFuturePayments)}</div>
           </div>
           <div>
             <div className="text-[10px] text-sub uppercase tracking-wide">Market ({marketReturnPct}% DCA)</div>
@@ -207,14 +207,14 @@ export default function EditorForm({ projection, justSaved }: Props) {
         <div className="grid grid-cols-4 gap-3 text-sm">
           <div>
             <div className="text-[10px] text-sub uppercase tracking-wide">&nbsp;</div>
-            {["Net worth", "Cash flow/mo", "Perpetual income/mo"].map((label) => (
+            {["Expected future payments", "Cash flow/mo", "Perpetual income/mo"].map((label) => (
               <div key={label} className="text-xs text-sub py-0.5">{label}</div>
             ))}
           </div>
           {SNAPSHOTS.map((m) => (
             <div key={m}>
               <div className="text-[10px] text-sub uppercase tracking-wide">{m / 12} yr</div>
-              <div className="text-sm font-bold py-0.5">{fmtCurrency(at(m).netWorth)}</div>
+              <div className="text-sm font-bold py-0.5">{fmtCurrency(at(m).expectedFuturePayments)}</div>
               <div className="text-sm py-0.5">{fmtCurrency(at(m).cashFlow)}</div>
               <div className="text-sm py-0.5 text-aqua">{fmtCurrency(at(m).perpetualIncome)}</div>
             </div>
@@ -226,7 +226,7 @@ export default function EditorForm({ projection, justSaved }: Props) {
               <span className="font-medium">Financial independence: </span>
               stop saving and draw {fmtCurrency(withdrawalAmount)}/mo from{" "}
               <span className="font-bold text-aqua">month {fi.month} (~{(fi.month / 12).toFixed(1)} yr)</span>{" "}
-              — net worth holds and ends {fmtCurrency(fi.netWorthAtEnd ?? 0)}.
+              — the total holds, ending at {fmtCurrency(fi.expectedFuturePaymentsAtEnd ?? 0)}.
             </>
           ) : (
             <span className="text-sub">FI: drawing {fmtCurrency(withdrawalAmount)}/mo is not sustainable within 30 years at these inputs.</span>

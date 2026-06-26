@@ -35,7 +35,7 @@ export default function SimCharts({ series }: { series: ProjectionSimPoint[] }) 
       </div>
 
       <div className="bg-card border border-edge rounded-lg p-3 mb-3">
-        <div className="text-[11px] text-sub uppercase tracking-wide mb-2">Net worth &amp; outstanding</div>
+        <div className="text-[11px] text-sub uppercase tracking-wide mb-2">Expected future payments &amp; outstanding</div>
         <div className="h-56">
           <ResponsiveContainer>
             <LineChart data={series}>
@@ -44,7 +44,7 @@ export default function SimCharts({ series }: { series: ProjectionSimPoint[] }) 
               <YAxis tickFormatter={fmtCurrency} tick={TICK} />
               <Tooltip formatter={(v: number) => fmtCurrency(v)} labelFormatter={(l) => `Month ${l}`} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Line type="monotone" dataKey="netWorth" name="Net worth" stroke="#3EC9C0" strokeWidth={2} dot={false} isAnimationActive={false} />
+              <Line type="monotone" dataKey="expectedFuturePayments" name="Expected future payments" stroke="#3EC9C0" strokeWidth={2} dot={false} isAnimationActive={false} />
               <Line type="monotone" dataKey="outstandingAmount" name="Outstanding" stroke="#A88BE8" strokeWidth={2} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
             </LineChart>
           </ResponsiveContainer>
@@ -61,7 +61,7 @@ export default function SimCharts({ series }: { series: ProjectionSimPoint[] }) 
               <YAxis tickFormatter={fmtCurrency} tick={TICK} />
               <Tooltip formatter={(v: number) => fmtCurrency(v)} labelFormatter={(l) => `Month ${l}`} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Line type="monotone" dataKey="netWorth" name="Net worth (flywheel)" stroke="#3EC9C0" strokeWidth={2} dot={false} isAnimationActive={false} />
+              <Line type="monotone" dataKey="expectedFuturePayments" name="Expected future payments" stroke="#3EC9C0" strokeWidth={2} dot={false} isAnimationActive={false} />
               <Line type="monotone" dataKey="marketBaseline" name="Market (DCA)" stroke="#6C4BD3" strokeWidth={2} dot={false} isAnimationActive={false} />
               <Line type="monotone" dataKey="contributedCapital" name="Contributed (MSC)" stroke="#8D8295" strokeWidth={2} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
             </LineChart>

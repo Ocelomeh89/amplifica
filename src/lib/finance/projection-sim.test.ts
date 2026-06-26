@@ -56,9 +56,9 @@ describe("runSimulation — cash bucket accelerates growth (no plateau)", () => 
     }
   });
 
-  it("net worth keeps climbing across the horizon — no plateau", () => {
+  it("expected future payments keeps climbing across the horizon — no plateau", () => {
     const r = runSimulation(baseInput);
-    const at = (m: number) => r.series[m].netWorth;
+    const at = (m: number) => r.series[m].expectedFuturePayments;
     expect(at(120)).toBeGreaterThan(at(60));
     expect(at(240)).toBeGreaterThan(at(120));
     expect(at(479)).toBeGreaterThan(at(240));
@@ -66,7 +66,7 @@ describe("runSimulation — cash bucket accelerates growth (no plateau)", () => 
     expect(at(479)).toBeGreaterThan(10_000_000);
   });
 
-  it("cash is always banked (never negative) and counted in net worth", () => {
+  it("cash is always banked (never negative) and counted in expected future payments", () => {
     const r = runSimulation(baseInput);
     expect(r.series.every((s) => s.cash >= 0 && Number.isFinite(s.cash))).toBe(true);
   });
@@ -82,19 +82,19 @@ describe("runSimulation — degenerate MSC = 0", () => {
     expect(r.finalInvestmentSize).toBe(0);
     expect(r.series.every((s) => s.cashFlow === 0)).toBe(true);
     expect(r.series.every((s) => s.outstandingAmount === 0)).toBe(true);
-    expect(r.series.every((s) => s.netWorth === 0)).toBe(true);
+    expect(r.series.every((s) => s.expectedFuturePayments === 0)).toBe(true);
   });
 });
 
-describe("runSimulation — net worth (nominal + cash − outstanding)", () => {
-  it("month 0 net worth = nominal remaining of inv0 (35 payments) − outstanding(0) (cash is 0)", () => {
+describe("runSimulation — expected future payments (nominal + cash − outstanding)", () => {
+  it("month 0 expected future payments = nominal remaining of inv0 (35 payments) − outstanding(0) (cash is 0)", () => {
     const r = runSimulation(baseInput);
     const pmt = monthlyPayment(20000, 0.08, 36);
     const expected = pmt * 35 - r.series[0].outstandingAmount;
-    expect(r.series[0].netWorth).toBeCloseTo(expected, 1);
+    expect(r.series[0].expectedFuturePayments).toBeCloseTo(expected, 1);
   });
-  it("net worth is finite", () => {
-    expect(Number.isFinite(runSimulation(baseInput).series[0].netWorth)).toBe(true);
+  it("expected future payments is finite", () => {
+    expect(Number.isFinite(runSimulation(baseInput).series[0].expectedFuturePayments)).toBe(true);
   });
 });
 

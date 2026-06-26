@@ -3,8 +3,8 @@ import { runSimulation, DEFAULT_MONTHLY_WITHDRAWAL, type ProjectionSimInput } fr
 export interface FiResult {
   month: number | null;
   monthlyWithdrawal: number;
-  netWorthAtSwitch: number | null;
-  netWorthAtEnd: number | null;
+  expectedFuturePaymentsAtSwitch: number | null;
+  expectedFuturePaymentsAtEnd: number | null;
 }
 
 export interface FiOptions {
@@ -12,14 +12,14 @@ export interface FiOptions {
   minRunwayMonths?: number;
 }
 
-function sustained(netWorths: number[], from: number, requireGrowth: boolean): boolean {
-  if (from >= netWorths.length - 1) return false;
-  const start = netWorths[from];
+function sustained(efpSeries: number[], from: number, requireGrowth: boolean): boolean {
+  if (from >= efpSeries.length - 1) return false;
+  const start = efpSeries[from];
   const tol = 1e-6 * Math.max(1, Math.abs(start));
-  for (let i = from + 1; i < netWorths.length; i++) {
-    if (netWorths[i] < start - tol) return false;
+  for (let i = from + 1; i < efpSeries.length; i++) {
+    if (efpSeries[i] < start - tol) return false;
   }
-  return requireGrowth ? netWorths[netWorths.length - 1] > start + tol : true;
+  return requireGrowth ? efpSeries[efpSeries.length - 1] > start + tol : true;
 }
 
 // Earliest month to stop MSC AND start drawing `monthlyWithdrawal` sustainably.
@@ -35,10 +35,10 @@ export function earliestSustainableWithdrawal(
   const maxStart = totalMonths - minRunwayMonths;
   for (let t = 0; t <= maxStart; t++) {
     const r = runSimulation({ ...base, mscEndMonth: t, withdrawalStartMonth: t, monthlyWithdrawal });
-    const nw = r.series.map((s) => s.netWorth);
+    const nw = r.series.map((s) => s.expectedFuturePayments);
     if (sustained(nw, t, requireGrowth)) {
-      return { month: t, monthlyWithdrawal, netWorthAtSwitch: nw[t], netWorthAtEnd: nw[nw.length - 1] };
+      return { month: t, monthlyWithdrawal, expectedFuturePaymentsAtSwitch: nw[t], expectedFuturePaymentsAtEnd: nw[nw.length - 1] };
     }
   }
-  return { month: null, monthlyWithdrawal, netWorthAtSwitch: null, netWorthAtEnd: null };
+  return { month: null, monthlyWithdrawal, expectedFuturePaymentsAtSwitch: null, expectedFuturePaymentsAtEnd: null };
 }
