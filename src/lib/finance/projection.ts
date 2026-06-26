@@ -10,8 +10,8 @@ export interface AmpliconLite {
 }
 
 // Global discount rate for valuing future cash flows, as an annual decimal.
-// 0 = nominal dollars (no discounting): net worth is the face value of all
-// remaining payments. This is a GLOBAL knob, intentionally NOT per-Amplicon —
+// 0 = nominal dollars (no discounting): expected future payments are the face
+// value of all remaining payments. This is a GLOBAL knob, NOT per-Amplicon —
 // a loan's own interest only sets its payment amount, never the valuation.
 // Eventually this constant will be replaced by a value sourced from a global
 // (profile-level) setting; for now it is the single source of truth.
@@ -24,7 +24,7 @@ export interface ProjectionInput {
   today: YearMonth;
   // Optional. Ensure the series extends at least this many months past `today`,
   // padding past the last active Amplicon with flat constants (cash flow 0,
-  // net worth = externalNetWorth) if needed. Defaults to 0 (no padding).
+  // expected future payments = externalNetWorth) if needed. Defaults to 0.
   minMonthsAhead?: number;
   // Optional global discount rate (annual decimal). Defaults to
   // GLOBAL_DISCOUNT_RATE_PCT (0 = nominal). Applies to every Amplicon uniformly.
@@ -35,7 +35,7 @@ export interface ProjectionPoint {
   month: YearMonth;
   monthIndex: number;
   cashFlow: number;
-  netWorth: number;
+  expectedFuturePayments: number;
 }
 
 export function monthlyPayoutOf(inv: AmpliconLite): number {
@@ -85,7 +85,7 @@ export function buildSeries(input: ProjectionInput): ProjectionPoint[] {
 
   if (amplicons.length === 0) {
     if (minMonthsAhead <= 0) {
-      return [{ month: today, monthIndex: 0, cashFlow: 0, netWorth: externalNetWorth }];
+      return [{ month: today, monthIndex: 0, cashFlow: 0, expectedFuturePayments: externalNetWorth }];
     }
     const out: ProjectionPoint[] = [];
     for (let i = 0; i < minMonthsAhead; i++) {
@@ -93,7 +93,7 @@ export function buildSeries(input: ProjectionInput): ProjectionPoint[] {
         month: addMonths(today, i),
         monthIndex: i,
         cashFlow: 0,
-        netWorth: externalNetWorth,
+        expectedFuturePayments: externalNetWorth,
       });
     }
     return out;
@@ -121,7 +121,7 @@ export function buildSeries(input: ProjectionInput): ProjectionPoint[] {
 
   const length = monthsBetween(startMonth, lastActiveMonth) + 1;
   if (length <= 0) {
-    return [{ month: startMonth, monthIndex: 0, cashFlow: 0, netWorth: externalNetWorth }];
+    return [{ month: startMonth, monthIndex: 0, cashFlow: 0, expectedFuturePayments: externalNetWorth }];
   }
 
   const series: ProjectionPoint[] = [];
@@ -137,7 +137,7 @@ export function buildSeries(input: ProjectionInput): ProjectionPoint[] {
       month,
       monthIndex: i,
       cashFlow,
-      netWorth: externalNetWorth + valueTotal,
+      expectedFuturePayments: externalNetWorth + valueTotal,
     });
   }
   return series;

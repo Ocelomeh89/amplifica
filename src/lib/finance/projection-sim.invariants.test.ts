@@ -40,7 +40,7 @@ describe("flywheel — robust across the whole input domain", () => {
       for (const s of r.series) {
         expect(Number.isFinite(s.cashFlow)).toBe(true);
         expect(Number.isFinite(s.outstandingAmount)).toBe(true);
-        expect(Number.isFinite(s.netWorth)).toBe(true);
+        expect(Number.isFinite(s.expectedFuturePayments)).toBe(true);
         expect(Number.isFinite(s.cash)).toBe(true);
         // Cash is banked surplus and debt is paid down (or set to 0), so neither
         // should ever cross zero by more than a floating-point hair.
@@ -54,7 +54,7 @@ describe("flywheel — robust across the whole input domain", () => {
 
 describe("flywheel — conservation when there is no interest anywhere", () => {
   // With 0% investment interest each loan repays exactly its face value, and with
-  // 0% LoC interest nothing accrues. So MSC is the ONLY net inflow and net worth
+  // 0% LoC interest nothing accrues. So MSC is the ONLY net inflow and expected future payments
   // must equal MSC × elapsed months EXACTLY — no matter how many upgrades fire.
   const noInterestCases: ProjectionSimInput[] = [
     { msc: 1000, investmentSizeFactor: 3, termMonths: 36, investmentInterestPct: 0, locIncrease: 1.5, locInterestPct: 0 },
@@ -63,20 +63,20 @@ describe("flywheel — conservation when there is no interest anywhere", () => {
   ];
 
   for (const input of noInterestCases) {
-    it(`netWorth[m] === MSC × (m+1) for msc=${input.msc}, factor=${input.investmentSizeFactor}, locInc=${input.locIncrease}`, () => {
+    it(`expectedFuturePayments[m] === MSC × (m+1) for msc=${input.msc}, factor=${input.investmentSizeFactor}, locInc=${input.locIncrease}`, () => {
       const r = runSimulation(input);
       for (const s of r.series) {
         const expected = input.msc * (s.monthIndex + 1);
-        expect(Math.abs(s.netWorth - expected)).toBeLessThan(1e-6 * Math.max(1, expected));
+        expect(Math.abs(s.expectedFuturePayments - expected)).toBeLessThan(1e-6 * Math.max(1, expected));
       }
     });
   }
 });
 
-describe("flywheel — net worth never falls when the LoC charges no interest", () => {
+describe("flywheel — expected future payments never falls when the LoC charges no interest", () => {
   // LoC interest is the only mechanism that can erode value month to month
   // (interest can outpace returns in a given month). With locInterestPct = 0
-  // there is no leakage, so net worth must be non-decreasing.
+  // there is no leakage, so expected future payments must be non-decreasing.
   const cases: ProjectionSimInput[] = [
     { msc: 5000, investmentSizeFactor: 4, termMonths: 36, investmentInterestPct: 0.08, locIncrease: 1.5, locInterestPct: 0 },
     { msc: 2000, investmentSizeFactor: 6, termMonths: 24, investmentInterestPct: 0.2, locIncrease: 2.0, locInterestPct: 0 },
@@ -86,8 +86,8 @@ describe("flywheel — net worth never falls when the LoC charges no interest", 
     it(`non-decreasing for investmentInterest=${input.investmentInterestPct}`, () => {
       const r = runSimulation(input);
       for (let i = 1; i < r.series.length; i++) {
-        const prev = r.series[i - 1].netWorth;
-        expect(r.series[i].netWorth).toBeGreaterThanOrEqual(prev - 1e-6 * Math.max(1, Math.abs(prev)));
+        const prev = r.series[i - 1].expectedFuturePayments;
+        expect(r.series[i].expectedFuturePayments).toBeGreaterThanOrEqual(prev - 1e-6 * Math.max(1, Math.abs(prev)));
       }
     });
   }
@@ -120,10 +120,10 @@ describe("flywheel — single cycle reconciles by hand", () => {
     expect(r.finalInvestmentSize).toBe(4500);
   });
 
-  it("net worth grows by exactly MSC each month through the cycle", () => {
+  it("expected future payments grows by exactly MSC each month through the cycle", () => {
     const r = runSimulation(input);
     for (const s of r.series) {
-      expect(s.netWorth).toBeCloseTo(1000 * (s.monthIndex + 1), 6);
+      expect(s.expectedFuturePayments).toBeCloseTo(1000 * (s.monthIndex + 1), 6);
     }
   });
 });

@@ -114,7 +114,7 @@ describe("buildSeries", () => {
     expect(series[0].cashFlow).toBeCloseTo(783.41, 2);
   });
 
-  it("netWorth at startMonth = externalNetWorth + nominal value of remaining payments", () => {
+  it("expectedFuturePayments at startMonth = externalNetWorth + nominal value of remaining payments", () => {
     const series = buildSeries({
       amplicons: [inv25k36mo],
       externalNetWorth: 100000,
@@ -122,7 +122,7 @@ describe("buildSeries", () => {
       today: "2026-05",
     });
     // Nominal (default rate 0): 100000 + payment × 36 months.
-    expect(series[0].netWorth).toBeCloseTo(100000 + monthlyPayoutOf(inv25k36mo) * 36, 1);
+    expect(series[0].expectedFuturePayments).toBeCloseTo(100000 + monthlyPayoutOf(inv25k36mo) * 36, 1);
   });
 
   it("multiple amplicons: additive at each month", () => {
@@ -156,6 +156,6 @@ describe("buildSeries", () => {
     });
     expect(series).toHaveLength(1);
     expect(series[0].cashFlow).toBe(0);
-    expect(series[0].netWorth).toBe(0);
+    expect(series[0].expectedFuturePayments).toBe(0);
   });
 });

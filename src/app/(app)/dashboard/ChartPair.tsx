@@ -18,14 +18,14 @@ interface Props {
   inceptionSeries: ProjectionPoint[];
   currentSeries: ProjectionPoint[];
   cashflowTargetUSD: number;
-  netWorthTargetUSD: number;
+  expectedFuturePaymentsTargetUSD: number;
 }
 
 export default function ChartPair({
   inceptionSeries,
   currentSeries,
   cashflowTargetUSD,
-  netWorthTargetUSD,
+  expectedFuturePaymentsTargetUSD,
 }: Props) {
   const [range, setRange] = useState<"inception" | "current">("current");
   const series = range === "inception" ? inceptionSeries : currentSeries;
@@ -86,7 +86,7 @@ export default function ChartPair({
       </div>
 
       <div className="bg-card border border-edge rounded-lg p-3 mb-3">
-        <div className="text-[11px] text-sub uppercase tracking-wide mb-2">Net worth</div>
+        <div className="text-[11px] text-sub uppercase tracking-wide mb-2">Expected future payments</div>
         <div className="h-56">
           <ResponsiveContainer>
             <LineChart data={series}>
@@ -99,18 +99,18 @@ export default function ChartPair({
               />
               <Line
                 type="monotone"
-                dataKey="netWorth"
+                dataKey="expectedFuturePayments"
                 stroke="#2e8a4a"
                 strokeWidth={2}
                 dot={false}
                 isAnimationActive={false}
               />
-              {netWorthTargetUSD > 0 && (
+              {expectedFuturePaymentsTargetUSD > 0 && (
                 <ReferenceLine
-                  y={netWorthTargetUSD}
+                  y={expectedFuturePaymentsTargetUSD}
                   stroke="#b08020"
                   strokeDasharray="4 4"
-                  label={{ value: `Target ${fmtMUSD(netWorthTargetUSD)}`, fontSize: 10, position: "right" }}
+                  label={{ value: `Target ${fmtMUSD(expectedFuturePaymentsTargetUSD)}`, fontSize: 10, position: "right" }}
                 />
               )}
             </LineChart>

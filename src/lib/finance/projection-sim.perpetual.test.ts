@@ -52,7 +52,7 @@ describe("MSC-end and withdrawal are independent", () => {
     expect(r.series[200].contributedCapital).toBeCloseTo(2000 * 100, 6);
   });
   it("zero-interest conservation: MSC in until cutoff, then withdrawal out", () => {
-    // 0% everywhere, MSC stops at 100, draw 4500 from 100. Net worth = MSC*100 - 4500*(m-100+1).
+    // 0% everywhere, MSC stops at 100, draw 4500 from 100. Expected future payments = MSC*100 - 4500*(m-100+1).
     const r = runSimulation({
       ...base, investmentInterestPct: 0, locInterestPct: 0, marketReturnPct: 0,
       totalMonths: 200, mscEndMonth: 100, withdrawalStartMonth: 100, monthlyWithdrawal: 4500,
@@ -60,7 +60,7 @@ describe("MSC-end and withdrawal are independent", () => {
     for (const s of r.series) {
       const m = s.monthIndex;
       const exp = m < 100 ? 2000 * (m + 1) : 2000 * 100 - 4500 * (m - 100 + 1);
-      expect(Math.abs(s.netWorth - exp)).toBeLessThan(1e-4 * Math.max(1, Math.abs(exp)));
+      expect(Math.abs(s.expectedFuturePayments - exp)).toBeLessThan(1e-4 * Math.max(1, Math.abs(exp)));
     }
   });
 });

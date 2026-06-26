@@ -36,16 +36,16 @@ export default async function DashboardPage() {
   const currentMonthlyCashflow = activeNow.reduce((s, a) => s + monthlyPayoutOf(a), 0);
 
   const externalNWUSD = (profile?.external_net_worth ?? 0) * 1_000_000;
-  // Net worth = external NW + nominal value of all remaining Amplicon payments,
-  // valued at the global discount rate (0 = nominal). Never per-Amplicon.
+  // Expected future payments = external assets + nominal value of all remaining
+  // Amplicon payments (face value, no discounting). Never per-Amplicon.
   const totalRemainingUSD = lites.reduce(
     (s, a) => s + remainingValueAtMonth(a, todayMonth, GLOBAL_DISCOUNT_RATE_PCT),
     0
   );
-  const currentTotalNetWorth = externalNWUSD + totalRemainingUSD;
+  const currentExpectedFuturePayments = externalNWUSD + totalRemainingUSD;
 
   const cashflowGoalUSD = (profile?.monthly_cashflow_goal ?? 0) * 1_000;
-  const netWorthGoalUSD = (profile?.net_worth_goal ?? 0) * 1_000_000;
+  const expectedFuturePaymentsGoalUSD = (profile?.net_worth_goal ?? 0) * 1_000_000;
 
   const ampliconsCount = lites.length;
   // Active = producing cashflow today (within its term). Matured Amplicons no longer count.
@@ -101,7 +101,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Current — live cashflow ($) + net worth (k$) */}
+        {/* Current — live cashflow ($) + expected future payments (k$) */}
         <div className="md:col-span-2 flex flex-col">
           <div className="text-[10px] text-sub uppercase tracking-wide font-semibold mb-1 h-4">Current</div>
           <div className="flex-1 grid grid-cols-2 rounded-lg border border-edge divide-x divide-edge bg-card">
@@ -111,10 +111,10 @@ export default async function DashboardPage() {
             </div>
             <div className="p-4 flex flex-col">
               <div className="text-[10px] text-sub uppercase tracking-wide">
-                Net worth
-                <InfoBox message="Net worth is the nominal dollar value of all remaining Amplicon payments and any external net worth added in Settings." />
+                Expected future payments
+                <InfoBox message="Expected future payments is the nominal total of all remaining Amplicon payments plus any external assets added in Settings. It is future cash at face value, not a discounted present value." />
               </div>
-              <div className="text-xl font-bold text-aqua mt-auto pt-3">{fmtKUSD(currentTotalNetWorth)}</div>
+              <div className="text-xl font-bold text-aqua mt-auto pt-3">{fmtKUSD(currentExpectedFuturePayments)}</div>
             </div>
           </div>
         </div>
@@ -128,8 +128,8 @@ export default async function DashboardPage() {
               <div className="text-xl font-bold mt-auto pt-3">{fmtUSD0(cashflowGoalUSD)}</div>
             </div>
             <div className="p-4 flex flex-col">
-              <div className="text-[10px] text-sub uppercase tracking-wide">Net worth</div>
-              <div className="text-xl font-bold mt-auto pt-3">{fmtKUSD(netWorthGoalUSD)}</div>
+              <div className="text-[10px] text-sub uppercase tracking-wide">Expected future payments</div>
+              <div className="text-xl font-bold mt-auto pt-3">{fmtKUSD(expectedFuturePaymentsGoalUSD)}</div>
             </div>
           </div>
         </div>
@@ -139,7 +139,7 @@ export default async function DashboardPage() {
         inceptionSeries={inceptionSeries}
         currentSeries={currentSeries}
         cashflowTargetUSD={cashflowGoalUSD}
-        netWorthTargetUSD={netWorthGoalUSD}
+        expectedFuturePaymentsTargetUSD={expectedFuturePaymentsGoalUSD}
       />
     </div>
   );
