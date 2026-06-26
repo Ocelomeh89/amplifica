@@ -226,7 +226,7 @@ export default function EditorForm({ projection, justSaved }: Props) {
               <span className="font-medium">Financial independence: </span>
               stop saving and draw {fmtCurrency(withdrawalAmount)}/mo from{" "}
               <span className="font-bold text-aqua">month {fi.month} (~{(fi.month / 12).toFixed(1)} yr)</span>{" "}
-              — expected future payments hold, ending at {fmtCurrency(fi.expectedFuturePaymentsAtEnd ?? 0)}.
+              — the total holds, ending at {fmtCurrency(fi.expectedFuturePaymentsAtEnd ?? 0)}.
             </>
           ) : (
             <span className="text-sub">FI: drawing {fmtCurrency(withdrawalAmount)}/mo is not sustainable within 30 years at these inputs.</span>
