@@ -1,9 +1,10 @@
-# Amplifica — V0.5 Product Status & Recreation Guide
+# Amplifica — Product Status & Recreation Guide
 
-A complete snapshot of the product as of **V0.5** (tag `V0.5`), written so the entire
+A complete snapshot of the product as of **V0.6** (tag `V0.6`), written so the entire
 application could be recreated from this document: domain model, architecture, data
 schemas, the finance engine, routes, and auth. Rollback point before this release is
-tag **`V0`**.
+tag **`V0.5`** (and `V0` before the whole 15-yr / perpetuals / FI feature). Full
+version history in §10.
 
 ---
 
@@ -14,13 +15,13 @@ flywheel** wealth strategy. The user funds income-producing investments (**Ampli
 by drawing on a **Line of Credit (LoC)**; the Amplicon's payments plus the user's
 **Monthly Savings Contribution (MSC)** pay the LoC back down; on payoff a new, larger
 Amplicon is launched. The app lets users record their real Amplicons/LoCs and run
-**Projections** that simulate this flywheel forward to estimate net worth, cash flow,
+**Projections** that simulate this flywheel forward to estimate expected future payments, cash flow,
 and the date of financial independence (FI).
 
 **Core domain objects**
 - **Amplicon** — an amortized income investment (face value, term, interest, start date). Pays a level monthly amount.
 - **LoC** — a Line of Credit (HELOC or PLOC) with a size and current utilization.
-- **Profile** — per-user settings: MSC, net-worth / cash-flow goals, external net worth.
+- **Profile** — per-user settings: MSC, expected-future-payments / cash-flow goals, external assets.
 - **Projection** — a saved simulation of the flywheel with its own parameter set.
 
 ---
@@ -145,7 +146,7 @@ RLS: self CRUD. Index on `user_id`. **Migration 0004 has been applied to the liv
 |---|---|
 | `amortization.ts` | `monthlyPayment(principal, aprPct, term)`, full `amortizationSchedule`, `remainingPrincipalAfter`. The standard amortizing-loan math underlying everything. |
 | `dates.ts` | `YearMonth` ("YYYY-MM") helpers: `addMonths`, `monthsBetween`, etc. |
-| `projection.ts` | **Valuation** of a user's real Amplicons: builds a month-by-month series of cash flow + net worth (`externalNetWorth + Σ remaining value`). Net worth is the nominal sum of remaining payments, optionally discounted by a **global** `discountRatePct` (default `GLOBAL_DISCOUNT_RATE_PCT = 0`, i.e. nominal). Supports "inception" vs "current" ranges. |
+| `projection.ts` | **Valuation** of a user's real Amplicons: builds a month-by-month series of cash flow + expected future payments (`externalNetWorth + Σ remaining value`) — the nominal sum of remaining payments, optionally discounted by a **global** `discountRatePct` (default `GLOBAL_DISCOUNT_RATE_PCT = 0`, i.e. nominal). Supports "inception" vs "current" ranges. |
 | `projection-sim.ts` | **The flywheel simulator** — the heart of Projections (see §6). |
 | `projection-fi.ts` | **FI solver**: `earliestSustainableWithdrawal(base, draw, {requireGrowth})` linearly scans the retirement month and returns the earliest at which you can stop the MSC and withdraw sustainably. |
 
@@ -164,7 +165,7 @@ original V0 behavior exactly (backward compatible).
 2. Collect inflow = MSC share + payouts of all active Amplicons (term = amortizing payment; perpetual = flat coupon `face × yield/12`).
 3. Apply `inflow − withdrawal` to the LoC: surplus banks as cash; a shortfall is covered from cash, then re-borrowed.
 4. On full payoff, launch a new Amplicon: step the size up ×`locIncrease` per the **growth mode**; once size ≥ `perpetualTriggerSize`, a `perpetualMix` fraction of launches become **perpetual** (chosen by a leaky-bucket accumulator → a clean cadence, e.g. 0.25 ⇒ ~1 in 4). Deploy banked cash against the fresh draw.
-5. Net worth = Σ remaining nominal payouts (all Amplicons) + cash − outstanding.
+5. Expected future payments = Σ remaining nominal payouts (all Amplicons) + cash − outstanding (nominal future cash, not a discounted present value).
 6. Roll the no-leverage benchmarks (`contributedCapital`, `marketBaseline`).
 
 **Key inputs** (defaults in parens): `msc`, `investmentSizeFactor`, `termMonths`,
@@ -175,7 +176,7 @@ original V0 behavior exactly (backward compatible).
 
 **Two growth modes:** *fixed* (gate 3 or 4 — step up only when payoff is faster than the gate) vs *continuous* (`Infinity` — step up on every payoff). UI toggle persists to `continuous_growth` + `payoff_upgrade_months`.
 
-**Two finish lines (`projection-fi.ts`):** *Income FI* (net worth never erodes while drawing — you live off income) and *Wealth FI* (net worth also keeps growing). The FI surface is **non-monotone** (flywheel saw-tooth) — the solver uses a linear scan, not binary search.
+**Two finish lines (`projection-fi.ts`):** *Income FI* (expected future payments never erode while drawing — you live off income) and *Wealth FI* (they also keep growing). The FI surface is **non-monotone** (flywheel saw-tooth) — the solver uses a linear scan, not binary search.
 
 **Validated findings baked into the product's guidance** (from the exploration documented in `docs/projection-continuous-loc-spec.md`): the leverage spread (investment return vs LoC cost) dominates the FI date; a return-above-amortization gap is the cheapest accelerator; perpetuals are a *post-retirement durable-income* layer (deploy late + light), not an FI accelerator.
 
@@ -189,7 +190,7 @@ original V0 behavior exactly (backward compatible).
 - `/dashboard` — net-worth & cash-flow charts over time (`ChartPair`), driven by the user's Amplicons via `projection.ts`.
 - `/amplicons` — list + inline create/edit/delete (`AmpliconRow`, `NewAmpliconForm`, `actions.ts`).
 - `/loc` — list + create; `UtilizationCell` for live utilization edits.
-- `/projections` — list + "New projection" button; `/[id]` opens `EditorForm` (the live simulator: inputs, fixed/continuous toggle, perpetual + drawdown controls, **Key results @ 5/10/15yr (accumulation)** card, **FI readout**, `SimCharts`, `FlywheelExplainer`).
+- `/projections` — list + "New projection" button; `/[id]` opens `EditorForm` (the live simulator: inputs, fixed/continuous toggle, perpetual + drawdown controls, **Expected future payments @ 5/10/15yr (accumulation)** card, **FI readout**, `SimCharts`, `FlywheelExplainer`).
 - `/settings` — profile settings form + light/dark `ThemeToggle`.
 
 Each feature folder pairs a Server Component `page.tsx` (reads rows) with `actions.ts` (Server Actions for mutations) and small client components for interactivity.
@@ -217,5 +218,6 @@ Each feature folder pairs a Server Component `page.tsx` (reads rows) with `actio
 ## 10. Versioning
 
 - **`V0`** — rollback tag: state immediately before the 15yr cash-flow / perpetuals / FI feature.
-- **`V0.5`** — this release: perpetual Amplicons, fixed-vs-continuous growth toggle, decoupled stop-MSC + withdraw-at-FI, income/wealth FI solver, persisted via migration 0004, 5/10/15yr cash-flow results card + FI readout. To roll back: `git reset --hard V0` (and revert migration 0004 if needed).
+- **`V0.5`** — perpetual Amplicons, fixed-vs-continuous growth toggle, decoupled stop-MSC + withdraw-at-FI, income/wealth FI solver, persisted via migration 0004, 5/10/15yr cash-flow results card + FI readout. Rollback: `git reset --hard V0` (and revert migration 0004 if needed).
+- **`V0.6`** — current release: renamed the headline metric **net worth → expected future payments** (engine field `expectedFuturePayments`, all UI copy, the explainer; "External net worth" → "External assets"). Pure reframing — values and FI logic unchanged — to remove the nominal-vs-discounted ambiguity and leave "net worth" free to be defined for real later. No DB change. Rollback: `git reset --hard V0.5`.
 - Prior milestone tags: `v1` (Projections 2.0 — market benchmark). Parked exploration branch `projection-continuous-loc` (stock sidecar, retained-return pile, spread-ETF, term×factor heatmap) on `origin`, documented in `docs/projection-continuous-loc-spec.md` — not merged.
