@@ -125,7 +125,7 @@ Base (0002): `id`, `user_id`, `name`, `msc` (≥0), `investment_size_factor` (3�
 - **0004 (V0.5):**
   | Column | Type / check | Default | Meaning |
   |---|---|---|---|
-  | `payoff_upgrade_months` | int, in (3,4) | 3 | fixed-mode gate: step LoC up if payoff < N months |
+  | `payoff_upgrade_months` | int, in (3,4) | 4 | fixed-mode gate: step LoC up if payoff < N months (default raised 3 → 4 in 0005) |
   | `continuous_growth` | boolean | false | step up on every payoff (overrides the gate) |
   | `perpetual_mix` | numeric(5,4), 0–1 | 0 | fraction of launches that become perpetual past the trigger |
   | `perpetual_yield_pct` | numeric(5,4), ≥0 | 0.10 | perpetual cash-on-cash yield (30-yr) |
@@ -157,8 +157,12 @@ RLS: self CRUD. Index on `user_id`. **Migration 0004 has been applied to the liv
 ## 6. The flywheel simulator (`projection-sim.ts`) — model spec
 
 `runSimulation(input: ProjectionSimInput): ProjectionSimResult`. Pure; default horizon
-480 months (the UI passes 360). With every optional field unset it reproduces the
-original V0 behavior exactly (backward compatible).
+480 months (the UI passes 360).
+
+**Payment timing:** every Amplicon — the bootstrap one included — is *drawn* one
+month before its *first payment*. The initial draw is taken at month 0 and its first
+payment lands at month 1, exactly like every re-launch (drawn the month a loan retires,
+first payment the month after). So month 0 sees MSC only.
 
 **Monthly loop:**
 1. Accrue LoC interest on the outstanding balance (`locInterestPct/12`).
@@ -170,7 +174,7 @@ original V0 behavior exactly (backward compatible).
 
 **Key inputs** (defaults in parens): `msc`, `investmentSizeFactor`, `termMonths`,
 `investmentInterestPct`, `locIncrease`, `locInterestPct`, `marketReturnPct` (0.10),
-`payoffUpgradeMonths` (3; **`Infinity` = continuous growth**), `perpetualMix` (0),
+`payoffUpgradeMonths` (4; **`Infinity` = continuous growth**), `perpetualMix` (0),
 `perpetualTriggerSize` (50000), `perpetualYieldPct` (0.10), `perpetualTermMonths` (360),
 `mscEndMonth` (∞), `withdrawalStartMonth`, `monthlyWithdrawal` (4500), `totalMonths` (480).
 

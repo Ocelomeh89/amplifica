@@ -3,7 +3,7 @@ import { monthlyPayment } from "./amortization";
 // Fixed payoff threshold: when a loan is retired in FEWER than this many months,
 // the next investment steps up by LineOfCreditIncrease. Otherwise the size is
 // stable. (User-chosen constant, not an input.)
-export const PAYOFF_UPGRADE_MONTHS = 3;
+export const PAYOFF_UPGRADE_MONTHS = 4;
 
 // Default annual return (decimal) for the stock-market benchmark: the same MSC,
 // dripped into an index fund instead of fed into the flywheel. Overridable per
@@ -117,11 +117,15 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
   let currentInvestmentSize = initialInvestmentSize;
   let outstandingAmount = initialInvestmentSize;
   let cash = 0;
-  let lastInvStartMonth = 0;
+  // The initial draw is taken at month 0 but, like every subsequent Amplicon, its
+  // first payment lands the month AFTER the draw (month 1). lastInvStartMonth
+  // tracks that first-payment month so payoff speed is measured on the same basis
+  // for the bootstrap loan as for every re-launch (which use m + 1).
+  let lastInvStartMonth = 1;
   let peakOutstanding = initialInvestmentSize;
   let mixAcc = 0;
 
-  const active: ActiveInvestment[] = [makeInvestment("term", initialInvestmentSize, 0, input)];
+  const active: ActiveInvestment[] = [makeInvestment("term", initialInvestmentSize, 1, input)];
   let investmentsLaunched = 1;
   let perpetualsLaunched = 0;
 

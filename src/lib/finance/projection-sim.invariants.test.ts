@@ -94,28 +94,29 @@ describe("flywheel — expected future payments never falls when the LoC charges
 });
 
 describe("flywheel — single cycle reconciles by hand", () => {
-  // msc=1000, factor=3 → initial draw 3000; 0% everywhere so payout = 3000/36 =
-  // 83.33/mo and total monthly inflow = 1083.33. The LoC is paid down linearly:
-  //   m0 out = 3000 − 1083.33 = 1916.67
-  //   m1 out = 3000 − 2166.67 =  833.33
-  //   m2 inflow (1083.33) clears the 833.33 → $250 surplus. Loan was retired in
-  //      2 (< 3) months, so the next size steps up ×1.5 → 4500 is drawn, and the
-  //      $250 is deployed against it → out = 4250.
+  // msc=1000, factor=3 → initial draw 3000 at month 0; 0% everywhere so payout =
+  // 3000/36 = 83.33/mo. The first Amplicon payment lands at month 1, so month 0
+  // sees MSC only. The LoC is paid down:
+  //   m0 out = 3000 − 1000 (MSC only) = 2000
+  //   m1 out = 2000 − 1083.33 (MSC + first payout) = 916.67
+  //   m2 inflow (1083.33) clears the 916.67 → $166.67 surplus. Loan was retired
+  //      1 (< 4) month after its first payment, so the next size steps up ×1.5 →
+  //      4500 is drawn, and the $166.67 is deployed against it → out = 4333.33.
   const input: ProjectionSimInput = {
     msc: 1000, investmentSizeFactor: 3, termMonths: 36,
     investmentInterestPct: 0, locIncrease: 1.5, locInterestPct: 0, totalMonths: 6,
   };
 
-  it("draws down the initial LoC linearly, banks surplus, and steps the size up once", () => {
+  it("draws down the initial LoC, banks surplus, and steps the size up once", () => {
     const r = runSimulation(input);
     expect(r.initialInvestmentSize).toBe(3000);
     expect(monthlyPayment(3000, 0, 36)).toBeCloseTo(83.33, 2);
 
-    expect(r.series[0].outstandingAmount).toBeCloseTo(1916.67, 2);
-    expect(r.series[1].outstandingAmount).toBeCloseTo(833.33, 2);
-    expect(r.series[2].outstandingAmount).toBeCloseTo(4250, 2);
+    expect(r.series[0].outstandingAmount).toBeCloseTo(2000, 2);
+    expect(r.series[1].outstandingAmount).toBeCloseTo(916.67, 2);
+    expect(r.series[2].outstandingAmount).toBeCloseTo(4333.33, 2);
 
-    // One upgrade fired (paid off in 2 < 3 months): 3000 × 1.5 = 4500.
+    // One upgrade fired (paid off < 4 months): 3000 × 1.5 = 4500.
     expect(r.investmentsLaunched).toBe(2);
     expect(r.finalInvestmentSize).toBe(4500);
   });

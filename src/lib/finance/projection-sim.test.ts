@@ -21,17 +21,24 @@ describe("runSimulation — bootstrap", () => {
     expect(runSimulation(baseInput).initialInvestmentSize).toBe(20000);
   });
 
-  it("month 0 cashFlow = MSC + first payout of investment 0", () => {
+  it("month 0 cashFlow = MSC only (the first Amplicon's first payment lands at month 1)", () => {
+    expect(runSimulation(baseInput).series[0].cashFlow).toBeCloseTo(5000, 2);
+  });
+
+  it("month 1 cashFlow = MSC + first payout of investment 0", () => {
     const pmt = monthlyPayment(20000, 0.08, 36);
-    expect(runSimulation(baseInput).series[0].cashFlow).toBeCloseTo(5000 + pmt, 2);
+    expect(runSimulation(baseInput).series[1].cashFlow).toBeCloseTo(5000 + pmt, 2);
   });
 
-  it("month 0 outstanding = accrued initial minus month-0 inflow", () => {
-    expect(runSimulation(baseInput).series[0].outstandingAmount).toBeCloseTo(14539.94, 1);
+  it("month 0 outstanding = accrued initial minus month-0 inflow (MSC only)", () => {
+    // 20000 × (1 + 0.10/12) − 5000 = 15166.67 (no Amplicon payment until month 1)
+    expect(runSimulation(baseInput).series[0].outstandingAmount).toBeCloseTo(15166.67, 1);
   });
 
-  it("active investment count starts at 1", () => {
-    expect(runSimulation(baseInput).series[0].activeInvestmentCount).toBe(1);
+  it("active investment count is 0 at month 0 (drawn, not yet paying) and 1 from month 1", () => {
+    const r = runSimulation(baseInput);
+    expect(r.series[0].activeInvestmentCount).toBe(0);
+    expect(r.series[1].activeInvestmentCount).toBe(1);
   });
 
   it("at startup currentInvestmentSize equals initialInvestmentSize", () => {
@@ -41,10 +48,10 @@ describe("runSimulation — bootstrap", () => {
 });
 
 describe("runSimulation — cash bucket accelerates growth (no plateau)", () => {
-  it("size steps up many times (13 upgrades → 20000 × 1.5^13 ≈ $3.89M) on the base inputs", () => {
-    // Banked cash pays down each new draw, so payoffs stay fast and the < 3-month
-    // upgrade fires far more than the stable-size rule alone (which gave 4).
-    expect(runSimulation(baseInput).finalInvestmentSize).toBeCloseTo(20000 * 1.5 ** 13, 0);
+  it("size steps up many times (14 upgrades → 20000 × 1.5^14 ≈ $5.84M) on the base inputs", () => {
+    // Banked cash pays down each new draw, so payoffs stay fast and the < 4-month
+    // upgrade fires on essentially every cycle.
+    expect(runSimulation(baseInput).finalInvestmentSize).toBeCloseTo(20000 * 1.5 ** 14, 0);
   });
 
   it("currentInvestmentSize never decreases over the series", () => {
@@ -87,10 +94,11 @@ describe("runSimulation — degenerate MSC = 0", () => {
 });
 
 describe("runSimulation — expected future payments (nominal + cash − outstanding)", () => {
-  it("month 0 expected future payments = nominal remaining of inv0 (35 payments) − outstanding(0) (cash is 0)", () => {
+  it("month 0 expected future payments = nominal remaining of inv0 (36 payments) − outstanding (cash is 0)", () => {
+    // No payment has landed yet at month 0 (first payout is month 1), so all 36 remain.
     const r = runSimulation(baseInput);
     const pmt = monthlyPayment(20000, 0.08, 36);
-    const expected = pmt * 35 - r.series[0].outstandingAmount;
+    const expected = pmt * 36 - r.series[0].outstandingAmount;
     expect(r.series[0].expectedFuturePayments).toBeCloseTo(expected, 1);
   });
   it("expected future payments is finite", () => {

@@ -45,7 +45,7 @@ export async function updateProjection(formData: FormData) {
   const investment_interest_pct = Number(formData.get("investment_interest_pct") ?? 0) / 100;
   const loc_increase = Number(formData.get("loc_increase") ?? 1.5);
   const loc_interest_pct = Number(formData.get("loc_interest_pct") ?? 0) / 100;
-  const payoff_upgrade_months = Number(formData.get("payoff_upgrade_months") ?? 3);
+  const payoff_upgrade_months = Number(formData.get("payoff_upgrade_months") ?? 4);
   const continuous_growth = formData.get("continuous_growth") === "on";
   const perpetual_mix = Number(formData.get("perpetual_mix") ?? 0) / 100;
   const perpetual_yield_pct = Number(formData.get("perpetual_yield_pct") ?? 10) / 100;

@@ -17,7 +17,7 @@ All added as optional `ProjectionSimInput` fields. Each defaults to original beh
 
 | Knob | What it does | Default |
 |---|---|---|
-| `payoffUpgradeMonths` | Payoff-speed gate below which the next Amplicon steps up ×`locIncrease`. **`Infinity` = continuous growth** (step up on *every* payoff); `3` = original "fixed" gate. | `PAYOFF_UPGRADE_MONTHS` (3) |
+| `payoffUpgradeMonths` | Payoff-speed gate below which the next Amplicon steps up ×`locIncrease`. **`Infinity` = continuous growth** (step up on *every* payoff); `4` = default "fixed" gate (`3` is the only other allowed value). | `PAYOFF_UPGRADE_MONTHS` (4) |
 | `perpetualMix` | Fraction 0–1 of new launches that become **Phase 2 perpetuals** (long-term coupon instead of amortizing), chosen by an accumulator → a clean cadence (0.25 = ~1 in 4). Applies only past the trigger. | `0` |
 | `perpetualTriggerSize` | Amplicon (draw) size at which perpetuals start merging in. | `50000` |
 | `perpetualYieldPct` | Perpetual coupon rate (cash/yr on face). | `0.10` |
