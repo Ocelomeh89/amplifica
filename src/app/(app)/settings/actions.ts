@@ -12,7 +12,8 @@ export async function saveSettings(formData: FormData) {
   const monthly_savings_contribution = Number(formData.get("monthly_savings_contribution") ?? 0);
   const net_worth_goal = Number(formData.get("net_worth_goal") ?? 0);
   const monthly_cashflow_goal = Number(formData.get("monthly_cashflow_goal") ?? 0);
-  const external_net_worth = Number(formData.get("external_net_worth") ?? 0);
+  // external_net_worth removed from Settings (parked — see PRODUCT-STATUS §11). The
+  // DB column is retained and left at its existing value; no longer written here.
 
   const { error } = await supabase
     .from("profiles")
@@ -20,7 +21,6 @@ export async function saveSettings(formData: FormData) {
       monthly_savings_contribution,
       net_worth_goal,
       monthly_cashflow_goal,
-      external_net_worth,
     })
     .eq("id", user.id);
 

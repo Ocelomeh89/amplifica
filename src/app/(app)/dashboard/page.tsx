@@ -35,14 +35,14 @@ export default async function DashboardPage() {
   const activeNow = lites.filter((a) => isActiveAt(a, todayMonth));
   const currentMonthlyCashflow = activeNow.reduce((s, a) => s + monthlyPayoutOf(a), 0);
 
-  const externalNWUSD = (profile?.external_net_worth ?? 0) * 1_000_000;
-  // Expected future payments = external assets + nominal value of all remaining
-  // Amplicon payments (face value, no discounting). Never per-Amplicon.
+  // Expected future payments = nominal value of all remaining Amplicon payments
+  // (face value, no discounting). Never per-Amplicon. External assets removed in
+  // V0.7 (parked — see PRODUCT-STATUS §11).
   const totalRemainingUSD = lites.reduce(
     (s, a) => s + remainingValueAtMonth(a, todayMonth, GLOBAL_DISCOUNT_RATE_PCT),
     0
   );
-  const currentExpectedFuturePayments = externalNWUSD + totalRemainingUSD;
+  const currentExpectedFuturePayments = totalRemainingUSD;
 
   const cashflowGoalUSD = (profile?.monthly_cashflow_goal ?? 0) * 1_000;
   const expectedFuturePaymentsGoalUSD = (profile?.net_worth_goal ?? 0) * 1_000_000;
@@ -54,7 +54,7 @@ export default async function DashboardPage() {
 
   const inceptionSeries = buildSeries({
     amplicons: lites,
-    externalNetWorth: externalNWUSD,
+    externalNetWorth: 0,
     range: "inception",
     today: todayMonth,
     minMonthsAhead: 36,
@@ -62,7 +62,7 @@ export default async function DashboardPage() {
   });
   const currentSeries = buildSeries({
     amplicons: lites,
-    externalNetWorth: externalNWUSD,
+    externalNetWorth: 0,
     range: "current",
     today: todayMonth,
     minMonthsAhead: 36,
@@ -112,7 +112,7 @@ export default async function DashboardPage() {
             <div className="p-4 flex flex-col">
               <div className="text-[10px] text-sub uppercase tracking-wide">
                 Expected future payments
-                <InfoBox message="Expected future payments is the nominal total of all remaining Amplicon payments plus any external assets added in Settings. It is future cash at face value, not a discounted present value." />
+                <InfoBox message="Expected future payments is the nominal total of all remaining Amplicon payments. It is future cash at face value, not a discounted present value." />
               </div>
               <div className="text-xl font-bold text-aqua mt-auto pt-3">{fmtKUSD(currentExpectedFuturePayments)}</div>
             </div>

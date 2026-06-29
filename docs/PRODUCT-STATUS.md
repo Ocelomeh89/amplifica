@@ -21,7 +21,7 @@ and the date of financial independence (FI).
 **Core domain objects**
 - **Amplicon** — an amortized income investment (face value, term, interest, start date). Pays a level monthly amount.
 - **LoC** — a Line of Credit (HELOC or PLOC) with a size and current utilization.
-- **Profile** — per-user settings: MSC, expected-future-payments / cash-flow goals, external assets.
+- **Profile** — per-user settings: MSC, expected-future-payments / cash-flow goals.
 - **Projection** — a saved simulation of the flywheel with its own parameter set.
 
 ---
@@ -88,7 +88,7 @@ Four user-owned tables, all RLS-protected, all with a `touch_updated_at` trigger
 | `monthly_savings_contribution` | numeric(14,2) | default 0 — the MSC |
 | `net_worth_goal` | numeric(8,4) | default 0 |
 | `monthly_cashflow_goal` | numeric(10,4) | default 0 |
-| `external_net_worth` | numeric(8,4) | default 0 — assets outside the model |
+| `external_net_worth` | numeric(8,4) | default 0 — assets outside the model. **Settings input removed (parked, §11); column retained, no longer written** |
 | `created_at` / `updated_at` | timestamptz | |
 RLS: self select/update only (`auth.uid() = id`).
 
@@ -236,4 +236,5 @@ explored but not shipped. Re-enabling the first two is a UI-only change.
 
 - **Fixed-mode gate selector** (`payoff_upgrade_months`, 3 or 4) — let the user choose how fast a payoff must be to trigger a step-up. Removed from the editor in V0.7; engine + DB column retained, default 4.
 - **Continuous LoC growth toggle** (`continuous_growth`) — step the investment up on *every* payoff (`payoffUpgradeMonths = Infinity`) instead of only on fast ones. Removed from the editor in V0.7; engine + DB column retained, default off.
+- **External assets** (`profiles.external_net_worth`) — a user-entered pile of assets held outside amplifica, added to the dashboard's expected-future-payments total. Settings input removed (dashboard no longer adds it; it now shows the flywheel alone). `projection.ts` still accepts an `externalNetWorth` param (the dashboard passes 0); DB column retained, no longer written. Re-enabling is a UI-only change.
 - **Exploration branch `projection-continuous-loc`** — stock sidecar, retained-return pile, spread-ETF, term×factor heatmap (see `docs/projection-continuous-loc-spec.md`). Not merged.

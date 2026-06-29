@@ -42,14 +42,6 @@ export default async function SettingsPage({
                 step={100}
               />
             </Field>
-            <Field label="External assets ($M)" hint="Assets held outside amplifica, in millions of USD.">
-              <NumberInput
-                name="external_net_worth"
-                defaultValue={profile?.external_net_worth ?? 0}
-                min={0}
-                step={0.01}
-              />
-            </Field>
             <Field label="Expected future payments goal ($M)" hint="Total target, in millions of USD.">
               <NumberInput
                 name="net_worth_goal"

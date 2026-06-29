@@ -70,7 +70,7 @@ Otherwise the investment size stays the same.`}</Formula>
 
             <Section title="Expected future payments">
               <p className="text-sm text-sub leading-relaxed">
-                {`Expected future payments = the nominal sum of all remaining investment payments, PLUS the cash bucket, minus the outstanding line-of-credit balance. It is future cash measured at face value — not a discounted present value — so there is no discount-rate assumption to argue about. Banking surplus cash (rather than discarding it) is what lets your monthly savings keep adding to the total over time. External assets are not included — this is the flywheel alone.`}
+                {`Expected future payments = the nominal sum of all remaining investment payments, PLUS the cash bucket, minus the outstanding line-of-credit balance. It is future cash measured at face value — not a discounted present value — so there is no discount-rate assumption to argue about. Banking surplus cash (rather than discarding it) is what lets your monthly savings keep adding to the total over time.`}
               </p>
             </Section>
           </div>
