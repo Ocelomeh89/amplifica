@@ -28,22 +28,22 @@ export default function EditorForm({ projection, justSaved }: Props) {
   const [locIncrease, setLocIncrease] = useState(projection.loc_increase);
   const [locInterestPct, setLocInterestPct] = useState(projection.loc_interest_pct * 100);
   const [marketReturnPct, setMarketReturnPct] = useState(projection.market_return_pct * 100);
-  const [payoffGate, setPayoffGate] = useState(projection.payoff_upgrade_months);
-  const [continuous, setContinuous] = useState(projection.continuous_growth);
+  // Fixed-mode gate + continuous LoC growth are parked (see PRODUCT-STATUS "Possible
+  // upgrades"). The engine + DB columns remain; the editor just uses the defaults.
   const [perpetualMixPct, setPerpetualMixPct] = useState(projection.perpetual_mix * 100);
   const [perpetualYieldPct, setPerpetualYieldPct] = useState(projection.perpetual_yield_pct * 100);
   const [perpetualTrigger, setPerpetualTrigger] = useState(projection.perpetual_trigger_size);
   const [mscEndMonth, setMscEndMonth] = useState<number | "">(projection.msc_end_month ?? "");
   const [withdrawalAmount, setWithdrawalAmount] = useState(projection.withdrawal_amount);
 
-  const [debounced, setDebounced] = useState({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, payoffGate, continuous, perpetualMixPct, perpetualYieldPct, perpetualTrigger, mscEndMonth, withdrawalAmount });
+  const [debounced, setDebounced] = useState({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, perpetualMixPct, perpetualYieldPct, perpetualTrigger, mscEndMonth, withdrawalAmount });
 
   useEffect(() => {
     const t = setTimeout(() => {
-      setDebounced({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, payoffGate, continuous, perpetualMixPct, perpetualYieldPct, perpetualTrigger, mscEndMonth, withdrawalAmount });
+      setDebounced({ msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, perpetualMixPct, perpetualYieldPct, perpetualTrigger, mscEndMonth, withdrawalAmount });
     }, 200);
     return () => clearTimeout(t);
-  }, [msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, payoffGate, continuous, perpetualMixPct, perpetualYieldPct, perpetualTrigger, mscEndMonth, withdrawalAmount]);
+  }, [msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, perpetualMixPct, perpetualYieldPct, perpetualTrigger, mscEndMonth, withdrawalAmount]);
 
   const simInput = useMemo(
     () => ({
@@ -54,7 +54,8 @@ export default function EditorForm({ projection, justSaved }: Props) {
       locIncrease: debounced.locIncrease,
       locInterestPct: debounced.locInterestPct / 100,
       marketReturnPct: debounced.marketReturnPct / 100,
-      payoffUpgradeMonths: debounced.continuous ? Infinity : debounced.payoffGate,
+      // payoffUpgradeMonths omitted → engine default (PAYOFF_UPGRADE_MONTHS). Gate
+      // + continuous growth are parked; see PRODUCT-STATUS "Possible upgrades".
       perpetualMix: debounced.perpetualMixPct / 100,
       perpetualYieldPct: debounced.perpetualYieldPct / 100,
       perpetualTriggerSize: debounced.perpetualTrigger,
@@ -140,18 +141,7 @@ export default function EditorForm({ projection, justSaved }: Props) {
             <Field label="Withdrawal at FI ($/mo)">
               <input name="withdrawal_amount" type="number" value={withdrawalAmount} onChange={(e) => setWithdrawalAmount(Number(e.target.value))} min={0} step={100} className={inputClass} />
             </Field>
-            <Field label="Fixed-mode gate (months)" hint="step up if payoff under N months">
-              <select name="payoff_upgrade_months" value={payoffGate} onChange={(e) => setPayoffGate(Number(e.target.value))} className={inputClass} disabled={continuous}>
-                <option value={3}>3</option>
-                <option value={4}>4</option>
-              </select>
-            </Field>
           </div>
-          <label className="flex items-center gap-2 mt-3 text-sm cursor-pointer select-none">
-            <input type="checkbox" name="continuous_growth" checked={continuous} onChange={(e) => setContinuous(e.target.checked)} />
-            <span className="font-medium">Continuous LoC growth</span>
-            <span className="text-sub text-xs">step up on every payoff (overrides the fixed gate)</span>
-          </label>
         </Card>
 
         <div className="flex gap-2 mb-4">

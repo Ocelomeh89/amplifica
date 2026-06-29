@@ -1,10 +1,10 @@
 # Amplifica — Product Status & Recreation Guide
 
-A complete snapshot of the product as of **V0.6** (tag `V0.6`), written so the entire
+A complete snapshot of the product as of **V0.7** (tag `V0.7`), written so the entire
 application could be recreated from this document: domain model, architecture, data
 schemas, the finance engine, routes, and auth. Rollback point before this release is
-tag **`V0.5`** (and `V0` before the whole 15-yr / perpetuals / FI feature). Full
-version history in §10.
+tag **`V0.6`** (and `V0` before the whole 15-yr / perpetuals / FI feature). Full
+version history in §10; parked work in §11.
 
 ---
 
@@ -178,7 +178,7 @@ first payment the month after). So month 0 sees MSC only.
 `perpetualTriggerSize` (50000), `perpetualYieldPct` (0.10), `perpetualTermMonths` (360),
 `mscEndMonth` (∞), `withdrawalStartMonth`, `monthlyWithdrawal` (4500), `totalMonths` (480).
 
-**Two growth modes:** *fixed* (gate 3 or 4 — step up only when payoff is faster than the gate) vs *continuous* (`Infinity` — step up on every payoff). UI toggle persists to `continuous_growth` + `payoff_upgrade_months`.
+**Two growth modes (engine):** *fixed* (gate 3 or 4 — step up only when payoff is faster than the gate; default 4) vs *continuous* (`Infinity` — step up on every payoff), persisted to `payoff_upgrade_months` + `continuous_growth`. **As of V0.7 the UI controls for both are removed (parked — see §11);** the editor runs the engine default (fixed, gate 4). The engine and DB columns are retained, so re-enabling is a UI-only change.
 
 **Two finish lines (`projection-fi.ts`):** *Income FI* (expected future payments never erode while drawing — you live off income) and *Wealth FI* (they also keep growing). The FI surface is **non-monotone** (flywheel saw-tooth) — the solver uses a linear scan, not binary search.
 
@@ -223,5 +223,17 @@ Each feature folder pairs a Server Component `page.tsx` (reads rows) with `actio
 
 - **`V0`** — rollback tag: state immediately before the 15yr cash-flow / perpetuals / FI feature.
 - **`V0.5`** — perpetual Amplicons, fixed-vs-continuous growth toggle, decoupled stop-MSC + withdraw-at-FI, income/wealth FI solver, persisted via migration 0004, 5/10/15yr cash-flow results card + FI readout. Rollback: `git reset --hard V0` (and revert migration 0004 if needed).
-- **`V0.6`** — current release: renamed the headline metric **net worth → expected future payments** (engine field `expectedFuturePayments`, all UI copy, the explainer; "External net worth" → "External assets"). Pure reframing — values and FI logic unchanged — to remove the nominal-vs-discounted ambiguity and leave "net worth" free to be defined for real later. No DB change. Rollback: `git reset --hard V0.5`.
+- **`V0.6`** — renamed the headline metric **net worth → expected future payments** (engine field `expectedFuturePayments`, all UI copy, the explainer; "External net worth" → "External assets"). Pure reframing — values and FI logic unchanged — to remove the nominal-vs-discounted ambiguity and leave "net worth" free to be defined for real later. No DB change. Rollback: `git reset --hard V0.5`.
+- **`V0.7`** — current release. Model: the **first Amplicon payment now lands at month 1** (the bootstrap draw is taken at month 0 but pays the next month, like every re-launch — month 0 is MSC-only), and the **payoff-upgrade gate default moves 3 → 4 months** (migration 0005; engine constant `PAYOFF_UPGRADE_MONTHS`). UI: the **Fixed-mode gate selector and Continuous-LoC-growth toggle are removed** from the projection editor and parked (§11) — engine + DB columns kept, editor uses the gate-4 default. Explainer + this doc updated. Rollback: `git reset --hard V0.6`.
 - Prior milestone tags: `v1` (Projections 2.0 — market benchmark). Parked exploration branch `projection-continuous-loc` (stock sidecar, retained-return pile, spread-ETF, term×factor heatmap) on `origin`, documented in `docs/projection-continuous-loc-spec.md` — not merged.
+
+---
+
+## 11. Possible upgrades (parked for later)
+
+Features built and working in the engine/DB but intentionally hidden from the UI, or
+explored but not shipped. Re-enabling the first two is a UI-only change.
+
+- **Fixed-mode gate selector** (`payoff_upgrade_months`, 3 or 4) — let the user choose how fast a payoff must be to trigger a step-up. Removed from the editor in V0.7; engine + DB column retained, default 4.
+- **Continuous LoC growth toggle** (`continuous_growth`) — step the investment up on *every* payoff (`payoffUpgradeMonths = Infinity`) instead of only on fast ones. Removed from the editor in V0.7; engine + DB column retained, default off.
+- **Exploration branch `projection-continuous-loc`** — stock sidecar, retained-return pile, spread-ETF, term×factor heatmap (see `docs/projection-continuous-loc-spec.md`). Not merged.
