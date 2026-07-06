@@ -48,10 +48,11 @@ describe("runSimulation — bootstrap", () => {
 });
 
 describe("runSimulation — cash bucket accelerates growth (no plateau)", () => {
-  it("size steps up many times (14 upgrades → 20000 × 1.5^14 ≈ $5.84M) on the base inputs", () => {
-    // Banked cash pays down each new draw, so payoffs stay fast and the < 4-month
-    // upgrade fires on essentially every cycle.
-    expect(runSimulation(baseInput).finalInvestmentSize).toBeCloseTo(20000 * 1.5 ** 14, 0);
+  it("size steps up many times (13 upgrades → 20000 × 1.5^13 ≈ $3.89M) on the base inputs", () => {
+    // Growth is paced by the predictive launch gate: a step-up only happens
+    // when the stepped-up draw is itself predicted to clear within the gate,
+    // so the flywheel relaunches at the current size in between upgrades.
+    expect(runSimulation(baseInput).finalInvestmentSize).toBeCloseTo(20000 * 1.5 ** 13, 0);
   });
 
   it("currentInvestmentSize never decreases over the series", () => {
@@ -76,6 +77,46 @@ describe("runSimulation — cash bucket accelerates growth (no plateau)", () => 
   it("cash is always banked (never negative) and counted in expected future payments", () => {
     const r = runSimulation(baseInput);
     expect(r.series.every((s) => s.cash >= 0 && Number.isFinite(s.cash))).toBe(true);
+  });
+});
+
+describe("runSimulation — predictive launch gate (only draw when payoff is predicted < gate)", () => {
+  // Hand-reconcilable at 0% everywhere: msc=1000, factor=3 → 3000 bootstrap
+  // (payout 83.33). The redeploy trigger fires at m1 (916.67 left < the
+  // 1083.33 payment). The ×3 step-up (9000 + 916.67 leftover) cannot reach its
+  // trigger in < 4 months on a 1333.33 inflow, but relaunching the current
+  // 3000 can (916.67 + 3000 on a 1166.67 inflow triggers at its 3rd payment),
+  // so the flywheel falls back to the current size instead of stalling or
+  // over-drawing.
+  const steep: ProjectionSimInput = {
+    msc: 1000, investmentSizeFactor: 3, termMonths: 36,
+    investmentInterestPct: 0, locIncrease: 3.0, locInterestPct: 0,
+  };
+
+  it("falls back to the current size when the stepped-up draw cannot clear within the gate", () => {
+    const r = runSimulation(steep);
+    expect(r.series[1].currentInvestmentSize).toBe(3000); // not 9000
+    // The relaunch really happened at m1: 916.67 leftover + 3000 drawn…
+    expect(r.series[1].outstandingAmount).toBeCloseTo(3916.67, 1);
+    // …and one 1166.67 payment later:
+    expect(r.series[2].outstandingAmount).toBeCloseTo(2750, 1);
+  });
+
+  it("growth resumes once the book's payouts make the stepped-up size affordable", () => {
+    const r = runSimulation(steep);
+    expect(r.finalInvestmentSize).toBeGreaterThanOrEqual(9000);
+  });
+
+  it("waits (banking cash on a debt-free ledger) when no candidate can clear within the gate", () => {
+    // MSC stops at month 4, leaving only the bootstrap Amplicon's payout as
+    // inflow. Once the trigger fires, neither the stepped-up nor the current
+    // size can reach its own trigger within 4 months on that trickle, so the
+    // flywheel waits: the leftover is ground down to zero and surplus banks as
+    // cash. The last two months are excluded — launches freeze at the horizon
+    // regardless of affordability.
+    const r = runSimulation({ ...baseInput, mscEndMonth: 4, totalMonths: 120 });
+    const waiting = r.series.slice(0, -2).filter((s) => s.outstandingAmount === 0 && s.cash > 0);
+    expect(waiting.length).toBeGreaterThan(0);
   });
 });
 

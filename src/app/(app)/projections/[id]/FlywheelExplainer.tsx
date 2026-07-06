@@ -50,7 +50,7 @@ export default function FlywheelExplainer() {
 
             <Section title="Each month">
               <p className="text-sm text-sub leading-relaxed">
-                {`The engine accrues interest on the line of credit, collects cash (your savings plus the monthly payout of every active investment), and uses it to pay the balance down. Any surplus beyond what's needed to clear the balance is banked in a cash bucket — never discarded. When the balance reaches zero, a loan is fully repaid and the engine immediately draws a new investment, then applies the banked cash to pay that fresh draw down right away.`}
+                {`The engine accrues interest on the line of credit, collects cash (your savings plus the monthly payout of every active investment), and uses it to pay the balance down. Any surplus beyond what's needed to clear the balance is banked in a cash bucket — never discarded. When the remaining balance drops below one month's payment, the line is effectively clear: the engine redeploys, rolling the small leftover into the new draw (it stays owed — nothing is written off) — but only if that new draw is itself predicted to clear within 4 months. It tries the stepped-up size first, then the current size; if neither qualifies, it waits and banks cash until one does.`}
               </p>
               <p className="text-sm text-sub leading-relaxed mt-2">
                 {`Each investment — the first one included — is drawn one month before it starts paying: the opening draw is taken in month 0, and its first payment lands in month 1. So month 0 sees your savings only.`}
@@ -60,11 +60,12 @@ export default function FlywheelExplainer() {
             <Section title="Sizing rule (steps up on fast payoff)">
               <Formula>{`Initial investment size = MSC × InvestmentSizeFactor
 
-When a loan is paid off in FEWER than 4 months:
+When a loan cleared in FEWER than 4 months AND the
+stepped-up draw is predicted to clear within 4 months:
     investment size × LineOfCreditIncrease
 Otherwise the investment size stays the same.`}</Formula>
               <p className="text-sm text-sub leading-relaxed mt-2">
-                {`Deploying the cash bucket against each new draw keeps payoffs fast, so the under-4-months upgrade fires often and the investment size compounds — the flywheel accelerates instead of settling into a plateau.`}
+                {`Redeploying the moment the line is nearly clear (and deploying the cash bucket against each new draw) keeps cycles short, so the upgrade fires often and the investment size compounds — but never faster than the returns can actually pay for, because every draw must pass the under-4-months prediction first.`}
               </p>
             </Section>
 

@@ -40,7 +40,7 @@ export async function updateProjection(formData: FormData) {
 
   const name = String(formData.get("name") ?? "").trim() || "Untitled projection";
   const msc = Number(formData.get("msc") ?? 0);
-  const investment_size_factor = Number(formData.get("investment_size_factor") ?? 4);
+  const investment_size_factor = Number(formData.get("investment_size_factor") ?? 5);
   const term_months = Number(formData.get("term_months") ?? 36);
   const investment_interest_pct = Number(formData.get("investment_interest_pct") ?? 0) / 100;
   const loc_increase = Number(formData.get("loc_increase") ?? 1.5);

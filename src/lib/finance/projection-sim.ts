@@ -1,42 +1,40 @@
-import { monthlyPayment } from "./amortization";
+// The flywheel simulator — the heart of Projections. Pure and total: any input
+// yields a finite, well-defined series (raw input is resolved through
+// sanitizeSimInput; see sim-input.ts). The investment population lives in
+// sim-book.ts; this module owns the monthly ledger loop and the launch policy.
+//
+// Payment timing convention: every Amplicon — the bootstrap one included — is
+// *drawn* one month before its *first payment*. The initial draw is taken at
+// month 0 and first pays at month 1, exactly like every re-launch.
 
-// Fixed payoff threshold: when a loan is retired in FEWER than this many months,
-// the next investment steps up by LineOfCreditIncrease. Otherwise the size is
-// stable. (User-chosen constant, not an input.)
-export const PAYOFF_UPGRADE_MONTHS = 4;
+import {
+  sanitizeSimInput,
+  type ProjectionSimInput,
+  type SimConfig,
+} from "./sim-input";
+import {
+  makeInvestment,
+  isActive,
+  collectPayouts,
+  valueBook,
+  countActive,
+  pruneExpired,
+  type ActiveInvestment,
+  type InvestmentKind,
+} from "./sim-book";
 
-// Default annual return (decimal) for the stock-market benchmark: the same MSC,
-// dripped into an index fund instead of fed into the flywheel. Overridable per
-// projection via ProjectionSimInput.marketReturnPct.
-export const DEFAULT_MARKET_RETURN_PCT = 0.1;
-
-export const DEFAULT_PERPETUAL_YIELD_PCT = 0.1; // 10% cash-on-cash per year
-export const DEFAULT_PERPETUAL_TERM_MONTHS = 360; // "perpetual", capped at 30y
-export const DEFAULT_PERPETUAL_TRIGGER = 50000; // draw size at which they roll in
-export const DEFAULT_MONTHLY_WITHDRAWAL = 4500;
-
-export interface ProjectionSimInput {
-  msc: number;
-  investmentSizeFactor: number;
-  termMonths: number;
-  investmentInterestPct: number;
-  locIncrease: number;
-  locInterestPct: number;
-  marketReturnPct?: number;
-  totalMonths?: number;
-  // Payoff-speed gate; Infinity = continuous (step up on every payoff).
-  payoffUpgradeMonths?: number;
-  // Long-term Amplicons: a fraction of launches go perpetual once size >= trigger.
-  perpetualMix?: number;
-  perpetualTriggerSize?: number;
-  perpetualYieldPct?: number;
-  perpetualTermMonths?: number;
-  // Stop MSC at this month (undefined = never). Independent of withdrawal.
-  mscEndMonth?: number;
-  // Withdraw monthlyWithdrawal from this month (undefined = never).
-  withdrawalStartMonth?: number;
-  monthlyWithdrawal?: number;
-}
+export {
+  PAYOFF_UPGRADE_MONTHS,
+  DEFAULT_MARKET_RETURN_PCT,
+  DEFAULT_PERPETUAL_YIELD_PCT,
+  DEFAULT_PERPETUAL_TERM_MONTHS,
+  DEFAULT_PERPETUAL_TRIGGER,
+  DEFAULT_MONTHLY_WITHDRAWAL,
+  DEFAULT_TOTAL_MONTHS,
+  sanitizeSimInput,
+} from "./sim-input";
+export type { ProjectionSimInput, SimConfig, SimInputIssue } from "./sim-input";
+export type { ActiveInvestment, InvestmentKind } from "./sim-book";
 
 export interface ProjectionSimPoint {
   monthIndex: number;
@@ -65,167 +63,223 @@ export interface ProjectionSimResult {
   perpetualsLaunched: number;
 }
 
-type InvestmentKind = "term" | "perpetual";
-
-interface ActiveInvestment {
-  kind: InvestmentKind;
-  monthlyPayout: number; // amortizing payment (term) or flat coupon (perpetual)
-  termMonths: number;
-  startMonth: number;
+// A relaunch owed since the last payoff but not yet executed: it waits,
+// banking cash, until some candidate's payoff is predicted to land within the
+// gate. `steppedEligible` records whether the retired loan paid off fast
+// enough (measured at the payoff month) to try the stepped-up size first.
+interface PendingLaunch {
+  steppedEligible: boolean;
 }
 
-function isActive(inv: ActiveInvestment, m: number): boolean {
-  const elapsed = m - inv.startMonth;
-  return elapsed >= 0 && elapsed < inv.termMonths;
+// Mutable state carried across months of one simulation run.
+interface SimState {
+  cash: number;
+  outstandingAmount: number;
+  currentInvestmentSize: number;
+  // First-payment month of the latest launch; payoff speed is measured from it
+  // on the same basis for the bootstrap loan as for every re-launch.
+  lastInvStartMonth: number;
+  peakOutstanding: number;
+  mixAcc: number; // leaky-bucket accumulator for the perpetual launch cadence
+  book: ActiveInvestment[];
+  pendingLaunch: PendingLaunch | null;
+  investmentsLaunched: number;
+  perpetualsLaunched: number;
+  contributed: number;
+  marketBalance: number;
 }
 
-function remainingBalanceAt(inv: ActiveInvestment, m: number): number {
-  const elapsed = m - inv.startMonth;
-  if (elapsed < 0 || elapsed >= inv.termMonths) return 0;
-  return inv.monthlyPayout * (inv.termMonths - elapsed);
-}
-
-function makeInvestment(
-  kind: InvestmentKind,
-  faceValue: number,
-  startMonth: number,
-  input: ProjectionSimInput
-): ActiveInvestment {
-  if (kind === "perpetual") {
-    const termMonths = input.perpetualTermMonths ?? DEFAULT_PERPETUAL_TERM_MONTHS;
-    const yieldPct = input.perpetualYieldPct ?? DEFAULT_PERPETUAL_YIELD_PCT;
-    return { kind, monthlyPayout: faceValue * (yieldPct / 12), termMonths, startMonth };
+// Apply the month's net inflow to the ledger: surplus pays the LoC down and
+// banks past it as cash; a shortfall is covered from cash, then re-borrowed.
+function applyNetInflow(state: SimState, netInflow: number): void {
+  if (netInflow >= 0) {
+    if (netInflow >= state.outstandingAmount) {
+      state.cash += netInflow - state.outstandingAmount;
+      state.outstandingAmount = 0;
+    } else {
+      state.outstandingAmount -= netInflow;
+    }
+  } else {
+    const shortfall = -netInflow;
+    const fromCash = Math.min(state.cash, shortfall);
+    state.cash -= fromCash;
+    state.outstandingAmount += shortfall - fromCash;
   }
-  return {
-    kind: "term",
-    monthlyPayout: monthlyPayment(faceValue, input.investmentInterestPct, input.termMonths),
-    termMonths: input.termMonths,
-    startMonth,
-  };
+}
+
+// Forecast the payoff of drawing `candidate` at `month` (first payment lands
+// at month + 1): the current leftover balance rolls into the draw, banked cash
+// is applied against it up front, then the balance accrues LoC interest and is
+// paid by the book's actual payout schedule (expiries included), the
+// candidate's own payout, and the MSC / withdrawal schedule. "Payoff" is the
+// redeploy trigger — the post-payment balance dropping below that month's
+// payment — predicted in fewer than payoffUpgradeMonths months, the same
+// strict-< basis the retrospective step-up gate uses (months counted from the
+// first-payment month).
+function payoffPredictedWithinGate(
+  state: SimState,
+  candidate: ActiveInvestment,
+  size: number,
+  config: SimConfig,
+  month: number
+): boolean {
+  if (config.payoffUpgradeMonths === Infinity) return true;
+  let balance = state.outstandingAmount + size;
+  balance -= Math.min(state.cash, balance);
+  if (balance <= 0) return true;
+  const monthlyLocRate = config.locInterestPct / 12;
+  const horizon = Math.ceil(config.payoffUpgradeMonths);
+  for (let j = 0; j < horizon; j++) {
+    const future = month + 1 + j;
+    balance *= 1 + monthlyLocRate;
+    const effMsc = config.mscEndMonth == null || future < config.mscEndMonth ? config.msc : 0;
+    const withdrawal =
+      config.withdrawalStartMonth != null && future >= config.withdrawalStartMonth ? config.monthlyWithdrawal : 0;
+    let inflow = effMsc - withdrawal;
+    for (const inv of state.book) {
+      if (isActive(inv, future)) inflow += inv.monthlyPayout;
+    }
+    if (isActive(candidate, future)) inflow += candidate.monthlyPayout;
+    balance -= inflow;
+    if (balance <= 0 || balance < inflow) return true;
+  }
+  return false;
+}
+
+// The perpetual cadence (leaky-bucket): which kind a launch of `size` would
+// be. Pure preview — mixAcc is only advanced when the launch commits, so the
+// preview and the commit must share this exact condition.
+function kindForSize(state: SimState, config: SimConfig, size: number): InvestmentKind {
+  const eligible = config.perpetualMix > 0 && size >= config.perpetualTriggerSize;
+  return eligible && state.mixAcc + config.perpetualMix >= 1 ? "perpetual" : "term";
+}
+
+// Launch policy. The redeploy trigger fires when the post-payment balance
+// drops below one month's payment (this month's net inflow) — the line is
+// "nearly clear", so waiting the final grind-out month(s) would just idle
+// capital. The leftover balance stays owed and rolls into the fresh draw
+// (capital is conserved — no absorption). A new Amplicon is only ever started
+// when its payoff is predicted to happen in fewer than payoffUpgradeMonths
+// months: the stepped-up size is tried first (growth, allowed only when the
+// retired loan itself cleared within the gate), then the current size (steady
+// relaunch). If neither qualifies the flywheel waits, banking surplus as cash
+// — which shrinks the effective draw and pulls the predicted payoff in — and
+// re-evaluates every month. Banked cash is deployed against the fresh draw.
+function manageLaunch(state: SimState, config: SimConfig, month: number, netInflow: number): void {
+  if (state.currentInvestmentSize <= 0 || month >= config.totalMonths - 1) {
+    return;
+  }
+  if (state.pendingLaunch == null) {
+    const triggered = state.outstandingAmount === 0 || state.outstandingAmount < netInflow;
+    if (!triggered) return;
+    const monthsToPayoff = month - state.lastInvStartMonth;
+    state.pendingLaunch = { steppedEligible: monthsToPayoff < config.payoffUpgradeMonths };
+  }
+
+  const candidateSizes = state.pendingLaunch.steppedEligible
+    ? [state.currentInvestmentSize * config.locIncrease, state.currentInvestmentSize]
+    : [state.currentInvestmentSize];
+
+  for (const size of candidateSizes) {
+    const kind = kindForSize(state, config, size);
+    const candidate = makeInvestment(kind, size, month + 1, config);
+    if (!payoffPredictedWithinGate(state, candidate, size, config, month)) continue;
+
+    if (config.perpetualMix > 0 && size >= config.perpetualTriggerSize) {
+      state.mixAcc += config.perpetualMix;
+      if (kind === "perpetual") state.mixAcc -= 1;
+    }
+    state.currentInvestmentSize = size;
+    state.book.push(candidate);
+    state.investmentsLaunched += 1;
+    if (kind === "perpetual") state.perpetualsLaunched += 1;
+    // The leftover balance rolls into the fresh draw: the full Amplicon cost
+    // is borrowed on top of what is still owed.
+    state.outstandingAmount += size;
+    state.lastInvStartMonth = month + 1;
+    state.pendingLaunch = null;
+
+    const fromCash = Math.min(state.cash, state.outstandingAmount);
+    state.outstandingAmount -= fromCash;
+    state.cash -= fromCash;
+    return;
+  }
 }
 
 export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
-  const totalMonths = input.totalMonths ?? 480;
-  const monthlyLocRate = input.locInterestPct / 12;
-  const monthlyMarketRate = (input.marketReturnPct ?? DEFAULT_MARKET_RETURN_PCT) / 12;
-  const payoffUpgradeMonths = input.payoffUpgradeMonths ?? PAYOFF_UPGRADE_MONTHS;
-  const perpetualMix = input.perpetualMix ?? 0;
-  const perpetualTrigger = input.perpetualTriggerSize ?? DEFAULT_PERPETUAL_TRIGGER;
-  const monthlyWithdrawal = input.monthlyWithdrawal ?? DEFAULT_MONTHLY_WITHDRAWAL;
-  const initialInvestmentSize = input.msc * input.investmentSizeFactor;
+  const { config } = sanitizeSimInput(input);
+  const monthlyLocRate = config.locInterestPct / 12;
+  const monthlyMarketRate = config.marketReturnPct / 12;
+  const initialInvestmentSize = config.msc * config.investmentSizeFactor;
 
-  let currentInvestmentSize = initialInvestmentSize;
-  let outstandingAmount = initialInvestmentSize;
-  let cash = 0;
-  // The initial draw is taken at month 0 but, like every subsequent Amplicon, its
-  // first payment lands the month AFTER the draw (month 1). lastInvStartMonth
-  // tracks that first-payment month so payoff speed is measured on the same basis
-  // for the bootstrap loan as for every re-launch (which use m + 1).
-  let lastInvStartMonth = 1;
-  let peakOutstanding = initialInvestmentSize;
-  let mixAcc = 0;
-
-  const active: ActiveInvestment[] = [makeInvestment("term", initialInvestmentSize, 1, input)];
-  let investmentsLaunched = 1;
-  let perpetualsLaunched = 0;
-
-  let contributed = 0;
-  let marketBalance = 0;
+  const state: SimState = {
+    cash: 0,
+    outstandingAmount: initialInvestmentSize,
+    currentInvestmentSize: initialInvestmentSize,
+    lastInvStartMonth: 1,
+    peakOutstanding: initialInvestmentSize,
+    mixAcc: 0,
+    book: [makeInvestment("term", initialInvestmentSize, 1, config)],
+    pendingLaunch: null,
+    investmentsLaunched: 1,
+    perpetualsLaunched: 0,
+    contributed: 0,
+    marketBalance: 0,
+  };
 
   const series: ProjectionSimPoint[] = [];
 
-  for (let m = 0; m < totalMonths; m++) {
-    const mscActive = input.mscEndMonth == null || m < input.mscEndMonth;
-    const effMsc = mscActive ? input.msc : 0;
-    const withdrawing = input.withdrawalStartMonth != null && m >= input.withdrawalStartMonth;
-    const withdrawal = withdrawing ? monthlyWithdrawal : 0;
+  for (let m = 0; m < config.totalMonths; m++) {
+    const mscActive = config.mscEndMonth == null || m < config.mscEndMonth;
+    const effMsc = mscActive ? config.msc : 0;
+    const withdrawing = config.withdrawalStartMonth != null && m >= config.withdrawalStartMonth;
+    const withdrawal = withdrawing ? config.monthlyWithdrawal : 0;
 
-    outstandingAmount *= 1 + monthlyLocRate;
+    state.outstandingAmount *= 1 + monthlyLocRate;
 
-    let cashFlow = effMsc;
-    let perpetualIncome = 0;
-    for (const inv of active) {
-      if (!isActive(inv, m)) continue;
-      cashFlow += inv.monthlyPayout;
-      if (inv.kind === "perpetual") perpetualIncome += inv.monthlyPayout;
-    }
-
+    const payouts = collectPayouts(state.book, m);
+    const cashFlow = effMsc + payouts.total;
     const netInflow = cashFlow - withdrawal;
-    if (netInflow >= 0) {
-      if (netInflow >= outstandingAmount) {
-        cash += netInflow - outstandingAmount;
-        outstandingAmount = 0;
-      } else {
-        outstandingAmount -= netInflow;
-      }
-    } else {
-      const shortfall = -netInflow;
-      const fromCash = Math.min(cash, shortfall);
-      cash -= fromCash;
-      outstandingAmount += shortfall - fromCash;
+
+    applyNetInflow(state, netInflow);
+    manageLaunch(state, config, m, netInflow);
+
+    if (state.outstandingAmount > state.peakOutstanding) {
+      state.peakOutstanding = state.outstandingAmount;
     }
 
-    if (outstandingAmount === 0 && currentInvestmentSize > 0 && m < totalMonths - 1) {
-      const monthsToPayoff = m - lastInvStartMonth;
-      if (monthsToPayoff < payoffUpgradeMonths) {
-        currentInvestmentSize *= input.locIncrease;
-      }
-      let kind: InvestmentKind = "term";
-      if (perpetualMix > 0 && currentInvestmentSize >= perpetualTrigger) {
-        mixAcc += perpetualMix;
-        if (mixAcc >= 1) {
-          kind = "perpetual";
-          mixAcc -= 1;
-          perpetualsLaunched += 1;
-        }
-      }
-      active.push(makeInvestment(kind, currentInvestmentSize, m + 1, input));
-      investmentsLaunched += 1;
-      outstandingAmount = currentInvestmentSize;
-      lastInvStartMonth = m + 1;
+    // Value the book after this month's payment (hence m + 1).
+    const value = valueBook(state.book, m + 1);
+    const expectedFuturePayments = value.total + state.cash - state.outstandingAmount;
 
-      const fromCash = Math.min(cash, outstandingAmount);
-      outstandingAmount -= fromCash;
-      cash -= fromCash;
-    }
-
-    if (outstandingAmount > peakOutstanding) peakOutstanding = outstandingAmount;
-
-    let totalRemaining = 0;
-    let perpetualBookValue = 0;
-    for (const inv of active) {
-      const rem = remainingBalanceAt(inv, m + 1);
-      totalRemaining += rem;
-      if (inv.kind === "perpetual") perpetualBookValue += rem;
-    }
-    const expectedFuturePayments = totalRemaining + cash - outstandingAmount;
-
-    contributed += effMsc;
-    marketBalance = marketBalance * (1 + monthlyMarketRate) + effMsc;
+    state.contributed += effMsc;
+    state.marketBalance = state.marketBalance * (1 + monthlyMarketRate) + effMsc;
 
     series.push({
       monthIndex: m,
       cashFlow,
-      outstandingAmount,
+      outstandingAmount: state.outstandingAmount,
       expectedFuturePayments,
-      cash,
-      currentInvestmentSize,
-      activeInvestmentCount: active.filter((inv) => isActive(inv, m)).length,
-      contributedCapital: contributed,
-      marketBaseline: marketBalance,
-      perpetualIncome,
-      perpetualBookValue,
+      cash: state.cash,
+      currentInvestmentSize: state.currentInvestmentSize,
+      activeInvestmentCount: countActive(state.book, m),
+      contributedCapital: state.contributed,
+      marketBaseline: state.marketBalance,
+      perpetualIncome: payouts.perpetual,
+      perpetualBookValue: value.perpetual,
     });
+
+    pruneExpired(state.book, m + 1);
   }
 
   return {
     series,
     initialInvestmentSize,
-    finalInvestmentSize: currentInvestmentSize,
-    investmentsLaunched,
-    perpetualsLaunched,
-    peakOutstanding,
-    finalContributedCapital: contributed,
-    finalMarketBaseline: marketBalance,
+    finalInvestmentSize: state.currentInvestmentSize,
+    investmentsLaunched: state.investmentsLaunched,
+    perpetualsLaunched: state.perpetualsLaunched,
+    peakOutstanding: state.peakOutstanding,
+    finalContributedCapital: state.contributed,
+    finalMarketBaseline: state.marketBalance,
   };
 }
