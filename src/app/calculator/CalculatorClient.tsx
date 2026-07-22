@@ -19,7 +19,7 @@ export default function CalculatorClient() {
       </div>
 
       <Card title="Inputs">
-        <SimInputsGrid values={sim.values} set={sim.set} initialInvestmentSize={sim.initialInvestmentSize} />
+        <SimInputsGrid values={sim.values} set={sim.set} initialInvestmentSize={sim.initialInvestmentSize} advanced="hidden" />
       </Card>
 
       <SimResults sim={sim} />
