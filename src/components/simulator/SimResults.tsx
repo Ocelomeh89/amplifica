@@ -11,7 +11,13 @@ const SNAPSHOTS = [60, 120, 180]; // 5 / 10 / 15 years
 // financial-optionality sentence, and the charts. Shared by the projection
 // editor and /calculator. (UI says "financial optionality"; the engine keeps
 // its original FI naming.)
-export default function SimResults({ sim }: { sim: Simulation }) {
+interface Props {
+  sim: Simulation;
+  // Forwarded to SimCharts (public calculator's deploys-exceed-income marker).
+  incomeMarkerMonth?: number | null;
+}
+
+export default function SimResults({ sim, incomeMarkerMonth }: Props) {
   const { values, result, fi, at, finalExpectedFuturePayments, vsMarket } = sim;
 
   return (
@@ -89,7 +95,7 @@ export default function SimResults({ sim }: { sim: Simulation }) {
         </div>
       </Card>
 
-      <SimCharts series={result.series} />
+      <SimCharts series={result.series} incomeMarkerMonth={incomeMarkerMonth} />
     </>
   );
 }
