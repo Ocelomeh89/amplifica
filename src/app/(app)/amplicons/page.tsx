@@ -28,7 +28,8 @@ export default async function AmpliconsPage() {
         {!amplicons || amplicons.length === 0 ? (
           <p className="text-sm text-sub">No Amplicons yet. Click &quot;Add Amplicon&quot; to start.</p>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[11px] text-sub uppercase tracking-wide border-b border-edge">
                 <th className="py-2">Name</th>
@@ -75,7 +76,8 @@ export default async function AmpliconsPage() {
                 );
               })}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
       </Card>
     </div>

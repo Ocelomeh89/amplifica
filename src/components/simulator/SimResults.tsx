@@ -15,7 +15,7 @@ export default function SimResults({ sim }: { sim: Simulation }) {
   return (
     <>
       <Card title="Summary">
-        <div className="grid grid-cols-4 gap-3 text-sm">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
           <div>
             <div className="text-[10px] text-sub uppercase tracking-wide">Initial investment</div>
             <div className="text-base font-bold">{fmtCurrency(result.initialInvestmentSize)}</div>
@@ -36,7 +36,7 @@ export default function SimResults({ sim }: { sim: Simulation }) {
       </Card>
 
       <Card title="Flywheel vs market">
-        <div className="grid grid-cols-4 gap-3 text-sm">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
           <div>
             <div className="text-[10px] text-sub uppercase tracking-wide">Total contributed (MSC)</div>
             <div className="text-base font-bold">{fmtCurrency(result.finalContributedCapital)}</div>
@@ -57,7 +57,7 @@ export default function SimResults({ sim }: { sim: Simulation }) {
       </Card>
 
       <Card title="Key results @ 5 / 10 / 15 years (accumulation)">
-        <div className="grid grid-cols-4 gap-3 text-sm">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
           <div>
             <div className="text-[10px] text-sub uppercase tracking-wide">&nbsp;</div>
             {["Expected future payments", "Cash flow/mo", "Perpetual income/mo"].map((label) => (

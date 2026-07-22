@@ -24,7 +24,7 @@ export default function CalculatorClient() {
 
       <SimResults sim={sim} />
 
-      <div className="bg-card border border-edge rounded-lg p-4 mt-2 flex items-center justify-between gap-4">
+      <div className="bg-card border border-edge rounded-lg p-4 mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <p className="text-sm text-sub">
           Like what you see? Create a free account to save this projection and track
           your real Amplicons and lines of credit.

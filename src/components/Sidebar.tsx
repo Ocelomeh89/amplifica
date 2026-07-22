@@ -50,8 +50,10 @@ export default function Sidebar({ email }: { email: string }) {
   const [collapsed, setCollapsed] = useState(false);
 
   // Restore the saved preference after mount (avoids a hydration mismatch).
+  // With no saved preference, start collapsed on narrow screens.
   useEffect(() => {
-    if (localStorage.getItem("sidebar-collapsed") === "1") setCollapsed(true);
+    const saved = localStorage.getItem("sidebar-collapsed");
+    if (saved === "1" || (saved === null && window.innerWidth < 640)) setCollapsed(true);
   }, []);
 
   const toggle = () =>

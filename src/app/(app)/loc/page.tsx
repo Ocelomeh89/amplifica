@@ -29,7 +29,7 @@ export default async function LoCPage() {
       <NewLoCForm />
 
       <Card>
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
             <div className="text-[10px] text-sub uppercase tracking-wide">Total Size</div>
             <div className="text-lg font-bold">{fmtCurrency(totalSize)}</div>
@@ -53,7 +53,8 @@ export default async function LoCPage() {
         {!locs || locs.length === 0 ? (
           <p className="text-sm text-sub">No lines of credit yet. Click &quot;Add Line of Credit&quot; to start.</p>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[11px] text-sub uppercase tracking-wide border-b border-edge">
                 <th className="py-2">Name</th>
@@ -99,7 +100,8 @@ export default async function LoCPage() {
                 );
               })}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
       </Card>
     </div>

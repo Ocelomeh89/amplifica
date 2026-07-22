@@ -24,7 +24,7 @@ export default function NewLoCForm() {
   return (
     <Card title="New Line of Credit">
       <form action={async (fd) => { await createLoC(fd); setOpen(false); }} className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Name">
             <input
               name="name"

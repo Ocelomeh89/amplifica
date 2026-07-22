@@ -33,7 +33,7 @@ export default async function SettingsPage({
 
       <form action={saveSettings}>
         <Card title="Personal settings">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Monthly savings contribution ($)" hint="What you contribute to investments each month, in USD.">
               <NumberInput
                 name="monthly_savings_contribution"

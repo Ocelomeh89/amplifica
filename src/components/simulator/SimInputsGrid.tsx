@@ -19,7 +19,7 @@ export default function SimInputsGrid({ values, set, initialInvestmentSize }: Pr
   const { msc, factor, term, invInterestPct, locIncrease, locInterestPct, marketReturnPct, perpetualMixPct, perpetualYieldPct, perpetualTrigger, mscEndMonth, withdrawalAmount } = values;
 
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
       <Field label="Monthly savings contribution ($)" hint="Default from Settings">
         <input name="msc" type="number" value={msc} onChange={(e) => set("msc", Number(e.target.value))} min={0} step={100} className={inputClass} />
       </Field>
