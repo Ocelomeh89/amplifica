@@ -58,7 +58,7 @@ export default function SimInputsGrid({ values, set, initialInvestmentSize }: Pr
       <Field label="Stop MSC at month" hint="blank = never">
         <input name="msc_end_month" type="number" value={mscEndMonth} onChange={(e) => set("mscEndMonth", e.target.value === "" ? "" : Number(e.target.value))} min={0} step={1} className={inputClass} />
       </Field>
-      <Field label="Withdrawal at FI ($/mo)">
+      <Field label="Withdrawal at optionality ($/mo)" hint="monthly draw once you could stop saving">
         <input name="withdrawal_amount" type="number" value={withdrawalAmount} onChange={(e) => set("withdrawalAmount", Number(e.target.value))} min={0} step={100} className={inputClass} />
       </Field>
     </div>

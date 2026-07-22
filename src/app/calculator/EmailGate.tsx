@@ -32,7 +32,7 @@ export default function EmailGate({ utm }: { utm: Utm }) {
       <h2 className="text-xl font-semibold mb-1">Try the flywheel calculator</h2>
       <p className="text-sm text-sub mb-5">
         See how a leverage flywheel compounds: model your monthly savings, line of
-        credit, and income investments — and find your financial independence date.
+        credit, and income investments — and find your financial optionality date.
         Enter your email to unlock the full simulator.
       </p>
 

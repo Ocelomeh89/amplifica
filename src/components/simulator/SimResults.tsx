@@ -7,8 +7,10 @@ import type { Simulation } from "./useSimulation";
 
 const SNAPSHOTS = [60, 120, 180]; // 5 / 10 / 15 years
 
-// Simulation output: Summary / Flywheel-vs-market / Key-results cards, the FI
-// sentence, and the charts. Shared by the projection editor and /calculator.
+// Simulation output: Summary / Flywheel-vs-market / Key-results cards, the
+// financial-optionality sentence, and the charts. Shared by the projection
+// editor and /calculator. (UI says "financial optionality"; the engine keeps
+// its original FI naming.)
 export default function SimResults({ sim }: { sim: Simulation }) {
   const { values, result, fi, at, finalExpectedFuturePayments, vsMarket } = sim;
 
@@ -76,13 +78,13 @@ export default function SimResults({ sim }: { sim: Simulation }) {
         <div className="mt-3 pt-3 border-t border-edge text-sm">
           {fi.month != null ? (
             <>
-              <span className="font-medium">Financial independence: </span>
+              <span className="font-medium">Financial optionality: </span>
               stop saving and draw {fmtCurrency(values.withdrawalAmount)}/mo from{" "}
               <span className="font-bold text-aqua">month {fi.month} (~{(fi.month / 12).toFixed(1)} yr)</span>{" "}
               — the total holds, ending at {fmtCurrency(fi.expectedFuturePaymentsAtEnd ?? 0)}.
             </>
           ) : (
-            <span className="text-sub">FI: drawing {fmtCurrency(values.withdrawalAmount)}/mo is not sustainable within 30 years at these inputs.</span>
+            <span className="text-sub">Financial optionality: drawing {fmtCurrency(values.withdrawalAmount)}/mo is not sustainable within 30 years at these inputs.</span>
           )}
         </div>
       </Card>

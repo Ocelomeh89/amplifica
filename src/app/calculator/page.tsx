@@ -7,11 +7,11 @@ import CalculatorClient from "./CalculatorClient";
 export const metadata: Metadata = {
   title: "Flywheel Calculator — Amplifica",
   description:
-    "Model the leverage flywheel: monthly savings, line of credit, and income investments compounding toward financial independence. Free interactive simulator.",
+    "Model the leverage flywheel: monthly savings, line of credit, and income investments compounding toward financial optionality. Free interactive simulator.",
   openGraph: {
     title: "The Amplifica Flywheel Calculator",
     description:
-      "Simulate a leverage flywheel wealth strategy and find your financial independence date.",
+      "Simulate a leverage flywheel wealth strategy and find your financial optionality date.",
     type: "website",
     url: "/calculator",
   },
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     card: "summary",
     title: "The Amplifica Flywheel Calculator",
     description:
-      "Simulate a leverage flywheel wealth strategy and find your financial independence date.",
+      "Simulate a leverage flywheel wealth strategy and find your financial optionality date.",
   },
 };
 
