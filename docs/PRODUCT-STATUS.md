@@ -40,16 +40,16 @@ and the date of financial independence (FI).
 | Tests | Vitest 2.1 (+ jsdom, Testing Library) |
 | Package manager | pnpm |
 
-**Env vars:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (see `.env.example`).
+**Env vars:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`; server-only: `SUPABASE_SERVICE_ROLE_KEY` (lead capture), `BEEHIIV_API_KEY` + `BEEHIIV_PUBLICATION_ID` (newsletter subscribe), `NEXT_PUBLIC_SITE_URL` (auth redirects + `metadataBase`). See `.env.example`.
 
 ---
 
 ## 3. Architecture
 
-- **App Router with a route group `(app)`** for authenticated pages, which share `src/app/(app)/layout.tsx` (renders the `Sidebar` + page shell). Public routes (`/login`, `/signup`, `/reset-password`, `/auth/callback`, `/`) live outside the group.
-- **Auth via Supabase SSR cookies.** `src/lib/supabase/middleware.ts` (wired through Next middleware) refreshes the session on every request; `server.ts` creates a request-scoped server client (used in Server Components + Actions), `client.ts` a browser client. Unauthenticated access to `(app)` pages redirects to `/login`.
+- **App Router with a route group `(app)`** for authenticated pages, which share `src/app/(app)/layout.tsx` (renders the `Sidebar` + page shell). Public routes (`/login`, `/signup`, `/reset-password`, `/auth/callback`, `/`, `/calculator`) live outside the group.
+- **Auth via Supabase SSR cookies.** `src/lib/supabase/middleware.ts` (wired through Next middleware) refreshes the session on every request; `server.ts` creates a request-scoped server client (used in Server Components + Actions), `client.ts` a browser client. Unauthenticated access to `(app)` pages redirects to `/login`. `/calculator` is intentionally public — the middleware early-returns before the auth round-trip.
 - **Mutations are Next.js Server Actions** (`actions.ts` per feature folder), never client-side DB calls. Each action calls `supabase.auth.getUser()`, then a scoped query, then `revalidatePath`. Writes are additionally scoped `.eq("user_id", user.id)` as defense-in-depth on top of RLS.
-- **Security model: RLS-first.** Every table has `enable row level security` and per-operation policies keyed on `auth.uid()`. A user can only ever see/modify their own rows.
+- **Security model: RLS-first.** Every user-owned table has `enable row level security` and per-operation policies keyed on `auth.uid()`. A user can only ever see/modify their own rows. The one non-user table, `leads`, has RLS enabled with **no policies** (anon key hard-denied); it is written only via the service-role client (`src/lib/supabase/admin.ts`, `import "server-only"`).
 - **The finance engine is pure and isolated** in `src/lib/finance/` — no I/O, no React. It is the most heavily tested part of the app (Vitest, property/invariant tests). UI reads persisted rows, runs the engine in-memory (client-side `useMemo`, debounced), and renders.
 - **Profiles auto-provision**: a Postgres trigger (`on_auth_user_created`) inserts a `profiles` row on signup.
 
@@ -64,14 +64,17 @@ src/
       projections/      # list + [id] editor (the flywheel simulator UI)
       settings/         # profile settings + theme toggle
       layout.tsx
+    calculator/         # PUBLIC email-gated simulator (page, EmailGate, CalculatorClient, actions)
     login/ signup/ reset-password/ auth/callback/  # auth
     layout.tsx  page.tsx  globals.css
   components/           # Card, Field, InfoBox, NumberInput, PasswordInput, Sidebar
+    simulator/          # shared simulator UI: sim-values, useSimulation, SimInputsGrid, SimResults, SimCharts, FlywheelExplainer
   lib/
+    beehiiv.ts          # server-only Beehiiv subscribe (best-effort)
     finance/            # PURE engine (see §5)
-    supabase/           # client.ts, server.ts, middleware.ts, database.types.ts
+    supabase/           # client.ts, server.ts, admin.ts (service role), middleware.ts, database.types.ts
     format.ts           # currency/percent/date formatters
-supabase/migrations/    # 0001–0004 (see §4)
+supabase/migrations/    # 0001–0007 (see §4)
 docs/                   # specs, plans, this status doc
 ```
 
@@ -79,7 +82,7 @@ docs/                   # specs, plans, this status doc
 
 ## 4. Data schema (Postgres / Supabase)
 
-Four user-owned tables, all RLS-protected, all with a `touch_updated_at` trigger. Reproduce by running migrations `0001`–`0004` in order.
+Four user-owned tables (all RLS-protected with self policies, all with a `touch_updated_at` trigger) plus the policy-less `leads` table. Reproduce by running migrations `0001`–`0007` in order.
 
 ### `profiles` (1:1 with `auth.users`, auto-created on signup) — migration 0001
 | Column | Type | Notes |
@@ -132,11 +135,24 @@ Base (0002): `id`, `user_id`, `name`, `msc` (≥0), `investment_size_factor` (3�
   | `perpetual_trigger_size` | numeric(14,2), ≥0 | 50000 | draw size at which perpetuals roll in |
   | `msc_end_month` | int, null or ≥0 | NULL | optional month to stop the MSC |
   | `withdrawal_amount` | numeric(14,2), ≥0 | 4500 | monthly cash to withdraw at FI |
-RLS: self CRUD. Index on `user_id`. **Migration 0004 has been applied to the live DB as of V0.5.**
+RLS: self CRUD. Index on `user_id`. **Migrations 0004–0006 have been applied to the live DB (0006 as of V1.0 launch, 2026-07-06).**
+
+### `leads` (public-calculator email captures) — migration 0007
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `email` | text | not null, format check, stored lowercased |
+| `source` | text | default `'calculator'` (future public surfaces get their own) |
+| `utm_source` / `utm_medium` / `utm_campaign` | text | nullable, from the visitor's landing URL |
+| `user_agent` | text | nullable |
+| `beehiiv_synced` | boolean | default false; set true after a successful Beehiiv subscribe |
+| `created_at` | timestamptz | |
+Unique index on `(lower(email), source)` — repeat submits are idempotent (23505 = success).
+**RLS enabled with no policies** (deliberate): the anon key is hard-denied, so the table is not a public spam surface; all writes go through the service-role client server-side.
 
 **Triggers/functions (0001):** `touch_updated_at()` (auto `updated_at`), `handle_new_user()` (auto-insert profile on signup, `security definer`).
 
-**TypeScript mirror:** `src/lib/supabase/database.types.ts` mirrors all tables as `Row`/`Insert`/`Update`; exported aliases `Projection`, `Amplicon`, `LoC`, `Profile`.
+**TypeScript mirror:** `src/lib/supabase/database.types.ts` mirrors all tables as `Row`/`Insert`/`Update`; exported aliases `Projection`, `Amplicon`, `LoC`, `Profile`, `Lead`.
 
 ---
 
@@ -198,13 +214,14 @@ first payment the month after). So month 0 sees MSC only.
 
 ## 7. Routes & pages
 
-**Public:** `/` (landing/redirect), `/login`, `/signup`, `/reset-password`, `/auth/callback` (OAuth/email-link handler, a Route Handler).
+**Public:** `/` (landing/redirect), `/login`, `/signup`, `/reset-password`, `/auth/callback` (OAuth/email-link handler, a Route Handler), and:
+- `/calculator` — **email-gated public simulator** (lead gen). The server component reads the `amp_calc_unlocked` httpOnly cookie (path `/calculator`, 1yr) and renders either `EmailGate` or `CalculatorClient` — no client-side flash. `captureLead` (server action): honeypot check → email validation → **insert into `leads` via the service-role client (required for unlock; duplicate = success)** → awaited best-effort Beehiiv subscribe (`utm_source: calculator`) → set cookie. The simulator itself is the full shared UI (`components/simulator/`) seeded from `PUBLIC_DEFAULT_VALUES` — same inputs and charts as the editor, no save; CTAs to `/signup`. Abuse resistance is deliberately lightweight (honeypot + validation + unique index + service-role-only writes); escalate to Vercel Firewall rate limiting if spam appears.
 
 **Authenticated `(app)`** (shared `Sidebar` layout):
 - `/dashboard` — net-worth & cash-flow charts over time (`ChartPair`), driven by the user's Amplicons via `projection.ts`.
 - `/amplicons` — list + inline create/edit/delete (`AmpliconRow`, `NewAmpliconForm`, `actions.ts`).
 - `/loc` — list + create; `UtilizationCell` for live utilization edits.
-- `/projections` — list + "New projection" button; `/[id]` opens `EditorForm` (the live simulator: inputs, fixed/continuous toggle, perpetual + drawdown controls, **Expected future payments @ 5/10/15yr (accumulation)** card, **FI readout**, `SimCharts`, `FlywheelExplainer`).
+- `/projections` — list + "New projection" button; `/[id]` opens `EditorForm` (the live simulator: inputs, fixed/continuous toggle, perpetual + drawdown controls, **Expected future payments @ 5/10/15yr (accumulation)** card, **FI readout**, `SimCharts`, `FlywheelExplainer`). `EditorForm` is a thin composition over the shared simulator UI in `src/components/simulator/` (`useSimulation` hook + `SimInputsGrid` + `SimResults`); the grid's `name=` attributes carry the `updateProjection` FormData contract.
 - `/settings` — profile settings form + light/dark `ThemeToggle`.
 
 Each feature folder pairs a Server Component `page.tsx` (reads rows) with `actions.ts` (Server Actions for mutations) and small client components for interactivity.
@@ -215,6 +232,7 @@ Each feature folder pairs a Server Component `page.tsx` (reads rows) with `actio
 
 - Tailwind with brand tokens (`tailwind.config.ts`): theme-aware `ink/sub/cream/card/edge` (flip via CSS variables in `globals.css`) and fixed brand colors `plum #221338`, `purple #6C4BD3`, `amethyst #A88BE8`, `aqua #3EC9C0`, `mauve #8D8295`. Display serif + body sans font variables.
 - Shared components: `Card`, `Field`, `InfoBox`, `NumberInput`, `PasswordInput`, `Sidebar` (sticky; keeps Settings + Log out visible while content scrolls).
+- Shared simulator UI in `src/components/simulator/`: `sim-values.ts` (the `SimValues` UI shape, `toSimInput` / `projectionToSimValues` mappers, `PUBLIC_DEFAULT_VALUES`), `useSimulation.ts` (state + 200ms debounce + engine memos), `SimInputsGrid`, `SimResults`, `SimCharts`, `FlywheelExplainer`. Used by both the projection editor and `/calculator`.
 - Formatters in `lib/format.ts`: `fmtCurrency` (k/M abbreviations), `fmtUSD0`, `fmtPct`, `fmtMonth`, `fmtDate`.
 
 ---
@@ -222,10 +240,10 @@ Each feature folder pairs a Server Component `page.tsx` (reads rows) with `actio
 ## 9. Recreating from zero
 
 1. `pnpm install`. Node 24 LTS.
-2. Create a Supabase project; set `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`.
-3. Apply `supabase/migrations/0001`→`0004` in order (`supabase db push` / `migration up`). This builds all tables, RLS, triggers, and the signup→profile automation.
+2. Create a Supabase project; set `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`, plus `SUPABASE_SERVICE_ROLE_KEY` / `BEEHIIV_API_KEY` / `BEEHIIV_PUBLICATION_ID` for the `/calculator` lead capture (it degrades gracefully without Beehiiv: leads still insert, `beehiiv_synced` stays false).
+3. Apply `supabase/migrations/0001`→`0007` in order (`supabase db push` / `migration up`). This builds all tables, RLS, triggers, and the signup→profile automation.
 4. `pnpm dev` → http://localhost:3000. Sign up (a profile row auto-creates), then add Amplicons/LoCs and build Projections.
-5. `pnpm test` (Vitest, 71 finance tests) and `pnpm typecheck` (`tsc --noEmit`) before shipping. **Do not run `next build` while `next dev` is running** — it corrupts the dev server's `.next` cache.
+5. `pnpm test` (Vitest, 99 finance tests) and `pnpm typecheck` (`tsc --noEmit`) before shipping. **Do not run `next build` while `next dev` is running** — it corrupts the dev server's `.next` cache.
 
 ---
 
