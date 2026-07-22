@@ -60,9 +60,9 @@ export function projectionToSimValues(p: Projection): SimValues {
 
 // Starting values for the public calculator. Same as the projections table
 // defaults except msc, whose DB default of 0 would render an empty simulation;
-// 2000/mo is a demo value worth tuning for lead-gen appeal.
+// 1000/mo is a demo value worth tuning for lead-gen appeal.
 export const PUBLIC_DEFAULT_VALUES: SimValues = {
-  msc: 2000,
+  msc: 1000,
   factor: 5,
   term: 36,
   invInterestPct: 8,
