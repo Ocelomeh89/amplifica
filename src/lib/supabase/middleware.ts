@@ -2,6 +2,13 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function updateSession(request: NextRequest) {
+  // /calculator is intentionally public (email-gated lead-gen simulator).
+  // Skip the auth round-trip entirely; session refresh happens on any other
+  // route, so logged-in visitors lose nothing.
+  if (request.nextUrl.pathname.startsWith("/calculator")) {
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(

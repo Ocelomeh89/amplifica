@@ -24,7 +24,7 @@ export default function NewAmpliconForm() {
   return (
     <Card title="New Amplicon">
       <form action={async (fd) => { await createAmplicon(fd); setOpen(false); }} className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Name">
             <input
               name="name"

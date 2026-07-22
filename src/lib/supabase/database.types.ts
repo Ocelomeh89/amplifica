@@ -145,6 +145,32 @@ export type Database = {
         };
         Relationships: [];
       };
+      leads: {
+        Row: {
+          id: string;
+          email: string;
+          source: string;
+          utm_source: string | null;
+          utm_medium: string | null;
+          utm_campaign: string | null;
+          user_agent: string | null;
+          beehiiv_synced: boolean;
+          created_at: string;
+        };
+        Insert: {
+          email: string;
+          source?: string;
+          utm_source?: string | null;
+          utm_medium?: string | null;
+          utm_campaign?: string | null;
+          user_agent?: string | null;
+          beehiiv_synced?: boolean;
+        };
+        Update: {
+          beehiiv_synced?: boolean;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -163,3 +189,5 @@ export type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 export type Projection = Database["public"]["Tables"]["projections"]["Row"];
 export type ProjectionInsert = Database["public"]["Tables"]["projections"]["Insert"];
 export type ProjectionUpdate = Database["public"]["Tables"]["projections"]["Update"];
+export type Lead = Database["public"]["Tables"]["leads"]["Row"];
+export type LeadInsert = Database["public"]["Tables"]["leads"]["Insert"];

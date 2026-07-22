@@ -27,7 +27,8 @@ export default async function ProjectionsPage() {
         {!projections || projections.length === 0 ? (
           <p className="text-sm text-sub">No projections yet. Click &quot;New projection&quot; to start.</p>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[11px] text-sub uppercase tracking-wide border-b border-edge">
                 <th className="py-2">Name</th>
@@ -67,7 +68,8 @@ export default async function ProjectionsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         )}
       </Card>
     </div>
