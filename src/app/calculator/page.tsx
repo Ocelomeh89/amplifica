@@ -8,12 +8,12 @@ import InfoSections from "./InfoSections";
 export const metadata: Metadata = {
   title: "Financial Optionality Calculator",
   description:
-    "Free calculator: see when your monthly savings could become monthly investment income — and when you could stop contributing. Month-by-month amortization model, real assumptions, no promised returns.",
+    "Free calculator: see when your monthly savings could become monthly investment income, and when you could stop contributing. Month-by-month amortization model, real assumptions, no promised returns.",
   alternates: { canonical: "/calculator" },
   openGraph: {
     title: "Financial Optionality Calculator | Amplifica Wealth",
     description:
-      "See when your monthly savings could become monthly investment income — and when you could stop contributing. No promised returns.",
+      "See when your monthly savings could become monthly investment income, and when you could stop contributing. No promised returns.",
     type: "website",
     url: "/calculator",
   },
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     card: "summary",
     title: "Financial Optionality Calculator | Amplifica Wealth",
     description:
-      "See when your monthly savings could become monthly investment income — and when you could stop contributing. No promised returns.",
+      "See when your monthly savings could become monthly investment income, and when you could stop contributing. No promised returns.",
   },
 };
 
@@ -73,7 +73,7 @@ export default function CalculatorPage({
           <h1 className="font-display text-2xl mb-2">Financial optionality calculator</h1>
           <p className="text-sm text-sub leading-relaxed">
             Financial optionality is the point where your investments&apos; monthly cash
-            flow covers your target income on its own — work becomes a choice. This
+            flow covers your target income on its own. Work becomes a choice. This
             free calculator simulates, month by month, how consistent savings and a
             line of credit can build that cash flow, and estimates your date.
           </p>

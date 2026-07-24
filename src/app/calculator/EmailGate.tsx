@@ -31,9 +31,9 @@ export default function EmailGate({ utm }: { utm: Utm }) {
     <div className="w-full max-w-md mx-auto bg-card border border-edge rounded-lg p-6">
       <h2 className="text-xl font-semibold mb-1">Try the flywheel calculator</h2>
       <p className="text-sm text-sub mb-5">
-        See how a leverage flywheel compounds: model your monthly savings, line of
-        credit, and income investments — and find your financial optionality date.
-        Enter your email to unlock the full simulator.
+        See how the flywheel compounds: model your monthly savings, line of credit,
+        and income investments, and find your financial optionality date. Enter your
+        email to unlock the full simulator.
       </p>
 
       {state.error && (
@@ -68,7 +68,7 @@ export default function EmailGate({ utm }: { utm: Utm }) {
       </form>
 
       <p className="text-xs text-sub mt-4">
-        No spam — we&apos;ll send you the occasional flywheel insight. Unsubscribe anytime.
+        No spam. You&apos;ll get the free weekly letter; unsubscribe anytime.
       </p>
     </div>
   );

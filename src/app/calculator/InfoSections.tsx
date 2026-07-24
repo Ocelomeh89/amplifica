@@ -34,7 +34,7 @@ const faqs = [
   },
   {
     q: "What assumptions does the calculator make?",
-    a: "You set the inputs: monthly contribution, investment return, term length, and line-of-credit rate. The engine then applies plain amortization math with conservative accounting: capital is conserved exactly, nothing is written off, and no return is ever assumed beyond the rate you typed in. Totals are reported in nominal dollars, so the optionality date is a more robust output than the far-future dollar magnitudes.",
+    a: "You set the inputs: monthly contribution, investment return, term length, and line-of-credit rate. The engine then applies plain amortization math with conservative accounting: capital is conserved exactly, nothing is written off, and no return is ever assumed beyond the rate you typed in. The engine reports totals in nominal dollars, so the optionality date is a more robust output than the far-future dollar magnitudes.",
   },
   {
     q: "Is this financial advice?",
@@ -90,9 +90,9 @@ export default function InfoSections() {
           savings amount, draw on a line of credit to fund an amortized income
           investment, and the investment&apos;s payments plus your savings repay the line.
           Each payoff funds a larger deployment. The calculator reports when the
-          system&apos;s own cash flow could cover your target monthly income — your{" "}
-          <strong>financial optionality date</strong> — and, separately, when you could
-          stop contributing and let the system sustain itself.
+          system&apos;s own cash flow could cover your target monthly income (your
+          financial optionality date) and, separately, when you could stop
+          contributing and let the system sustain itself.
         </p>
       </Section>
 
@@ -134,31 +134,30 @@ export default function InfoSections() {
 
       <Section title="What the model shows: a benchmark scenario">
         <p className="text-sm leading-relaxed mb-3">
-          These are model outputs under one fixed set of assumptions — a{" "}
-          <strong>$2,000 monthly contribution, investments amortizing at 8%, a line
-          of credit costing 10%</strong>, and the calculator&apos;s defaults otherwise.
-          They are not projections of any real account and not promised returns.
+          These are model outputs under one fixed set of assumptions: a $2,000
+          monthly contribution, investments amortizing at 8%, a line of credit
+          costing 10%, and the calculator&apos;s defaults otherwise. They describe the
+          model, not your account, and we promise no return.
         </p>
         <ul className="text-sm leading-relaxed list-disc pl-5 space-y-2">
           <li>
-            The system&apos;s own cash flow — investment payments only, excluding the
-            contribution — first crosses <strong>$45,000 per month at roughly 15
-            years</strong> (month 179 of the simulation).
+            The system&apos;s own cash flow (investment payments only, excluding the
+            contribution) first crosses $45,000 per month at roughly 15 years, month
+            179 of the simulation.
           </li>
           <li>
-            <strong>Term length is the dominant accelerator.</strong> Shortening
-            investment terms from 36 to 24 months moves that same milestone to
-            roughly <strong>10.7 years</strong> (month 128). Deployment size step-ups
-            barely move the date.
+            Term length sets the pace. Shortening investment terms from 36 to 24
+            months moves that same milestone to roughly 10.7 years (month 128), while
+            deployment size step-ups barely move the date.
           </li>
           <li>
-            With 24-month terms, <strong>stopping the contribution at year 10</strong>{" "}
-            leaves a self-sustaining system: expected future payments never erode and
-            cash flow keeps compounding on its own.
+            With 24-month terms, stopping the contribution at year 10 leaves a
+            self-sustaining system: expected future payments never erode and cash
+            flow keeps compounding on its own.
           </li>
           <li>
             Aggressive &quot;always step up&quot; configurations look years faster early and
-            then collapse — which is why the engine gates each deployment on a
+            then collapse, which is why the engine gates each deployment on a
             predicted payoff instead of optimism.
           </li>
         </ul>
@@ -170,7 +169,7 @@ export default function InfoSections() {
           accrue interest on the line&apos;s balance, collect every active investment&apos;s
           payment, apply inflows against the line, and redeploy only when the next
           investment&apos;s payoff is predicted within the configured window. Three
-          properties are worth knowing:
+          properties matter:
         </p>
         <ul className="text-sm leading-relaxed list-disc pl-5 space-y-2">
           <li>
@@ -188,7 +187,7 @@ export default function InfoSections() {
             <strong>Accounting is nominal and we say so.</strong> Asset values are the
             sum of remaining future payments, undiscounted. That makes far-future
             dollar totals optimistic, so treat the <em>date</em> outputs as the robust
-            result — a limitation most calculators in this category do not disclose.
+            result, a limitation most calculators in this category do not disclose.
           </li>
         </ul>
       </Section>
@@ -207,12 +206,12 @@ export default function InfoSections() {
       <Section title="Who built this">
         <p className="text-sm leading-relaxed">
           Amplifica Wealth was founded by <strong>Miguel Graf</strong> and{" "}
-          <strong>Jackie Tang</strong>. Miguel has lost over a million dollars twice —
+          <strong>Jackie Tang</strong>. Miguel has lost over a million dollars, twice:
           once to a custodian bankruptcy, once to a business he bought and had to
-          close — and built this system, and this calculator, from what those losses
+          close. He built this system, and this calculator, from what those losses
           taught him. Neither founder is financially free yet; they are ahead on the
-          same road, reporting real numbers as they go. The strategy, with the actual
-          figures behind it, is covered weekly in the{" "}
+          same road, reporting real numbers as they go. They cover the strategy, with
+          the actual figures behind it, weekly in the{" "}
           <a
             href="https://amplifica-wealth.beehiiv.com"
             className="text-purple hover:underline"
