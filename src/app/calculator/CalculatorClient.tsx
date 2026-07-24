@@ -27,7 +27,8 @@ export default function CalculatorClient() {
   return (
     <>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold">Flywheel calculator</h1>
+        {/* The page's h1 lives in page.tsx (server-rendered, crawlable). */}
+        <h2 className="text-xl font-semibold">Flywheel calculator</h2>
         <FlywheelExplainer />
       </div>
 

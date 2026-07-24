@@ -3,23 +3,25 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import EmailGate from "./EmailGate";
 import CalculatorClient from "./CalculatorClient";
+import InfoSections from "./InfoSections";
 
 export const metadata: Metadata = {
-  title: "Flywheel Calculator — Amplifica",
+  title: "Financial Optionality Calculator",
   description:
-    "Model the leverage flywheel: monthly savings, line of credit, and income investments compounding toward financial optionality. Free interactive simulator.",
+    "Free calculator: see when your monthly savings could become monthly investment income — and when you could stop contributing. Month-by-month amortization model, real assumptions, no promised returns.",
+  alternates: { canonical: "/calculator" },
   openGraph: {
-    title: "The Amplifica Flywheel Calculator",
+    title: "Financial Optionality Calculator | Amplifica Wealth",
     description:
-      "Simulate a leverage flywheel wealth strategy and find your financial optionality date.",
+      "See when your monthly savings could become monthly investment income — and when you could stop contributing. No promised returns.",
     type: "website",
     url: "/calculator",
   },
   twitter: {
     card: "summary",
-    title: "The Amplifica Flywheel Calculator",
+    title: "Financial Optionality Calculator | Amplifica Wealth",
     description:
-      "Simulate a leverage flywheel wealth strategy and find your financial optionality date.",
+      "See when your monthly savings could become monthly investment income — and when you could stop contributing. No promised returns.",
   },
 };
 
@@ -67,7 +69,19 @@ export default function CalculatorPage({
       </header>
 
       <main className="flex-1 w-full max-w-5xl mx-auto px-6 py-8">
+        <div className="max-w-3xl mb-6">
+          <h1 className="font-display text-2xl mb-2">Financial optionality calculator</h1>
+          <p className="text-sm text-sub leading-relaxed">
+            Financial optionality is the point where your investments&apos; monthly cash
+            flow covers your target income on its own — work becomes a choice. This
+            free calculator simulates, month by month, how consistent savings and a
+            line of credit can build that cash flow, and estimates your date.
+          </p>
+        </div>
+
         {unlocked ? <CalculatorClient /> : <EmailGate utm={searchParams} />}
+
+        <InfoSections />
       </main>
 
       <footer className="border-t border-edge">
