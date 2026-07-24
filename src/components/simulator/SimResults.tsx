@@ -104,7 +104,7 @@ export default function SimResults({ sim, incomeMarkerMonth, variant = "editor" 
         )}
       </Card>
 
-      <SimCharts series={result.series} incomeMarkerMonth={incomeMarkerMonth} />
+      <SimCharts series={result.series} incomeMarkerMonth={incomeMarkerMonth} variant={variant} />
     </>
   );
 }

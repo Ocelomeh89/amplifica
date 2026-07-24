@@ -23,6 +23,8 @@ interface Props {
   // Month at which the system's yearly cashflow first exceeds the visitor's
   // annual income (public calculator only). Rendered as a vertical marker.
   incomeMarkerMonth?: number | null;
+  // "public" drops the market-baseline comparison line.
+  variant?: "editor" | "public";
 }
 
 // Recharts only renders children of its own types, so the marker must be an
@@ -34,7 +36,7 @@ const incomeMarkerProps = {
   label: { value: "Cashflow > annual income", fontSize: 10, fill: MARKER, position: "insideTopLeft" as const },
 };
 
-export default function SimCharts({ series, incomeMarkerMonth }: Props) {
+export default function SimCharts({ series, incomeMarkerMonth, variant = "editor" }: Props) {
   return (
     <div>
       <div className="bg-card border border-edge rounded-lg p-3 mb-3">
@@ -72,7 +74,9 @@ export default function SimCharts({ series, incomeMarkerMonth }: Props) {
       </div>
 
       <div className="bg-card border border-edge rounded-lg p-3 mb-3">
-        <div className="text-[11px] text-sub uppercase tracking-wide mb-2">Flywheel vs market vs contributions</div>
+        <div className="text-[11px] text-sub uppercase tracking-wide mb-2">
+          {variant === "editor" ? "Flywheel vs market vs contributions" : "Flywheel vs contributions"}
+        </div>
         <div className="h-56">
           <ResponsiveContainer>
             <LineChart data={series}>
@@ -83,7 +87,9 @@ export default function SimCharts({ series, incomeMarkerMonth }: Props) {
               {incomeMarkerMonth != null && <ReferenceLine x={incomeMarkerMonth} {...incomeMarkerProps} />}
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Line type="monotone" dataKey="expectedFuturePayments" name="Expected future payments" stroke="#3EC9C0" strokeWidth={2} dot={false} isAnimationActive={false} />
-              <Line type="monotone" dataKey="marketBaseline" name="Market (DCA)" stroke="#6C4BD3" strokeWidth={2} dot={false} isAnimationActive={false} />
+              {variant === "editor" && (
+                <Line type="monotone" dataKey="marketBaseline" name="Market (DCA)" stroke="#6C4BD3" strokeWidth={2} dot={false} isAnimationActive={false} />
+              )}
               <Line type="monotone" dataKey="contributedCapital" name="Contributed (MSC)" stroke="#8D8295" strokeWidth={2} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
             </LineChart>
           </ResponsiveContainer>
