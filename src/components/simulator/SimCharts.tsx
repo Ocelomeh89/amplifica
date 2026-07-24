@@ -16,12 +16,12 @@ import { fmtCurrency } from "@/lib/format";
 
 const TICK = { fontSize: 10, fill: "#8D8295" };
 const GRID = "#8d829533";
-const MARKER = "#D97706"; // amber: the deploys-exceed-income milestone
+const MARKER = "#D97706"; // amber: the cashflow-exceeds-income milestone
 
 interface Props {
   series: ProjectionSimPoint[];
-  // Month at which a new deployment first exceeds the visitor's annual
-  // income (public calculator only). Rendered as a vertical marker.
+  // Month at which the system's yearly cashflow first exceeds the visitor's
+  // annual income (public calculator only). Rendered as a vertical marker.
   incomeMarkerMonth?: number | null;
 }
 
@@ -31,7 +31,7 @@ const incomeMarkerProps = {
   stroke: MARKER,
   strokeDasharray: "4 3",
   strokeWidth: 1.5,
-  label: { value: "Deploys > annual income", fontSize: 10, fill: MARKER, position: "insideTopLeft" as const },
+  label: { value: "Cashflow > annual income", fontSize: 10, fill: MARKER, position: "insideTopLeft" as const },
 };
 
 export default function SimCharts({ series, incomeMarkerMonth }: Props) {

@@ -1,28 +1,32 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import Card from "@/components/Card";
 import Field from "@/components/Field";
+import InfoBox from "@/components/InfoBox";
 import { fmtCurrency } from "@/lib/format";
 import { useSimulation } from "@/components/simulator/useSimulation";
 import { PUBLIC_DEFAULT_VALUES } from "@/components/simulator/sim-values";
-import SimInputsGrid from "@/components/simulator/SimInputsGrid";
+import SimInputsGrid, { OPTIONALITY_INFO } from "@/components/simulator/SimInputsGrid";
 import SimResults from "@/components/simulator/SimResults";
 import FlywheelExplainer from "@/components/simulator/FlywheelExplainer";
 
 const DEFAULT_ANNUAL_INCOME = 100_000;
+const JOIN_URL = "https://community.amplificawealth.com/home-page";
 
 export default function CalculatorClient() {
   const sim = useSimulation(PUBLIC_DEFAULT_VALUES);
   const [annualIncome, setAnnualIncome] = useState(DEFAULT_ANNUAL_INCOME);
 
-  // First month where the flywheel deploys a single investment larger than a
-  // year's income — the "this is now a serious machine" milestone.
+  // First month where the system's own yearly cashflow (Amplicon payouts,
+  // excluding the MSC) exceeds the visitor's annual income. series.cashFlow
+  // includes the MSC, so subtract it; the public calculator never ends the MSC.
   const incomeCrossMonth =
     annualIncome > 0
-      ? sim.result.series.find((p) => p.currentInvestmentSize > annualIncome)?.monthIndex ?? null
+      ? sim.result.series.find((p) => (p.cashFlow - sim.values.msc) * 12 > annualIncome)?.monthIndex ?? null
       : null;
+
+  const fiMonth = sim.fi.month;
 
   return (
     <>
@@ -33,47 +37,88 @@ export default function CalculatorClient() {
       </div>
 
       <Card title="Inputs">
-        <SimInputsGrid values={sim.values} set={sim.set} initialInvestmentSize={sim.initialInvestmentSize} advanced="hidden" />
-
-        <div className="mt-3 pt-3 border-t border-edge grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end">
-          <Field label="Your annual income ($)" hint="marks when a single deployment tops a year's income">
-            <input
-              type="number"
-              value={annualIncome}
-              onChange={(e) => setAnnualIncome(Number(e.target.value))}
-              min={0}
-              step={5000}
-              className="w-full border border-edge rounded px-2 py-1.5 text-sm"
-            />
-          </Field>
-          <p className="text-xs text-sub sm:col-span-1 lg:col-span-2 pb-1">
-            {incomeCrossMonth != null ? (
-              <>
-                From <span className="font-semibold text-amber-600">month {incomeCrossMonth} (~{(incomeCrossMonth / 12).toFixed(1)} yr)</span>,
-                each new investment you deploy exceeds your annual income of {fmtCurrency(annualIncome)} — shown as the amber line on the charts.
-              </>
-            ) : annualIncome > 0 ? (
-              <>Within 30 years, no single deployment exceeds your annual income of {fmtCurrency(annualIncome)} at these inputs.</>
-            ) : (
-              <>Enter your annual income to see when a single deployment starts to exceed it.</>
-            )}
-          </p>
-        </div>
+        <SimInputsGrid
+          values={sim.values}
+          set={sim.set}
+          initialInvestmentSize={sim.initialInvestmentSize}
+          variant="public"
+          mainExtra={
+            <Field label="Annual income ($)">
+              <input
+                type="number"
+                value={annualIncome}
+                onChange={(e) => setAnnualIncome(Number(e.target.value))}
+                min={0}
+                step={5000}
+                className="w-full border border-edge rounded px-2 py-1.5 text-sm"
+              />
+            </Field>
+          }
+        />
       </Card>
 
-      <SimResults sim={sim} incomeMarkerMonth={incomeCrossMonth} />
+      <Card title="Financial optionality">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+          <div>
+            <div className="text-[10px] text-sub uppercase tracking-wide">
+              Optionality threshold
+              <InfoBox message={OPTIONALITY_INFO} />
+            </div>
+            {fiMonth != null ? (
+              <>
+                <div className="text-lg font-bold text-aqua">
+                  month {fiMonth} (~{(fiMonth / 12).toFixed(1)} yr)
+                </div>
+                <div className="text-xs text-sub mt-0.5">
+                  stop saving and draw {fmtCurrency(sim.values.withdrawalAmount)}/mo, sustained
+                </div>
+              </>
+            ) : (
+              <div className="text-xs text-sub mt-1">
+                Drawing {fmtCurrency(sim.values.withdrawalAmount)}/mo is not sustainable
+                within 30 years at these inputs.
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="text-[10px] text-sub uppercase tracking-wide">
+              Cashflow exceeds income
+            </div>
+            {incomeCrossMonth != null ? (
+              <>
+                <div className="text-lg font-bold text-amber-600">
+                  month {incomeCrossMonth} (~{(incomeCrossMonth / 12).toFixed(1)} yr)
+                </div>
+                <div className="text-xs text-sub mt-0.5">
+                  yearly system cashflow tops your income of {fmtCurrency(annualIncome)}
+                </div>
+              </>
+            ) : (
+              <div className="text-xs text-sub mt-1">
+                {annualIncome > 0
+                  ? "Within 30 years, yearly system cashflow does not exceed your annual income at these inputs."
+                  : "Enter your annual income to see when the system's cashflow exceeds it."}
+              </div>
+            )}
+          </div>
+        </div>
+        {incomeCrossMonth != null && (
+          <p className="mt-3 pt-3 border-t border-edge text-xs text-sub">
+            From month {incomeCrossMonth}, the Amplification pays you more per year
+            than your income of {fmtCurrency(annualIncome)}, shown as the amber line
+            on the charts.
+          </p>
+        )}
+      </Card>
 
-      <div className="bg-card border border-edge rounded-lg p-4 mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <p className="text-sm text-sub">
-          Like what you see? Create a free account to save this projection and track
-          your real Amplicons and lines of credit.
-        </p>
-        <Link
-          href="/signup"
-          className="bg-purple hover:bg-purple/90 transition-colors text-white text-sm px-4 py-2 rounded whitespace-nowrap"
-        >
-          Create an account
-        </Link>
+      <SimResults sim={sim} incomeMarkerMonth={incomeCrossMonth} variant="public" />
+
+      <div className="bg-card border border-edge rounded-lg p-4 mt-2 text-sm text-sub">
+        Like what you see?{" "}
+        <a href={JOIN_URL} className="text-purple font-medium hover:underline">
+          Join now
+        </a>{" "}
+        at {JOIN_URL.replace("https://", "")}.
       </div>
     </>
   );

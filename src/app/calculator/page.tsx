@@ -87,9 +87,12 @@ export default function CalculatorPage({
       <footer className="border-t border-edge">
         <div className="max-w-5xl mx-auto px-6 py-4 text-sm text-sub flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <span>Engineer your future. Amplify your wealth. Live your way.</span>
-          <Link href="/signup" className="text-purple hover:underline">
-            Create a free account
-          </Link>
+          <a
+            href="https://community.amplificawealth.com/home-page"
+            className="text-purple hover:underline"
+          >
+            Join the community
+          </a>
         </div>
       </footer>
     </div>

@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 // Server-rendered content below the calculator/gate. Always visible to
 // visitors and crawlers regardless of unlock state — this is the page's
 // rankable, citable substance. The FAQ array drives both the visible section
@@ -228,11 +226,7 @@ export default function InfoSections() {
           Amplifica Wealth is an educational publisher, not a registered investment
           adviser. Nothing on this page is financial, legal, or tax advice, and no
           return is promised or implied. Borrowing to invest involves real risk,
-          including the loss of borrowed principal.{" "}
-          <Link href="/signup" className="text-purple hover:underline">
-            Create a free account
-          </Link>{" "}
-          to model your own numbers in full.
+          including the loss of borrowed principal.
         </p>
       </div>
     </div>

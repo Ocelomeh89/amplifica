@@ -13,11 +13,14 @@ const SNAPSHOTS = [60, 120, 180]; // 5 / 10 / 15 years
 // its original FI naming.)
 interface Props {
   sim: Simulation;
-  // Forwarded to SimCharts (public calculator's deploys-exceed-income marker).
+  // Forwarded to SimCharts (public calculator's cashflow-exceeds-income marker).
   incomeMarkerMonth?: number | null;
+  // "public" drops the market comparison and the optionality footer (the
+  // public calculator shows optionality in its own card instead).
+  variant?: "editor" | "public";
 }
 
-export default function SimResults({ sim, incomeMarkerMonth }: Props) {
+export default function SimResults({ sim, incomeMarkerMonth, variant = "editor" }: Props) {
   const { values, result, fi, at, finalExpectedFuturePayments, vsMarket } = sim;
 
   return (
@@ -43,6 +46,7 @@ export default function SimResults({ sim, incomeMarkerMonth }: Props) {
         </div>
       </Card>
 
+      {variant === "editor" && (
       <Card title="Flywheel vs market">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
           <div>
@@ -63,12 +67,13 @@ export default function SimResults({ sim, incomeMarkerMonth }: Props) {
           </div>
         </div>
       </Card>
+      )}
 
       <Card title="Key results @ 5 / 10 / 15 years (accumulation)">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
           <div>
             <div className="text-[10px] text-sub uppercase tracking-wide">&nbsp;</div>
-            {["Expected future payments", "Cash flow/mo", "Perpetual income/mo"].map((label) => (
+            {["Expected future payments", "Cash flow/mo", ...(variant === "editor" ? ["Perpetual income/mo"] : [])].map((label) => (
               <div key={label} className="text-xs text-sub py-0.5">{label}</div>
             ))}
           </div>
@@ -77,10 +82,13 @@ export default function SimResults({ sim, incomeMarkerMonth }: Props) {
               <div className="text-[10px] text-sub uppercase tracking-wide">{m / 12} yr</div>
               <div className="text-sm font-bold py-0.5">{fmtCurrency(at(m).expectedFuturePayments)}</div>
               <div className="text-sm py-0.5">{fmtCurrency(at(m).cashFlow)}</div>
-              <div className="text-sm py-0.5 text-aqua">{fmtCurrency(at(m).perpetualIncome)}</div>
+              {variant === "editor" && (
+                <div className="text-sm py-0.5 text-aqua">{fmtCurrency(at(m).perpetualIncome)}</div>
+              )}
             </div>
           ))}
         </div>
+        {variant === "editor" && (
         <div className="mt-3 pt-3 border-t border-edge text-sm">
           {fi.month != null ? (
             <>
@@ -93,6 +101,7 @@ export default function SimResults({ sim, incomeMarkerMonth }: Props) {
             <span className="text-sub">Financial optionality: drawing {fmtCurrency(values.withdrawalAmount)}/mo is not sustainable within 30 years at these inputs.</span>
           )}
         </div>
+        )}
       </Card>
 
       <SimCharts series={result.series} incomeMarkerMonth={incomeMarkerMonth} />
