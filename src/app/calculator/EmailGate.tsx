@@ -29,11 +29,11 @@ export default function EmailGate({ utm }: { utm: Utm }) {
 
   return (
     <div className="w-full max-w-md mx-auto bg-card border border-edge rounded-lg p-6">
-      <h2 className="text-xl font-semibold mb-1">Try the flywheel calculator</h2>
+      <h2 className="text-xl font-semibold mb-1">See your optionality date</h2>
       <p className="text-sm text-sub mb-5">
-        See how the flywheel compounds: model your monthly savings, line of credit,
-        and income investments, and find your financial optionality date. Enter your
-        email to unlock the full simulator.
+        Model your monthly savings, line of credit, and income investments, and find
+        your financial base case optionality date. Enter your email to unlock the
+        full simulator.
       </p>
 
       {state.error && (

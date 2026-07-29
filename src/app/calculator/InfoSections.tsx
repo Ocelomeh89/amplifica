@@ -15,12 +15,12 @@ const faqs = [
     a: "FIRE calculators answer \"when have I accumulated 25 times my expenses, so I can sell about 4% per year?\" This calculator answers a different question: when does the monthly income from your investments cover your target spending on its own? It models cash flow month by month instead of a withdrawal rate on a lump sum.",
   },
   {
-    q: "What is an Amplicon?",
-    a: "An Amplicon is our name for one income investment in the cycle: an amortized investment that pays a level monthly amount over a fixed term, like a loan you own the receiving side of. Each completed payoff funds the next, larger deployment. That repeating cycle is the amplification.",
+    q: "How does the Amplification Method work?",
+    a: "Deploy, collect, repay, repeat. You draw on a line of credit to fund an income investment. The investment's monthly payments, plus your own monthly savings, pay the line back down. When the line is effectively clear, you deploy again at a larger size. The calculator simulates this loop for every month of the horizon.",
   },
   {
-    q: "How does the flywheel work?",
-    a: "Deploy, collect, repay, repeat. You draw on a line of credit to fund an income investment. The investment's monthly payments, plus your own monthly savings, pay the line back down. When the line is effectively clear, you deploy again at a larger size. The calculator simulates this loop for every month of the horizon.",
+    q: "What is an Amplicon?",
+    a: "An Amplicon is our name for one investment cycle. These can be short term or long term. For example, an amortized investment that pays a level monthly amount over a fixed term (36 months), like a loan you own the receiving side of. Each completed payoff funds the next, larger deployment. That repeating cycle is the amplification.",
   },
   {
     q: "Do I need a HELOC to use this strategy?",
@@ -28,7 +28,7 @@ const faqs = [
   },
   {
     q: "Is borrowing to invest risky?",
-    a: "Yes. The spread between investment return and borrowing cost can invert, credit lines can be repriced or frozen, and income investments can default or pay late. This calculator does not hide that: it shows peak debt alongside the upside, and the model deliberately avoids the accounting tricks that make similar strategies look faster than they are. Never model money you could not repay from your income.",
+    a: "The Amplification Method limits risk by never borrowing more than can be repaid within 4-6 months. While borrowing always involves a higher level of risk, this guidance ensures that in an adverse financial life event, the leverage remains manageable.",
   },
   {
     q: "What assumptions does the calculator make?",
@@ -134,8 +134,8 @@ export default function InfoSections() {
         <p className="text-sm leading-relaxed mb-3">
           These are model outputs under one fixed set of assumptions: a $2,000
           monthly contribution, investments amortizing at 8%, a line of credit
-          costing 10%, and the calculator&apos;s defaults otherwise. They describe the
-          model, not your account, and we promise no return.
+          costing 10%, and the calculator&apos;s defaults otherwise. Actual returns
+          based on your investment choices and consistency. No guaranteed returns.
         </p>
         <ul className="text-sm leading-relaxed list-disc pl-5 space-y-2">
           <li>
@@ -144,48 +144,13 @@ export default function InfoSections() {
             179 of the simulation.
           </li>
           <li>
-            Term length sets the pace. Shortening investment terms from 36 to 24
-            months moves that same milestone to roughly 10.7 years (month 128), while
-            deployment size step-ups barely move the date.
+            Boost, such as reducing term length from 36 to 24 months, move the same
+            milestone to 10 years and under.
           </li>
           <li>
             With 24-month terms, stopping the contribution at year 10 leaves a
             self-sustaining system: expected future payments never erode and cash
             flow keeps compounding on its own.
-          </li>
-          <li>
-            Aggressive &quot;always step up&quot; configurations look years faster early and
-            then collapse, which is why the engine gates each deployment on a
-            predicted payoff instead of optimism.
-          </li>
-        </ul>
-      </Section>
-
-      <Section title="Methodology">
-        <p className="text-sm leading-relaxed mb-3">
-          The engine is standard amortization mathematics run as a monthly ledger:
-          accrue interest on the line&apos;s balance, collect every active investment&apos;s
-          payment, apply inflows against the line, and redeploy only when the next
-          investment&apos;s payoff is predicted within the configured window. Three
-          properties matter:
-        </p>
-        <ul className="text-sm leading-relaxed list-disc pl-5 space-y-2">
-          <li>
-            <strong>Capital is conserved exactly.</strong> Nothing is written off and
-            no &quot;free capital&quot; appears between cycles. We rejected a common modeling
-            shortcut in this space that silently credits unearned capital at every
-            redeploy, because it overstates the strategy&apos;s speed by years.
-          </li>
-          <li>
-            <strong>The engine is tested.</strong> Over 70 automated tests pin its
-            behavior, including invariants that prove conservation of capital at a 0%
-            interest rate.
-          </li>
-          <li>
-            <strong>Accounting is nominal and we say so.</strong> Asset values are the
-            sum of remaining future payments, undiscounted. That makes far-future
-            dollar totals optimistic, so treat the <em>date</em> outputs as the robust
-            result, a limitation most calculators in this category do not disclose.
           </li>
         </ul>
       </Section>
@@ -204,12 +169,12 @@ export default function InfoSections() {
       <Section title="Who built this">
         <p className="text-sm leading-relaxed">
           Amplifica Wealth was founded by <strong>Miguel Graf</strong> and{" "}
-          <strong>Jackie Tang</strong>. Miguel has lost over a million dollars, twice:
-          once to a custodian bankruptcy, once to a business he bought and had to
-          close. He built this system, and this calculator, from what those losses
-          taught him. Neither founder is financially free yet; they are ahead on the
-          same road, reporting real numbers as they go. They cover the strategy, with
-          the actual figures behind it, weekly in the{" "}
+          <strong>Jackie Tang</strong>. Miguel&apos;s 15 years in financial risk
+          management and Jackie&apos;s PhD in cancer biology are the engine behind the
+          calculator and method. Both founders built this to be tested, falsifiable
+          and empirically used. They share their own real numbers and portfolios, not
+          theories. They also cover the strategy, with the actual figures behind it,
+          weekly in the{" "}
           <a
             href="https://amplifica-wealth.beehiiv.com"
             className="text-purple hover:underline"
