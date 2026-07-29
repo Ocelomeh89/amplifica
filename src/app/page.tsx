@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 export const metadata: Metadata = {
   title: { absolute: "Amplifica Wealth — savings into monthly investment income" },
   description:
-    "A repeatable system for turning consistent savings into monthly investment income: deploy borrowed capital into income investments, collect, repay, repeat. Free calculator, weekly letter, real numbers. No promised returns.",
+    "A scalable system for turning consistent savings into monthly investment income: deploy borrowed capital into income investments, collect, repay, repeat. Free calculator, weekly letter, real numbers. No promised returns.",
   alternates: { canonical: "/" },
   openGraph: {
     title: "Amplifica Wealth",

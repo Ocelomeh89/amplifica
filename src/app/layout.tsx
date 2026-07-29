@@ -45,7 +45,7 @@ const organizationSchema = {
       url: siteUrl,
       slogan: "Engineer your future. Amplify your wealth. Live your way.",
       description:
-        "Amplifica Wealth teaches a repeatable system for turning consistent savings and borrowed capital into monthly investment income.",
+        "Amplifica Wealth teaches a scalable system for turning consistent savings and borrowed capital into monthly investment income.",
       founder: [
         { "@type": "Person", name: "Miguel Graf" },
         { "@type": "Person", name: "Jackie Tang" },
