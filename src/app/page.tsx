@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Amplifica Wealth",
     description:
-      "Turn consistent savings into monthly investment income. A system, not stock tips. No promised returns, ever.",
+      "Turn consistent savings into monthly investment income. A mathematical system, not investment tips. No promised returns, ever.",
     type: "website",
     url: "/",
   },
@@ -82,11 +82,11 @@ const cycle = [
   },
   {
     step: "Repay",
-    text: "Those payments, plus your monthly contribution, clear the line back down.",
+    text: "The investment payouts, plus your monthly contribution, pay down the borrowed money.",
   },
   {
     step: "Repeat",
-    text: "Each payoff funds the next, larger deployment. One completed turn is an Amplicon.",
+    text: "Each payoff funds the next, larger deployment. One completed cycle is an Amplicon.",
   },
 ];
 
@@ -123,7 +123,7 @@ export default async function Home() {
       <section className="max-w-6xl mx-auto px-6 pt-20 pb-24 sm:pt-28 sm:pb-32 grid grid-cols-1 lg:grid-cols-12 gap-12 items-end">
         <div className="lg:col-span-7">
           <p className="rise text-sm tracking-wide text-purple mb-5" style={{ animationDelay: "0ms" }}>
-            A system, not stock tips
+            A mathematical system, not investment tips
           </p>
           <h1
             className="rise text-[2.6rem] leading-[1.08] sm:text-6xl sm:leading-[1.05]"
@@ -137,7 +137,7 @@ export default async function Home() {
             className="rise mt-7 max-w-xl text-base sm:text-lg text-sub leading-relaxed"
             style={{ animationDelay: "180ms" }}
           >
-            Amplifica Wealth is a repeatable system for turning consistent savings into
+            Amplifica Wealth is a scalable system for turning consistent savings into
             monthly investment income. Draw on a line of credit, fund an income
             investment, let its payments and your savings clear the line, then deploy
             again, larger.
@@ -202,7 +202,7 @@ export default async function Home() {
               href="/calculator"
               className="mt-5 inline-block text-sm text-purple hover:underline"
             >
-              See the full methodology
+              See the power of the Amplification Methodology
             </Link>
           </div>
           <dl className="lg:col-span-7 lg:col-start-6 divide-y divide-edge">
@@ -215,17 +215,18 @@ export default async function Home() {
             </div>
             <div className="py-6 flex items-baseline justify-between gap-6 flex-wrap">
               <dt className="text-sm text-sub max-w-sm">
-                The same milestone with 24-month terms. Term length sets the pace;
-                step-up size barely moves it
-              </dt>
-              <dd className="font-display text-3xl tabular-nums text-purple">~10.7 yrs</dd>
-            </div>
-            <div className="py-6 flex items-baseline justify-between gap-6 flex-wrap">
-              <dt className="text-sm text-sub max-w-sm">
                 With short terms, stop contributing at year ten and the system
                 sustains itself. Cash flow keeps compounding on its own
               </dt>
               <dd className="font-display text-3xl tabular-nums text-aqua">Year 10</dd>
+            </div>
+            <div className="py-6 flex items-baseline justify-between gap-6 flex-wrap">
+              <dt className="text-sm text-sub max-w-sm">
+                With optimization on short term investments, strategic deployments of
+                long term investments or line of credit improvements, financial
+                optionality is reached
+              </dt>
+              <dd className="font-display text-3xl tabular-nums text-purple">5–9 yrs</dd>
             </div>
           </dl>
         </div>
@@ -263,24 +264,23 @@ export default async function Home() {
           <div className="mt-8 max-w-2xl space-y-4 text-[#F6F1EA]/80 text-base leading-relaxed">
             <p>
               Miguel has lost over a million dollars, twice: once to a custodian
-              bankruptcy, once to a business he bought and had to close. Jackie was
-              laid off three months into her first industry role. We built this system
-              from those lessons.
+              bankruptcy, once to a business he bought and had to close. Jackie, a
+              trained scientist, was laid off three months into his first industry
+              role. We built this system from those lessons, taking control of our
+              finances and lives.
             </p>
             <p>
               We&apos;re peers walking ahead on the same road, reporting back with real
               numbers, wins and expensive lessons included. When we&apos;re still
-              testing something, we say so.
+              testing something, we say so. Between an astrophysicist and a PhD, we
+              also know how to test a model before we trust it.
             </p>
           </div>
           <div className="mt-10 flex flex-wrap items-center gap-6">
             <a
-              href={NEWSLETTER_URL}
+              href={COMMUNITY_URL}
               className="bg-[#F6F1EA] text-plum hover:bg-white transition-colors px-6 py-3 rounded text-sm"
             >
-              Read the free weekly letter
-            </a>
-            <a href={COMMUNITY_URL} className="text-sm text-amethyst hover:underline">
               Join the community
             </a>
           </div>
