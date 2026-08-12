@@ -12,9 +12,15 @@ export async function updateSession(request: NextRequest) {
   // it to /auth/callback so the session actually gets established.
   if (pathname !== "/auth/callback") {
     const code = searchParams.get("code");
-    if (code) {
+    const tokenHash = searchParams.get("token_hash");
+    if (code || tokenHash) {
       const callbackUrl = new URL("/auth/callback", request.url);
-      callbackUrl.searchParams.set("code", code);
+      if (code) callbackUrl.searchParams.set("code", code);
+      if (tokenHash) {
+        callbackUrl.searchParams.set("token_hash", tokenHash);
+        const type = searchParams.get("type");
+        if (type) callbackUrl.searchParams.set("type", type);
+      }
       const next = searchParams.get("next");
       if (next && next.startsWith("/")) callbackUrl.searchParams.set("next", next);
       return NextResponse.redirect(callbackUrl);
