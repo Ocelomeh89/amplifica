@@ -4,7 +4,10 @@ import "server-only";
 // is already durable in Postgres by the time this runs, so a Beehiiv outage
 // must not block the unlock. Await it in the action — fire-and-forget work
 // can be killed after the response on Vercel serverless.
-export async function subscribeToNewsletter(email: string): Promise<boolean> {
+export async function subscribeToNewsletter(
+  email: string,
+  utmSource = "calculator"
+): Promise<boolean> {
   const apiKey = process.env.BEEHIIV_API_KEY;
   const publicationId = process.env.BEEHIIV_PUBLICATION_ID;
   if (!apiKey || !publicationId) {
@@ -24,7 +27,7 @@ export async function subscribeToNewsletter(email: string): Promise<boolean> {
         body: JSON.stringify({
           email,
           reactivate_existing: true,
-          utm_source: "calculator",
+          utm_source: utmSource,
           utm_medium: "organic",
         }),
         signal: AbortSignal.timeout(5000),

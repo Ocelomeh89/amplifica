@@ -23,23 +23,36 @@ beehiiv subdomain, so SEO authority accrues to the root domain.
 - `src/app/newsletter/[slug]/page.tsx` — post render via RSS fragment, canonical
   set to the main-domain URL, 1h ISR, `generateStaticParams` for known slugs.
 
-## Open decisions before ship
+## Decision (2026-08)
 
-1. **Duplicate content / canonical.** The beehiiv mirror
-   (`amplifica-wealth.beehiiv.com/p/...`) will still exist. Our pages set
-   canonical to the main domain, but ideally the beehiiv posts should also
-   canonical to the main domain, or the beehiiv site set to `noindex`, or the
-   subdomain 301'd. Decide the mirror strategy.
-2. **Styling polish.** The injected RSS fragment needs a CSS pass to sit cleanly
-   in the site theme (`.beehiiv-content` hook is in place).
-3. **Nav switch-over.** `src/app/page.tsx` still links "Newsletter" to the
-   beehiiv subdomain (`NEWSLETTER_URL`). Point it at `/newsletter` once shipped.
-4. **Subscribe CTA.** Add an email-capture form on `/newsletter` (reuse the
-   calculator's beehiiv subscribe path) so the first-party page also converts.
-5. **Sitemap.** Add `/newsletter` + post URLs to `sitemap.xml`.
+**Native render on the main domain + hide the beehiiv web version.** The main
+domain is the single canonical, indexed home for posts; beehiiv stays for email
+sending only. Chosen because beehiiv posts have ~zero indexation today, so
+there's no equity to migrate and no redirect debt.
 
-## Alternative (fallback)
+## Done (this branch)
 
-If native rendering is undesirable, `newsletter.amplificawealth.com` via a
-beehiiv custom domain is the lower-effort option — better than `beehiiv.com`,
-but a subdomain, not a true subpath, and it forfeits full first-party control.
+1. **Canonical.** `/newsletter/[slug]` sets canonical to the main-domain URL.
+2. **Styling.** `.beehiiv-content` rules in `globals.css` fit the RSS fragment
+   to the site theme (responsive media, brand links, readable measure).
+3. **Nav switch-over.** `src/app/page.tsx` and `calculator/InfoSections.tsx` now
+   link "Newsletter" to `/newsletter` instead of the beehiiv subdomain.
+4. **Subscribe CTA.** `/newsletter` has an email-capture form
+   (`newsletter/actions.ts`) reusing the durable lead + beehiiv subscribe path
+   (attributed `utm_source=newsletter`).
+5. **Sitemap.** `sitemap.ts` is async and includes `/newsletter` + every post.
+
+## Remaining before/after merge
+
+- **Beehiiv dashboard (you): hide the web version from search** so the main
+  domain is the only indexed copy. Options in beehiiv settings: disable the
+  website / make posts email-only, or set the site to noindex. (MCP can't write
+  these; do it in the dashboard.)
+- **Rebase/merge** this branch onto current `main` (which now has the auth fix).
+- **Verify** live: `/newsletter` lists posts, a post renders, sitemap includes
+  the URLs, and the beehiiv site no longer competes in search.
+
+## Alternative (not chosen)
+
+`newsletter.amplificawealth.com` via a beehiiv custom domain — lower effort but
+a subdomain, not a true subpath, and forfeits first-party HTML/SEO control.
