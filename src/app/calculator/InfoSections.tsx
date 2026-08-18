@@ -176,7 +176,7 @@ export default function InfoSections() {
           theories. They also cover the strategy, with the actual figures behind it,
           weekly in the{" "}
           <a
-            href="/newsletter"
+            href="https://newsletter.amplificawealth.com"
             className="text-purple hover:underline"
           >
             Amplifica Wealth newsletter

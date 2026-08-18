@@ -63,28 +63,3 @@ h1, h2, h3 {
 @media (prefers-reduced-motion: reduce) {
   .rise, .grow-bar { animation: none; }
 }
-
-/* Newsletter posts: the injected beehiiv RSS fragment carries its own scoped
-   `.beehiiv` styles; these rules just make it sit in the site theme —
-   responsive media, readable measure, and brand link colour. */
-.beehiiv-content {
-  line-height: 1.7;
-  color: rgb(var(--ink));
-}
-.beehiiv-content p { margin: 0 0 1.1em; }
-.beehiiv-content h1,
-.beehiiv-content h2,
-.beehiiv-content h3 { line-height: 1.25; margin: 1.6em 0 0.5em; }
-.beehiiv-content a { color: rgb(108 75 211); text-decoration: underline; }
-.beehiiv-content img,
-.beehiiv-content video,
-.beehiiv-content iframe { max-width: 100%; height: auto; border-radius: 6px; }
-.beehiiv-content ul,
-.beehiiv-content ol { margin: 0 0 1.1em; padding-left: 1.4em; }
-.beehiiv-content blockquote {
-  margin: 1.4em 0;
-  padding-left: 1em;
-  border-left: 3px solid rgb(var(--edge));
-  color: rgb(var(--sub));
-}
-.beehiiv-content hr { border: 0; border-top: 1px solid rgb(var(--edge)); margin: 2em 0; }
