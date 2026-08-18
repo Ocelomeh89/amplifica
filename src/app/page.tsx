@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   },
 };
 
-const NEWSLETTER_URL = "/newsletter";
+const NEWSLETTER_URL = "https://amplifica-wealth.beehiiv.com";
 const COMMUNITY_URL = "https://community.amplificawealth.com";
 
 function AmplitudeMark({ id }: { id: string }) {
@@ -107,9 +107,9 @@ export default async function Home() {
           <Link href="/calculator" className="hover:text-purple transition-colors hidden sm:inline">
             Calculator
           </Link>
-          <Link href={NEWSLETTER_URL} className="hover:text-purple transition-colors hidden sm:inline">
+          <a href={NEWSLETTER_URL} className="hover:text-purple transition-colors hidden sm:inline">
             Newsletter
-          </Link>
+          </a>
           <a href={COMMUNITY_URL} className="hover:text-purple transition-colors hidden md:inline">
             Community
           </a>
@@ -149,9 +149,9 @@ export default async function Home() {
             >
               Find your optionality date
             </Link>
-            <Link href={NEWSLETTER_URL} className="text-sm text-purple hover:underline">
+            <a href={NEWSLETTER_URL} className="text-sm text-purple hover:underline">
               Read the weekly letter
-            </Link>
+            </a>
           </div>
           <p className="rise mt-5 text-xs text-sub" style={{ animationDelay: "360ms" }}>
             Both free. No promised returns, ever.
@@ -296,7 +296,7 @@ export default async function Home() {
             </span>
             <nav className="flex gap-6 text-sm text-sub">
               <Link href="/calculator" className="hover:text-purple">Calculator</Link>
-              <Link href={NEWSLETTER_URL} className="hover:text-purple">Newsletter</Link>
+              <a href={NEWSLETTER_URL} className="hover:text-purple">Newsletter</a>
               <a href={COMMUNITY_URL} className="hover:text-purple">Community</a>
               <Link href="/login" className="hover:text-purple">Sign in</Link>
             </nav>
