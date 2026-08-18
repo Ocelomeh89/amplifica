@@ -149,12 +149,9 @@ export default async function Home() {
             >
               Find your optionality date
             </Link>
-            <a href={NEWSLETTER_URL} className="text-sm text-purple hover:underline">
-              Read the weekly letter
-            </a>
           </div>
           <p className="rise mt-5 text-xs text-sub" style={{ animationDelay: "360ms" }}>
-            Both free. No promised returns, ever.
+            Free. No promised returns, ever.
           </p>
         </div>
         <div className="lg:col-span-5 hidden lg:flex justify-end">

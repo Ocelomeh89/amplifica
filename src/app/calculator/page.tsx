@@ -58,13 +58,22 @@ export default function CalculatorPage({
     <div className="min-h-screen bg-cream flex flex-col">
       <header className="border-b border-edge bg-card">
         <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <Link
+            href="/"
+            aria-label="Amplifica Wealth home"
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          >
             <AmplitudeMark />
             <span className="font-display text-lg leading-none">Amplifica</span>
-          </div>
-          <Link href="/login" className="text-sm text-purple hover:underline">
-            Sign in
           </Link>
+          <nav className="flex items-center gap-5 text-sm">
+            <Link href="/" className="text-sub hover:text-purple transition-colors">
+              Home
+            </Link>
+            <Link href="/login" className="text-purple hover:underline">
+              Sign in
+            </Link>
+          </nav>
         </div>
       </header>
 
@@ -87,12 +96,17 @@ export default function CalculatorPage({
       <footer className="border-t border-edge">
         <div className="max-w-5xl mx-auto px-6 py-4 text-sm text-sub flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <span>Engineer your future. Amplify your wealth. Live your way.</span>
-          <a
-            href="https://community.amplificawealth.com/home-page"
-            className="text-purple hover:underline"
-          >
-            Join the community
-          </a>
+          <div className="flex items-center gap-5">
+            <Link href="/" className="text-purple hover:underline">
+              Home
+            </Link>
+            <a
+              href="https://community.amplificawealth.com/home-page"
+              className="text-purple hover:underline"
+            >
+              Join the community
+            </a>
+          </div>
         </div>
       </footer>
     </div>
