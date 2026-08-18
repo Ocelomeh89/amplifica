@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   },
 };
 
-const NEWSLETTER_URL = "https://amplifica-wealth.beehiiv.com";
+const NEWSLETTER_URL = "https://newsletter.amplificawealth.com";
 const COMMUNITY_URL = "https://community.amplificawealth.com";
 
 function AmplitudeMark({ id }: { id: string }) {

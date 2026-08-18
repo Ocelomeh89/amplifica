@@ -50,7 +50,7 @@ const organizationSchema = {
         { "@type": "Person", name: "Miguel Graf" },
         { "@type": "Person", name: "Jackie Tang" },
       ],
-      sameAs: ["https://amplifica-wealth.beehiiv.com"],
+      sameAs: ["https://newsletter.amplificawealth.com"],
     },
     {
       "@type": "WebSite",
