@@ -11,19 +11,22 @@ import SimInputsGrid, { OPTIONALITY_INFO } from "@/components/simulator/SimInput
 import SimResults from "@/components/simulator/SimResults";
 import FlywheelExplainer from "@/components/simulator/FlywheelExplainer";
 
-const DEFAULT_ANNUAL_INCOME = 100_000;
+const DEFAULT_ANNUAL_INCOME = 80_000;
 const JOIN_URL = "https://community.amplificawealth.com/home-page";
+
+const CASHFLOW_EXCEEDS_INCOME_INFO =
+  "This marks when projected monthly cash flow exceeds your current gross monthly income. It is not the same as reaching your optionality threshold or financial independence.";
 
 export default function CalculatorClient() {
   const sim = useSimulation(PUBLIC_DEFAULT_VALUES);
   const [annualIncome, setAnnualIncome] = useState(DEFAULT_ANNUAL_INCOME);
 
-  // First month where the system's own yearly cashflow (Amplicon payouts,
-  // excluding the MSC) exceeds the visitor's annual income. series.cashFlow
-  // includes the MSC, so subtract it; the public calculator never ends the MSC.
+  // First month where the system's own yearly cash flow (Amplicon payouts,
+  // which distributionCashFlow already reports net of the MSC) exceeds the
+  // visitor's annual income.
   const incomeCrossMonth =
     annualIncome > 0
-      ? sim.result.series.find((p) => (p.cashFlow - sim.values.msc) * 12 > annualIncome)?.monthIndex ?? null
+      ? sim.result.series.find((p) => p.distributionCashFlow * 12 > annualIncome)?.monthIndex ?? null
       : null;
 
   const fiMonth = sim.fi.month;
@@ -43,7 +46,7 @@ export default function CalculatorClient() {
           initialInvestmentSize={sim.initialInvestmentSize}
           variant="public"
           mainExtra={
-            <Field label="Annual income ($)">
+            <Field label="Annual income ($)" hint="Your current gross annual income.">
               <input
                 type="number"
                 value={annualIncome}
@@ -82,7 +85,8 @@ export default function CalculatorClient() {
           </div>
           <div>
             <div className="text-[10px] text-sub uppercase tracking-wide">
-              Cashflow exceeds income
+              Cash flow exceeds income
+              <InfoBox message={CASHFLOW_EXCEEDS_INCOME_INFO} />
             </div>
             {incomeCrossMonth != null ? (
               <>
@@ -90,25 +94,19 @@ export default function CalculatorClient() {
                   month {incomeCrossMonth} (~{(incomeCrossMonth / 12).toFixed(1)} yr)
                 </div>
                 <div className="text-xs text-sub mt-0.5">
-                  yearly system cashflow tops your income of {fmtCurrency(annualIncome)}
+                  monthly cash flow tops your gross income of{" "}
+                  {fmtCurrency(annualIncome / 12)}/mo
                 </div>
               </>
             ) : (
               <div className="text-xs text-sub mt-1">
                 {annualIncome > 0
-                  ? "Within 30 years, yearly system cashflow does not exceed your annual income at these inputs."
-                  : "Enter your annual income to see when the system's cashflow exceeds it."}
+                  ? "Within 30 years, monthly cash flow does not exceed your income at these inputs."
+                  : "Enter your annual income to see when monthly cash flow exceeds it."}
               </div>
             )}
           </div>
         </div>
-        {incomeCrossMonth != null && (
-          <p className="mt-3 pt-3 border-t border-edge text-xs text-sub">
-            From month {incomeCrossMonth}, the Amplification pays you more per year
-            than your income of {fmtCurrency(annualIncome)}, shown as the amber line
-            on the charts.
-          </p>
-        )}
       </Card>
 
       <SimResults sim={sim} incomeMarkerMonth={incomeCrossMonth} variant="public" />

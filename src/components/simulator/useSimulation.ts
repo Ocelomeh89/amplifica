@@ -30,10 +30,24 @@ export function useSimulation(initial: SimValues) {
 
   // Live (undebounced) so the read-only field tracks keystrokes.
   const initialInvestmentSize = values.msc * values.factor;
-  const finalExpectedFuturePayments = result.series[result.series.length - 1]?.expectedFuturePayments ?? 0;
-  const vsMarket = result.finalMarketBaseline > 0 ? finalExpectedFuturePayments / result.finalMarketBaseline : null;
+  const lastMonth = result.series.length - 1;
+  const finalExpectedFuturePayments = at(lastMonth)?.expectedFuturePayments ?? 0;
+  const finalMonthlyCashFlow = at(lastMonth)?.distributionCashFlow ?? 0;
+  const finalDeployedCapital = result.finalDeployedCapital;
+  const horizonYears = Math.round(result.series.length / 12);
 
-  return { values, set, result, fi, at, initialInvestmentSize, finalExpectedFuturePayments, vsMarket };
+  return {
+    values,
+    set,
+    result,
+    fi,
+    at,
+    initialInvestmentSize,
+    finalExpectedFuturePayments,
+    finalMonthlyCashFlow,
+    finalDeployedCapital,
+    horizonYears,
+  };
 }
 
 export type Simulation = ReturnType<typeof useSimulation>;

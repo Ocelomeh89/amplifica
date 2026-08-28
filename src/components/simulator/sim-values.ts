@@ -59,10 +59,10 @@ export function projectionToSimValues(p: Projection): SimValues {
 }
 
 // Starting values for the public calculator. Same as the projections table
-// defaults except msc, whose DB default of 0 would render an empty simulation;
-// 1000/mo is a demo value worth tuning for lead-gen appeal.
+// defaults except msc (the DB default of 0 would render an empty simulation)
+// and withdrawalAmount, both set to the benchmark scenario the site quotes.
 export const PUBLIC_DEFAULT_VALUES: SimValues = {
-  msc: 1000,
+  msc: 2000,
   factor: 5,
   term: 36,
   invInterestPct: 8,
@@ -73,5 +73,5 @@ export const PUBLIC_DEFAULT_VALUES: SimValues = {
   perpetualYieldPct: 10,
   perpetualTrigger: 50000,
   mscEndMonth: "",
-  withdrawalAmount: 4500,
+  withdrawalAmount: 3000,
 };

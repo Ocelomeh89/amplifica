@@ -38,7 +38,12 @@ export type { ActiveInvestment, InvestmentKind } from "./sim-book";
 
 export interface ProjectionSimPoint {
   monthIndex: number;
+  // Total cash collected this month: the MSC still being contributed plus every
+  // active Amplicon's payout.
   cashFlow: number;
+  // The system's own monthly income: this month's Amplicon payouts, with the
+  // MSC excluded. This is the figure the UI leads with.
+  distributionCashFlow: number;
   outstandingAmount: number;
   expectedFuturePayments: number;
   cash: number;
@@ -46,6 +51,13 @@ export interface ProjectionSimPoint {
   activeInvestmentCount: number;
   // Cumulative MSC contributed through this month (the principal you put in).
   contributedCapital: number;
+  // Cumulative capital deployed into Amplicons through this month: the sum of
+  // every draw taken, the bootstrap one included. Gross deployment, not net of
+  // repayment — the same dollar redeployed twice counts twice.
+  deployedCapital: number;
+  // Cumulative investment distributions collected through this month (payouts
+  // only — the MSC is excluded).
+  distributionsReceived: number;
   // The same contributions dripped into the market at marketReturnPct instead.
   marketBaseline: number;
   perpetualIncome: number;
@@ -60,6 +72,8 @@ export interface ProjectionSimResult {
   peakOutstanding: number;
   finalContributedCapital: number;
   finalMarketBaseline: number;
+  finalDeployedCapital: number;
+  finalDistributionsReceived: number;
   perpetualsLaunched: number;
 }
 
@@ -87,6 +101,8 @@ interface SimState {
   perpetualsLaunched: number;
   contributed: number;
   marketBalance: number;
+  deployed: number;
+  distributions: number;
 }
 
 // Apply the month's net inflow to the ledger: surplus pays the LoC down and
@@ -192,6 +208,7 @@ function manageLaunch(state: SimState, config: SimConfig, month: number, netInfl
     state.currentInvestmentSize = size;
     state.book.push(candidate);
     state.investmentsLaunched += 1;
+    state.deployed += size;
     if (kind === "perpetual") state.perpetualsLaunched += 1;
     // The leftover balance rolls into the fresh draw: the full Amplicon cost
     // is borrowed on top of what is still owed.
@@ -225,6 +242,8 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
     perpetualsLaunched: 0,
     contributed: 0,
     marketBalance: 0,
+    deployed: initialInvestmentSize,
+    distributions: 0,
   };
 
   const series: ProjectionSimPoint[] = [];
@@ -253,17 +272,21 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
     const expectedFuturePayments = value.total + state.cash - state.outstandingAmount;
 
     state.contributed += effMsc;
+    state.distributions += payouts.total;
     state.marketBalance = state.marketBalance * (1 + monthlyMarketRate) + effMsc;
 
     series.push({
       monthIndex: m,
       cashFlow,
+      distributionCashFlow: payouts.total,
       outstandingAmount: state.outstandingAmount,
       expectedFuturePayments,
       cash: state.cash,
       currentInvestmentSize: state.currentInvestmentSize,
       activeInvestmentCount: countActive(state.book, m),
       contributedCapital: state.contributed,
+      deployedCapital: state.deployed,
+      distributionsReceived: state.distributions,
       marketBaseline: state.marketBalance,
       perpetualIncome: payouts.perpetual,
       perpetualBookValue: value.perpetual,
@@ -281,5 +304,7 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
     peakOutstanding: state.peakOutstanding,
     finalContributedCapital: state.contributed,
     finalMarketBaseline: state.marketBalance,
+    finalDeployedCapital: state.deployed,
+    finalDistributionsReceived: state.distributions,
   };
 }
