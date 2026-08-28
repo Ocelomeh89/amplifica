@@ -11,9 +11,10 @@ interface Props {
   set: <K extends keyof SimValues>(key: K, value: SimValues[K]) => void;
   initialInvestmentSize: number;
   // "editor" (default): full grid + Advanced ribbon (perpetuals, stop MSC,
-  //   withdrawal). All fields stay mounted for the editor's save FormData.
+  //   monthly cash needed). All fields stay mounted for the editor's save
+  //   FormData.
   // "public": only the MSC (plus mainExtra) visible; the strategy inputs sit
-  //   behind a "Settings" ribbon. No market return, no perpetuals.
+  //   behind a "Settings" ribbon. No perpetuals.
   variant?: "editor" | "public";
   // Extra fields rendered inside the main grid (public: the annual-income
   // input, which is page state rather than a SimValues member).
@@ -71,7 +72,11 @@ export default function SimInputsGrid({ values, set, initialInvestmentSize, vari
     </Field>
   );
   const withdrawalField = (
-    <Field label="Cash needed at optionality ($/mo)" info={OPTIONALITY_INFO} hint="monthly draw once you could stop saving">
+    <Field
+      label="Monthly cash needed ($/mo)"
+      info={OPTIONALITY_INFO}
+      hint="Your estimated monthly essential expenses or cash-flow target."
+    >
       <input name="withdrawal_amount" type="number" value={withdrawalAmount} onChange={(e) => set("withdrawalAmount", Number(e.target.value))} min={0} step={100} className={inputClass} />
     </Field>
   );
@@ -97,7 +102,7 @@ export default function SimInputsGrid({ values, set, initialInvestmentSize, vari
           {mainExtra}
         </div>
 
-        {ribbonButton("Settings", "investment size, term, rates & optionality draw")}
+        {ribbonButton("Settings", "investment size, term, rates & monthly cash needed")}
 
         <div className={showRibbon ? gridClass : "hidden"}>
           {factorField}
@@ -122,12 +127,13 @@ export default function SimInputsGrid({ values, set, initialInvestmentSize, vari
         {invInterestField}
         {locIncreaseField}
         {locInterestField}
-        <Field label="Market return (%)" hint="Stock-market benchmark, e.g. 10%">
-          <input name="market_return_pct" type="number" value={marketReturnPct} onChange={(e) => set("marketReturnPct", Number(e.target.value))} min={0} step={0.5} className={inputClass} />
-        </Field>
       </div>
 
-      {ribbonButton("Advanced", "perpetuals, stop MSC & withdrawal")}
+      {/* The market comparison was removed from the Amplifier; the stored
+          value still rides along so saving does not reset the column. */}
+      <input type="hidden" name="market_return_pct" value={marketReturnPct} />
+
+      {ribbonButton("Advanced", "perpetuals, stop MSC & monthly cash needed")}
 
       <div className={showRibbon ? gridClass : "hidden"}>
         <Field label="Perpetual yield (% COC)" hint="long-term Amplicon cash-on-cash, 30-yr">

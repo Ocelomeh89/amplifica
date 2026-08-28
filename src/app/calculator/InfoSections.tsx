@@ -16,15 +16,15 @@ const faqs = [
   },
   {
     q: "How does the Amplification Method work?",
-    a: "Deploy, collect, repay, repeat. You draw on a line of credit to fund an income investment. The investment's monthly payments, plus your own monthly savings, pay the line back down. When the line is effectively clear, you deploy again at a larger size. The calculator simulates this loop for every month of the horizon.",
+    a: "We call it the CYCLE: Credit, Yield, Collect, Liberate, Expand. You draw from a line of credit (Credit) and deploy it into an income-yielding investment (Yield). You collect the monthly distribution it pays out (Collect) and use those distributions, plus your own monthly savings, to pay the line back down (Liberate). Once the line is clear you redeploy, or deploy at a larger scale, next cycle (Expand). The calculator simulates this loop for every month of the horizon.",
   },
   {
     q: "What is an Amplicon?",
-    a: "An Amplicon is our name for one investment cycle. These can be short term or long term. For example, an amortized investment that pays a level monthly amount over a fixed term (36 months), like a loan you own the receiving side of. Each completed payoff funds the next, larger deployment. That repeating cycle is the amplification.",
+    a: "An Amplicon is our name for one investment cycle. These can be short term or long term. For example, an amortized investment that pays a level monthly amount over a fixed term (36 months), like a loan you own the receiving side of. Each payoff gets you closer to a larger deployment. That repeating cycle is the amplification.",
   },
   {
-    q: "Do I need a HELOC to use this strategy?",
-    a: "No. The model works with any line of credit: a HELOC, a personal or unsecured line, or other revolving credit you can draw and repay. The calculator only needs the line's interest rate and your starting deployment size. What matters is the spread between what the investment pays and what the borrowed capital costs.",
+    q: "Can I use the strategy without a HELOC?",
+    a: "Yes. A HELOC is not required. The model works with any revolving line of credit you can draw and repay: a HELOC, a personal or unsecured line, or a margin line. What matters is the spread between what the investment pays and what the borrowed capital costs, so a lower borrowing cost — which a HELOC often provides — improves how far and how fast the strategy scales. The calculator only needs the line's interest rate and your starting deployment size.",
   },
   {
     q: "Is borrowing to invest risky?",
@@ -87,7 +87,7 @@ export default function InfoSections() {
           It simulates a cash-flow system month by month. You contribute a fixed monthly
           savings amount, draw on a line of credit to fund an amortized income
           investment, and the investment&apos;s payments plus your savings repay the line.
-          Each payoff funds a larger deployment. The calculator reports when the
+          Each payoff gets you closer to a larger deployment. The calculator reports when the
           system&apos;s own cash flow could cover your target monthly income (your
           financial optionality date) and, separately, when you could stop
           contributing and let the system sustain itself.
@@ -123,7 +123,7 @@ export default function InfoSections() {
               <tr className="border-t border-edge">
                 <td className="p-3 text-sub">Risk shown</td>
                 <td className="p-3">Sequence-of-returns, usually implicit</td>
-                <td className="p-3">Peak debt, displayed explicitly</td>
+                <td className="p-3">Borrowing cost and payoff pace, modeled month by month</td>
               </tr>
             </tbody>
           </table>

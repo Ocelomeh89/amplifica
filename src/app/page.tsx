@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 export const metadata: Metadata = {
   title: { absolute: "Amplifica Wealth — savings into monthly investment income" },
   description:
-    "A scalable system for turning consistent savings into monthly investment income: deploy borrowed capital into income investments, collect, repay, repeat. Free calculator, weekly letter, real numbers. No promised returns.",
+    "A scalable system for turning consistent savings into monthly investment income: credit, yield, collect, liberate, expand — the CYCLE. Free calculator, weekly letter, real numbers. No promised returns.",
   alternates: { canonical: "/" },
   openGraph: {
     title: "Amplifica Wealth",
@@ -73,20 +73,29 @@ function AmplitudeField() {
 
 const cycle = [
   {
-    step: "Deploy",
-    text: "Draw on a line of credit and fund an amortized income investment.",
+    letter: "C",
+    step: "Credit",
+    text: "Draw from a line of credit.",
   },
   {
+    letter: "Y",
+    step: "Yield",
+    text: "Deploy it into an income-yielding investment.",
+  },
+  {
+    letter: "C",
     step: "Collect",
-    text: "Its level monthly payments arrive the next month.",
+    text: "Collect the monthly distribution it pays out.",
   },
   {
-    step: "Repay",
-    text: "The investment payouts, plus your monthly contribution, pay down the borrowed money.",
+    letter: "L",
+    step: "Liberate",
+    text: "Use those distributions to pay off the line of credit.",
   },
   {
-    step: "Repeat",
-    text: "Each payoff funds the next, larger deployment. One completed cycle is an Amplicon.",
+    letter: "E",
+    step: "Expand",
+    text: "Redeploy, or deploy at a larger scale, next cycle. Each payoff gets you closer to a larger deployment. One completed cycle is an Amplicon.",
   },
 ];
 
@@ -166,13 +175,14 @@ export default async function Home() {
             Most people spend a dollar once.{" "}
             <span className="text-purple">Ours do three jobs before they rest.</span>
           </p>
-          <div className="mt-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-10 gap-y-10">
-            {cycle.map((c, i) => (
-              <div key={c.step} className={i % 2 === 1 ? "lg:mt-8" : ""}>
+          <p className="mt-4 text-sm text-sub leading-relaxed max-w-2xl">
+            Five steps, repeating. We call it the <span className="text-ink font-medium">CYCLE</span>.
+          </p>
+          <div className="mt-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-x-8 gap-y-10">
+            {cycle.map((c) => (
+              <div key={c.step}>
                 <div className="flex items-baseline gap-3">
-                  <span className="font-display text-aqua text-lg tabular-nums">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
+                  <span className="font-display text-aqua text-lg">{c.letter}</span>
                   <h2 className="text-lg">{c.step}</h2>
                 </div>
                 <p className="mt-2 text-sm text-sub leading-relaxed">{c.text}</p>

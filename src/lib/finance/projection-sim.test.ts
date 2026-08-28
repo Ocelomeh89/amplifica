@@ -157,3 +157,41 @@ describe("runSimulation — termination", () => {
     expect(runSimulation(noTotal).series).toHaveLength(480);
   });
 });
+
+describe("runSimulation — deployed capital & distribution cash flow", () => {
+  it("month 0 deployedCapital = the bootstrap draw", () => {
+    expect(runSimulation(baseInput).series[0].deployedCapital).toBeCloseTo(20000, 2);
+  });
+
+  it("deployedCapital is monotonically non-decreasing and ends at finalDeployedCapital", () => {
+    const r = runSimulation(baseInput);
+    for (let i = 1; i < r.series.length; i++) {
+      expect(r.series[i].deployedCapital).toBeGreaterThanOrEqual(r.series[i - 1].deployedCapital);
+    }
+    expect(r.series[r.series.length - 1].deployedCapital).toBeCloseTo(r.finalDeployedCapital, 2);
+  });
+
+  it("deployedCapital exceeds contributed capital once the flywheel is turning", () => {
+    const r = runSimulation(baseInput);
+    const last = r.series[r.series.length - 1];
+    expect(last.deployedCapital).toBeGreaterThan(last.contributedCapital);
+  });
+
+  it("distributionCashFlow is cashFlow net of the MSC, and is 0 at month 0", () => {
+    const r = runSimulation(baseInput);
+    expect(r.series[0].distributionCashFlow).toBeCloseTo(0, 6);
+    for (const p of r.series) {
+      expect(p.cashFlow - p.distributionCashFlow).toBeCloseTo(5000, 6);
+    }
+  });
+
+  it("distributionsReceived accumulates distributionCashFlow", () => {
+    const r = runSimulation(baseInput);
+    let running = 0;
+    for (const p of r.series) {
+      running += p.distributionCashFlow;
+      expect(p.distributionsReceived).toBeCloseTo(running, 2);
+    }
+    expect(r.finalDistributionsReceived).toBeCloseTo(running, 2);
+  });
+});
