@@ -5,6 +5,8 @@ node_modules/
 .DS_Store
 dist/
 build/
+# ...but src/lib/compare/build/ is source, not build output.
+!src/lib/compare/build/
 .next/
 .vercel/
 
