@@ -48,6 +48,11 @@ export function niitOn(
 // §199A, modelled as a flat 20% of qualifying pass-through income. Wage and
 // qualified-property limits are a per-option cap rather than a computation;
 // the simplification is disclosed in the UI.
+//
+// Intentionally not yet called from computeTaxSeries: no option in this plan
+// produces QBI-eligible income. The eligibility signal (which activities are
+// a qualified trade or business) arrives with the business builder in the
+// next plan, at which point this gets wired in.
 export function qbiDeduction(qualifiedIncome: number, profile: TaxProfile): number {
   if (!profile.qbiEnabled) return 0;
   if (qualifiedIncome <= 0) return 0;
@@ -189,7 +194,18 @@ export function computeTaxSeries(
       inflationPct
     );
 
-    const taxDelta = withInvestment - baseline;
+    // NIIT: 3.8% on passive and portfolio investment income. Never on
+    // non-passive working-interest or materially-participated business
+    // income — that exemption is a real structural edge for those options
+    // and has to be visible every year, not only at exit.
+    const investmentIncome = Math.max(
+      0,
+      passiveUsable + b.portfolioOrdinary + b.qualifiedDividends + b.ltcg
+    );
+    const totalIncome = withOrdinary + b.qualifiedDividends + b.ltcg;
+    const niit = niitOn(investmentIncome, totalIncome, profile);
+
+    const taxDelta = withInvestment + niit - baseline;
     monthlyTaxCash[(y + 1) * 12 - 1] = taxDelta;
     years.push({ year: y, taxDelta, nonPassiveCarryforward, suspendedPassive });
   }

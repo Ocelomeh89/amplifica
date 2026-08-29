@@ -183,4 +183,39 @@ describe("computeTaxSeries — baseline delta", () => {
     expect(r.monthlyTaxCash).toHaveLength(HORIZON_MONTHS);
     expect(r.monthlyTaxCash.every((v) => Number.isFinite(v))).toBe(true);
   });
+
+  it("charges NIIT on portfolio income every year, not only at exit", () => {
+    // profile.otherOrdinaryIncome is 400k, well above the 250k MFJ threshold,
+    // so all of this portfolio income is exposed to the 3.8% surtax.
+    const withNiit = computeTaxSeries(
+      series([item({ month: 6, amount: 10_000, activity: "portfolio" })]),
+      { ...profile, niitEnabled: true },
+      0
+    );
+    const without = computeTaxSeries(
+      series([item({ month: 6, amount: 10_000, activity: "portfolio" })]),
+      profile,
+      0
+    );
+    expect(withNiit.monthlyTaxCash[11] - without.monthlyTaxCash[11]).toBeCloseTo(
+      10_000 * 0.038,
+      4
+    );
+  });
+
+  it("charges no NIIT on non-passive working-interest or business income", () => {
+    // Same income, same size, but non-passive — NIIT's structural exemption
+    // for materially-participated business income has to actually bite.
+    const withNiit = computeTaxSeries(
+      series([item({ month: 6, amount: 10_000, activity: "non-passive" })]),
+      { ...profile, niitEnabled: true },
+      0
+    );
+    const without = computeTaxSeries(
+      series([item({ month: 6, amount: 10_000, activity: "non-passive" })]),
+      profile,
+      0
+    );
+    expect(withNiit.monthlyTaxCash[11] - without.monthlyTaxCash[11]).toBeCloseTo(0, 6);
+  });
 });
