@@ -12,6 +12,11 @@ export interface ActiveInvestment {
   monthlyPayout: number; // amortizing payment (term) or flat coupon (perpetual)
   termMonths: number;
   startMonth: number; // month of the FIRST payment (draw is the month before)
+  // Retained solely to split a payout into interest and principal (see
+  // `interestAt`). No aggregate depends on them, so they cannot change any
+  // existing output.
+  faceValue: number;
+  monthlyRate: number;
 }
 
 export function makeInvestment(
@@ -26,6 +31,8 @@ export function makeInvestment(
       monthlyPayout: faceValue * (config.perpetualYieldPct / 12),
       termMonths: config.perpetualTermMonths,
       startMonth,
+      faceValue,
+      monthlyRate: config.perpetualYieldPct / 12,
     };
   }
   return {
@@ -33,7 +40,30 @@ export function makeInvestment(
     monthlyPayout: monthlyPayment(faceValue, config.investmentInterestPct, config.termMonths),
     termMonths: config.termMonths,
     startMonth,
+    faceValue,
+    monthlyRate: config.investmentInterestPct / 12,
   };
+}
+
+// The interest portion of `month`'s payout — the only taxable part, since the
+// rest is return of capital. A term Amplicon amortizes, so interest is that
+// month's opening balance times the rate, falling as the balance does; the
+// closed form avoids walking the schedule. A perpetual returns no principal
+// within its term, so its whole coupon is interest.
+export function interestAt(inv: ActiveInvestment, month: number): number {
+  if (!isActive(inv, month)) return 0;
+  if (inv.kind === "perpetual") return inv.monthlyPayout;
+
+  const r = inv.monthlyRate;
+  if (r <= 0) return 0;
+
+  const e = month - inv.startMonth; // payments already made
+  const growth = Math.pow(1 + r, e);
+  const opening = inv.faceValue * growth - (inv.monthlyPayout * (growth - 1)) / r;
+
+  // Float drift over a long schedule can push the final balance a hair either
+  // side of zero; interest is a share of the payment and clamps to it.
+  return Math.min(Math.max(opening * r, 0), inv.monthlyPayout);
 }
 
 export function isActive(inv: ActiveInvestment, month: number): boolean {
@@ -56,17 +86,20 @@ export function remainingBalanceAt(inv: ActiveInvestment, month: number): number
 export interface BookPayout {
   total: number; // all payouts landing this month
   perpetual: number; // the perpetual-coupon share of `total`
+  interest: number; // the taxable share of `total`; the remainder is principal
 }
 
 export function collectPayouts(book: ActiveInvestment[], month: number): BookPayout {
   let total = 0;
   let perpetual = 0;
+  let interest = 0;
   for (const inv of book) {
     if (!isActive(inv, month)) continue;
     total += inv.monthlyPayout;
     if (inv.kind === "perpetual") perpetual += inv.monthlyPayout;
+    interest += interestAt(inv, month);
   }
-  return { total, perpetual };
+  return { total, perpetual, interest };
 }
 
 export interface BookValue {

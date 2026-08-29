@@ -44,6 +44,10 @@ export interface ProjectionSimPoint {
   // The system's own monthly income: this month's Amplicon payouts, with the
   // MSC excluded. This is the figure the UI leads with.
   distributionCashFlow: number;
+  // The interest share of distributionCashFlow — the taxable part. The
+  // remainder is return of principal. Nothing in the Amplifier uses this; it
+  // exists so downstream models can tax the payouts correctly.
+  distributionInterest: number;
   outstandingAmount: number;
   expectedFuturePayments: number;
   cash: number;
@@ -279,6 +283,7 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
       monthIndex: m,
       cashFlow,
       distributionCashFlow: payouts.total,
+      distributionInterest: payouts.interest,
       outstandingAmount: state.outstandingAmount,
       expectedFuturePayments,
       cash: state.cash,

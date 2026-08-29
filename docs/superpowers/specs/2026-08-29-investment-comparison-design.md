@@ -314,11 +314,22 @@ change in the cash flow series — an option that never returns cash, or one wit
 no capital in — the function returns `null` with a stated reason. It never
 returns `NaN` or a misleading number.
 
-**Flywheel exit value.** `expectedFuturePayments` at month 84 is the face value
-of payments still scheduled. A note portfolio does not sell at face, so the
-exit value is that stream discounted at an **editable discount rate**,
-defaulting to the Amplicon interest rate. Using face value would flatter the
-flywheel against options whose exit is a genuine market price.
+**Flywheel exit value — both figures, always.** The year-7 exit models one
+concrete act: sell everything and start from scratch. Two numbers describe it
+and the tool shows both.
+
+- **Undiscounted** — `expectedFuturePayments` at month 84, the face sum of
+  payments still owed. This is the Amplifier's existing convention (see
+  `remainingBalanceAt` in `sim-book.ts`) and the figure to keep if you are
+  holding the notes to term rather than selling.
+- **Discounted** — that same stream at an **editable discount rate**,
+  defaulting to the Amplicon interest rate. This is what a buyer would pay.
+
+A discount-rate input of 0 collapses the two, so the pair is one control, not
+two modes. Metrics are computed from whichever is selected, and the comparison
+table labels which basis is live, because IRR and MOIC move materially between
+them. The default is discounted: against options whose exit is a genuine market
+price, face value would flatter the flywheel.
 
 ## The nine options
 
