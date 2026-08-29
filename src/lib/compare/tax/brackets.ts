@@ -2,9 +2,11 @@
 // inflation rate. Thresholds move with inflation in reality; without indexing
 // the model would invent bracket creep and overstate future tax.
 //
-// Brackets (ORDINARY_BRACKETS, LTCG_BRACKETS) and NIIT thresholds: IRS Rev.
-// Proc. 2024-40. Standard deduction: P.L. 119-21 (One Big Beautiful Bill Act,
-// signed 2025-07-04), which superseded Rev. Proc. 2024-40 for tax year 2025.
+// Brackets (ORDINARY_BRACKETS, LTCG_BRACKETS): IRS Rev. Proc. 2024-40.
+// Standard deduction: P.L. 119-21 (One Big Beautiful Bill Act, signed
+// 2025-07-04), which superseded Rev. Proc. 2024-40 for tax year 2025. NIIT
+// thresholds: fixed statutory amounts under IRC §1411, not inflation-adjusted
+// by Rev. Proc. or any other annual guidance (see note above NIIT_THRESHOLD).
 
 import type { FilingStatus } from "../types";
 

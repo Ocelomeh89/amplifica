@@ -4,9 +4,9 @@
 // exactly what it shelters and no more, with the cap falling out of the
 // arithmetic rather than needing a special-case rule.
 //
-// Task 4 scope: non-passive and portfolio activity, plus passive income.
-// Passive LOSSES are conservatively suspended and never released; Task 5
-// replaces that stub with the real passive-activity rules.
+// Passive losses are handled by passive.ts: suspended, offset against passive
+// income, and released in full at disposition. This module also applies the
+// 3.8% net investment income tax and the §199A QBI deduction.
 
 import {
   HORIZON_MONTHS,
@@ -16,13 +16,43 @@ import {
   type TaxProfile,
 } from "../types";
 import {
+  NIIT_RATE,
+  NIIT_THRESHOLD,
   ORDINARY_BRACKETS,
+  QBI_RATE,
   STANDARD_DEDUCTION,
   indexAmount,
   indexBrackets,
   taxOn,
 } from "./brackets";
 import { newPassiveState, applyPassiveRules } from "./passive";
+import { exitTax } from "./exit";
+
+// The 3.8% net investment income tax reaches passive and portfolio income but
+// NOT non-passive working-interest or materially-participated business income.
+// That exemption is a genuine structural edge for an oil & gas working
+// interest over real estate, dividends and the flywheel.
+export function niitOn(
+  investmentIncome: number,
+  totalIncome: number,
+  profile: TaxProfile
+): number {
+  if (!profile.niitEnabled) return 0;
+  if (investmentIncome <= 0) return 0;
+  const threshold = NIIT_THRESHOLD[profile.filingStatus];
+  const over = totalIncome - threshold;
+  if (over <= 0) return 0;
+  return Math.min(investmentIncome, over) * NIIT_RATE;
+}
+
+// §199A, modelled as a flat 20% of qualifying pass-through income. Wage and
+// qualified-property limits are a per-option cap rather than a computation;
+// the simplification is disclosed in the UI.
+export function qbiDeduction(qualifiedIncome: number, profile: TaxProfile): number {
+  if (!profile.qbiEnabled) return 0;
+  if (qualifiedIncome <= 0) return 0;
+  return qualifiedIncome * QBI_RATE;
+}
 
 export interface YearBuckets {
   nonPassiveOrdinary: number;
@@ -164,5 +194,7 @@ export function computeTaxSeries(
     years.push({ year: y, taxDelta, nonPassiveCarryforward, suspendedPassive });
   }
 
-  return { monthlyTaxCash, exitTaxCash: 0, years };
+  const exitTaxCash = exitTax(series.exit, profile, HORIZON_YEARS - 1, inflationPct);
+
+  return { monthlyTaxCash, exitTaxCash, years };
 }
