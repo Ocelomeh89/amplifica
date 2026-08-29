@@ -20,7 +20,7 @@
 - Tests use Vitest and live beside their source, matching `src/lib/finance/*.test.ts`.
 - Run tests with `pnpm test`, typecheck with `pnpm typecheck`.
 - Nothing in this plan modifies `src/lib/finance/`, `src/app/calculator/`, or `src/components/simulator/`.
-- **Tax figures in Task 3 are 2025 base-year values written from reference and MUST be verified against IRS Rev. Proc. 2024-40 before the tool is used for a real decision.** Task 3 includes this verification as an explicit step.
+- **Tax figures in Task 3 have been independently verified** (2026-08-29): brackets, LTCG bands, NIIT thresholds and rates confirmed against the Rev. Proc. 2024-40 primary source; `STANDARD_DEDUCTION` corrected to the post-OBBBA (P.L. 119-21) tax-year-2025 amounts. Re-verify before any tax year other than 2025.
 
 ---
 
@@ -451,7 +451,10 @@ export function irrMonthly(flows: number[]): { rate: number | null; reason: stri
 
   const npv = (r: number) => flows.reduce((a, f, m) => a + f / Math.pow(1 + r, m), 0);
 
-  let lo = -0.9999;
+  // -0.99 rather than -0.9999: at -0.9999 the discount factor (1+r)^84 is
+  // 1e-336, which underflows to zero in double precision, so the NPV divides
+  // by zero and every solve fails the finite-guard below.
+  let lo = -0.99;
   let hi = 1.0;
   const npvLo = npv(lo);
   if (!Number.isFinite(npvLo) || npvLo * npv(hi) > 0) {
@@ -735,11 +738,14 @@ export const LTCG_BRACKETS: Record<FilingStatus, Bracket[]> = {
   ],
 };
 
+// Post-OBBBA (H.R.1 / P.L. 119-21, signed 2025-07-04), which raised these for
+// tax year 2025 itself and therefore supersedes Rev. Proc. 2024-40 here. The
+// bracket, LTCG and NIIT figures above are still Rev. Proc. 2024-40.
 export const STANDARD_DEDUCTION: Record<FilingStatus, number> = {
-  single: 15_000,
-  mfj: 30_000,
-  mfs: 15_000,
-  hoh: 22_500,
+  single: 15_750,
+  mfj: 31_500,
+  mfs: 15_750,
+  hoh: 23_625,
 };
 
 // Statutory and deliberately NOT inflation-indexed, which is why NIIT reaches
