@@ -73,11 +73,39 @@ describe("applyPassiveRules", () => {
     expect(applyPassiveRules(s, -40_000, active, 0, 0, false).usableLoss).toBe(0);
   });
 
-  it("indexes the phaseout range with inflation", () => {
+  it("holds the statutory phaseout fixed while the income measured against it rises", () => {
+    // Replaces a test that asserted the phaseout range was indexed. It is
+    // not: §469(i) has never been inflation-adjusted, exactly like the NIIT
+    // threshold. The income is indexed instead, because engine.ts escalates
+    // otherOrdinaryIncome the same way — the old code compared a moving
+    // threshold against a frozen income and got both halves backwards.
     const active = { ...profile, activelyParticipatesRental: true, otherOrdinaryIncome: 100_000 };
     const s = newPassiveState();
-    // In a later year the same nominal income sits below the indexed floor,
-    // so the full allowance survives.
-    expect(applyPassiveRules(s, -40_000, active, 3, 0.03, false).usableLoss).toBe(25_000);
+    const indexedIncome = 100_000 * 1.03 ** 3;
+    const expected = 25_000 - (indexedIncome - 100_000) * 0.5;
+    expect(applyPassiveRules(s, -40_000, active, 3, 0.03, false).usableLoss).toBeCloseTo(
+      expected,
+      6
+    );
+    // The bug's signature: the allowance must NOT survive intact.
+    expect(applyPassiveRules(newPassiveState(), -40_000, active, 3, 0.03, false).usableLoss)
+      .toBeLessThan(25_000);
+  });
+
+  it("indexes income into the phaseout the same way the engine does", () => {
+    // The stated case from the review: $120k, 3% inflation, year 6.
+    const active = { ...profile, activelyParticipatesRental: true, otherOrdinaryIncome: 120_000 };
+    const income = 120_000 * 1.03 ** 6;
+    const allowance = applyPassiveRules(
+      newPassiveState(),
+      -40_000,
+      active,
+      6,
+      0.03,
+      false
+    ).usableLoss;
+    expect(allowance).toBeCloseTo(25_000 - (income - 100_000) * 0.5, 6);
+    expect(allowance).toBeGreaterThan(3_000);
+    expect(allowance).toBeLessThan(4_000);
   });
 });

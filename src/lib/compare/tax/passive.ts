@@ -10,8 +10,12 @@
 import type { TaxProfile } from "../types";
 import { indexAmount } from "./brackets";
 
+// §469(i) fixes these three numbers in statute and has never indexed them —
+// the same category as NIIT_THRESHOLD, which this codebase deliberately
+// refuses to index. The allowance is worth less every year in real terms, and
+// that erosion is a real feature of the law, not a modelling artefact.
 const ALLOWANCE_MAX = 25_000;
-const PHASEOUT_START = 100_000;
+const PHASEOUT_START = 100_000; // fully gone at $150,000
 const PHASEOUT_RATE = 0.5;
 
 export interface PassiveState {
@@ -29,10 +33,16 @@ export function rentalAllowance(
   inflationPct: number
 ): number {
   if (!profile.activelyParticipatesRental) return 0;
-  const start = indexAmount(PHASEOUT_START, inflationPct, year);
-  const income = profile.otherOrdinaryIncome;
-  if (income <= start) return ALLOWANCE_MAX;
-  const reduced = ALLOWANCE_MAX - (income - start) * PHASEOUT_RATE;
+  // The threshold is statutory and frozen. The income measured against it is
+  // NOT: engine.ts escalates otherOrdinaryIncome by year on the modelling
+  // assumption that wages track CPI, and this comparison has to be made in
+  // the same dollars or it is meaningless. Indexing the threshold instead of
+  // the income — the previous behaviour — inverted both halves: at $120k,
+  // 3% inflation, year 6 it let ~$24,700 of loss through where the correct
+  // figure is ~$3,357, roughly $6,200/yr of tax handed to real estate.
+  const income = indexAmount(profile.otherOrdinaryIncome, inflationPct, year);
+  if (income <= PHASEOUT_START) return ALLOWANCE_MAX;
+  const reduced = ALLOWANCE_MAX - (income - PHASEOUT_START) * PHASEOUT_RATE;
   return Math.max(0, reduced);
 }
 
