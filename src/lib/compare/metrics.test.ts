@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { HORIZON_MONTHS, zeroSeries } from "./types";
+import { HORIZON_MONTHS, INCOME_MONTHS, zeroSeries } from "./types";
 import { irrMonthly, annualize, computeMetrics } from "./metrics";
 
 describe("irrMonthly", () => {
@@ -56,7 +56,10 @@ describe("computeMetrics", () => {
   it("sums cash and averages it over the horizon", () => {
     const m = computeMetrics(base);
     expect(m.totalCashCollected).toBeCloseTo(20 * (HORIZON_MONTHS - 1), 6);
-    expect(m.averageMonthlyCashFlow).toBeCloseTo((20 * (HORIZON_MONTHS - 1)) / HORIZON_MONTHS, 6);
+    // 83 payments of $20 over the 83 months that can carry income averages
+    // exactly $20 — dividing by 84 would report $19.76 for a flat annuity.
+    expect(m.averageMonthlyCashFlow).toBeCloseTo(20, 6);
+    expect(INCOME_MONTHS).toBe(HORIZON_MONTHS - 1);
     expect(m.yearSevenMonthlyCashFlow).toBeCloseTo(20, 6);
   });
 

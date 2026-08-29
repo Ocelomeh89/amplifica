@@ -79,7 +79,7 @@ function emptyBuckets(): YearBuckets {
 }
 
 // Month 1-12 is year 0, 13-24 is year 1, and so on. Month 0 is the deployment
-// month and carries no income.
+// month and carries no income. See the month convention in types.ts.
 export function yearOf(month: number): number {
   return Math.floor((month - 1) / 12);
 }
@@ -87,6 +87,12 @@ export function yearOf(month: number): number {
 export function bucketByYear(items: TaxItem[]): YearBuckets[] {
   const years = Array.from({ length: HORIZON_YEARS }, emptyBuckets);
   for (const t of items) {
+    // Bounds are checked on the MONTH, not just the derived year, so a
+    // builder cannot emit taxable income into a month with no cash-flow slot.
+    // Month 0 is deployment; month 84 is the exit, which is carried by
+    // ExitEvent alone (see types.ts) — a month-84 TaxItem would double-tax a
+    // liquidation gain that ExitEvent already taxes.
+    if (t.month < 1 || t.month >= HORIZON_MONTHS) continue;
     const y = yearOf(t.month);
     if (y < 0 || y >= HORIZON_YEARS) continue;
     const b = years[y];

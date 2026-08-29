@@ -2,7 +2,7 @@
 // exception that must also be reported nominally, since a nominal IRR is what
 // a sponsor quotes and what you would compare against a quoted rate.
 
-import { HORIZON_MONTHS } from "./types";
+import { HORIZON_MONTHS, INCOME_MONTHS } from "./types";
 import { deflate } from "./inflation";
 
 export interface OptionMetrics {
@@ -91,7 +91,10 @@ export function computeMetrics(input: MetricsInput): OptionMetrics {
 
   return {
     totalCashCollected: totalCash,
-    averageMonthlyCashFlow: totalCash / HORIZON_MONTHS,
+    // Divided by INCOME_MONTHS, not HORIZON_MONTHS: month 0 is the deployment
+    // month and can never carry income, so dividing an 83-month total by 84
+    // understated every option's average by 1.2%.
+    averageMonthlyCashFlow: totalCash / INCOME_MONTHS,
     yearSevenMonthlyCashFlow: realCash[HORIZON_MONTHS - 1],
     irrNominal,
     irrReal: irrNominal === null ? null : (1 + irrNominal) / (1 + inflationPct) - 1,

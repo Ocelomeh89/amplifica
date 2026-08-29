@@ -89,6 +89,25 @@ describe("bucketByYear", () => {
     const b = bucketByYear([item({ month: HORIZON_MONTHS + 12, amount: 999 })]);
     expect(b.every((y) => y.portfolioOrdinary === 0)).toBe(true);
   });
+
+  it("rejects a month with no cash-flow slot, on either end", () => {
+    // Month 0 is deployment and month 84 is the exit; neither has an array
+    // index. A month-84 item is the dangerous one: it would tax a
+    // liquidation gain that ExitEvent already taxes.
+    for (const month of [-1, 0, HORIZON_MONTHS, HORIZON_MONTHS + 1]) {
+      const b = bucketByYear([item({ month, amount: 999, activity: "portfolio" })]);
+      expect(b.every((y) => y.portfolioOrdinary === 0)).toBe(true);
+    }
+  });
+
+  it("accepts the first and last real income months", () => {
+    const b = bucketByYear([
+      item({ month: 1, amount: 5, activity: "portfolio" }),
+      item({ month: HORIZON_MONTHS - 1, amount: 7, activity: "portfolio" }),
+    ]);
+    expect(b[0].portfolioOrdinary).toBe(5);
+    expect(b[HORIZON_YEARS - 1].portfolioOrdinary).toBe(7);
+  });
 });
 
 describe("computeTaxSeries — baseline delta", () => {
