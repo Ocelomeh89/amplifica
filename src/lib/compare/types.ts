@@ -4,8 +4,25 @@
 // That is what makes comparability structural rather than a discipline anyone
 // has to maintain.
 
+// MONTH CONVENTION — stated once, here, because eight more builders are about
+// to encode it.
+//
+//   * Arrays (`capitalIn`, `preTaxCash`) are HORIZON_MONTHS long: indices 0-83.
+//   * Month 0 is the DEPLOYMENT month. Capital goes out; no income comes in.
+//   * Income months are 1 through 83 inclusive — 83 of them, not 84.
+//   * The exit lands at month 84, which has no array slot. It is carried by
+//     `ExitEvent`, never by a `preTaxCash` entry and never by a `TaxItem`.
+//   * Tax years therefore run months 1-12, 13-24, ... 73-84 — but the last
+//     bucket is truncated by the array, so YEAR 6 HAS 11 INCOME MONTHS, not 12.
+//
+// Anything that divides by "the number of months in a year" or "the length of
+// the horizon" has to reckon with those last two lines.
 export const HORIZON_MONTHS = 84;
 export const HORIZON_YEARS = 7;
+// The last index that can carry income. Month 0 is deployment, so this is
+// HORIZON_MONTHS - 1 and the horizon holds INCOME_MONTHS income months.
+export const LAST_INCOME_MONTH = HORIZON_MONTHS - 1;
+export const INCOME_MONTHS = HORIZON_MONTHS - 1;
 
 export type TaxCharacter = "ordinary" | "qualified-div" | "ltcg";
 

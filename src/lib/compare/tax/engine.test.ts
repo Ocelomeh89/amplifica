@@ -39,6 +39,18 @@ function series(items: TaxItem[]): OptionSeries {
   };
 }
 
+// Tax is spread evenly across the months of the year it belongs to (see
+// engine.ts), so a year's bill is read as the sum over that year's months
+// rather than from a single index. Year 6 is short by one month — month 84 is
+// the exit and has no array slot.
+function yearTax(monthly: number[], year: number): number {
+  const first = year * 12 + 1;
+  const last = Math.min((year + 1) * 12, HORIZON_MONTHS - 1);
+  let sum = 0;
+  for (let m = first; m <= last; m++) sum += monthly[m];
+  return sum;
+}
+
 describe("bucketByYear", () => {
   it("produces one bucket per horizon year", () => {
     expect(bucketByYear([])).toHaveLength(HORIZON_YEARS);
@@ -90,13 +102,42 @@ describe("computeTaxSeries — baseline delta", () => {
     const taxable = profile.otherOrdinaryIncome - STANDARD_DEDUCTION.mfj;
     const expected =
       taxOn(taxable + 10_000, ORDINARY_BRACKETS.mfj) - taxOn(taxable, ORDINARY_BRACKETS.mfj);
-    expect(r.monthlyTaxCash[11]).toBeCloseTo(expected, 4);
+    expect(yearTax(r.monthlyTaxCash, 0)).toBeCloseTo(expected, 4);
   });
 
-  it("posts each year's tax in that year's final month", () => {
+  it("spreads each year's tax evenly across that year's months", () => {
+    // Replaces an earlier test that asserted the whole year's bill landed in
+    // one month. That lumping made metrics.ts read one month of income
+    // against twelve months of tax; the spreading is the fix, and this test
+    // pins it along with the property that matters most — the year's TOTAL
+    // is untouched by how it is distributed.
     const r = computeTaxSeries(series([item({ month: 6, amount: 10_000 })]), profile, 0);
-    expect(r.monthlyTaxCash[11]).toBeGreaterThan(0);
-    expect(r.monthlyTaxCash.filter((v) => v !== 0)).toHaveLength(1);
+    const yearZero = r.monthlyTaxCash.slice(1, 13);
+    expect(yearZero).toHaveLength(12);
+    expect(yearZero.every((v) => v > 0)).toBe(true);
+    for (const v of yearZero) expect(v).toBeCloseTo(yearZero[0], 10);
+
+    // Month 0 is deployment and nothing leaks into a later year.
+    expect(r.monthlyTaxCash[0]).toBe(0);
+    expect(r.monthlyTaxCash.slice(13).every((v) => v === 0)).toBe(true);
+
+    const taxable = profile.otherOrdinaryIncome - STANDARD_DEDUCTION.mfj;
+    const expected =
+      taxOn(taxable + 10_000, ORDINARY_BRACKETS.mfj) - taxOn(taxable, ORDINARY_BRACKETS.mfj);
+    expect(yearTax(r.monthlyTaxCash, 0)).toBeCloseTo(expected, 4);
+    expect(r.years[0].taxDelta).toBeCloseTo(expected, 4);
+  });
+
+  it("spreads year 6 over its eleven real income months", () => {
+    // Month 84 is the exit and has no array slot, so the last tax year is
+    // short. Dividing by 12 here would quietly leave a twelfth of the bill
+    // unbilled.
+    const r = computeTaxSeries(series([item({ month: 80, amount: 10_000 })]), profile, 0);
+    const yearSix = r.monthlyTaxCash.slice(73);
+    expect(yearSix).toHaveLength(11);
+    expect(yearSix.every((v) => v > 0)).toBe(true);
+    expect(yearTax(r.monthlyTaxCash, 6)).toBeCloseTo(r.years[6].taxDelta, 6);
+    expect(r.monthlyTaxCash.slice(1, 73).every((v) => v === 0)).toBe(true);
   });
 
   it("returns a benefit — negative tax — for a non-passive deduction", () => {
@@ -105,7 +146,7 @@ describe("computeTaxSeries — baseline delta", () => {
       profile,
       0
     );
-    expect(r.monthlyTaxCash[11]).toBeLessThan(0);
+    expect(yearTax(r.monthlyTaxCash, 0)).toBeLessThan(0);
   });
 
   it("caps the benefit at the income actually available to shelter", () => {
@@ -118,7 +159,7 @@ describe("computeTaxSeries — baseline delta", () => {
       0
     );
     const wholeBill = taxOn(50_000 - STANDARD_DEDUCTION.mfj, ORDINARY_BRACKETS.mfj);
-    expect(-r.monthlyTaxCash[11]).toBeLessThanOrEqual(wholeBill + 1e-6);
+    expect(-yearTax(r.monthlyTaxCash, 0)).toBeLessThanOrEqual(wholeBill + 1e-6);
   });
 
   it("carries an unused non-passive loss forward instead of wasting it", () => {
@@ -132,7 +173,7 @@ describe("computeTaxSeries — baseline delta", () => {
       0
     );
     // Year 2's income is absorbed by the carryforward, so it costs nothing.
-    expect(r.monthlyTaxCash[23]).toBeLessThanOrEqual(0);
+    expect(yearTax(r.monthlyTaxCash, 1)).toBeLessThanOrEqual(0);
   });
 
   it("suspends a passive loss during the horizon and releases it at disposition", () => {
@@ -141,8 +182,8 @@ describe("computeTaxSeries — baseline delta", () => {
       profile,
       0
     );
-    expect(r.monthlyTaxCash[11]).toBe(0); // suspended in year 1
-    expect(r.monthlyTaxCash[HORIZON_MONTHS - 1]).toBeLessThan(0); // released at exit
+    expect(yearTax(r.monthlyTaxCash, 0)).toBe(0); // suspended in year 1
+    expect(yearTax(r.monthlyTaxCash, HORIZON_YEARS - 1)).toBeLessThan(0); // released at exit
   });
 
   it("taxes passive income normally", () => {
@@ -151,7 +192,7 @@ describe("computeTaxSeries — baseline delta", () => {
       profile,
       0
     );
-    expect(r.monthlyTaxCash[11]).toBeGreaterThan(0);
+    expect(yearTax(r.monthlyTaxCash, 0)).toBeGreaterThan(0);
   });
 
   it("adds flat state tax on top of federal", () => {
@@ -161,7 +202,10 @@ describe("computeTaxSeries — baseline delta", () => {
       0
     );
     const without = computeTaxSeries(series([item({ month: 6, amount: 10_000 })]), profile, 0);
-    expect(withState.monthlyTaxCash[11] - without.monthlyTaxCash[11]).toBeCloseTo(500, 4);
+    expect(yearTax(withState.monthlyTaxCash, 0) - yearTax(without.monthlyTaxCash, 0)).toBeCloseTo(
+      500,
+      4
+    );
   });
 
   it("indexes brackets forward, so identical real income costs identical real tax", () => {
@@ -175,7 +219,10 @@ describe("computeTaxSeries — baseline delta", () => {
       profile,
       0.03
     );
-    expect(late.monthlyTaxCash[71] / 1.03 ** 5).toBeCloseTo(early.monthlyTaxCash[11], 2);
+    expect(yearTax(late.monthlyTaxCash, 5) / 1.03 ** 5).toBeCloseTo(
+      yearTax(early.monthlyTaxCash, 0),
+      2
+    );
   });
 
   it("produces a finite number in every month", () => {
@@ -197,7 +244,7 @@ describe("computeTaxSeries — baseline delta", () => {
       profile,
       0
     );
-    expect(withNiit.monthlyTaxCash[11] - without.monthlyTaxCash[11]).toBeCloseTo(
+    expect(yearTax(withNiit.monthlyTaxCash, 0) - yearTax(without.monthlyTaxCash, 0)).toBeCloseTo(
       10_000 * 0.038,
       4
     );
@@ -216,6 +263,9 @@ describe("computeTaxSeries — baseline delta", () => {
       profile,
       0
     );
-    expect(withNiit.monthlyTaxCash[11] - without.monthlyTaxCash[11]).toBeCloseTo(0, 6);
+    expect(yearTax(withNiit.monthlyTaxCash, 0) - yearTax(without.monthlyTaxCash, 0)).toBeCloseTo(
+      0,
+      6
+    );
   });
 });

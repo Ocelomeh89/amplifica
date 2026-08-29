@@ -11,6 +11,7 @@
 import {
   HORIZON_MONTHS,
   HORIZON_YEARS,
+  LAST_INCOME_MONTH,
   type OptionSeries,
   type TaxItem,
   type TaxProfile,
@@ -206,7 +207,18 @@ export function computeTaxSeries(
     const niit = niitOn(investmentIncome, totalIncome, profile);
 
     const taxDelta = withInvestment + niit - baseline;
-    monthlyTaxCash[(y + 1) * 12 - 1] = taxDelta;
+    // Spread the year's bill evenly across the months that year actually
+    // occupies rather than lumping it into a single month. Lumping made a
+    // per-month metric read one month of income against twelve months of tax
+    // — the golden 4% savings account reported NEGATIVE monthly cash flow in
+    // year 7 — and it also de-lumps payback, peak capital at risk and IRR.
+    // Even spreading is also closer to how estimated payments actually work.
+    // Year 6 gets 11 months, not 12: see the month convention in types.ts.
+    const firstMonth = y * 12 + 1;
+    const lastMonth = Math.min((y + 1) * 12, LAST_INCOME_MONTH);
+    const monthsInYear = lastMonth - firstMonth + 1;
+    const perMonth = taxDelta / monthsInYear;
+    for (let m = firstMonth; m <= lastMonth; m++) monthlyTaxCash[m] = perMonth;
     years.push({ year: y, taxDelta, nonPassiveCarryforward, suspendedPassive });
   }
 
