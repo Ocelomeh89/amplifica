@@ -135,13 +135,14 @@ describe("computeTaxSeries — baseline delta", () => {
     expect(r.monthlyTaxCash[23]).toBeLessThanOrEqual(0);
   });
 
-  it("suspends passive losses entirely for now", () => {
+  it("suspends a passive loss during the horizon and releases it at disposition", () => {
     const r = computeTaxSeries(
       series([item({ month: 1, amount: -50_000, activity: "passive" })]),
       profile,
       0
     );
-    expect(r.monthlyTaxCash[11]).toBe(0);
+    expect(r.monthlyTaxCash[11]).toBe(0); // suspended in year 1
+    expect(r.monthlyTaxCash[HORIZON_MONTHS - 1]).toBeLessThan(0); // released at exit
   });
 
   it("taxes passive income normally", () => {

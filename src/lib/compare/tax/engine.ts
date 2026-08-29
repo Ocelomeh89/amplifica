@@ -22,6 +22,7 @@ import {
   indexBrackets,
   taxOn,
 } from "./brackets";
+import { newPassiveState, applyPassiveRules } from "./passive";
 
 export interface YearBuckets {
   nonPassiveOrdinary: number;
@@ -107,6 +108,7 @@ export function computeTaxSeries(
   const years: TaxYearDetail[] = [];
 
   let nonPassiveCarryforward = 0; // a positive number: losses waiting to be used
+  const passiveState = newPassiveState();
   let suspendedPassive = 0;
 
   for (let y = 0; y < HORIZON_YEARS; y++) {
@@ -116,10 +118,17 @@ export function computeTaxSeries(
     // Baseline: the bill you would owe with none of this investment's items.
     const baseline = householdTax(otherIncome, 0, profile, y, inflationPct);
 
-    // Passive losses are suspended; passive income is taxed. Task 5 lets
-    // suspended losses offset passive income and release at disposition.
-    const passiveUsable = Math.max(0, b.passiveOrdinary);
-    if (b.passiveOrdinary < 0) suspendedPassive += -b.passiveOrdinary;
+    const isDisposition = y === HORIZON_YEARS - 1;
+    const passive = applyPassiveRules(
+      passiveState,
+      b.passiveOrdinary,
+      profile,
+      y,
+      inflationPct,
+      isDisposition
+    );
+    const passiveUsable = passive.taxablePassiveIncome - passive.usableLoss;
+    suspendedPassive = passiveState.suspended;
 
     // Net this year's non-passive amount against losses carried in, then split
     // the result into the part other income can actually absorb and the part
