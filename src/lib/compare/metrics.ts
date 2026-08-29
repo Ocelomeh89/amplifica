@@ -36,10 +36,14 @@ export function irrMonthly(flows: number[]): { rate: number | null; reason: stri
 
   const npv = (r: number) => flows.reduce((a, f, m) => a + f / Math.pow(1 + r, m), 0);
 
+  // At r = -0.9999, (1 + r)^84 = 0.0001^84 underflows to 0 in IEEE 754,
+  // making NPV(lo) = Infinity for long horizons and tripping the finite-guard
+  // below. Set lo = -0.99 with safety margin: realistic monthly IRRs never
+  // approach -99% and -99% is still far enough into the bracket to find roots.
   let lo = -0.99;
   let hi = 1.0;
   const npvLo = npv(lo);
-  if (!Number.isFinite(npvLo) || npv(lo) * npv(hi) > 0) {
+  if (!Number.isFinite(npvLo) || npvLo * npv(hi) > 0) {
     return { rate: null, reason: "no rate solves within bounds" };
   }
 
