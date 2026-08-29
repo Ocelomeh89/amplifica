@@ -8,6 +8,7 @@ import {
   indexAmount,
   taxOn,
 } from "./brackets";
+import { inflationFactor } from "../inflation";
 
 describe("taxOn", () => {
   const single = ORDINARY_BRACKETS.single;
@@ -89,6 +90,26 @@ describe("indexing", () => {
   it("is the identity in year 0", () => {
     expect(indexBrackets(ORDINARY_BRACKETS.mfj, 0.03, 0)).toEqual(ORDINARY_BRACKETS.mfj);
     expect(indexAmount(30_000, 0.03, 0)).toBe(30_000);
+  });
+
+  it("never hands back the shared constant array, even on the identity path", () => {
+    const out = indexBrackets(ORDINARY_BRACKETS.mfj, 0.03, 0);
+    expect(out).not.toBe(ORDINARY_BRACKETS.mfj);
+    expect(out[0]).not.toBe(ORDINARY_BRACKETS.mfj[0]);
+    out[0].upTo = 1;
+    expect(ORDINARY_BRACKETS.mfj[0].upTo).toBe(23_850);
+  });
+
+  it("degrades to a no-op below -100% inflation, matching inflationFactor", () => {
+    // inflation.ts already refuses to compound out of domain. Without the
+    // same guard here the tax engine returned NaN where the inflation layer
+    // stayed finite — two layers disagreeing about one input.
+    expect(indexAmount(100_000, -1, 3)).toBe(100_000);
+    expect(indexAmount(100_000, -1.5, 3)).toBe(100_000);
+    expect(inflationFactor(-1.5, 36)).toBe(1);
+    const out = indexBrackets(ORDINARY_BRACKETS.single, -1.5, 3);
+    expect(out.every((b) => Number.isFinite(b.upTo) || b.upTo === Infinity)).toBe(true);
+    expect(out).toEqual(ORDINARY_BRACKETS.single);
   });
 
   it("without indexing the model would invent bracket creep", () => {

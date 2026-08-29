@@ -58,6 +58,60 @@ describe("exitTax", () => {
     expect(t).toBeCloseTo(20_000 * 0.25, 4);
   });
 
+  it("does not abandon later recapture entries after a zero-amount one", () => {
+    // The loop used to `break` on a zero amount, so everything after it
+    // escaped recapture entirely and was taxed at the gentler LTCG rate.
+    const withZeroFirst = exitTax(
+      {
+        grossProceeds: 500_000,
+        costBasis: 300_000,
+        recapture: [
+          { amount: 0, rate: 0.25 },
+          { amount: 50_000, rate: 0.25 },
+        ],
+      },
+      profile,
+      6,
+      0
+    );
+    // 200k gain: 50k recaptured at 25%, remaining 150k at 15%.
+    expect(withZeroFirst).toBeCloseTo(50_000 * 0.25 + 150_000 * 0.15, 4);
+
+    // Order must not matter.
+    const withZeroLast = exitTax(
+      {
+        grossProceeds: 500_000,
+        costBasis: 300_000,
+        recapture: [
+          { amount: 50_000, rate: 0.25 },
+          { amount: 0, rate: 0.25 },
+        ],
+      },
+      profile,
+      6,
+      0
+    );
+    expect(withZeroLast).toBeCloseTo(withZeroFirst, 8);
+  });
+
+  it("stops recapturing once the gain is exhausted, not once an entry is zero", () => {
+    const t = exitTax(
+      {
+        grossProceeds: 350_000,
+        costBasis: 300_000,
+        recapture: [
+          { amount: 50_000, rate: 0.25 },
+          { amount: 80_000, rate: 0.25 },
+        ],
+      },
+      profile,
+      6,
+      0
+    );
+    // Only the 50k gain exists to recapture; the second entry finds nothing.
+    expect(t).toBeCloseTo(50_000 * 0.25, 4);
+  });
+
   it("adds state tax on the whole gain", () => {
     const t = exitTax(
       { grossProceeds: 500_000, costBasis: 400_000, recapture: [] },
