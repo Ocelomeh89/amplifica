@@ -2249,7 +2249,10 @@ Expected: FAIL, with Vitest printing the actual value for each of the six assert
 Copy each printed actual into its `toBeCloseTo` first argument, replacing the `0` placeholders. Then sanity-check the result before pinning it — a golden test that pins a wrong number is worse than no golden test:
 
 - `irrNominal` should land a little under 4% (the stated yield, less federal, state and NIIT on the interest).
-- `equityMultiple` should exceed 1.
+- `equityMultiple` is in **today's dollars**, so it may legitimately fall below
+  1: this scenario's 4% yield, taxed at roughly 33%, nets ~2.7% against 3%
+  inflation and therefore loses purchasing power. Confirm the figure is
+  consistent with that arithmetic rather than assuming it must exceed 1.
 - `peakCapitalAtRisk` should be roughly the lump sum plus contributions, less cash returned.
 
 If any of those reads wrong, stop and find the bug rather than pinning it.
