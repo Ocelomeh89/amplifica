@@ -34,7 +34,10 @@ Amplicon payouts (see "Required engine change"). It is additive.
 
 - Horizon is fixed at **84 months** (7 years). `HORIZON_MONTHS = 84`.
 - Month indices align with the existing simulator convention: capital is
-  deployed at month 0 and first income lands at month 1.
+  deployed at month 0 and first income lands at month 1. Arrays are 84 long
+  (indices 0-83), so **income months are 1 through 83** and the exit lands at
+  month 84; the seventh tax year therefore carries 11 income months. The
+  convention is stated in `types.ts` and enforced in `bucketByYear`.
 - Every displayed figure defaults to **today's dollars**, with a nominal/real
   display toggle.
 
@@ -78,6 +81,11 @@ export interface TaxItem {
   // Percentage depletion and similar permanent exclusions are not deductions
   // against basis; flagged so the exit basis calculation ignores them.
   basisAffecting: boolean;
+  // Whether this item tracks inflation. Rent does; depreciation, fixed by
+  // historical cost, does not. Only consulted for a "real" entryBasis — added
+  // during implementation, because escalating a "real" builder's cash without
+  // also escalating the tax items derived from it taxes the wrong figure.
+  escalates: boolean;
 }
 
 export interface OptionSeries {
