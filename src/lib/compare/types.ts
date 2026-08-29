@@ -46,6 +46,13 @@ export interface TaxItem {
   escalates: boolean;
 }
 
+// THE EXIT CONTRACT. The liquidation gain is expressed HERE and ONLY here —
+// never also as a TaxItem. tax/exit.ts already taxes grossProceeds minus
+// costBasis, including recapture and NIIT, so a builder that emitted both an
+// ExitEvent and a month-84 capital-gain TaxItem for the same gain would have
+// it taxed twice, and nothing about the resulting number would look wrong.
+// bucketByYear rejects month 84 outright, which kills that variant, but the
+// rule is stated here because it is a contract, not a coincidence of bounds.
 export interface ExitEvent {
   grossProceeds: number;
   costBasis: number;
