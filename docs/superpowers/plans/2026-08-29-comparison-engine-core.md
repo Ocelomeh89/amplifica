@@ -1708,7 +1708,31 @@ export function exitTax(
 }
 ```
 
-- [ ] **Step 6: Wire exit tax into `computeTaxSeries`**
+- [ ] **Step 6: Wire exit tax AND annual NIIT into `computeTaxSeries`**
+
+Annual NIIT was missing from this plan's first draft — `niitOn` was defined and
+exported but never called from the yearly loop, so NIIT only bit at the year-7
+exit. The spec requires it annually: the non-passive exemption is a per-year
+structural edge for the oil & gas and business options, and applying it only at
+exit makes that edge invisible in every annual figure. Inside the year loop,
+after `withInvestment` and before `taxDelta`:
+
+```ts
+    const investmentIncome = Math.max(
+      0,
+      passiveUsable + b.portfolioOrdinary + b.qualifiedDividends + b.ltcg
+    );
+    const totalIncome = withOrdinary + b.qualifiedDividends + b.ltcg;
+    const niit = niitOn(investmentIncome, totalIncome, profile);
+```
+
+then `const taxDelta = withInvestment + niit - baseline;`. `investmentIncome`
+excludes non-passive income by construction and floors at zero so a released
+passive loss cannot produce negative NIIT. The baseline leg needs no NIIT term:
+`otherOrdinaryIncome` is ordinary non-investment income, so the baseline's
+investment income is zero.
+
+Then wire the exit tax:
 
 In `src/lib/compare/tax/engine.ts`, add the import:
 
