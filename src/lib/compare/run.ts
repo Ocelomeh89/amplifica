@@ -5,7 +5,7 @@
 import { HORIZON_MONTHS, type GlobalInputs, type OptionSeries } from "./types";
 import { escalateToNominal } from "./inflation";
 import { computeTaxSeries } from "./tax/engine";
-import { computeMetrics, type OptionMetrics } from "./metrics";
+import { afterTaxContinuingIncome, computeMetrics, type OptionMetrics } from "./metrics";
 import { buildCash, type CashSpec } from "./build/cash";
 
 // Plan B extends this union with the remaining eight option kinds.
@@ -58,7 +58,14 @@ export function runComparison(
         afterTaxCash,
         capitalIn: nominal.capitalIn,
         exitProceedsAfterTax,
-        continuingMonthlyIncome: nominal.continuingMonthlyIncome,
+        // Builders emit this pre-tax. Metrics are an all-after-tax block, so
+        // it is converted here at year 6's own blended rate rather than
+        // passed through raw — see afterTaxContinuingIncome in metrics.ts.
+        continuingMonthlyIncome: afterTaxContinuingIncome(
+          nominal.preTaxCash,
+          afterTaxCash,
+          nominal.continuingMonthlyIncome
+        ),
         inflationPct: globals.inflationPct,
       }),
     };

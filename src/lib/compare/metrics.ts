@@ -2,7 +2,11 @@
 // exception that must also be reported nominally, since a nominal IRR is what
 // a sponsor quotes and what you would compare against a quoted rate.
 
-import { HORIZON_MONTHS, INCOME_MONTHS } from "./types";
+import { HORIZON_MONTHS, HORIZON_YEARS, INCOME_MONTHS, LAST_INCOME_MONTH } from "./types";
+
+// Year 6 runs months 73 through LAST_INCOME_MONTH (83) — eleven months, not
+// twelve. See the month convention in types.ts.
+const FINAL_YEAR_FIRST_MONTH = (HORIZON_YEARS - 1) * 12 + 1;
 import { deflate } from "./inflation";
 
 export interface OptionMetrics {
@@ -23,7 +27,9 @@ export interface MetricsInput {
   afterTaxCash: number[]; // nominal, length HORIZON_MONTHS
   capitalIn: number[]; // nominal, length HORIZON_MONTHS
   exitProceedsAfterTax: number; // nominal, at HORIZON_MONTHS
-  continuingMonthlyIncome: number; // nominal, at HORIZON_MONTHS
+  // Nominal, at HORIZON_MONTHS, and AFTER TAX like every sibling figure —
+  // run.ts derives it with afterTaxContinuingIncome below.
+  continuingMonthlyIncome: number;
   inflationPct: number;
 }
 
@@ -57,6 +63,38 @@ export function irrMonthly(flows: number[]): { rate: number | null; reason: stri
 
 export function annualize(monthlyRate: number): number {
   return Math.pow(1 + monthlyRate, 12) - 1;
+}
+
+// continuingMonthlyIncome arrives from the builder PRE-TAX, and every other
+// figure in this module is after-tax. The spec requires the year-7 pair —
+// liquidation value and continuing income — to be read together, which mixing
+// bases defeats: a pre-tax run rate flatters whichever option is taxed
+// hardest, exactly the comparison the pair exists to make.
+//
+// The estimate is year 6's own realised BLENDED rate: what fraction of that
+// year's pre-tax cash actually survived tax. It is not a marginal-rate
+// calculation and does not try to be one — the month-85 run rate lands in a
+// tax year the model does not simulate, so any figure here is an estimate,
+// and the year immediately before it is the least arbitrary one available.
+// Applied identically to every option, so it cannot tilt the ranking.
+//
+// A zero or non-finite denominator (an option that pays nothing in year 6)
+// falls back to passing the pre-tax figure through untaxed. That is
+// conservative in the option's favour and visibly so, rather than NaN.
+export function afterTaxContinuingIncome(
+  preTaxCash: number[],
+  afterTaxCash: number[],
+  continuingMonthlyIncome: number
+): number {
+  let pre = 0;
+  let post = 0;
+  for (let m = FINAL_YEAR_FIRST_MONTH; m <= LAST_INCOME_MONTH; m++) {
+    pre += preTaxCash[m];
+    post += afterTaxCash[m];
+  }
+  const ratio = post / pre;
+  if (pre === 0 || !Number.isFinite(ratio)) return continuingMonthlyIncome;
+  return continuingMonthlyIncome * ratio;
 }
 
 export function computeMetrics(input: MetricsInput): OptionMetrics {

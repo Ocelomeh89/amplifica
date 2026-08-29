@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { HORIZON_MONTHS, INCOME_MONTHS, zeroSeries } from "./types";
-import { irrMonthly, annualize, computeMetrics } from "./metrics";
+import { irrMonthly, annualize, computeMetrics, afterTaxContinuingIncome } from "./metrics";
 
 describe("irrMonthly", () => {
   it("solves a one-month 10% return exactly", () => {
@@ -36,6 +36,31 @@ describe("irrMonthly", () => {
 describe("annualize", () => {
   it("compounds a monthly rate to an annual one", () => {
     expect(annualize(0.01)).toBeCloseTo(Math.pow(1.01, 12) - 1, 10);
+  });
+});
+
+describe("afterTaxContinuingIncome", () => {
+  const pre = zeroSeries().map((_, m) => (m === 0 ? 0 : 100));
+  const post = zeroSeries().map((_, m) => (m === 0 ? 0 : 70));
+
+  it("applies year 6's own blended after-tax ratio to the run rate", () => {
+    expect(afterTaxContinuingIncome(pre, post, 100)).toBeCloseTo(70, 8);
+  });
+
+  it("reads only year 6, not the whole horizon", () => {
+    // Year 0-5 taxed to nothing, year 6 taxed at 30%. The run rate is the
+    // month-85 figure, so only the most recent year is informative.
+    const lopsided = post.map((v, m) => (m >= 73 ? v : 0));
+    expect(afterTaxContinuingIncome(pre, lopsided, 100)).toBeCloseTo(70, 8);
+  });
+
+  it("passes the pre-tax figure through when year 6 has no cash flow", () => {
+    const none = zeroSeries();
+    expect(afterTaxContinuingIncome(none, none, 500)).toBe(500);
+  });
+
+  it("is never NaN", () => {
+    expect(Number.isFinite(afterTaxContinuingIncome(zeroSeries(), zeroSeries(), 0))).toBe(true);
   });
 });
 
