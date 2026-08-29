@@ -145,6 +145,17 @@ export function computeTaxSeries(
   profile: TaxProfile,
   inflationPct: number
 ): TaxResult {
+  // Swapping the escalateToNominal and computeTaxSeries calls in run.ts type-
+  // checks perfectly and silently taxes pre-escalation dollars — every figure
+  // stays plausible and every one is wrong, by more the further out you look.
+  // Tax is computed on nominal figures because that is what the IRS taxes, so
+  // an unescalated series arriving here is a pipeline-ordering bug, not an
+  // input to be coped with. This guard converts a silent wrong answer into a
+  // loud failure at the only point that can still tell the difference.
+  if (series.entryBasis !== "nominal") {
+    throw new Error("computeTaxSeries requires escalated (nominal) input");
+  }
+
   const buckets = bucketByYear(series.taxItems);
   const monthlyTaxCash = new Array(HORIZON_MONTHS).fill(0);
   const years: TaxYearDetail[] = [];

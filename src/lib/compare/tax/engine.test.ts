@@ -110,6 +110,20 @@ describe("bucketByYear", () => {
   });
 });
 
+describe("computeTaxSeries — pipeline order guard", () => {
+  it("refuses a series that has not been escalated to nominal", () => {
+    // The failure this prevents is invisible: swap the escalate and tax calls
+    // in run.ts and everything still type-checks and still returns numbers,
+    // they are just computed on the wrong dollars.
+    const real: OptionSeries = { ...series([]), entryBasis: "real" };
+    expect(() => computeTaxSeries(real, profile, 0.03)).toThrow(/nominal/);
+  });
+
+  it("accepts an escalated series", () => {
+    expect(() => computeTaxSeries(series([]), profile, 0.03)).not.toThrow();
+  });
+});
+
 describe("computeTaxSeries — baseline delta", () => {
   it("charges nothing when the option has no tax items", () => {
     const r = computeTaxSeries(series([]), profile, 0);
