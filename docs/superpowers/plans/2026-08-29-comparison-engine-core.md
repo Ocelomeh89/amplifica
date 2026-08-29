@@ -519,7 +519,7 @@ export function computeMetrics(input: MetricsInput): OptionMetrics {
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm test src/lib/compare/metrics.test.ts && pnpm typecheck`
-Expected: PASS, 13 tests. Typecheck clean.
+Expected: PASS, 14 tests. Typecheck clean.
 
 - [ ] **Step 5: Commit**
 
@@ -987,10 +987,14 @@ describe("computeTaxSeries — baseline delta", () => {
   });
 
   it("indexes brackets forward, so identical real income costs identical real tax", () => {
+    // The engine indexes profile.otherOrdinaryIncome by year itself, so the
+    // profile is passed unchanged here — pre-inflating it as well would
+    // compare against a filer who has climbed two brackets, and the test
+    // would fail for a reason that has nothing to do with indexing.
     const early = computeTaxSeries(series([item({ month: 6, amount: 10_000 })]), profile, 0.03);
     const late = computeTaxSeries(
       series([item({ month: 66, amount: 10_000 * 1.03 ** 5 })]),
-      { ...profile, otherOrdinaryIncome: profile.otherOrdinaryIncome * 1.03 ** 5 },
+      profile,
       0.03
     );
     expect(late.monthlyTaxCash[71] / 1.03 ** 5).toBeCloseTo(early.monthlyTaxCash[11], 2);
@@ -1101,9 +1105,11 @@ function householdTax(
   const brackets = indexBrackets(ORDINARY_BRACKETS[profile.filingStatus], inflationPct, year);
   const deduction = indexAmount(STANDARD_DEDUCTION[profile.filingStatus], inflationPct, year);
   const ordinaryTaxable = Math.max(0, ordinaryIncome - deduction);
-  // Preferential income is layered on top of ordinary income; its own bracket
-  // treatment arrives in Task 6. Until then it is taxed as ordinary, which is
-  // conservative and never silently favours an option.
+  // Annual preferential income is layered on top of ordinary income and taxed
+  // at ordinary rates for the whole of Plan A. Only the year-7 exit gets true
+  // capital-gains brackets (Task 6). This is conservative — it never silently
+  // favours an option — and it costs nothing until Plan B adds the dividend
+  // portfolio, which is where the distinction starts to matter.
   const federal = taxOn(ordinaryTaxable + Math.max(0, preferentialIncome), brackets);
   const state = Math.max(0, ordinaryIncome + preferentialIncome) * profile.stateRatePct;
   return federal + state;
@@ -1174,7 +1180,7 @@ export function computeTaxSeries(
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm test src/lib/compare/tax/engine.test.ts && pnpm typecheck`
-Expected: PASS, 17 tests. Typecheck clean.
+Expected: PASS, 16 tests. Typecheck clean.
 
 - [ ] **Step 5: Commit**
 
