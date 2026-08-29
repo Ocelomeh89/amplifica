@@ -2,8 +2,9 @@
 // inflation rate. Thresholds move with inflation in reality; without indexing
 // the model would invent bracket creep and overstate future tax.
 //
-// VERIFY BEFORE RELYING ON THIS FOR A REAL DECISION: these are transcribed
-// figures, not an authoritative source. Check against IRS Rev. Proc. 2024-40.
+// Brackets (ORDINARY_BRACKETS, LTCG_BRACKETS) and NIIT thresholds: IRS Rev.
+// Proc. 2024-40. Standard deduction: P.L. 119-21 (One Big Beautiful Bill Act,
+// signed 2025-07-04), which superseded Rev. Proc. 2024-40 for tax year 2025.
 
 import type { FilingStatus } from "../types";
 
@@ -77,10 +78,10 @@ export const LTCG_BRACKETS: Record<FilingStatus, Bracket[]> = {
 };
 
 export const STANDARD_DEDUCTION: Record<FilingStatus, number> = {
-  single: 15_000,
-  mfj: 30_000,
-  mfs: 15_000,
-  hoh: 22_500,
+  single: 15_750,
+  mfj: 31_500,
+  mfs: 15_750,
+  hoh: 23_625,
 };
 
 // Statutory and deliberately NOT inflation-indexed, which is why NIIT reaches
