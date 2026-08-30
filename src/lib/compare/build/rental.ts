@@ -61,7 +61,10 @@ export function buildRental(spec: RentalSpec, scenario: Scenario): OptionSeries 
   const taxItems: TaxItem[] = [];
 
   capitalIn[0] = down + closing;
-  bookValue[0] = spec.purchasePrice - loan;
+  // Netted by selling costs like every other entry: this is what a sale would
+  // hand you, not what you paid. Closing costs are spent, not equity, so they
+  // do not appear here.
+  bookValue[0] = spec.purchasePrice * (1 - spec.sellingCostPct) - loan;
 
   const appreciation = spec.appreciationPct[scenario];
   const monthlyRate = spec.mortgageRatePct / 12;
@@ -74,13 +77,17 @@ export function buildRental(spec: RentalSpec, scenario: Scenario): OptionSeries 
     const effectiveRent = grossRent * (1 - spec.vacancyPct);
     const noi = effectiveRent * (1 - spec.operatingExpensePct);
 
+    // The loan is retired once its term ends; no payment is owed after that,
+    // even though the horizon continues.
+    const paymentDue = m <= spec.mortgageTermMonths ? payment : 0;
+
     // Split this month's payment before applying it, so the interest deduction
     // uses the opening balance rather than the closing one.
     const interest = balance * monthlyRate;
-    const principal = Math.min(Math.max(payment - interest, 0), balance);
+    const principal = Math.min(Math.max(paymentDue - interest, 0), balance);
     balance -= principal;
 
-    preTaxCash[m] = noi - payment;
+    preTaxCash[m] = noi - paymentDue;
 
     // Operating income net of the interest deduction. Principal is not
     // deductible, which is why this is not simply the cash flow.
@@ -107,8 +114,11 @@ export function buildRental(spec: RentalSpec, scenario: Scenario): OptionSeries 
       });
     }
 
+    // Net of selling costs at every month, not just the last one: this is what
+    // a sale would hand you, so it must be stated on the same basis throughout
+    // rather than jumping at the horizon's edge.
     const value = spec.purchasePrice * Math.pow(1 + appreciation, m / 12);
-    bookValue[m] = value - balance;
+    bookValue[m] = value * (1 - spec.sellingCostPct) - balance;
   }
 
   const salePrice = spec.purchasePrice * Math.pow(1 + appreciation, HORIZON_MONTHS / 12);

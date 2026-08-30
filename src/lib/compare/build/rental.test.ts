@@ -68,6 +68,13 @@ describe("buildRental — operating cash flow", () => {
   it("grows rent but not the mortgage payment, so cash flow improves", () => {
     expect(s.preTaxCash[LAST_INCOME_MONTH]).toBeGreaterThan(s.preTaxCash[1]);
   });
+
+  it("compounds rent growth annually from month 1, not monthly", () => {
+    // A monthly-compounding bug also grows faster than month 1, so pin an
+    // exact later month instead of only checking the direction.
+    const expected = 3_500 * 1.03 * 0.94 * 0.65 - PAYMENT;
+    expect(s.preTaxCash[13]).toBeCloseTo(expected, 4);
+  });
 });
 
 describe("buildRental — tax items", () => {
@@ -105,6 +112,39 @@ describe("buildRental — tax items", () => {
   });
 });
 
+describe("buildRental — amortization actually runs", () => {
+  // Deleting `balance -= principal` still passes month-1 interest (opening
+  // balance either way), debtPayoff (an independent remainingPrincipalAfter
+  // call) and the bookValue tests (month 83 is overwritten from the exit).
+  // These pin an interior month and the shape of the whole run, so a balance
+  // that stops amortizing after month 1 fails here.
+  const s = buildRental(spec, "base");
+  const at = (m: number) => s.taxItems.filter((t) => t.month === m);
+  const noiAt = (m: number) => {
+    const years = (m - 1) / 12;
+    const grossRent = 3_500 * Math.pow(1.03, years);
+    const effectiveRent = grossRent * 0.94;
+    return effectiveRent * 0.65;
+  };
+
+  it("pins month-83 interest to the balance actually remaining after 82 payments", () => {
+    const balance83 = remainingPrincipalAfter(LOAN, 0.065, 360, 82);
+    const interest83 = balance83 * (0.065 / 12);
+    const operating83 = at(83).find((t) => !t.basisAffecting);
+    expect(operating83?.amount).toBeCloseTo(noiAt(83) - interest83, 3);
+  });
+
+  it("declines the interest embedded in the operating items monotonically as the loan amortizes", () => {
+    const interestOf = (m: number) => {
+      const operating = at(m).find((t) => !t.basisAffecting);
+      return noiAt(m) - (operating?.amount ?? 0);
+    };
+    for (let m = 2; m <= LAST_INCOME_MONTH; m++) {
+      expect(interestOf(m)).toBeLessThan(interestOf(m - 1));
+    }
+  });
+});
+
 describe("buildRental — the sale", () => {
   const s = buildRental(spec, "base");
   const salePrice = 500_000 * Math.pow(1.035, 7);
@@ -137,9 +177,24 @@ describe("buildRental — the sale", () => {
     );
   });
 
-  it("starts bookValue at the equity actually purchased", () => {
-    // Price less loan. Closing costs are spent, not equity.
-    expect(s.bookValue[0]).toBeCloseTo(125_000, 4);
+  it("starts bookValue at what a sale would hand you, net of selling costs", () => {
+    // Price net of selling costs, less loan. Closing costs are spent, not
+    // equity, so they don't appear here — but a sale isn't free either, so
+    // this is not simply "price less loan."
+    expect(s.bookValue[0]).toBeCloseTo(500_000 * 0.94 - 375_000, 4);
+  });
+
+  it("has no cliff between the final two months — selling costs are netted throughout", () => {
+    const balance82 = remainingPrincipalAfter(LOAN, 0.065, 360, 82);
+    const value82 = 500_000 * Math.pow(1.035, 82 / 12) * 0.94;
+    // The exit anchors appreciation at exactly 7 years (month 84 has no array
+    // slot), so this step still carries that last sliver of appreciation plus
+    // one month of principal paydown — nothing like the ~34k selling-cost
+    // cliff this replaces.
+    const expectedDiff = realized - payoff - (value82 - balance82);
+    const actualDiff = s.bookValue[LAST_INCOME_MONTH] - s.bookValue[LAST_INCOME_MONTH - 1];
+    expect(actualDiff).toBeCloseTo(expectedDiff, 2);
+    expect(Math.abs(actualDiff)).toBeLessThan(5_000);
   });
 });
 
@@ -155,6 +210,19 @@ describe("buildRental — scenarios", () => {
       buildRental(spec, "bull").preTaxCash[12],
       6
     );
+  });
+});
+
+describe("buildRental — mortgage term shorter than the horizon", () => {
+  it("stops paying once the loan is retired, so cash flow steps up and no debt remains at exit", () => {
+    const s = buildRental({ ...spec, mortgageTermMonths: 60 }, "base");
+    // Rent grows a little every month regardless, so a plain "greater than"
+    // would also pass if the payment never actually stopped. Pin the size of
+    // the step to (most of) a full payment, which only a retired loan produces.
+    const shortPayment = monthlyPayment(LOAN, 0.065, 60);
+    const step = s.preTaxCash[61] - s.preTaxCash[60];
+    expect(step).toBeGreaterThan(shortPayment * 0.9);
+    expect(s.exit.debtPayoff).toBeCloseTo(0, 6);
   });
 });
 
