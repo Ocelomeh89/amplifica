@@ -99,6 +99,12 @@ export interface OptionSeries {
     costBasis: number; // after accumulated basis-affecting deductions
     recapture: { amount: number; rate: number }[]; // e.g. §1250 at 0.25
   };
+  // What the position could be liquidated for at the end of each month,
+  // GROSS of exit tax. Length 84. bookValue[83] must equal exit.grossProceeds
+  // — the last month's value IS the exit value, not a separate estimate of
+  // it. Added so a payback metric and the net-position chart can know what a
+  // position is worth mid-horizon, not just at deployment and at exit.
+  bookValue: number[];
   continuingMonthlyIncome: number; // the month-85 run rate
   entryBasis: "real" | "nominal";
 }
@@ -310,6 +316,7 @@ All computed on after-tax cash flows, per option.
 | IRR | Annualized from monthly net flows including the terminal exit; shown nominal **and** real |
 | Equity multiple (MOIC) | (total cash + net exit proceeds) ÷ total capital in |
 | Payback period | First month where cumulative after-tax cash ≥ cumulative capital in |
+| Payback period including sale | First month where cumulative after-tax cash **plus `bookValue` at that month** ≥ cumulative capital in. Gross of exit tax, so it is optimistic by the tax a sale would trigger — the point is the timing, not a precise net figure. Never later than payback period, since `bookValue` only adds to the cash side. Exists because payback-on-cash-alone reads "never" for anything funded by monthly contributions, honestly but uninformatively. |
 | Peak capital at risk | Maximum cumulative net outlay across the horizon |
 | Year-7 net position | After-tax liquidation proceeds **and** continuing monthly income, reported as two separate figures |
 
