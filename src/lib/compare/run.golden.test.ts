@@ -59,6 +59,17 @@ describe("golden — $100k lump plus $2k/mo into a 4% HYSA", () => {
     expect(o.metrics.peakCapitalAtRisk).toBeCloseTo(219524.11821505608, 0);
   });
 
+  it("pays back including sale at month 0, though cash alone never catches up", () => {
+    // Cash equivalents return the principal intact, so bookValue tracks
+    // capital in exactly — the lump sum is immediately worth the lump sum.
+    // Correct, not a bug. Cash-only paybackMonth, by contrast, is null here:
+    // this schedule keeps contributing $2k/mo, and interest income never
+    // outruns fresh capital going in — exactly the "reads never" case the
+    // new metric exists to give an honest answer for.
+    expect(o.metrics.paybackMonthIncludingSale).toBe(0);
+    expect(o.metrics.paybackMonth).toBeNull();
+  });
+
   it("reports a POSITIVE year-7 monthly cash flow", () => {
     // The pin that matters most in this wave. This row previously read
     // -$1,787/month, because the whole year's tax was posted into month 83

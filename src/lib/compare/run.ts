@@ -57,6 +57,7 @@ export function runComparison(
       metrics: computeMetrics({
         afterTaxCash,
         capitalIn: nominal.capitalIn,
+        bookValue: nominal.bookValue,
         exitProceedsAfterTax,
         // Builders emit this pre-tax. Metrics are an all-after-tax block, so
         // it is converted here at year 6's own blended rate rather than

@@ -18,6 +18,12 @@ export interface OptionMetrics {
   irrUnavailableReason: string | null;
   equityMultiple: number | null;
   paybackMonth: number | null;
+  // First month where cumulative after-tax cash PLUS what the position could
+  // be sold for covers cumulative capital in. Gross of exit tax, so it is
+  // optimistic by the tax a sale would trigger; the point is the timing, not
+  // a precise net figure. Never later than paybackMonth, since bookValue only
+  // adds to the cash side of the comparison.
+  paybackMonthIncludingSale: number | null;
   peakCapitalAtRisk: number;
   exitProceeds: number;
   continuingMonthlyIncome: number;
@@ -26,6 +32,10 @@ export interface OptionMetrics {
 export interface MetricsInput {
   afterTaxCash: number[]; // nominal, length HORIZON_MONTHS
   capitalIn: number[]; // nominal, length HORIZON_MONTHS
+  // What the position could be sold for at the end of each month. Nominal,
+  // length HORIZON_MONTHS, GROSS of exit tax — unlike every other field here,
+  // which is after-tax. See paybackMonthIncludingSale.
+  bookValue: number[];
   exitProceedsAfterTax: number; // nominal, at HORIZON_MONTHS
   // Nominal, at HORIZON_MONTHS, and AFTER TAX like every sibling figure —
   // run.ts derives it with afterTaxContinuingIncome below.
@@ -102,6 +112,7 @@ export function computeMetrics(input: MetricsInput): OptionMetrics {
 
   const realCash = afterTaxCash.map((v, m) => deflate(v, inflationPct, m));
   const realCapital = capitalIn.map((v, m) => deflate(v, inflationPct, m));
+  const realBookValue = input.bookValue.map((v, m) => deflate(v, inflationPct, m));
   const realExit = deflate(exitProceedsAfterTax, inflationPct, HORIZON_MONTHS);
   const realContinuing = deflate(input.continuingMonthlyIncome, inflationPct, HORIZON_MONTHS);
 
@@ -113,11 +124,19 @@ export function computeMetrics(input: MetricsInput): OptionMetrics {
   let cumCapital = 0;
   let peak = 0;
   let paybackMonth: number | null = null;
+  let paybackMonthIncludingSale: number | null = null;
   for (let m = 0; m < HORIZON_MONTHS; m++) {
     cumCash += realCash[m];
     cumCapital += realCapital[m];
     peak = Math.max(peak, cumCapital - cumCash);
     if (paybackMonth === null && cumCapital > 0 && cumCash >= cumCapital) paybackMonth = m;
+    if (
+      paybackMonthIncludingSale === null &&
+      cumCapital > 0 &&
+      cumCash + realBookValue[m] >= cumCapital
+    ) {
+      paybackMonthIncludingSale = m;
+    }
   }
 
   // Terminal value lands one month past the last period, matching the
@@ -139,6 +158,7 @@ export function computeMetrics(input: MetricsInput): OptionMetrics {
     irrUnavailableReason: solved.reason,
     equityMultiple: totalCapital > 0 ? (totalCash + realExit) / totalCapital : null,
     paybackMonth,
+    paybackMonthIncludingSale,
     peakCapitalAtRisk: peak,
     exitProceeds: realExit,
     continuingMonthlyIncome: realContinuing,

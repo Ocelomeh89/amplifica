@@ -64,20 +64,22 @@ describe("afterTaxContinuingIncome", () => {
   });
 });
 
+// $1,000 at month 0, then $20/mo for the whole horizon, exiting at $1,000.
+// Shared by computeMetrics and paybackMonthIncludingSale below.
+const baseCapitalIn = zeroSeries();
+baseCapitalIn[0] = 1000;
+const baseAfterTaxCash = zeroSeries().map((_, m) => (m === 0 ? 0 : 20));
+
+const base = {
+  afterTaxCash: baseAfterTaxCash,
+  capitalIn: baseCapitalIn,
+  exitProceedsAfterTax: 1000,
+  bookValue: zeroSeries(),
+  continuingMonthlyIncome: 20,
+  inflationPct: 0,
+};
+
 describe("computeMetrics", () => {
-  // $1,000 at month 0, then $20/mo for the whole horizon, exiting at $1,000.
-  const capitalIn = zeroSeries();
-  capitalIn[0] = 1000;
-  const afterTaxCash = zeroSeries().map((_, m) => (m === 0 ? 0 : 20));
-
-  const base = {
-    afterTaxCash,
-    capitalIn,
-    exitProceedsAfterTax: 1000,
-    continuingMonthlyIncome: 20,
-    inflationPct: 0,
-  };
-
   it("sums cash and averages it over the horizon", () => {
     const m = computeMetrics(base);
     expect(m.totalCashCollected).toBeCloseTo(20 * (HORIZON_MONTHS - 1), 6);
@@ -107,6 +109,16 @@ describe("computeMetrics", () => {
     expect(m.paybackMonth).toBeNull();
   });
 
+  it("reports payback-including-sale as null too when the position is worthless and cash never covers capital", () => {
+    const m = computeMetrics({
+      ...base,
+      afterTaxCash: zeroSeries(),
+      exitProceedsAfterTax: 0,
+      bookValue: zeroSeries(),
+    });
+    expect(m.paybackMonthIncludingSale).toBeNull();
+  });
+
   it("derives real IRR from nominal and the inflation rate", () => {
     const m = computeMetrics({ ...base, inflationPct: 0.03 });
     expect(m.irrNominal).not.toBeNull();
@@ -126,5 +138,54 @@ describe("computeMetrics", () => {
     const m = computeMetrics({ ...base, capitalIn: zeroSeries() });
     expect(m.irrNominal).toBeNull();
     expect(m.irrUnavailableReason).toBe("no capital invested");
+  });
+});
+
+describe("paybackMonthIncludingSale", () => {
+  // $1,200 capital at month 0, no cash distributions at all — paybackMonth
+  // (cash only) is null forever, cash alone never covers capital. But the
+  // position itself is worth something and appreciates: bookValue[m] =
+  // 25*m, capped at 1,200. Hand computation: cumCash is always 0, so the
+  // month it first covers capital is the month bookValue alone reaches
+  // 1,200 — m = 48 (25 * 48 = 1,200; 25 * 47 = 1,175 falls short).
+  const capitalIn = zeroSeries();
+  capitalIn[0] = 1200;
+  const noCash = zeroSeries();
+  const appreciating = zeroSeries().map((_, m) => Math.min(25 * m, 1200));
+
+  const worthless = {
+    afterTaxCash: noCash,
+    capitalIn,
+    exitProceedsAfterTax: 0,
+    bookValue: appreciating,
+    continuingMonthlyIncome: 0,
+    inflationPct: 0,
+  };
+
+  it("fires at the month cumulative cash plus sale value first covers capital, by hand", () => {
+    const m = computeMetrics(worthless);
+    expect(m.paybackMonth).toBeNull(); // cash alone never gets there
+    expect(m.paybackMonthIncludingSale).toBe(48);
+  });
+
+  it("is never later than paybackMonth when both exist", () => {
+    // Same $1,000-capital / $20-per-month scenario as `base`, but now the
+    // position is also worth something the whole way through: bookValue
+    // ramps 25/mo up to 1,000 by month 40. Hand computation: cumCash(m) =
+    // 20*m for m >= 1, so cumCash(m) + bookValue(m) = 45*m up to month 40 —
+    // crosses 1,000 at m = 23 (45*22 = 990 short, 45*23 = 1,035 covers it),
+    // well before the cash-only payback at month 50.
+    const ramping = zeroSeries().map((_, m) => Math.min(25 * m, 1000));
+    const m = computeMetrics({ ...base, bookValue: ramping });
+    expect(m.paybackMonth).toBe(50);
+    expect(m.paybackMonthIncludingSale).toBe(23);
+    expect(m.paybackMonthIncludingSale as number).toBeLessThanOrEqual(m.paybackMonth as number);
+  });
+
+  it("pays back immediately when the whole lump sum is liquid from day one", () => {
+    // The cash-equivalent case: bookValue equals capital in from month 0.
+    const flat = zeroSeries().map(() => 1000);
+    const m = computeMetrics({ ...base, bookValue: flat });
+    expect(m.paybackMonthIncludingSale).toBe(0);
   });
 });
