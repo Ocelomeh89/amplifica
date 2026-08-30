@@ -18,6 +18,8 @@ function item(over: Partial<TaxItem> = {}): TaxItem {
 function series(over: Partial<OptionSeries> = {}): OptionSeries {
   const cash = zeroSeries();
   cash[12] = 100;
+  const bookValue = zeroSeries();
+  bookValue[12] = 800;
   return {
     id: "x",
     label: "X",
@@ -25,6 +27,7 @@ function series(over: Partial<OptionSeries> = {}): OptionSeries {
     preTaxCash: cash,
     taxItems: [item()],
     exit: { grossProceeds: 1000, costBasis: 500, recapture: [] },
+    bookValue,
     continuingMonthlyIncome: 100,
     entryBasis: "real",
     ...over,
@@ -67,6 +70,17 @@ describe("escalateToNominal", () => {
     expect(out.continuingMonthlyIncome).toBeCloseTo(100 * Math.pow(1.03, 7), 8);
   });
 
+  it("grows a real option's book value month by month, like preTaxCash", () => {
+    const out = escalateToNominal(series(), 0.03);
+    expect(out.bookValue[12]).toBeCloseTo(800 * 1.03, 8);
+    expect(out.bookValue[0]).toBe(0);
+  });
+
+  it("leaves a nominal option's book value untouched", () => {
+    const s = series({ entryBasis: "nominal" });
+    expect(escalateToNominal(s, 0.03).bookValue).toEqual(s.bookValue);
+  });
+
   it("does not escalate cost basis, which is fixed at historical cost", () => {
     expect(escalateToNominal(series(), 0.03).exit.costBasis).toBe(500);
   });
@@ -88,5 +102,6 @@ describe("escalateToNominal", () => {
 
   it("preserves series length", () => {
     expect(escalateToNominal(series(), 0.03).preTaxCash).toHaveLength(HORIZON_MONTHS);
+    expect(escalateToNominal(series(), 0.03).bookValue).toHaveLength(HORIZON_MONTHS);
   });
 });

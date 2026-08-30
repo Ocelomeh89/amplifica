@@ -67,6 +67,11 @@ export interface OptionSeries {
   preTaxCash: number[]; // length HORIZON_MONTHS — distributions received
   taxItems: TaxItem[]; // sparse, dated
   exit: ExitEvent;
+  // What the position could be liquidated for at the end of each month, GROSS
+  // of exit tax. Length HORIZON_MONTHS. bookValue[HORIZON_MONTHS - 1] must
+  // equal exit.grossProceeds — the last month's value IS the exit value, not
+  // a separate estimate of it.
+  bookValue: number[];
   continuingMonthlyIncome: number; // the month-85 run rate
   // "real" = these are today's dollars, grow them. "nominal" = this is the
   // projection as given, leave it alone.

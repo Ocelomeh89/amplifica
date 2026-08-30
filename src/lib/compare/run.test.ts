@@ -32,6 +32,16 @@ describe("buildCash", () => {
   it("emits exactly the horizon length", () => {
     expect(s.capitalIn).toHaveLength(HORIZON_MONTHS);
     expect(s.preTaxCash).toHaveLength(HORIZON_MONTHS);
+    expect(s.bookValue).toHaveLength(HORIZON_MONTHS);
+  });
+
+  it("emits a bookValue whose last month IS the exit value, not a separate estimate", () => {
+    // The invariant that will catch a future builder getting it wrong.
+    expect(s.bookValue[HORIZON_MONTHS - 1]).toBe(s.exit.grossProceeds);
+  });
+
+  it("takes the lump sum as the month-0 book value", () => {
+    expect(s.bookValue[0]).toBe(100_000);
   });
 
   it("takes the lump sum at month 0 and pays nothing that month", () => {

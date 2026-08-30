@@ -29,6 +29,7 @@ export function escalateToNominal(series: OptionSeries, annualPct: number): Opti
   return {
     ...series,
     preTaxCash: series.preTaxCash.map(grow),
+    bookValue: series.bookValue.map(grow),
     continuingMonthlyIncome: grow(series.continuingMonthlyIncome, HORIZON_MONTHS),
     exit: {
       ...series.exit,
