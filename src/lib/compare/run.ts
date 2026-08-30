@@ -26,7 +26,11 @@ export interface ComparisonResult {
   options: ComparisonOption[];
 }
 
-function build(spec: OptionSpec, globals: GlobalInputs): OptionSeries {
+// Exported so the shared invariant sweep in run.invariants.test.ts can reach
+// bookValue and exit, which the ComparisonOption result deliberately does not
+// carry. The switch is exhaustive over OptionSpec, so a new kind is a compile
+// error here rather than a silent omission.
+export function buildSeries(spec: OptionSpec, globals: GlobalInputs): OptionSeries {
   switch (spec.kind) {
     case "cash":
       return buildCash(spec, globals.capital, globals.scenario);
@@ -40,7 +44,7 @@ export function runComparison(
   specs: OptionSpec[]
 ): ComparisonResult {
   const options = specs.map((spec) => {
-    const built = build(spec, globals);
+    const built = buildSeries(spec, globals);
     const nominal = escalateToNominal(built, globals.inflationPct);
     const tax = computeTaxSeries(nominal, globals.tax, globals.inflationPct);
 

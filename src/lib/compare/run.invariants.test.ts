@@ -2,8 +2,14 @@
 // The engine is pure and total: any input yields finite, well-defined output.
 
 import { describe, it, expect } from "vitest";
-import { HORIZON_MONTHS, type FilingStatus, type GlobalInputs, type Scenario } from "./types";
-import { runComparison, type OptionSpec } from "./run";
+import {
+  HORIZON_MONTHS,
+  LAST_INCOME_MONTH,
+  type FilingStatus,
+  type GlobalInputs,
+  type Scenario,
+} from "./types";
+import { buildSeries, runComparison, type OptionSpec } from "./run";
 
 const spec: OptionSpec = {
   kind: "cash",
@@ -11,6 +17,34 @@ const spec: OptionSpec = {
   label: "Cash",
   yieldPct: { bear: 0.02, base: 0.04, bull: 0.05 },
 };
+
+const rentalSpec: OptionSpec = {
+  kind: "rental",
+  id: "duplex",
+  label: "Duplex",
+  purchasePrice: 500_000,
+  downPct: 0.25,
+  closingCostPct: 0.02,
+  mortgageRatePct: 0.065,
+  mortgageTermMonths: 360,
+  monthlyRent: 3_500,
+  rentGrowthPct: 0.03,
+  vacancyPct: 0.06,
+  operatingExpensePct: 0.35,
+  landPct: 0.2,
+  depreciationYears: 27.5,
+  sellingCostPct: 0.06,
+  appreciationPct: { bear: 0, base: 0.035, bull: 0.06 },
+};
+
+// EVERY option spec in the tool. A future builder is registered by APPENDING
+// ONE ENTRY here, and the sweep below then covers it — that is the whole
+// point. These invariants were being re-proved per builder (run.test.ts for
+// cash, build/rental.test.ts for the rental) and nowhere generically, so
+// seven more builders were each about to re-prove them in their own file or
+// quietly forget to. Structural comparability is the design's central claim;
+// it belongs in one sweep, not in nine.
+const ALL_SPECS: OptionSpec[] = [spec, rentalSpec];
 
 function globals(over: Partial<GlobalInputs> = {}): GlobalInputs {
   return {
@@ -33,6 +67,71 @@ function globals(over: Partial<GlobalInputs> = {}): GlobalInputs {
 
 const STATUSES: FilingStatus[] = ["single", "mfj", "mfs", "hoh"];
 const SCENARIOS: Scenario[] = ["bear", "base", "bull"];
+
+describe("every option spec satisfies the shared contract", () => {
+  for (const optionSpec of ALL_SPECS) {
+    describe(optionSpec.id, () => {
+      const g = globals();
+      const built = buildSeries(optionSpec, g);
+      const o = runComparison(g, [optionSpec]).options[0];
+
+      it("ends bookValue at the exit equity, not a separate estimate of it", () => {
+        expect(built.bookValue[LAST_INCOME_MONTH]).toBeCloseTo(
+          built.exit.grossProceeds - built.exit.debtPayoff,
+          4
+        );
+      });
+
+      it("emits exactly HORIZON_MONTHS entries in every series", () => {
+        expect(built.capitalIn).toHaveLength(HORIZON_MONTHS);
+        expect(built.preTaxCash).toHaveLength(HORIZON_MONTHS);
+        expect(built.bookValue).toHaveLength(HORIZON_MONTHS);
+        expect(o.preTaxCash).toHaveLength(HORIZON_MONTHS);
+        expect(o.taxPaid).toHaveLength(HORIZON_MONTHS);
+        expect(o.afterTaxCash).toHaveLength(HORIZON_MONTHS);
+      });
+
+      it("carries no non-finite value anywhere", () => {
+        const values = [
+          ...built.capitalIn,
+          ...built.preTaxCash,
+          ...built.bookValue,
+          ...built.taxItems.map((t) => t.amount),
+          ...built.exit.recapture.flatMap((r) => [r.amount, r.rate]),
+          built.exit.grossProceeds,
+          built.exit.costBasis,
+          built.exit.debtPayoff,
+          built.continuingMonthlyIncome,
+          ...o.preTaxCash,
+          ...o.taxPaid,
+          ...o.afterTaxCash,
+          o.exitProceedsAfterTax,
+          o.metrics.totalCashCollected,
+          o.metrics.averageMonthlyCashFlow,
+          o.metrics.yearSevenMonthlyCashFlow,
+          o.metrics.peakCapitalAtRisk,
+          o.metrics.exitProceeds,
+          o.metrics.continuingMonthlyIncome,
+        ];
+        for (const v of values) expect(Number.isFinite(v)).toBe(true);
+        // Nullable by contract when unsolvable — but never NaN.
+        for (const v of [o.metrics.irrNominal, o.metrics.irrReal, o.metrics.equityMultiple]) {
+          if (v !== null) expect(Number.isFinite(v)).toBe(true);
+        }
+      });
+
+      it("satisfies after-tax = pre-tax minus tax", () => {
+        for (let m = 0; m < HORIZON_MONTHS; m++) {
+          expect(o.afterTaxCash[m]).toBeCloseTo(o.preTaxCash[m] - o.taxPaid[m], 6);
+        }
+        const pre = o.preTaxCash.reduce((a, v) => a + v, 0);
+        const tax = o.taxPaid.reduce((a, v) => a + v, 0);
+        const post = o.afterTaxCash.reduce((a, v) => a + v, 0);
+        expect(post).toBeCloseTo(pre - tax, 4);
+      });
+    });
+  }
+});
 
 describe("pipeline invariants", () => {
   it("emits exactly HORIZON_MONTHS entries in every series", () => {
