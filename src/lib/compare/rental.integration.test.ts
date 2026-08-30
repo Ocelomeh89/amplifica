@@ -3,8 +3,10 @@
 // and exitTax through the whole pipeline rather than calling them directly.
 
 import { describe, it, expect } from "vitest";
-import { HORIZON_MONTHS, HORIZON_YEARS, type GlobalInputs } from "./types";
+import { HORIZON_MONTHS, HORIZON_YEARS, LAST_INCOME_MONTH, type GlobalInputs } from "./types";
 import { runComparison, type OptionSpec } from "./run";
+import { buildRental } from "./build/rental";
+import { remainingPrincipalAfter } from "@/lib/finance/amortization";
 
 const rental: OptionSpec = {
   kind: "rental",
@@ -68,6 +70,10 @@ describe("rental through the pipeline", () => {
   it("releases the suspended losses at disposition in the final year", () => {
     const o = runComparison(globals(), [rental]).options[0];
     expect(yearTax(o.taxPaid, HORIZON_YEARS - 1)).toBeLessThan(0);
+    // A magnitude floor, not just a sign check: a broken carryforward (e.g.
+    // state.suspended reset every year) still lands modestly negative here
+    // because year 6 is itself a loss year. The real release is ~-$16,138.
+    expect(yearTax(o.taxPaid, HORIZON_YEARS - 1)).toBeLessThan(-10_000);
   });
 
   it("lets a real estate professional use those losses immediately", () => {
@@ -89,21 +95,36 @@ describe("rental through the pipeline", () => {
     expect(yearTax(active.taxPaid, 0)).toBeLessThan(yearTax(plain.taxPaid, 0));
   });
 
+  it("gives a partial allowance at $130k, inside the phaseout band", () => {
+    const mid = { otherOrdinaryIncome: 130_000 };
+    const plain = runComparison(globals(mid), [rental]).options[0];
+    const active = runComparison(globals({ ...mid, activelyParticipatesRental: true }), [rental]).options[0];
+    const relief = yearTax(plain.taxPaid, 0) - yearTax(active.taxPaid, 0);
+    // Allowance at $130k is 25,000 - 30,000*0.5 = 10,000, which is BELOW the
+    // ~13.1k year-0 loss, so the cap binds and relief is strictly smaller
+    // than at $90k where the whole loss fits.
+    expect(relief).toBeGreaterThan(0);
+    const low = runComparison(globals({ otherOrdinaryIncome: 90_000, activelyParticipatesRental: true }), [rental]).options[0];
+    const lowRelief = yearTax(runComparison(globals({ otherOrdinaryIncome: 90_000 }), [rental]).options[0].taxPaid, 0) - yearTax(low.taxPaid, 0);
+    expect(relief).toBeLessThan(lowRelief);
+  });
+
   it("charges exit tax on a real gain, including depreciation recapture", () => {
     const o = runComparison(globals(), [rental]).options[0];
-    const grossEquity = 500_000 * Math.pow(1.035, 7) * 0.94;
-    // Exit cash must be materially below the pre-tax equity, because the gain
-    // and the recaptured depreciation are both taxed.
-    expect(o.exitProceedsAfterTax).toBeLessThan(grossEquity);
+    const payoff = remainingPrincipalAfter(375_000, 0.065, 360, 83);
+    const preTaxEquity = 500_000 * Math.pow(1.035, 7) * 0.94 - payoff;
+    // Exit cash must sit meaningfully below pre-tax EQUITY (net of debt
+    // payoff, not gross proceeds) — a $20k floor is well under the real tax
+    // (~$46.1k) but far above zero, so this fails if exit tax stops applying.
+    expect(o.exitProceedsAfterTax).toBeLessThan(preTaxEquity - 20_000);
     expect(o.exitProceedsAfterTax).toBeGreaterThan(0);
   });
 
   it("never taxes the same gain twice — no TaxItem carries the sale", () => {
     // bucketByYear rejects month 84, but the contract is that the builder never
     // emits one at all. This pins the contract, not the bounds check.
-    const o = runComparison(globals(), [rental]).options[0];
-    expect(o.taxPaid).toHaveLength(HORIZON_MONTHS);
-    expect(o.taxPaid.every(Number.isFinite)).toBe(true);
+    const built = buildRental(rental, "base");
+    expect(built.taxItems.every((t) => t.month >= 1 && t.month <= LAST_INCOME_MONTH)).toBe(true);
   });
 
   it("reports continuing income with the same sign as year-7 cash flow", () => {
