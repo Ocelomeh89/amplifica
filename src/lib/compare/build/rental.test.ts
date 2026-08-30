@@ -227,6 +227,43 @@ describe("buildRental — mortgage term shorter than the horizon", () => {
   });
 });
 
+describe("buildRental — expense growth", () => {
+  it("defaults to rent growth, which is exactly the old behaviour", () => {
+    // Expenses used to ride rent implicitly, as a fixed share of that month's
+    // effective rent. The default has to reproduce that to the dollar, or this
+    // shape change would have quietly moved every rental figure in the tool.
+    const implicit = buildRental(spec, "base");
+    const explicit = buildRental({ ...spec, expenseGrowthPct: spec.rentGrowthPct }, "base");
+    for (let m = 0; m < HORIZON_MONTHS; m++) {
+      expect(explicit.preTaxCash[m]).toBeCloseTo(implicit.preTaxCash[m], 8);
+    }
+    expect(explicit.taxItems).toEqual(implicit.taxItems);
+  });
+
+  it("leaves month 1 alone — expenses are stated at month-1 rent", () => {
+    const hot = buildRental({ ...spec, expenseGrowthPct: 0.08 }, "base");
+    const base = buildRental(spec, "base");
+    expect(hot.preTaxCash[1]).toBeCloseTo(base.preTaxCash[1], 8);
+  });
+
+  it("compresses the margin when expenses outrun rent", () => {
+    const hot = buildRental({ ...spec, expenseGrowthPct: 0.08 }, "base");
+    const base = buildRental(spec, "base");
+    // Five years of 8% expense growth against 3% rent growth.
+    expect(hot.preTaxCash[LAST_INCOME_MONTH]).toBeLessThan(base.preTaxCash[LAST_INCOME_MONTH]);
+    // And the tax items follow the cash, so the deduction is not left behind.
+    const noiAt = (s: ReturnType<typeof buildRental>, m: number) =>
+      s.taxItems.filter((t) => t.month === m).find((t) => !t.basisAffecting)?.amount ?? 0;
+    expect(noiAt(hot, LAST_INCOME_MONTH)).toBeLessThan(noiAt(base, LAST_INCOME_MONTH));
+  });
+
+  it("lifts it when expenses grow slower than rent", () => {
+    const cool = buildRental({ ...spec, expenseGrowthPct: 0 }, "base");
+    const base = buildRental(spec, "base");
+    expect(cool.preTaxCash[LAST_INCOME_MONTH]).toBeGreaterThan(base.preTaxCash[LAST_INCOME_MONTH]);
+  });
+});
+
 describe("buildRental — a zero mortgage term does not forgive the loan", () => {
   it("carries the full loan to the exit when the term is 0", () => {
     // remainingPrincipalAfter returns 0 whenever monthsElapsed >= termMonths,

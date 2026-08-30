@@ -30,8 +30,16 @@ export interface RentalSpec {
   monthlyRent: number;
   rentGrowthPct: number;
   vacancyPct: number;
-  // Operating expenses as a share of effective (post-vacancy) rent.
+  // Operating expenses as a share of effective (post-vacancy) rent, stated at
+  // month 1 and then grown at expenseGrowthPct.
   operatingExpensePct: number;
+  // Annual growth in operating expenses. Defaults to rentGrowthPct, which is
+  // exactly how expenses behaved before this field existed: they rode rent, so
+  // the expense ratio was frozen for the whole horizon by construction.
+  // Insurance, property taxes and maintenance have historically OUTRUN rents,
+  // so leaving this unset is a deliberately optimistic assumption rather than
+  // a neutral one — set it above rentGrowthPct to see the margin compress.
+  expenseGrowthPct?: number;
   // Land is not depreciable, so this share is carved out of the basis.
   landPct: number;
   depreciationYears: number;
@@ -68,6 +76,9 @@ export function buildRental(spec: RentalSpec, scenario: Scenario): OptionSeries 
 
   const appreciation = spec.appreciationPct[scenario];
   const monthlyRate = spec.mortgageRatePct / 12;
+  // Absent, expenses track rent — which reproduces the previous behaviour of
+  // taking them as a fixed share of that month's effective rent, to the dollar.
+  const expenseGrowth = spec.expenseGrowthPct ?? spec.rentGrowthPct;
   let accumulatedDep = 0;
   let balance = loan;
 
@@ -75,7 +86,14 @@ export function buildRental(spec: RentalSpec, scenario: Scenario): OptionSeries 
     const years = (m - 1) / 12;
     const grossRent = spec.monthlyRent * Math.pow(1 + spec.rentGrowthPct, years);
     const effectiveRent = grossRent * (1 - spec.vacancyPct);
-    const noi = effectiveRent * (1 - spec.operatingExpensePct);
+    // operatingExpensePct is a share of month-1 effective rent; the expense
+    // then compounds on its own curve instead of being pinned to rent's.
+    const operatingExpense =
+      spec.monthlyRent *
+      Math.pow(1 + expenseGrowth, years) *
+      (1 - spec.vacancyPct) *
+      spec.operatingExpensePct;
+    const noi = effectiveRent - operatingExpense;
 
     // The loan is retired once its term ends; no payment is owed after that,
     // even though the horizon continues.
