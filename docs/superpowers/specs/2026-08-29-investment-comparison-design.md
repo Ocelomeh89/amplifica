@@ -98,10 +98,18 @@ export interface OptionSeries {
     grossProceeds: number;
     costBasis: number; // after accumulated basis-affecting deductions
     recapture: { amount: number; rate: number }[]; // e.g. §1250 at 0.25
+    // Debt retired out of the sale proceeds. Reduces the CASH you walk away
+    // with; never the taxable gain, because repaying principal isn't a
+    // deductible expense. grossProceeds stays the full amount realized so a
+    // leveraged asset is taxed on its whole gain while paying out only
+    // equity. Unlevered options set this to 0. Added for the rental, the
+    // first option to carry debt into its exit.
+    debtPayoff: number;
   };
-  // What the position could be liquidated for at the end of each month,
-  // GROSS of exit tax. Length 84. bookValue[83] must equal exit.grossProceeds
-  // — the last month's value IS the exit value, not a separate estimate of
+  // What the position could be liquidated for at the end of each month, NET
+  // of debt — i.e. equity — and, per a later fix, net of selling costs too.
+  // Length 84. bookValue[83] must equal exit.grossProceeds - exit.debtPayoff
+  // — the last month's value IS the exit equity, not a separate estimate of
   // it. Added so a payback metric and the net-position chart can know what a
   // position is worth mid-horizon, not just at deployment and at exit.
   bookValue: number[];
@@ -354,11 +362,20 @@ price, face value would flatter the flywheel.
 | Index fund | Return ×3 scenarios | No annual tax; exit gain at LTCG + NIIT |
 | Cash equivalents | Yield | Ordinary portfolio, taxed yearly; NIIT |
 | Dividend portfolio | Yield, price growth | Qualified-dividend rate; exit at LTCG; NIIT |
-| Rental real estate | Price, down %, mortgage rate/term, gross rent, expense ratio, vacancy, appreciation, land % | 27.5-yr depreciation; passive unless REPS; $25k allowance; §1250 recapture + LTCG at exit |
+| Rental real estate | Purchase price, down %, closing cost %, mortgage rate, mortgage term (months), monthly rent, rent growth %, vacancy %, operating expense % (of effective rent), land %, depreciation years, selling cost %, appreciation % per scenario | 27.5-yr depreciation; passive unless REPS; $25k allowance; §1250 recapture + LTCG at exit |
 | Commercial real estate | Manual monthly grid, land %, cost-seg/bonus, exit price | 39-yr or cost-segregated; same passive and recapture machinery |
 | Business investment | Manual monthly grid, exit valuation | Material-participation toggle → non-passive ordinary; QBI eligible; NIIT-exempt when participating |
 | Oil & gas | Capital, IDC %, tangible %, revenue grid with decline-curve fill | IDC expensed yr 1, non-passive; tangible on 7-yr MACRS; 15% depletion; NIIT-exempt |
 | Debt paydown | Balance, rate, deductible flag | Interest avoided is tax-free; nets down by marginal rate if deductible |
+
+The rental is `entryBasis: "nominal"`, not `"real"`, and that is forced rather
+than chosen: a levered property mixes inflation-tracking rent with a fixed
+mortgage payment, and one per-option flag cannot describe both. So the builder
+grows rent from its own `rentGrowthPct` and hands the pipeline nominal dollars
+outright, rather than declaring `"real"` and relying on the shared escalation
+step to inflate a mortgage payment that is contractually fixed. `"real"`
+remains the right basis for the manual-grid options, whose entries are a
+sponsor's pro forma with no embedded financing mismatch to reconcile.
 
 ## UI
 
