@@ -137,21 +137,37 @@ Replace the `exitProceedsAfterTax` line with:
       nominal.exit.grossProceeds - nominal.exit.debtPayoff - tax.exitTaxCash;
 ```
 
-- [ ] **Step 6: Restate the invariant in `run.invariants.test.ts`**
+- [ ] **Step 6: Restate the invariant — it lives in `run.test.ts:40`, not the invariants file**
 
-Find the assertion that `bookValue[HORIZON_MONTHS - 1]` equals `exit.grossProceeds` and change it to:
+`src/lib/compare/run.test.ts` line 40 currently reads:
 
 ```ts
-  it("ends bookValue at the equity the sale actually hands over", () => {
-    const built = buildCash(spec, globals().capital, "base");
-    expect(built.bookValue[LAST_INCOME_MONTH]).toBeCloseTo(
-      built.exit.grossProceeds - built.exit.debtPayoff,
-      6
-    );
-  });
+    expect(s.bookValue[HORIZON_MONTHS - 1]).toBe(s.exit.grossProceeds);
 ```
 
-Import `LAST_INCOME_MONTH` and `buildCash` if not already imported.
+Replace it with the equity form, which is what the restated contract says:
+
+```ts
+    expect(s.bookValue[HORIZON_MONTHS - 1]).toBeCloseTo(
+      s.exit.grossProceeds - s.exit.debtPayoff,
+      6
+    );
+```
+
+`toBe` becomes `toBeCloseTo` because the right-hand side is now a subtraction.
+
+- [ ] **Step 6b: Add `debtPayoff: 0` to every existing `ExitEvent` literal**
+
+`debtPayoff` is required, not optional — this contract is about to be
+implemented by eight builders, and a builder forced to state its debt is a
+builder that has thought about leverage. The cost is a one-time mechanical
+edit at twelve sites. Add `debtPayoff: 0` to each:
+
+- `src/lib/compare/inflation.test.ts:29`
+- `src/lib/compare/tax/engine.test.ts:36`
+- `src/lib/compare/tax/exit.test.ts` — lines 15, 28, and the objects beginning at 37, 52, 68, 85, 102, plus 117 and 127 (ten literals in that file)
+
+Run `pnpm typecheck` after this step; it will name any literal you missed.
 
 - [ ] **Step 7: Run the whole compare suite**
 
@@ -174,81 +190,102 @@ git commit -m "compare: separate amount realized from exit cash, so leverage can
 - Test: `src/lib/compare/metrics.test.ts`
 
 **Interfaces:**
-- Consumes: `MetricsInput` from `./metrics`.
-- Produces: no new exports; `continuingMonthlyIncome` becomes safe for options whose year-6 cash flow is negative.
+- Consumes: `afterTaxContinuingIncome(preTaxCash, afterTaxCash, continuingMonthlyIncome)` — already exported from `./metrics` and called by `run.ts`. Its signature does not change.
+- Produces: no new exports; the function becomes safe for options whose year-6 cash flow is negative.
 
-`continuingMonthlyIncome` is derived from year 6's after-tax ÷ pre-tax ratio. A
-rental can easily run **negative** operating cash flow in year 6, and the
-current guard only catches a zero or non-finite denominator. With `pre = -1000`
-and `after = -800`, the ratio is `0.8` — plausible-looking and applied to a
-negative run rate, which silently reports a *positive* continuing income for a
-property that loses money every month. A prior reviewer flagged this as
-unreachable for cash and reachable for exactly this builder.
+The estimator lives in the standalone `afterTaxContinuingIncome` function in
+`metrics.ts` (around line 95) — **not** inside `computeMetrics`, which receives
+`continuingMonthlyIncome` already converted. It sums year 6's pre-tax and
+after-tax cash and applies the ratio to the run rate.
 
-- [ ] **Step 1: Write the failing test** — append to `metrics.test.ts`
+The guard today is `if (pre === 0 || !Number.isFinite(ratio))`. That misses the
+case this builder produces: a rental running a **pre-tax loss** in year 6 whose
+loss yields a tax benefit, so `post` is positive while `pre` is negative. The
+ratio is then negative, and a negative run rate multiplied by it comes back
+**positive** — reporting monthly income for a property that loses money every
+month. A prior reviewer flagged this as unreachable for cash and reachable for
+exactly this builder.
+
+- [ ] **Step 1: Write the failing test** — append to `src/lib/compare/metrics.test.ts`
 
 ```ts
-describe("continuingMonthlyIncome with a loss-making year 6", () => {
-  const capitalIn = zeroSeries();
-  capitalIn[0] = 1000;
+describe("afterTaxContinuingIncome with a loss-making year 6", () => {
+  // Year 6 runs months 73-83 inclusive — 11 months, not 12.
+  const yearSix = (pre: number, post: number) => {
+    const p = zeroSeries();
+    const a = zeroSeries();
+    for (let m = 73; m <= 83; m++) {
+      p[m] = pre;
+      a[m] = post;
+    }
+    return { p, a };
+  };
 
-  it("does not report positive income when the run rate is negative", () => {
-    const afterTaxCash = zeroSeries().map((_, m) => (m === 0 ? 0 : -50));
-    const m = computeMetrics({
-      afterTaxCash,
-      capitalIn,
-      bookValue: zeroSeries(),
-      exitProceedsAfterTax: 0,
-      continuingMonthlyIncome: -50,
-      inflationPct: 0,
-    });
-    expect(m.continuingMonthlyIncome).toBeLessThan(0);
+  it("applies year 6's blended rate when the year was profitable", () => {
+    const { p, a } = yearSix(100, 70);
+    expect(afterTaxContinuingIncome(p, a, 200)).toBeCloseTo(140, 6);
   });
 
-  it("does not flip a negative run rate positive via a negative ratio", () => {
-    // pre-tax negative, after-tax negative -> ratio positive. The old code
-    // multiplied a negative run rate by that and got the sign right by luck;
-    // the failure mode is a ratio built from mixed signs.
-    const afterTaxCash = zeroSeries().map((_, m) => (m === 0 ? 0 : m > 72 ? 40 : -50));
-    const m = computeMetrics({
-      afterTaxCash,
-      capitalIn,
-      bookValue: zeroSeries(),
-      exitProceedsAfterTax: 0,
-      continuingMonthlyIncome: -50,
-      inflationPct: 0,
-    });
-    expect(m.continuingMonthlyIncome).toBeLessThanOrEqual(0);
+  it("does not turn a loss-making run rate into positive income", () => {
+    // Pre-tax loss, but the loss produced a tax benefit, so post is positive.
+    // ratio is negative, and a negative run rate times it comes back positive.
+    const { p, a } = yearSix(-100, 40);
+    expect(afterTaxContinuingIncome(p, a, -50)).toBeLessThanOrEqual(0);
+  });
+
+  it("passes the run rate through when year 6 lost money", () => {
+    const { p, a } = yearSix(-100, -80);
+    expect(afterTaxContinuingIncome(p, a, -50)).toBe(-50);
+  });
+
+  it("passes the run rate through when year 6 produced nothing", () => {
+    const { p, a } = yearSix(0, 0);
+    expect(afterTaxContinuingIncome(p, a, 25)).toBe(25);
   });
 });
 ```
 
+Add `afterTaxContinuingIncome` to the existing import from `./metrics`, and
+`zeroSeries` to the import from `./types`, if they are not already there.
+
 - [ ] **Step 2: Run it to verify it fails**
 
 Run: `pnpm test src/lib/compare/metrics.test.ts`
-Expected: FAIL on the second case — the ratio is computed from a positive after-tax sum over a negative pre-tax sum, yielding a negative ratio that flips the sign.
+Expected: FAIL on "does not turn a loss-making run rate into positive income" — the current code returns `+20` for that case.
 
-- [ ] **Step 3: Fix the guard in `metrics.ts`**
+- [ ] **Step 3: Fix the guard in `afterTaxContinuingIncome`**
 
-Replace the ratio computation with:
+Replace the final three lines of the function:
 
 ```ts
-  // Blended-rate estimate: what fraction of year 6's pre-tax cash survived tax,
-  // applied to the run rate. Only meaningful when the year was profitable — a
-  // ratio built from a negative denominator, or from mixed signs, can flip the
-  // run rate's sign and report income for a position that loses money every
-  // month. In those cases the run rate passes through untaxed, which is the
-  // conservative reading: a loss is not sheltered by this estimate.
-  const ratio = pre > 0 && after >= 0 ? after / pre : 1;
-  const taxed = Number.isFinite(ratio) ? ratio : 1;
+  const ratio = post / pre;
+  if (pre === 0 || !Number.isFinite(ratio)) return continuingMonthlyIncome;
+  return continuingMonthlyIncome * ratio;
 ```
 
-and use `taxed` where `ratio` was used.
+with:
+
+```ts
+  // The blended rate only means anything when year 6 was actually profitable.
+  // A negative denominator — or a loss year whose tax benefit makes `post`
+  // positive — yields a negative ratio, and a negative run rate multiplied by
+  // that comes back POSITIVE: monthly income reported for a position that
+  // loses money every month. In any of those cases the run rate passes through
+  // untaxed, which is conservative and visibly so.
+  if (pre <= 0 || post < 0) return continuingMonthlyIncome;
+  const ratio = post / pre;
+  if (!Number.isFinite(ratio)) return continuingMonthlyIncome;
+  return continuingMonthlyIncome * ratio;
+```
+
+Update the function's doc comment above it: the old text says a zero or
+non-finite denominator falls back; it now also falls back for a loss-making
+year 6.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm test src/lib/compare && pnpm typecheck`
-Expected: PASS. The golden's year 6 is profitable, so its pinned value must not move. **If it moves, stop and report BLOCKED.**
+Expected: PASS. The golden's year 6 is profitable, so its pinned continuing-income value must not move. **If it moves, stop and report BLOCKED.**
 
 - [ ] **Step 5: Commit**
 
