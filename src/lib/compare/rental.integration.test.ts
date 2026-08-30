@@ -127,10 +127,21 @@ describe("rental through the pipeline", () => {
     expect(built.taxItems.every((t) => t.month >= 1 && t.month <= LAST_INCOME_MONTH)).toBe(true);
   });
 
-  it("reports continuing income with the same sign as year-7 cash flow", () => {
+  it("reports a continuing run rate near the actual month-83 cash flow", () => {
     const o = runComparison(globals(), [rental]).options[0];
-    const yearSeven = o.metrics.yearSevenMonthlyCashFlow;
-    expect(Math.sign(o.metrics.continuingMonthlyIncome)).toBe(Math.sign(yearSeven));
+    const raw = o.preTaxCash[LAST_INCOME_MONTH];
+    expect(raw).toBeGreaterThan(0);
+    expect(o.metrics.continuingMonthlyIncome).toBeGreaterThan(0);
+    // A sign check passed both with and without the clamp in
+    // afterTaxContinuingIncome, so it constrained nothing. This is the
+    // magnitude bound instead: year 6 is the DISPOSITION year, so its tax
+    // delta carries the whole passive-loss release — $2,364 pre-tax against
+    // $18,502 after tax, a blended ratio of 7.8 that reported $1,571/mo of
+    // continuing income against an honest ~$201. The bound is stated against
+    // the NOMINAL month-83 cash flow while the metric is deflated to today's
+    // dollars, which only makes it more generous, and 7.8x still blows
+    // straight through it.
+    expect(o.metrics.continuingMonthlyIncome).toBeLessThan(2 * raw);
   });
 
   it("does not flip a permanently loss-making rental to positive income", () => {

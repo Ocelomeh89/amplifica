@@ -94,6 +94,16 @@ export function annualize(monthlyRate: number): number {
 // that comes back POSITIVE: monthly income reported for a position that
 // loses money every month. In any of those cases the run rate passes through
 // untaxed, which is conservative and visibly so.
+//
+// A ratio ABOVE 1 fails the same way from the other side, and it is the one
+// that actually bit. Year 6 is the DISPOSITION year, so its tax delta carries
+// the whole release of seven years of suspended passive losses. For the
+// rental that is $2,364 of pre-tax cash against $18,502 after tax — a ratio
+// of 7.8, reporting $1,571/mo of continuing income against an honest ~$201.
+// A ratio above 1 means the year's tax was a net BENEFIT, which describes a
+// one-time disposition effect rather than a recurring rate, so the run rate
+// passes through untaxed there too. This clamp is the contract for a function
+// whose behaviour is otherwise invisible in the output.
 export function afterTaxContinuingIncome(
   preTaxCash: number[],
   afterTaxCash: number[],
@@ -114,6 +124,8 @@ export function afterTaxContinuingIncome(
   if (pre <= 0 || post < 0) return continuingMonthlyIncome;
   const ratio = post / pre;
   if (!Number.isFinite(ratio)) return continuingMonthlyIncome;
+  // A one-time disposition benefit is not a run rate. See above.
+  if (ratio > 1) return continuingMonthlyIncome;
   return continuingMonthlyIncome * ratio;
 }
 
