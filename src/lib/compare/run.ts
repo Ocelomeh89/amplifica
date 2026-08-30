@@ -7,9 +7,10 @@ import { escalateToNominal } from "./inflation";
 import { computeTaxSeries } from "./tax/engine";
 import { afterTaxContinuingIncome, computeMetrics, type OptionMetrics } from "./metrics";
 import { buildCash, type CashSpec } from "./build/cash";
+import { buildRental, type RentalSpec } from "./build/rental";
 
-// Plan B extends this union with the remaining eight option kinds.
-export type OptionSpec = CashSpec;
+// Plan B extends this union with the remaining seven option kinds.
+export type OptionSpec = CashSpec | RentalSpec;
 
 export interface ComparisonOption {
   id: string;
@@ -29,6 +30,8 @@ function build(spec: OptionSpec, globals: GlobalInputs): OptionSeries {
   switch (spec.kind) {
     case "cash":
       return buildCash(spec, globals.capital, globals.scenario);
+    case "rental":
+      return buildRental(spec, globals.scenario);
   }
 }
 
