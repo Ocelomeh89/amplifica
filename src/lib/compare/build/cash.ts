@@ -66,7 +66,7 @@ export function buildCash(
     capitalIn,
     preTaxCash,
     taxItems,
-    exit: { grossProceeds: balance, costBasis: balance, recapture: [] },
+    exit: { grossProceeds: balance, costBasis: balance, recapture: [], debtPayoff: 0 },
     bookValue,
     continuingMonthlyIncome: balance * rate,
     // A quoted yield is already a nominal rate.

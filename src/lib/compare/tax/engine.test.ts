@@ -33,7 +33,7 @@ function series(items: TaxItem[]): OptionSeries {
     capitalIn: zeroSeries(),
     preTaxCash: zeroSeries(),
     taxItems: items,
-    exit: { grossProceeds: 0, costBasis: 0, recapture: [] },
+    exit: { grossProceeds: 0, costBasis: 0, recapture: [], debtPayoff: 0 },
     bookValue: zeroSeries(),
     continuingMonthlyIncome: 0,
     entryBasis: "nominal",

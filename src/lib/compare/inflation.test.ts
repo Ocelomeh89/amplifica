@@ -26,7 +26,7 @@ function series(over: Partial<OptionSeries> = {}): OptionSeries {
     capitalIn: zeroSeries(),
     preTaxCash: cash,
     taxItems: [item()],
-    exit: { grossProceeds: 1000, costBasis: 500, recapture: [] },
+    exit: { grossProceeds: 1000, costBasis: 500, recapture: [], debtPayoff: 0 },
     bookValue,
     continuingMonthlyIncome: 100,
     entryBasis: "real",

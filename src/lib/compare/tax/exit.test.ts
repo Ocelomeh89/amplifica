@@ -12,7 +12,7 @@ const profile: TaxProfile = {
   qbiEnabled: false,
 };
 
-const noExit: ExitEvent = { grossProceeds: 0, costBasis: 0, recapture: [] };
+const noExit: ExitEvent = { grossProceeds: 0, costBasis: 0, recapture: [], debtPayoff: 0 };
 
 describe("exitTax", () => {
   it("is zero when there is nothing to sell", () => {
@@ -25,7 +25,12 @@ describe("exitTax", () => {
 
   it("taxes gain above basis at the capital gains rate", () => {
     // 400k other income puts an MFJ filer in the 15% LTCG band.
-    const t = exitTax({ grossProceeds: 500_000, costBasis: 400_000, recapture: [] }, profile, 6, 0);
+    const t = exitTax(
+      { grossProceeds: 500_000, costBasis: 400_000, recapture: [], debtPayoff: 0 },
+      profile,
+      6,
+      0
+    );
     expect(t).toBeCloseTo(100_000 * 0.15, 4);
   });
 
@@ -35,6 +40,7 @@ describe("exitTax", () => {
         grossProceeds: 500_000,
         costBasis: 300_000,
         recapture: [{ amount: 100_000, rate: 0.25 }],
+        debtPayoff: 0,
       },
       profile,
       6,
@@ -50,6 +56,7 @@ describe("exitTax", () => {
         grossProceeds: 320_000,
         costBasis: 300_000,
         recapture: [{ amount: 100_000, rate: 0.25 }],
+        debtPayoff: 0,
       },
       profile,
       6,
@@ -69,6 +76,7 @@ describe("exitTax", () => {
           { amount: 0, rate: 0.25 },
           { amount: 50_000, rate: 0.25 },
         ],
+        debtPayoff: 0,
       },
       profile,
       6,
@@ -86,6 +94,7 @@ describe("exitTax", () => {
           { amount: 50_000, rate: 0.25 },
           { amount: 0, rate: 0.25 },
         ],
+        debtPayoff: 0,
       },
       profile,
       6,
@@ -103,6 +112,7 @@ describe("exitTax", () => {
           { amount: 50_000, rate: 0.25 },
           { amount: 80_000, rate: 0.25 },
         ],
+        debtPayoff: 0,
       },
       profile,
       6,
@@ -114,7 +124,7 @@ describe("exitTax", () => {
 
   it("adds state tax on the whole gain", () => {
     const t = exitTax(
-      { grossProceeds: 500_000, costBasis: 400_000, recapture: [] },
+      { grossProceeds: 500_000, costBasis: 400_000, recapture: [], debtPayoff: 0 },
       { ...profile, stateRatePct: 0.05 },
       6,
       0
@@ -124,7 +134,7 @@ describe("exitTax", () => {
 
   it("adds NIIT on the gain when enabled", () => {
     const t = exitTax(
-      { grossProceeds: 500_000, costBasis: 400_000, recapture: [] },
+      { grossProceeds: 500_000, costBasis: 400_000, recapture: [], debtPayoff: 0 },
       { ...profile, niitEnabled: true },
       6,
       0

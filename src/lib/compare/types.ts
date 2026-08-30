@@ -58,6 +58,13 @@ export interface ExitEvent {
   costBasis: number;
   // e.g. unrecaptured §1250 depreciation at { rate: 0.25 }
   recapture: { amount: number; rate: number }[];
+  // Debt retired out of the sale proceeds. Reduces the CASH you walk away
+  // with; does NOT reduce the taxable gain, because repaying principal is not
+  // a deductible expense. grossProceeds is the amount realized (sale price net
+  // of selling costs, before debt) — keeping the two separate is what lets a
+  // leveraged asset be taxed on its full gain while paying out only equity.
+  // Unlevered options set this to 0.
+  debtPayoff: number;
 }
 
 export interface OptionSeries {
@@ -68,9 +75,10 @@ export interface OptionSeries {
   taxItems: TaxItem[]; // sparse, dated
   exit: ExitEvent;
   // What the position could be liquidated for at the end of each month, GROSS
-  // of exit tax. Length HORIZON_MONTHS. bookValue[HORIZON_MONTHS - 1] must
-  // equal exit.grossProceeds — the last month's value IS the exit value, not
-  // a separate estimate of it.
+  // of exit tax but NET of debt — i.e. your equity. Length HORIZON_MONTHS.
+  // bookValue[LAST_INCOME_MONTH] must equal exit.grossProceeds -
+  // exit.debtPayoff: the last month's equity IS what the sale hands you before
+  // tax, not a separate estimate of it.
   bookValue: number[];
   continuingMonthlyIncome: number; // the month-85 run rate
   // "real" = these are today's dollars, grow them. "nominal" = this is the

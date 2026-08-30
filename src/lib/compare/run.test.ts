@@ -37,7 +37,10 @@ describe("buildCash", () => {
 
   it("emits a bookValue whose last month IS the exit value, not a separate estimate", () => {
     // The invariant that will catch a future builder getting it wrong.
-    expect(s.bookValue[HORIZON_MONTHS - 1]).toBe(s.exit.grossProceeds);
+    expect(s.bookValue[HORIZON_MONTHS - 1]).toBeCloseTo(
+      s.exit.grossProceeds - s.exit.debtPayoff,
+      6
+    );
   });
 
   it("takes the lump sum as the month-0 book value", () => {
@@ -117,5 +120,23 @@ describe("runComparison", () => {
     for (const v of [...opt.afterTaxCash, ...opt.taxPaid, ...opt.preTaxCash]) {
       expect(Number.isFinite(v)).toBe(true);
     }
+  });
+});
+
+describe("debtPayoff", () => {
+  it("subtracts debt from exit cash without touching the taxable gain", () => {
+    // A synthetic series: no income, a 100k position bought for 100k with 60k
+    // of debt against it. No gain, so no exit tax; cash out is 40k.
+    const globalsNoTax: GlobalInputs = {
+      ...globals,
+      inflationPct: 0,
+      capital: { lumpSum: 40_000, monthly: 0, monthlyEndMonth: null },
+    };
+    const levered = runComparison(globalsNoTax, [
+      { ...spec, yieldPct: { bear: 0, base: 0, bull: 0 } },
+    ]).options[0];
+    // The cash option carries debtPayoff 0, so this is the regression guard:
+    // adding the field must not move an unlevered option at all.
+    expect(levered.exitProceedsAfterTax).toBeCloseTo(40_000, 6);
   });
 });

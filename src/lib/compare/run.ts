@@ -45,7 +45,8 @@ export function runComparison(
     for (let m = 0; m < HORIZON_MONTHS; m++) {
       afterTaxCash[m] = nominal.preTaxCash[m] - tax.monthlyTaxCash[m];
     }
-    const exitProceedsAfterTax = nominal.exit.grossProceeds - tax.exitTaxCash;
+    const exitProceedsAfterTax =
+      nominal.exit.grossProceeds - nominal.exit.debtPayoff - tax.exitTaxCash;
 
     return {
       id: nominal.id,
