@@ -189,3 +189,38 @@ describe("paybackMonthIncludingSale", () => {
     expect(m.paybackMonthIncludingSale).toBe(0);
   });
 });
+
+describe("afterTaxContinuingIncome with a loss-making year 6", () => {
+  // Year 6 runs months 73-83 inclusive — 11 months, not 12.
+  const yearSix = (pre: number, post: number) => {
+    const p = zeroSeries();
+    const a = zeroSeries();
+    for (let m = 73; m <= 83; m++) {
+      p[m] = pre;
+      a[m] = post;
+    }
+    return { p, a };
+  };
+
+  it("applies year 6's blended rate when the year was profitable", () => {
+    const { p, a } = yearSix(100, 70);
+    expect(afterTaxContinuingIncome(p, a, 200)).toBeCloseTo(140, 6);
+  });
+
+  it("does not turn a loss-making run rate into positive income", () => {
+    // Pre-tax loss, but the loss produced a tax benefit, so post is positive.
+    // ratio is negative, and a negative run rate times it comes back positive.
+    const { p, a } = yearSix(-100, 40);
+    expect(afterTaxContinuingIncome(p, a, -50)).toBeLessThanOrEqual(0);
+  });
+
+  it("passes the run rate through when year 6 lost money", () => {
+    const { p, a } = yearSix(-100, -80);
+    expect(afterTaxContinuingIncome(p, a, -50)).toBe(-50);
+  });
+
+  it("passes the run rate through when year 6 produced nothing", () => {
+    const { p, a } = yearSix(0, 0);
+    expect(afterTaxContinuingIncome(p, a, 25)).toBe(25);
+  });
+});

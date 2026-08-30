@@ -88,9 +88,12 @@ export function annualize(monthlyRate: number): number {
 // and the year immediately before it is the least arbitrary one available.
 // Applied identically to every option, so it cannot tilt the ranking.
 //
-// A zero or non-finite denominator (an option that pays nothing in year 6)
-// falls back to passing the pre-tax figure through untaxed. That is
-// conservative in the option's favour and visibly so, rather than NaN.
+// The blended rate only means anything when year 6 was actually profitable.
+// A negative denominator, or a loss year whose tax benefit makes `post`
+// positive, yields a negative ratio, and a negative run rate multiplied by
+// that comes back POSITIVE: monthly income reported for a position that
+// loses money every month. In any of those cases the run rate passes through
+// untaxed, which is conservative and visibly so.
 export function afterTaxContinuingIncome(
   preTaxCash: number[],
   afterTaxCash: number[],
@@ -102,8 +105,15 @@ export function afterTaxContinuingIncome(
     pre += preTaxCash[m];
     post += afterTaxCash[m];
   }
+  // The blended rate only means anything when year 6 was actually profitable.
+  // A negative denominator — or a loss year whose tax benefit makes `post`
+  // positive — yields a negative ratio, and a negative run rate multiplied by
+  // that comes back POSITIVE: monthly income reported for a position that
+  // loses money every month. In any of those cases the run rate passes through
+  // untaxed, which is conservative and visibly so.
+  if (pre <= 0 || post < 0) return continuingMonthlyIncome;
   const ratio = post / pre;
-  if (pre === 0 || !Number.isFinite(ratio)) return continuingMonthlyIncome;
+  if (!Number.isFinite(ratio)) return continuingMonthlyIncome;
   return continuingMonthlyIncome * ratio;
 }
 
