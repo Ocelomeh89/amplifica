@@ -24,6 +24,21 @@ export function deflateSeries(series: number[], annualPct: number): number[] {
 // is returned untouched, and the result is always marked "nominal" so a second
 // call is a no-op — escalating twice would silently inflate every figure.
 export function escalateToNominal(series: OptionSeries, annualPct: number): OptionSeries {
+  // A levered "real" option cannot be reconciled here and must not be waved
+  // through. This function grows grossProceeds and every bookValue entry but
+  // carries debtPayoff — a fixed, contractual amount — untouched, so
+  // bookValue[LAST_INCOME_MONTH] and grossProceeds - debtPayoff would end up
+  // disagreeing: the binding invariant in types.ts, failing silently. Worse,
+  // escalating debt-netted equity inflates the equity AND the debt buried
+  // inside it, double-counting the leverage. Commercial real estate is specced
+  // "real" and is leveraged in practice, so this combination is one edit away
+  // at all times. This mirrors the precondition guard computeTaxSeries carries:
+  // a loud failure at the only point that can still detect the difference.
+  if (series.entryBasis === "real" && series.exit.debtPayoff !== 0) {
+    throw new Error(
+      "a levered option must declare entryBasis 'nominal': escalating debt-netted equity double-counts the debt"
+    );
+  }
   if (series.entryBasis === "nominal") return series;
   const grow = (v: number, m: number) => v * inflationFactor(annualPct, m);
   return {

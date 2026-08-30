@@ -100,6 +100,26 @@ describe("escalateToNominal", () => {
     expect(escalateToNominal(once, 0.03)).toEqual(once);
   });
 
+  it("refuses a levered real option rather than breaking the bookValue invariant", () => {
+    // grossProceeds and bookValue escalate; debtPayoff, a fixed contractual
+    // amount, does not. So bookValue[83] and grossProceeds - debtPayoff would
+    // silently stop agreeing, and the escalated equity would carry the debt
+    // twice. Commercial real estate is specced "real" and is levered in
+    // practice, so this is a live combination, not a hypothetical.
+    const levered = series({
+      exit: { grossProceeds: 1000, costBasis: 500, recapture: [], debtPayoff: 600 },
+    });
+    expect(() => escalateToNominal(levered, 0.03)).toThrow(/levered/);
+  });
+
+  it("lets a levered NOMINAL option through untouched", () => {
+    const levered = series({
+      entryBasis: "nominal",
+      exit: { grossProceeds: 1000, costBasis: 500, recapture: [], debtPayoff: 600 },
+    });
+    expect(escalateToNominal(levered, 0.03)).toEqual(levered);
+  });
+
   it("preserves series length", () => {
     expect(escalateToNominal(series(), 0.03).preTaxCash).toHaveLength(HORIZON_MONTHS);
     expect(escalateToNominal(series(), 0.03).bookValue).toHaveLength(HORIZON_MONTHS);
