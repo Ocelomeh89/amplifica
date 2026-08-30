@@ -15,7 +15,7 @@ import {
   type TaxItem,
 } from "../types";
 import { straightLineMonthly } from "./depreciation";
-import { monthlyPayment, remainingPrincipalAfter } from "@/lib/finance/amortization";
+import { monthlyPayment } from "@/lib/finance/amortization";
 
 export interface RentalSpec {
   kind: "rental";
@@ -123,15 +123,15 @@ export function buildRental(spec: RentalSpec, scenario: Scenario): OptionSeries 
 
   const salePrice = spec.purchasePrice * Math.pow(1 + appreciation, HORIZON_MONTHS / 12);
   const realized = salePrice * (1 - spec.sellingCostPct);
-  const payoff =
-    loan > 0
-      ? remainingPrincipalAfter(
-          loan,
-          spec.mortgageRatePct,
-          spec.mortgageTermMonths,
-          LAST_INCOME_MONTH
-        )
-      : 0;
+  // The loop's own running balance, not a second independent amortization
+  // call. remainingPrincipalAfter returns 0 whenever monthsElapsed >= term,
+  // which with mortgageTermMonths: 0 — a value the field accepts — forgave the
+  // entire loan: no payment was ever deducted, debtPayoff came back 0, and
+  // $375,000 of debt evaporated at the sale, yielding a finite, plausible 38%
+  // IRR. The two agree for every valid term (amortizationSchedule zeroes its
+  // last row, and this loop's residue is ~1e-9), so this is the same number
+  // everywhere it was already right.
+  const payoff = balance;
 
   // bookValue's last entry is the equity the sale hands over, so it is stated
   // on the same basis as the exit rather than as a separate estimate.

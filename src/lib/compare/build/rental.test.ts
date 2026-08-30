@@ -114,10 +114,11 @@ describe("buildRental — tax items", () => {
 
 describe("buildRental — amortization actually runs", () => {
   // Deleting `balance -= principal` still passes month-1 interest (opening
-  // balance either way), debtPayoff (an independent remainingPrincipalAfter
-  // call) and the bookValue tests (month 83 is overwritten from the exit).
-  // These pin an interior month and the shape of the whole run, so a balance
-  // that stops amortizing after month 1 fails here.
+  // balance either way) and the month-0 bookValue test. These pin an interior
+  // month and the shape of the whole run, so a balance that stops amortizing
+  // after month 1 fails here. debtPayoff now reads that same balance, so it
+  // fails too — it used to be an independent remainingPrincipalAfter call and
+  // could not see the difference.
   const s = buildRental(spec, "base");
   const at = (m: number) => s.taxItems.filter((t) => t.month === m);
   const noiAt = (m: number) => {
@@ -223,6 +224,22 @@ describe("buildRental — mortgage term shorter than the horizon", () => {
     const step = s.preTaxCash[61] - s.preTaxCash[60];
     expect(step).toBeGreaterThan(shortPayment * 0.9);
     expect(s.exit.debtPayoff).toBeCloseTo(0, 6);
+  });
+});
+
+describe("buildRental — a zero mortgage term does not forgive the loan", () => {
+  it("carries the full loan to the exit when the term is 0", () => {
+    // remainingPrincipalAfter returns 0 whenever monthsElapsed >= termMonths,
+    // so computing the payoff from a second, independent call reported no debt
+    // at all here: no payment is ever due at term 0, nothing amortizes, and
+    // $375,000 of debt simply vanished at the sale — a finite, plausible-
+    // looking ~38% IRR out of an input the field accepts. The payoff now comes
+    // off the loop's own running balance, which is right in every case.
+    const s = buildRental({ ...spec, mortgageTermMonths: 0 }, "base");
+    expect(s.exit.debtPayoff).toBeCloseTo(LOAN, 6);
+    expect(s.exit.debtPayoff).not.toBe(0);
+    // And the equity handed over at exit is netted by that debt.
+    expect(s.bookValue[LAST_INCOME_MONTH]).toBeCloseTo(s.exit.grossProceeds - LOAN, 6);
   });
 });
 
