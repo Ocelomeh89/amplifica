@@ -132,6 +132,18 @@ describe("exitTax", () => {
     expect(t).toBeCloseTo(100_000 * 0.15 + 100_000 * 0.05, 4);
   });
 
+  it("ignores debtPayoff entirely — repaying principal is not deductible", () => {
+    // debtPayoff reduces the CASH a sale hands over and never the taxable
+    // gain. Nothing else asserted that, so a change that netted debt out of
+    // the gain would have gone unnoticed here and simply made every levered
+    // option look better than it is.
+    const base = { grossProceeds: 500_000, costBasis: 300_000, recapture: [{ amount: 100_000, rate: 0.25 }] };
+    const unlevered = exitTax({ ...base, debtPayoff: 0 }, { ...profile, niitEnabled: true, stateRatePct: 0.05 }, 6, 0.03);
+    const levered = exitTax({ ...base, debtPayoff: 300_000 }, { ...profile, niitEnabled: true, stateRatePct: 0.05 }, 6, 0.03);
+    expect(levered).toBe(unlevered);
+    expect(levered).toBeGreaterThan(0);
+  });
+
   it("adds NIIT on the gain when enabled", () => {
     const t = exitTax(
       { grossProceeds: 500_000, costBasis: 400_000, recapture: [], debtPayoff: 0 },

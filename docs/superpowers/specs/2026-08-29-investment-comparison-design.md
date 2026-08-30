@@ -324,7 +324,7 @@ All computed on after-tax cash flows, per option.
 | IRR | Annualized from monthly net flows including the terminal exit; shown nominal **and** real |
 | Equity multiple (MOIC) | (total cash + net exit proceeds) ÷ total capital in |
 | Payback period | First month where cumulative after-tax cash ≥ cumulative capital in |
-| Payback period including sale | First month where cumulative after-tax cash **plus `bookValue` at that month** ≥ cumulative capital in. Gross of exit tax, so it is optimistic by the tax a sale would trigger — the point is the timing, not a precise net figure. Never later than payback period, since `bookValue` only adds to the cash side. Exists because payback-on-cash-alone reads "never" for anything funded by monthly contributions, honestly but uninformatively. |
+| Payback period including sale | First month where cumulative after-tax cash **plus `bookValue` at that month** ≥ cumulative capital in. Gross of exit tax, so it is optimistic by the tax a sale would trigger — the point is the timing, not a precise net figure. Usually, but not always, no later than payback period: `bookValue` is net of debt and selling costs, so on a thinly-capitalised purchase (5% down) it starts negative and subtracts from the cash side rather than adding to it. Exists because payback-on-cash-alone reads "never" for anything funded by monthly contributions, honestly but uninformatively. |
 | Peak capital at risk | Maximum cumulative net outlay across the horizon |
 | Year-7 net position | After-tax liquidation proceeds **and** continuing monthly income, reported as two separate figures |
 

@@ -21,8 +21,14 @@ export interface OptionMetrics {
   // First month where cumulative after-tax cash PLUS what the position could
   // be sold for covers cumulative capital in. Gross of exit tax, so it is
   // optimistic by the tax a sale would trigger; the point is the timing, not
-  // a precise net figure. Never later than paybackMonth, since bookValue only
-  // adds to the cash side of the comparison.
+  // a precise net figure.
+  //
+  // USUALLY, but not always, no later than paybackMonth. bookValue is net of
+  // debt and selling costs, so it can be NEGATIVE: a property bought with 5%
+  // down owes more than a sale would realise, and bookValue[0] subtracts from
+  // the cash side rather than adding to it. This metric can therefore land
+  // later than paybackMonth, and on a deeply levered option it can be null
+  // where paybackMonth is not.
   paybackMonthIncludingSale: number | null;
   peakCapitalAtRisk: number;
   exitProceeds: number;
@@ -32,9 +38,11 @@ export interface OptionMetrics {
 export interface MetricsInput {
   afterTaxCash: number[]; // nominal, length HORIZON_MONTHS
   capitalIn: number[]; // nominal, length HORIZON_MONTHS
-  // What the position could be sold for at the end of each month. Nominal,
-  // length HORIZON_MONTHS, GROSS of exit tax — unlike every other field here,
-  // which is after-tax. See paybackMonthIncludingSale.
+  // What a sale would hand you at the end of each month: nominal, length
+  // HORIZON_MONTHS, GROSS of exit tax — unlike every other field here, which
+  // is after-tax — but NET of debt and of selling costs. It is equity, not
+  // asset value, so it is negative whenever the debt plus the cost of selling
+  // exceeds what the position is worth. See paybackMonthIncludingSale.
   bookValue: number[];
   exitProceedsAfterTax: number; // nominal, at HORIZON_MONTHS
   // Nominal, at HORIZON_MONTHS, and AFTER TAX like every sibling figure —
@@ -115,12 +123,6 @@ export function afterTaxContinuingIncome(
     pre += preTaxCash[m];
     post += afterTaxCash[m];
   }
-  // The blended rate only means anything when year 6 was actually profitable.
-  // A negative denominator — or a loss year whose tax benefit makes `post`
-  // positive — yields a negative ratio, and a negative run rate multiplied by
-  // that comes back POSITIVE: monthly income reported for a position that
-  // loses money every month. In any of those cases the run rate passes through
-  // untaxed, which is conservative and visibly so.
   if (pre <= 0 || post < 0) return continuingMonthlyIncome;
   const ratio = post / pre;
   if (!Number.isFinite(ratio)) return continuingMonthlyIncome;

@@ -114,9 +114,13 @@ describe("rental through the pipeline", () => {
     const payoff = remainingPrincipalAfter(375_000, 0.065, 360, 83);
     const preTaxEquity = 500_000 * Math.pow(1.035, 7) * 0.94 - payoff;
     // Exit cash must sit meaningfully below pre-tax EQUITY (net of debt
-    // payoff, not gross proceeds) — a $20k floor is well under the real tax
-    // (~$46.1k) but far above zero, so this fails if exit tax stops applying.
-    expect(o.exitProceedsAfterTax).toBeLessThan(preTaxEquity - 20_000);
+    // payoff, not gross proceeds). The bound is $40k, not the $20k it was:
+    // real tax here is ~$46.1k WITH recapture and ~$35.8k without it, so a
+    // $20k floor was satisfied by a run that recaptured nothing at all and
+    // the test did not check what its name claims. $40k sits between the two
+    // and fails if §1250 recapture stops being applied — or if exit tax stops
+    // applying entirely.
+    expect(o.exitProceedsAfterTax).toBeLessThan(preTaxEquity - 40_000);
     expect(o.exitProceedsAfterTax).toBeGreaterThan(0);
   });
 

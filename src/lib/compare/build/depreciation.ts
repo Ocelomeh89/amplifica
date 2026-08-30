@@ -5,9 +5,11 @@
 
 // 7-year property, half-year convention (IRS Pub 946 Table A-1). Eight entries
 // because the half-year convention pushes recovery into a ninth tax year.
+// `as const` because two more builders will consume this: a shared rate table
+// that a caller can splice is a defect waiting to happen.
 export const MACRS_7_YEAR = [
   0.1429, 0.2449, 0.1749, 0.1249, 0.0893, 0.0892, 0.0893, 0.0446,
-];
+] as const;
 
 // Straight-line recovery per month. Real property uses this: 27.5 years for
 // residential rental, 39 for commercial.
@@ -17,7 +19,11 @@ export function straightLineMonthly(basis: number, years: number): number {
 }
 
 // The deduction for one tax year under a declining-balance table.
-export function macrsAnnual(basis: number, table: number[], yearIndex: number): number {
+export function macrsAnnual(
+  basis: number,
+  table: readonly number[],
+  yearIndex: number
+): number {
   if (basis <= 0) return 0;
   if (yearIndex < 0 || yearIndex >= table.length) return 0;
   return basis * table[yearIndex];
