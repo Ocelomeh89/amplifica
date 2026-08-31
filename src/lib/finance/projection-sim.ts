@@ -84,6 +84,12 @@ export interface ProjectionSimResult {
   // rather than accepting the undiscounted convention of
   // expectedFuturePayments. Nothing in the Amplifier reads it.
   finalBook: ActiveInvestment[];
+  // The active book as of each month, captured after that month's payment and
+  // before the next month's pruning — the same instant `expectedFuturePayments`
+  // is valued at. Exposed so a consumer can value the book on its own terms at
+  // any point in the run, not only at the horizon. Nothing in the Amplifier
+  // reads it.
+  bookByMonth: ActiveInvestment[][];
 }
 
 // A relaunch owed since the last payoff but not yet executed: it waits,
@@ -256,6 +262,7 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
   };
 
   const series: ProjectionSimPoint[] = [];
+  const bookByMonth: ActiveInvestment[][] = [];
 
   for (let m = 0; m < config.totalMonths; m++) {
     const mscActive = config.mscEndMonth == null || m < config.mscEndMonth;
@@ -276,7 +283,9 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
       state.peakOutstanding = state.outstandingAmount;
     }
 
-    // Value the book after this month's payment (hence m + 1).
+    // Value the book after this month's payment (hence m + 1). The snapshot is
+    // taken here so it and that valuation see the identical book.
+    bookByMonth.push(state.book.slice());
     const value = valueBook(state.book, m + 1);
     const expectedFuturePayments = value.total + state.cash - state.outstandingAmount;
 
@@ -317,5 +326,6 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
     finalDeployedCapital: state.deployed,
     finalDistributionsReceived: state.distributions,
     finalBook: state.book.slice(),
+    bookByMonth,
   };
 }

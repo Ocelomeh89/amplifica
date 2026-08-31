@@ -251,3 +251,39 @@ describe("finalBook", () => {
     expect(Array.isArray(short.finalBook)).toBe(true);
   });
 });
+
+describe("bookByMonth", () => {
+  const result = runSimulation({ ...baseInput, totalMonths: 84 });
+
+  it("carries one snapshot per month", () => {
+    expect(result.bookByMonth).toHaveLength(84);
+  });
+
+  it("is captured at the same instant expectedFuturePayments is valued", () => {
+    // The snapshot's own undiscounted remaining payments, valued at m + 1,
+    // must reconstruct that month's expectedFuturePayments exactly. This is
+    // the alignment build/compare's per-month equity calculation relies on.
+    for (const m of [0, 1, 17, 42, 83]) {
+      let remaining = 0;
+      for (const inv of result.bookByMonth[m]) {
+        const elapsed = m + 1 - inv.startMonth;
+        if (elapsed < 0 || elapsed >= inv.termMonths) continue;
+        remaining += inv.monthlyPayout * (inv.termMonths - elapsed);
+      }
+      const p = result.series[m];
+      expect(remaining + p.cash - p.outstandingAmount).toBeCloseTo(p.expectedFuturePayments, 6);
+    }
+  });
+
+  it("ends on the same positions finalBook keeps, pruning aside", () => {
+    // The last snapshot precedes the final prune, so it may carry positions
+    // finalBook has dropped — but every one of those is already expired at the
+    // horizon and contributes nothing to any valuation.
+    const last = result.bookByMonth[83];
+    expect(last.length).toBeGreaterThanOrEqual(result.finalBook.length);
+    for (const inv of result.finalBook) expect(last).toContain(inv);
+    for (const inv of last) {
+      if (!result.finalBook.includes(inv)) expect(84 - inv.startMonth).toBeGreaterThanOrEqual(inv.termMonths);
+    }
+  });
+});
