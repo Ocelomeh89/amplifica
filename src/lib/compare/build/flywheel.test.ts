@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { HORIZON_MONTHS, LAST_INCOME_MONTH, type CapitalSchedule } from "../types";
-import { runSimulation } from "@/lib/finance/projection-sim";
-import { buildFlywheel, type FlywheelSpec } from "./flywheel";
+import { runSimulation, type ActiveInvestment } from "@/lib/finance/projection-sim";
+import { monthlyPayment } from "@/lib/finance/amortization";
+import { buildFlywheel, discountedValue, type FlywheelSpec } from "./flywheel";
 
 const spec: FlywheelSpec = {
   kind: "flywheel",
@@ -30,8 +31,20 @@ describe("buildFlywheel — shape", () => {
     expect(s.entryBasis).toBe("nominal");
   });
 
-  it("carries no debt at exit — the LoC is netted into book value", () => {
-    expect(s.exit.debtPayoff).toBe(0);
+  it("carries the outstanding LoC balance as debt at exit, not netted away", () => {
+    const sim = runSimulation({
+      msc: 2_000,
+      investmentSizeFactor: 5,
+      termMonths: 36,
+      investmentInterestPct: 0.08,
+      locIncrease: 1.5,
+      locInterestPct: 0.1,
+      totalMonths: HORIZON_MONTHS,
+    });
+    expect(s.exit.debtPayoff).toBeCloseTo(sim.series[LAST_INCOME_MONTH].outstandingAmount, 6);
+    // The default run never fully delevers by the horizon, so this is a real
+    // regression guard, not a vacuous zero check.
+    expect(s.exit.debtPayoff).toBeGreaterThan(0);
   });
 
   it("emits no TaxItem outside the income months", () => {
@@ -57,9 +70,39 @@ describe("buildFlywheel — capital", () => {
     const without = buildFlywheel(spec, capital);
     expect(withLump.capitalIn[0]).toBeCloseTo(without.capitalIn[0], 6);
   });
+
+  it("honours the shared monthly cutoff — and stops feeding the simulator too", () => {
+    const capped: CapitalSchedule = { ...capital, monthlyEndMonth: 24 };
+    const s = buildFlywheel(spec, capped);
+    expect(s.capitalIn[23]).toBeCloseTo(2_000, 6);
+    expect(s.capitalIn[24]).toBe(0);
+    expect(s.capitalIn[LAST_INCOME_MONTH]).toBe(0);
+  });
 });
 
-describe("buildFlywheel — only interest is taxable", () => {
+describe("buildFlywheel — owner cash flow is the withdrawal, not the distribution", () => {
+  it("pays the owner nothing during accumulation when no withdrawal is set", () => {
+    const s = buildFlywheel(spec, capital);
+    expect(s.preTaxCash.every((v) => v === 0)).toBe(true);
+  });
+
+  it("pays exactly the configured withdrawal from the start month onward", () => {
+    const s = buildFlywheel({ ...spec, withdrawalStartMonth: 24, monthlyWithdrawal: 900 }, capital);
+    expect(s.preTaxCash[23]).toBe(0);
+    expect(s.preTaxCash[24]).toBeCloseTo(900, 6);
+    expect(s.preTaxCash[LAST_INCOME_MONTH]).toBeCloseTo(900, 6);
+  });
+
+  it("forwards the withdrawal into the simulator itself, not just the reported series", () => {
+    const withdrawing = buildFlywheel({ ...spec, withdrawalStartMonth: 12, monthlyWithdrawal: 1_500 }, capital);
+    const notWithdrawing = buildFlywheel(spec, capital);
+    // Pulling cash out starves the flywheel's reinvestment, so its terminal
+    // book is smaller than the otherwise-identical run that withdraws nothing.
+    expect(withdrawing.exit.grossProceeds).toBeLessThan(notWithdrawing.exit.grossProceeds);
+  });
+});
+
+describe("buildFlywheel — interest income and LoC interest expense", () => {
   const s = buildFlywheel(spec, capital);
   const sim = runSimulation({
     msc: 2_000,
@@ -71,35 +114,80 @@ describe("buildFlywheel — only interest is taxable", () => {
     totalMonths: HORIZON_MONTHS,
   });
 
-  it("passes distributions through as pre-tax cash", () => {
-    expect(s.preTaxCash[40]).toBeCloseTo(sim.series[40].distributionCashFlow, 6);
+  it("taxes the interest earned, not the whole payment — and taxes it whether or not it is withdrawn", () => {
+    const incomeItem = s.taxItems.find((t) => t.month === 40 && t.amount > 0);
+    expect(incomeItem?.amount).toBeCloseTo(sim.series[40].distributionInterest, 6);
+    // The default spec takes no withdrawal, so there is no cash in month 40 —
+    // yet the interest earned that month is still taxable. That mismatch is
+    // the intended phantom-income drag, not a bug.
+    expect(s.preTaxCash[40]).toBe(0);
+    expect(incomeItem!.amount).toBeGreaterThan(0);
   });
 
-  it("taxes only the interest share, not the whole payment", () => {
-    const item = s.taxItems.find((t) => t.month === 40);
-    expect(item?.amount).toBeCloseTo(sim.series[40].distributionInterest, 6);
-    expect(item!.amount).toBeLessThan(s.preTaxCash[40]);
+  it("tags the interest income ordinary portfolio income — no shelter", () => {
+    const incomeItem = s.taxItems.find((t) => t.month === 40 && t.amount > 0);
+    expect(incomeItem?.character).toBe("ordinary");
+    expect(incomeItem?.activity).toBe("portfolio");
+    expect(incomeItem?.basisAffecting).toBe(false);
   });
 
-  it("tags it ordinary portfolio income — no shelter", () => {
-    const item = s.taxItems.find((t) => t.month === 40);
-    expect(item?.character).toBe("ordinary");
-    expect(item?.activity).toBe("portfolio");
-    expect(item?.basisAffecting).toBe(false);
+  it("deducts the LoC interest expense as a negative ordinary item", () => {
+    const expenseItem = s.taxItems.find((t) => t.month === 40 && t.amount < 0);
+    expect(expenseItem).toBeDefined();
+    expect(expenseItem?.character).toBe("ordinary");
+    expect(expenseItem?.activity).toBe("portfolio");
+    expect(expenseItem?.basisAffecting).toBe(false);
+    expect(expenseItem?.amount).toBeCloseTo(
+      -(sim.series[40].outstandingAmount * (0.1 / 12)),
+      6
+    );
   });
 
-  it("taxes far less than it distributes over the horizon", () => {
-    const cash = s.preTaxCash.reduce((a, v) => a + v, 0);
-    const taxable = s.taxItems.reduce((a, t) => a + t.amount, 0);
-    expect(taxable).toBeGreaterThan(0);
-    expect(taxable).toBeLessThan(cash * 0.5);
+  it("nets the LoC interest expense against interest income — net taxable is materially below gross", () => {
+    const grossInterest = sim.series.reduce((a, p) => a + p.distributionInterest, 0);
+    const netTaxable = s.taxItems.reduce((a, t) => a + t.amount, 0);
+    expect(netTaxable).toBeGreaterThan(0);
+    expect(netTaxable).toBeLessThan(grossInterest * 0.9);
+  });
+});
+
+describe("discountedValue — verified against an independently computed amortization balance", () => {
+  it("equals the textbook remaining-balance formula at a note's own rate", () => {
+    const faceValue = 100_000;
+    const annualRate = 0.08;
+    const termMonths = 36;
+    const startMonth = 1;
+    const payment = monthlyPayment(faceValue, annualRate, termMonths);
+
+    const inv: ActiveInvestment = {
+      kind: "term",
+      monthlyPayout: payment,
+      termMonths,
+      startMonth,
+      faceValue,
+      monthlyRate: annualRate / 12,
+    };
+
+    const paymentsMade = 10;
+    const month = startMonth + paymentsMade;
+
+    // Independently derived remaining-balance formula for an amortizing loan
+    // after k payments: B_k = P(1+r)^k - PMT * ((1+r)^k - 1) / r.
+    const r = annualRate / 12;
+    const growth = Math.pow(1 + r, paymentsMade);
+    const expectedBalance = faceValue * growth - (payment * (growth - 1)) / r;
+
+    expect(discountedValue(inv, month, annualRate)).toBeCloseTo(expectedBalance, 4);
   });
 });
 
 describe("buildFlywheel — the exit", () => {
-  it("sells at basis when discounting at the Amplicon rate", () => {
+  it("the OptionSeries assembly sells at basis when discounting at the Amplicon rate", () => {
     // Discounting a note's own payments at its own rate returns its
     // outstanding principal, so proceeds equal basis and the gain is zero.
+    // (discountedValue's own correctness is verified independently above —
+    // this checks that buildFlywheel reuses the same valuation on both sides
+    // rather than proving the discounting math itself.)
     const s = buildFlywheel(spec, capital);
     expect(s.exit.grossProceeds).toBeCloseTo(s.exit.costBasis, 4);
   });
@@ -119,7 +207,7 @@ describe("buildFlywheel — the exit", () => {
     expect(buildFlywheel(spec, capital).exit.recapture).toEqual([]);
   });
 
-  it("ends bookValue at the exit proceeds", () => {
+  it("ends bookValue at the exit equity — proceeds net of the LoC payoff", () => {
     const s = buildFlywheel(spec, capital);
     expect(s.bookValue[LAST_INCOME_MONTH]).toBeCloseTo(
       s.exit.grossProceeds - s.exit.debtPayoff,
