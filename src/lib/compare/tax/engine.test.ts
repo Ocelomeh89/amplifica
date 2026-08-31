@@ -356,4 +356,28 @@ describe("disposition release is reported separately", () => {
     );
     expect(r.years[0].dispositionTaxBenefit).toBe(0);
   });
+
+  it("recomputes NIIT for the counterfactual instead of reusing the with-release figure", () => {
+    // MFJ, $300k other income (already past the $250k NIIT threshold), $50k
+    // of disposition-year portfolio income, and a $40k release. Reversing the
+    // release to build the counterfactual raises BOTH ordinary income (more
+    // of it clears the threshold) and investment income (passiveUsable grows
+    // by the full $40k) — so the counterfactual's NIIT is not the with-release
+    // NIIT. Here the with-release NIIT is $380; the true counterfactual NIIT
+    // is $1,900 — a $1,520 gap, which changes the reported benefit by $1,140
+    // (the gap net of the $380 that both sides share).
+    const niitProfile: TaxProfile = { ...profile, otherOrdinaryIncome: 300_000, niitEnabled: true };
+    const r = computeTaxSeries(
+      series([passiveLoss(6, -40_000), item({ month: 80, amount: 50_000 })]),
+      niitProfile,
+      0
+    );
+    // A formula that reuses the with-release NIIT (the bug: subtracting an
+    // unpaired `niit` term, or reusing it as this year's counterfactual NIIT)
+    // produces -$9,980 for this fixture. The correct, NIIT-recomputed answer
+    // is -$11,120. Assert we get the correct figure and NOT the buggy one.
+    const buggyFormulaBenefit = -9_980;
+    expect(r.dispositionTaxBenefit).not.toBeCloseTo(buggyFormulaBenefit, 0);
+    expect(r.dispositionTaxBenefit).toBeCloseTo(-11_120, 2);
+  });
 });

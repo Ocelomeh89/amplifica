@@ -233,19 +233,29 @@ export function computeTaxSeries(
 
     // The disposition release is a one-time event folded into this year's
     // taxDelta. Isolate its value by adding the released amount back to
-    // ordinary income (reversing the release) and re-running householdTax;
-    // the difference is exactly what the release was worth.
-    const withoutRelease =
-      passive.releasedAtDisposition > 0
-        ? householdTax(
-            withOrdinary + passive.releasedAtDisposition,
-            b.qualifiedDividends + b.ltcg,
-            profile,
-            y,
-            inflationPct
-          ) + niit
-        : withInvestment;
-    const dispositionTaxBenefit = withInvestment - withoutRelease;
+    // ordinary income (reversing the release) and re-running householdTax.
+    // Reversing the release raises both ordinary income and investment
+    // income, so the counterfactual's NIIT has to be recomputed rather than
+    // reused — and both sides must carry their own NIIT or the difference is
+    // biased.
+    const released = passive.releasedAtDisposition;
+    let dispositionTaxBenefit = 0;
+    if (released > 0) {
+      const ordinaryWithout = withOrdinary + released;
+      const investmentWithout = Math.max(
+        0,
+        passiveUsable + released + b.portfolioOrdinary + b.qualifiedDividends + b.ltcg
+      );
+      const niitWithout = niitOn(
+        investmentWithout,
+        ordinaryWithout + b.qualifiedDividends + b.ltcg,
+        profile
+      );
+      const withoutRelease =
+        householdTax(ordinaryWithout, b.qualifiedDividends + b.ltcg, profile, y, inflationPct) +
+        niitWithout;
+      dispositionTaxBenefit = withInvestment + niit - withoutRelease;
+    }
 
     // Spread the year's bill evenly across the months that year actually
     // occupies rather than lumping it into a single month. Lumping made a
