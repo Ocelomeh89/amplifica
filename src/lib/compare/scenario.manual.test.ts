@@ -61,6 +61,18 @@ const duplex: OptionSpec = {
   appreciationPct: { bear: 0, base: 0.035, bull: 0.06 },
 };
 
+const flywheel: OptionSpec = {
+  kind: "flywheel",
+  id: "amplifica",
+  label: "Flywheel",
+  investmentSizeFactor: 5,
+  termMonths: 36,
+  investmentInterestPct: 0.08,
+  locIncrease: 1.5,
+  locInterestPct: 0.1,
+  exitDiscountPct: 0.08,
+};
+
 interface Column {
   label: string;
   g: GlobalInputs;
@@ -96,6 +108,11 @@ function table(title: string, note: string, columns: Column[]) {
   }
 }
 
+function contrib(): GlobalInputs {
+  const g = globals();
+  return { ...g, capital: { lumpSum: 0, monthly: 2_000, monthlyEndMonth: null } };
+}
+
 it("comparison runner", () => {
   table(
     "SAME $135,000, SAME 7 YEARS - MFJ $400k, no state tax, 3% inflation",
@@ -104,6 +121,15 @@ it("comparison runner", () => {
       { label: "HYSA 4%", g: globals(), spec: hysa },
       { label: "Duplex", g: globals(), spec: duplex },
       { label: "Duplex + REPS", g: globals({ realEstateProfessional: true }), spec: duplex },
+    ]
+  );
+
+  table(
+    "FLYWHEEL vs THE ALTERNATIVES - $2,000/mo, no lump sum",
+    "Flywheel funded by the shared monthly contribution; cash the same. Rental sets its own $135k outlay.",
+    [
+      { label: "Flywheel", g: contrib(), spec: flywheel },
+      { label: "HYSA 4%", g: contrib(), spec: hysa },
     ]
   );
 
