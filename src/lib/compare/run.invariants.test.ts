@@ -44,7 +44,19 @@ const rentalSpec: OptionSpec = {
 // seven more builders were each about to re-prove them in their own file or
 // quietly forget to. Structural comparability is the design's central claim;
 // it belongs in one sweep, not in nine.
-const ALL_SPECS: OptionSpec[] = [spec, rentalSpec];
+const flywheelSpec: OptionSpec = {
+  kind: "flywheel",
+  id: "amplifica",
+  label: "Amplification",
+  investmentSizeFactor: 5,
+  termMonths: 36,
+  investmentInterestPct: 0.08,
+  locIncrease: 1.5,
+  locInterestPct: 0.1,
+  exitDiscountPct: 0.08,
+};
+
+const ALL_SPECS: OptionSpec[] = [spec, rentalSpec, flywheelSpec];
 
 function globals(over: Partial<GlobalInputs> = {}): GlobalInputs {
   return {

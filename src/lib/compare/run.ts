@@ -8,9 +8,10 @@ import { computeTaxSeries } from "./tax/engine";
 import { afterTaxContinuingIncome, computeMetrics, type OptionMetrics } from "./metrics";
 import { buildCash, type CashSpec } from "./build/cash";
 import { buildRental, type RentalSpec } from "./build/rental";
+import { buildFlywheel, type FlywheelSpec } from "./build/flywheel";
 
-// Plan B extends this union with the remaining seven option kinds.
-export type OptionSpec = CashSpec | RentalSpec;
+// Plan B extends this union with the remaining six option kinds.
+export type OptionSpec = CashSpec | RentalSpec | FlywheelSpec;
 
 export interface ComparisonOption {
   id: string;
@@ -40,6 +41,8 @@ export function buildSeries(spec: OptionSpec, globals: GlobalInputs): OptionSeri
       return buildCash(spec, globals.capital, globals.scenario);
     case "rental":
       return buildRental(spec, globals.scenario);
+    case "flywheel":
+      return buildFlywheel(spec, globals.capital);
   }
 }
 
