@@ -46,6 +46,15 @@ export function rentalAllowance(
   return Math.max(0, reduced);
 }
 
+export interface PassiveOutcome {
+  usableLoss: number;
+  taxablePassiveIncome: number;
+  // The portion of usableLoss that came from releasing previously SUSPENDED
+  // losses at disposition, rather than from this year's own allowance. A
+  // one-time event; downstream metrics must not read it as a recurring rate.
+  releasedAtDisposition: number;
+}
+
 // `netPassive` is the year's passive income net of passive deductions:
 // positive is income, negative is a loss. Mutates `state`.
 export function applyPassiveRules(
@@ -55,15 +64,19 @@ export function applyPassiveRules(
   year: number,
   inflationPct: number,
   isDispositionYear: boolean
-): { usableLoss: number; taxablePassiveIncome: number } {
+): PassiveOutcome {
   // A real estate professional has no passive bucket at all: losses are
   // immediately usable against ordinary income from any source.
   if (profile.realEstateProfessional) {
     const released = state.suspended;
     state.suspended = 0;
     return netPassive >= 0
-      ? { usableLoss: released, taxablePassiveIncome: netPassive }
-      : { usableLoss: released - netPassive, taxablePassiveIncome: 0 };
+      ? { usableLoss: released, taxablePassiveIncome: netPassive, releasedAtDisposition: released }
+      : {
+          usableLoss: released - netPassive,
+          taxablePassiveIncome: 0,
+          releasedAtDisposition: released,
+        };
   }
 
   if (netPassive >= 0) {
@@ -72,11 +85,13 @@ export function applyPassiveRules(
     state.suspended -= absorbed;
     let taxable = netPassive - absorbed;
     let usableLoss = 0;
+    let releasedAtDisposition = 0;
     if (isDispositionYear) {
       usableLoss = state.suspended;
+      releasedAtDisposition = state.suspended;
       state.suspended = 0;
     }
-    return { usableLoss, taxablePassiveIncome: taxable };
+    return { usableLoss, taxablePassiveIncome: taxable, releasedAtDisposition };
   }
 
   // A loss this year. The special allowance may let part of it through now.
@@ -86,9 +101,11 @@ export function applyPassiveRules(
   state.suspended += loss - allowed;
 
   let usableLoss = allowed;
+  let releasedAtDisposition = 0;
   if (isDispositionYear) {
+    releasedAtDisposition = state.suspended;
     usableLoss += state.suspended;
     state.suspended = 0;
   }
-  return { usableLoss, taxablePassiveIncome: 0 };
+  return { usableLoss, taxablePassiveIncome: 0, releasedAtDisposition };
 }

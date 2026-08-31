@@ -303,3 +303,57 @@ describe("computeTaxSeries — baseline delta", () => {
     );
   });
 });
+
+describe("disposition release is reported separately", () => {
+  // Thin wrapper on the file's existing `item` helper — do not re-declare the
+  // whole TaxItem literal, the reviewer will (rightly) flag the duplication.
+  const passiveLoss = (month: number, amount: number): TaxItem =>
+    item({ month, amount, activity: "passive", activityId: "prop" });
+
+  it("is zero when nothing was ever suspended", () => {
+    const r = computeTaxSeries(series([item({ month: 6, amount: 10_000 })]), profile, 0);
+    expect(r.dispositionTaxBenefit).toBe(0);
+  });
+
+  it("reports the tax value of losses released at the horizon", () => {
+    const losses = [passiveLoss(6, -40_000), passiveLoss(18, -40_000)];
+    const r = computeTaxSeries(series(losses), profile, 0);
+    // Nothing is usable while suspended, so every early year is flat...
+    expect(r.years[0].taxDelta).toBe(0);
+    expect(r.years[1].taxDelta).toBe(0);
+    // ...and the whole $80,000 releases in the final year.
+    expect(r.dispositionTaxBenefit).toBeLessThan(0);
+    expect(r.dispositionTaxBenefit).toBeCloseTo(r.years[HORIZON_YEARS - 1].taxDelta, 6);
+  });
+
+  it("nets the final year's own passive income against the release", () => {
+    // 40k suspended from year 0, plus 15k of passive income in the final year.
+    // The income absorbs 15k of the suspended balance, so only 25k releases —
+    // a smaller benefit than releasing the full 40k would give.
+    const partly = computeTaxSeries(
+      series([passiveLoss(6, -40_000), passiveLoss(80, 15_000)]),
+      profile,
+      0
+    );
+    const full = computeTaxSeries(series([passiveLoss(6, -40_000)]), profile, 0);
+    // Both are negative (benefits); the partial one is the smaller benefit, so
+    // it is the LESS negative of the two.
+    expect(partly.dispositionTaxBenefit).toBeLessThan(0);
+    expect(partly.dispositionTaxBenefit).toBeGreaterThan(full.dispositionTaxBenefit);
+  });
+
+  it("is zero for a real estate professional, who never suspends anything", () => {
+    const reps = { ...profile, realEstateProfessional: true };
+    const r = computeTaxSeries(series([passiveLoss(6, -40_000)]), reps, 0);
+    expect(r.dispositionTaxBenefit).toBe(0);
+  });
+
+  it("exposes the released amount on the final year's detail", () => {
+    const r = computeTaxSeries(series([passiveLoss(6, -40_000)]), profile, 0);
+    expect(r.years[HORIZON_YEARS - 1].dispositionTaxBenefit).toBeCloseTo(
+      r.dispositionTaxBenefit,
+      6
+    );
+    expect(r.years[0].dispositionTaxBenefit).toBe(0);
+  });
+});

@@ -110,12 +110,18 @@ export interface TaxYearDetail {
   taxDelta: number;
   nonPassiveCarryforward: number;
   suspendedPassive: number;
+  // The tax value of losses released at disposition — a one-time event, not a
+  // rate. Zero in every year but the last.
+  dispositionTaxBenefit: number;
 }
 
 export interface TaxResult {
   monthlyTaxCash: number[]; // + = tax owed, - = benefit. Length HORIZON_MONTHS.
   exitTaxCash: number;
   years: TaxYearDetail[];
+  // The horizon's disposition release, in tax dollars (negative = a benefit).
+  // Metrics net this out before reading the final year as a recurring rate.
+  dispositionTaxBenefit: number;
 }
 
 // The household's federal + state bill on a given slug of ordinary income and
@@ -224,6 +230,23 @@ export function computeTaxSeries(
     const niit = niitOn(investmentIncome, totalIncome, profile);
 
     const taxDelta = withInvestment + niit - baseline;
+
+    // The disposition release is a one-time event folded into this year's
+    // taxDelta. Isolate its value by adding the released amount back to
+    // ordinary income (reversing the release) and re-running householdTax;
+    // the difference is exactly what the release was worth.
+    const withoutRelease =
+      passive.releasedAtDisposition > 0
+        ? householdTax(
+            withOrdinary + passive.releasedAtDisposition,
+            b.qualifiedDividends + b.ltcg,
+            profile,
+            y,
+            inflationPct
+          ) + niit
+        : withInvestment;
+    const dispositionTaxBenefit = withInvestment - withoutRelease;
+
     // Spread the year's bill evenly across the months that year actually
     // occupies rather than lumping it into a single month. Lumping made a
     // per-month metric read one month of income against twelve months of tax
@@ -236,10 +259,17 @@ export function computeTaxSeries(
     const monthsInYear = lastMonth - firstMonth + 1;
     const perMonth = taxDelta / monthsInYear;
     for (let m = firstMonth; m <= lastMonth; m++) monthlyTaxCash[m] = perMonth;
-    years.push({ year: y, taxDelta, nonPassiveCarryforward, suspendedPassive });
+    years.push({
+      year: y,
+      taxDelta,
+      nonPassiveCarryforward,
+      suspendedPassive,
+      dispositionTaxBenefit,
+    });
   }
 
   const exitTaxCash = exitTax(series.exit, profile, HORIZON_YEARS - 1, inflationPct);
+  const dispositionTaxBenefit = years[HORIZON_YEARS - 1].dispositionTaxBenefit;
 
-  return { monthlyTaxCash, exitTaxCash, years };
+  return { monthlyTaxCash, exitTaxCash, years, dispositionTaxBenefit };
 }
