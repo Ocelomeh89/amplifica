@@ -136,16 +136,32 @@ describe("rental through the pipeline", () => {
     const raw = o.preTaxCash[LAST_INCOME_MONTH];
     expect(raw).toBeGreaterThan(0);
     expect(o.metrics.continuingMonthlyIncome).toBeGreaterThan(0);
-    // A sign check passed both with and without the clamp in
-    // afterTaxContinuingIncome, so it constrained nothing. This is the
-    // magnitude bound instead: year 6 is the DISPOSITION year, so its tax
-    // delta carries the whole passive-loss release — $2,364 pre-tax against
-    // $18,502 after tax, a blended ratio of 7.8 that reported $1,571/mo of
-    // continuing income against an honest ~$201. The bound is stated against
-    // the NOMINAL month-83 cash flow while the metric is deflated to today's
-    // dollars, which only makes it more generous, and 7.8x still blows
-    // straight through it.
-    expect(o.metrics.continuingMonthlyIncome).toBeLessThan(2 * raw);
+    // Netting dispositionTaxBenefit out of the blended ratio (rather than
+    // clamping it) recovers the honest recurring figure directly: ~$201/mo,
+    // not the ~$1,571/mo the release-inflated ratio used to report. The
+    // bound is tight now — well under the old 2x-of-raw bound, which passed
+    // both with and without the clamp and constrained nothing.
+    expect(o.metrics.continuingMonthlyIncome).toBeGreaterThan(150);
+    expect(o.metrics.continuingMonthlyIncome).toBeLessThan(250);
+    // Year 7's monthly cash flow is read the same way: month 83's raw figure
+    // minus its share of the disposition release, so it should land close to
+    // the same honest recurring figure rather than the ~$1,397 the release
+    // used to inflate it to.
+    expect(o.metrics.yearSevenMonthlyCashFlow).toBeGreaterThan(150);
+    expect(o.metrics.yearSevenMonthlyCashFlow).toBeLessThan(250);
+  });
+
+  it("pays real tax at the sale — it is not actually a shelter", () => {
+    const o = runComparison(globals(), [rental]).options[0];
+    // Operating-only taxPaid nets to a benefit, which reads as a shelter in
+    // isolation. exitTaxPaid is the tax on the sale, held separately, and it
+    // is substantial.
+    expect(o.exitTaxPaid).toBeGreaterThan(30_000);
+    const operatingTax = o.taxPaid.reduce((a, v) => a + v, 0);
+    expect(operatingTax).toBeLessThan(0);
+    // But summed together — operating tax plus exit tax — the rental pays
+    // real net tax over the whole hold.
+    expect(operatingTax + o.exitTaxPaid).toBeGreaterThan(0);
   });
 
   it("does not flip a permanently loss-making rental to positive income", () => {

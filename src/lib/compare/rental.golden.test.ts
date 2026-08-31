@@ -69,5 +69,20 @@ describe("golden — $500k duplex, 25% down, 6.5% for 30 years", () => {
     // 500_000 * 0.94 - 375_000) against $135,000 of capital in, so it takes
     // ~2.7 years of appreciation and amortization to close the gap.
     expect(o.metrics.paybackMonthIncludingSale).toBe(32);
+    // Month 83's after-tax cash netted against its share of the disposition
+    // release. Before the fix this read $1,397 — mostly a one-time refund
+    // wearing a monthly label; the honest recurring figure is ~$201.
+    expect(o.metrics.yearSevenMonthlyCashFlow).toBeCloseTo(201.25, 2);
+  });
+
+  it("pays real tax at the sale, on top of the operating-only taxPaid total", () => {
+    // taxPaid alone sums to -$16,138 (a net operating benefit, from the
+    // suspended-loss release netting against ordinary-year tax). exitTaxPaid
+    // is held separately and is substantially positive — the rental is not
+    // actually a shelter once the sale is counted.
+    expect(o.exitTaxPaid).toBeCloseTo(46_092.63, 2);
+    const operatingTax = o.taxPaid.reduce((a, v) => a + v, 0);
+    expect(operatingTax).toBeCloseTo(-16_137.91, 2);
+    expect(operatingTax + o.exitTaxPaid).toBeCloseTo(29_954.72, 2);
   });
 });

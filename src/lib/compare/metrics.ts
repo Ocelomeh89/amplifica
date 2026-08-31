@@ -48,6 +48,9 @@ export interface MetricsInput {
   // Nominal, at HORIZON_MONTHS, and AFTER TAX like every sibling figure —
   // run.ts derives it with afterTaxContinuingIncome below.
   continuingMonthlyIncome: number;
+  // The final year's one-time disposition release, in tax dollars (negative =
+  // a benefit). Netted out before any figure is read as a recurring rate.
+  dispositionTaxBenefit: number;
   inflationPct: number;
 }
 
@@ -103,19 +106,18 @@ export function annualize(monthlyRate: number): number {
 // loses money every month. In any of those cases the run rate passes through
 // untaxed, which is conservative and visibly so.
 //
-// A ratio ABOVE 1 fails the same way from the other side, and it is the one
-// that actually bit. Year 6 is the DISPOSITION year, so its tax delta carries
-// the whole release of seven years of suspended passive losses. For the
-// rental that is $2,364 of pre-tax cash against $18,502 after tax — a ratio
-// of 7.8, reporting $1,571/mo of continuing income against an honest ~$201.
-// A ratio above 1 means the year's tax was a net BENEFIT, which describes a
-// one-time disposition effect rather than a recurring rate, so the run rate
-// passes through untaxed there too. This clamp is the contract for a function
-// whose behaviour is otherwise invisible in the output.
+// Year 6 is the DISPOSITION year, so its tax delta carries the whole release
+// of seven years of suspended passive losses, dominating `post` and inflating
+// the blended ratio far past what the position actually recurs at. Rather
+// than clamp the symptom (a ratio above 1), `dispositionTaxBenefit` — the tax
+// value of that release, negative when it is a benefit — is subtracted from
+// `post` before the ratio is formed, recovering the recurring after-tax
+// figure directly.
 export function afterTaxContinuingIncome(
   preTaxCash: number[],
   afterTaxCash: number[],
-  continuingMonthlyIncome: number
+  continuingMonthlyIncome: number,
+  dispositionTaxBenefit: number
 ): number {
   let pre = 0;
   let post = 0;
@@ -123,11 +125,10 @@ export function afterTaxContinuingIncome(
     pre += preTaxCash[m];
     post += afterTaxCash[m];
   }
-  if (pre <= 0 || post < 0) return continuingMonthlyIncome;
-  const ratio = post / pre;
+  const recurringPost = post + dispositionTaxBenefit;
+  if (pre <= 0 || recurringPost < 0) return continuingMonthlyIncome;
+  const ratio = recurringPost / pre;
   if (!Number.isFinite(ratio)) return continuingMonthlyIncome;
-  // A one-time disposition benefit is not a run rate. See above.
-  if (ratio > 1) return continuingMonthlyIncome;
   return continuingMonthlyIncome * ratio;
 }
 
@@ -170,13 +171,20 @@ export function computeMetrics(input: MetricsInput): OptionMetrics {
   const solved = irrMonthly(flows);
   const irrNominal = solved.rate === null ? null : annualize(solved.rate);
 
+  // The final year's tax lands spread across its income months, and part of it
+  // is the one-time disposition release. Month 83 carries one share of that,
+  // so reading it raw reports a refund as recurring income.
+  const finalYearMonths = LAST_INCOME_MONTH - FINAL_YEAR_FIRST_MONTH + 1;
+  const releasePerMonth = input.dispositionTaxBenefit / finalYearMonths;
+  const yearSeven = realCash[LAST_INCOME_MONTH] + deflate(releasePerMonth, inflationPct, LAST_INCOME_MONTH);
+
   return {
     totalCashCollected: totalCash,
     // Divided by INCOME_MONTHS, not HORIZON_MONTHS: month 0 is the deployment
     // month and can never carry income, so dividing an 83-month total by 84
     // understated every option's average by 1.2%.
     averageMonthlyCashFlow: totalCash / INCOME_MONTHS,
-    yearSevenMonthlyCashFlow: realCash[HORIZON_MONTHS - 1],
+    yearSevenMonthlyCashFlow: yearSeven,
     irrNominal,
     irrReal: irrNominal === null ? null : (1 + irrNominal) / (1 + inflationPct) - 1,
     irrUnavailableReason: solved.reason,

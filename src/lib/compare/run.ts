@@ -19,6 +19,10 @@ export interface ComparisonOption {
   taxPaid: number[];
   afterTaxCash: number[];
   exitProceedsAfterTax: number;
+  // Tax on the liquidation, held separate from `taxPaid` (which is operating
+  // tax only). Summing taxPaid alone can show a net benefit for an option that
+  // pays substantial tax at the sale.
+  exitTaxPaid: number;
   metrics: OptionMetrics;
 }
 
@@ -62,6 +66,7 @@ export function runComparison(
       taxPaid: tax.monthlyTaxCash,
       afterTaxCash,
       exitProceedsAfterTax,
+      exitTaxPaid: tax.exitTaxCash,
       metrics: computeMetrics({
         afterTaxCash,
         capitalIn: nominal.capitalIn,
@@ -73,8 +78,10 @@ export function runComparison(
         continuingMonthlyIncome: afterTaxContinuingIncome(
           nominal.preTaxCash,
           afterTaxCash,
-          nominal.continuingMonthlyIncome
+          nominal.continuingMonthlyIncome,
+          tax.dispositionTaxBenefit
         ),
+        dispositionTaxBenefit: tax.dispositionTaxBenefit,
         inflationPct: globals.inflationPct,
       }),
     };

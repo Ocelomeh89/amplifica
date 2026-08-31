@@ -44,23 +44,23 @@ describe("afterTaxContinuingIncome", () => {
   const post = zeroSeries().map((_, m) => (m === 0 ? 0 : 70));
 
   it("applies year 6's own blended after-tax ratio to the run rate", () => {
-    expect(afterTaxContinuingIncome(pre, post, 100)).toBeCloseTo(70, 8);
+    expect(afterTaxContinuingIncome(pre, post, 100, 0)).toBeCloseTo(70, 8);
   });
 
   it("reads only year 6, not the whole horizon", () => {
     // Year 0-5 taxed to nothing, year 6 taxed at 30%. The run rate is the
     // month-85 figure, so only the most recent year is informative.
     const lopsided = post.map((v, m) => (m >= 73 ? v : 0));
-    expect(afterTaxContinuingIncome(pre, lopsided, 100)).toBeCloseTo(70, 8);
+    expect(afterTaxContinuingIncome(pre, lopsided, 100, 0)).toBeCloseTo(70, 8);
   });
 
   it("passes the pre-tax figure through when year 6 has no cash flow", () => {
     const none = zeroSeries();
-    expect(afterTaxContinuingIncome(none, none, 500)).toBe(500);
+    expect(afterTaxContinuingIncome(none, none, 500, 0)).toBe(500);
   });
 
   it("is never NaN", () => {
-    expect(Number.isFinite(afterTaxContinuingIncome(zeroSeries(), zeroSeries(), 0))).toBe(true);
+    expect(Number.isFinite(afterTaxContinuingIncome(zeroSeries(), zeroSeries(), 0, 0))).toBe(true);
   });
 });
 
@@ -76,6 +76,7 @@ const base = {
   exitProceedsAfterTax: 1000,
   bookValue: zeroSeries(),
   continuingMonthlyIncome: 20,
+  dispositionTaxBenefit: 0,
   inflationPct: 0,
 };
 
@@ -159,6 +160,7 @@ describe("paybackMonthIncludingSale", () => {
     exitProceedsAfterTax: 0,
     bookValue: appreciating,
     continuingMonthlyIncome: 0,
+    dispositionTaxBenefit: 0,
     inflationPct: 0,
   };
 
@@ -204,23 +206,83 @@ describe("afterTaxContinuingIncome with a loss-making year 6", () => {
 
   it("applies year 6's blended rate when the year was profitable", () => {
     const { p, a } = yearSix(100, 70);
-    expect(afterTaxContinuingIncome(p, a, 200)).toBeCloseTo(140, 6);
+    expect(afterTaxContinuingIncome(p, a, 200, 0)).toBeCloseTo(140, 6);
   });
 
   it("does not turn a loss-making run rate into positive income", () => {
     // Pre-tax loss, but the loss produced a tax benefit, so post is positive.
     // ratio is negative, and a negative run rate times it comes back positive.
     const { p, a } = yearSix(-100, 40);
-    expect(afterTaxContinuingIncome(p, a, -50)).toBeLessThanOrEqual(0);
+    expect(afterTaxContinuingIncome(p, a, -50, 0)).toBeLessThanOrEqual(0);
   });
 
   it("passes the run rate through when year 6 lost money", () => {
     const { p, a } = yearSix(-100, -80);
-    expect(afterTaxContinuingIncome(p, a, -50)).toBe(-50);
+    expect(afterTaxContinuingIncome(p, a, -50, 0)).toBe(-50);
   });
 
   it("passes the run rate through when year 6 produced nothing", () => {
     const { p, a } = yearSix(0, 0);
-    expect(afterTaxContinuingIncome(p, a, 25)).toBe(25);
+    expect(afterTaxContinuingIncome(p, a, 25, 0)).toBe(25);
+  });
+});
+
+describe("year-7 cash flow excludes the disposition release", () => {
+  const capitalIn = zeroSeries();
+  capitalIn[0] = 1000;
+
+  it("subtracts the release's share from the final month", () => {
+    // 11 income months in the final year, each carrying 1/11 of the benefit.
+    const afterTaxCash = zeroSeries().map((_, m) => (m === 0 ? 0 : 100));
+    const withRelease = computeMetrics({
+      afterTaxCash,
+      capitalIn,
+      bookValue: zeroSeries(),
+      exitProceedsAfterTax: 0,
+      continuingMonthlyIncome: 100,
+      dispositionTaxBenefit: -1100, // -100/month across 11 months
+      inflationPct: 0,
+    });
+    // The raw month-83 figure is 100; 100 of that is the release's share.
+    expect(withRelease.yearSevenMonthlyCashFlow).toBeCloseTo(0, 6);
+  });
+
+  it("is unchanged when there was no release", () => {
+    const afterTaxCash = zeroSeries().map((_, m) => (m === 0 ? 0 : 100));
+    const m = computeMetrics({
+      afterTaxCash,
+      capitalIn,
+      bookValue: zeroSeries(),
+      exitProceedsAfterTax: 0,
+      continuingMonthlyIncome: 100,
+      dispositionTaxBenefit: 0,
+      inflationPct: 0,
+    });
+    expect(m.yearSevenMonthlyCashFlow).toBeCloseTo(100, 6);
+  });
+});
+
+describe("afterTaxContinuingIncome nets out the disposition release", () => {
+  const yearSix = (pre: number, post: number) => {
+    const p = zeroSeries();
+    const a = zeroSeries();
+    for (let m = 73; m <= 83; m++) {
+      p[m] = pre;
+      a[m] = post;
+    }
+    return { p, a };
+  };
+
+  it("uses the recurring rate, not the release-inflated one", () => {
+    // Pre-tax 100/mo; after-tax 200/mo only because a -1100 release is spread
+    // across the year's 11 months. The recurring after-tax figure is 100/mo,
+    // so the ratio is 1.0 and the run rate passes through unchanged.
+    const { p, a } = yearSix(100, 200);
+    expect(afterTaxContinuingIncome(p, a, 500, -1100)).toBeCloseTo(500, 6);
+  });
+
+  it("still taxes the run rate when the year was genuinely profitable", () => {
+    const { p, a } = yearSix(100, 70);
+    expect(afterTaxContinuingIncome(p, a, 200, 0)).toBeCloseTo(140, 6);
   });
 });
