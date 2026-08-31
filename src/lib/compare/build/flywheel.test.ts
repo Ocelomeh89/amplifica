@@ -242,11 +242,38 @@ describe("buildFlywheel — the exit", () => {
   });
 
   it("ends bookValue at the exit equity — proceeds net of the LoC payoff", () => {
+    // The overwrite that used to force this identity is gone; it now holds by
+    // construction, because month 83's book and the horizon book differ only
+    // by positions the final prune dropped, and those are worth exactly 0 at
+    // month 84. This is the assertion that guards it.
     const s = buildFlywheel(spec, capital);
     expect(s.bookValue[LAST_INCOME_MONTH]).toBeCloseTo(
       s.exit.grossProceeds - s.exit.debtPayoff,
       4
     );
+  });
+});
+
+describe("buildFlywheel — month-0 equity, derived independently", () => {
+  it("values month 0 at the bootstrap Amplicon less the opening LoC balance", () => {
+    // At month 0 exactly one position exists: the bootstrap Amplicon, drawn
+    // for msc × investmentSizeFactor = $10,000 and first paying at month 1.
+    // Discounted at 8% — its own rate — its remaining 36 payments are worth
+    // its $10,000 principal, no more and no less.
+    const bootstrapDraw = 2_000 * 5;
+    // The LoC carries that draw. Month 0 accrues one month's interest on it at
+    // 10%/12 and the month's $2,000 contribution pays it down; the Amplicon
+    // pays nothing yet. There is no cash in the system.
+    const openingLoc = bootstrapDraw * (1 + 0.1 / 12) - 2_000;
+    expect(openingLoc).toBeCloseTo(8_083.333333, 6);
+
+    const s = buildFlywheel(spec, capital);
+    expect(s.bookValue[0]).toBeCloseTo(bootstrapDraw - openingLoc, 6);
+    expect(s.bookValue[0]).toBeCloseTo(1_916.67, 2);
+    // The month's capital in is $2,000, so month 0 is NOT paid back on a sale
+    // — the reading the old uniform haircut produced by overstating this
+    // figure to $2,929.
+    expect(s.bookValue[0]).toBeLessThan(s.capitalIn[0]);
   });
 });
 

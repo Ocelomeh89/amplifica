@@ -222,29 +222,35 @@ export function buildFlywheel(spec: FlywheelSpec, capital: CapitalSchedule): Opt
   const costBasis = basisOfBookAt(sim.finalBook, HORIZON_MONTHS) + lastPoint.cash;
   const debtPayoff = lastPoint.outstandingAmount;
 
-  // Monthly book value rides the simulator's own per-month
-  // expectedFuturePayments — correct every month, since it is derived from
-  // the actual book at that point, not the horizon's survivors — scaled by a
-  // single uniform haircut: the ratio of the discounted horizon book to its
-  // undiscounted sum. That haircut is an approximation (the true discount
-  // varies with each position's remaining term, which shortens as the
-  // horizon approaches), but it beats the undiscounted figure at every month
-  // instead of matching it only at the very last one. Also note:
-  // expectedFuturePayments is book + cash - debt, so the haircut — a
-  // book-only ratio — gets applied to the cash and debt terms too, not just
-  // the book; that overstates equity by roughly 8.4% of the outstanding
-  // balance in mid-horizon months at the default rates. This is the
-  // approximation as prescribed; it is documented, not fixed, because it only
-  // touches paybackMonthIncludingSale — month LAST_INCOME_MONTH is then
-  // overwritten with the exact exit figures so the required identity
-  // (bookValue[LAST_INCOME_MONTH] === grossProceeds - debtPayoff) holds
-  // exactly rather than approximately.
-  const undiscounted = valueBookAt(sim.finalBook, HORIZON_MONTHS, 0);
-  const haircut = undiscounted > 0 ? bookAtDiscount / undiscounted : 1;
+  // Each month's equity, computed the same way the exit is: that month's own
+  // book, discounted at the sale rate, plus the cash in the system, less the
+  // LoC still owed. Every term is exact — sim.bookByMonth[m] is the actual
+  // book at month m, so each position is discounted over its own remaining
+  // term, and cash and debt enter at face because they are face.
+  //
+  // The predecessor scaled expectedFuturePayments by one book-wide haircut,
+  // which was wrong in two compounding ways: the ratio came off the HORIZON
+  // book, whose positions have far less term left than a mid-horizon book's,
+  // and it was applied to the cash and debt terms folded inside
+  // expectedFuturePayments as well as to the book. At month 0 that returned
+  // $2,929 against a true equity of $1,916.67 — a 53% overstatement, sitting
+  // above the month's $2,000 of capital, which reported the flywheel as paid
+  // back including sale in month 0.
+  //
+  // The old explicit overwrite of month LAST_INCOME_MONTH with the exit
+  // figures is gone rather than kept as an assertion: the identity
+  // bookValue[LAST_INCOME_MONTH] === grossProceeds - debtPayoff now holds by
+  // construction, since the horizon book differs from bookByMonth[83] only by
+  // positions the final prune dropped, and those value to exactly 0 at month
+  // HORIZON_MONTHS. Restating it here would hide a real divergence if that
+  // ever stopped being true; the identity is pinned as a test instead, in
+  // flywheel.test.ts and run.invariants.test.ts, where a break is visible.
   for (let m = 0; m < HORIZON_MONTHS; m++) {
-    bookValue[m] = sim.series[m].expectedFuturePayments * haircut;
+    bookValue[m] =
+      valueBookAt(sim.bookByMonth[m], m + 1, spec.exitDiscountPct) +
+      sim.series[m].cash -
+      sim.series[m].outstandingAmount;
   }
-  bookValue[LAST_INCOME_MONTH] = grossProceeds - debtPayoff;
 
   return {
     id: spec.id,

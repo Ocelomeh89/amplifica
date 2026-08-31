@@ -93,4 +93,20 @@ describe("golden — $2,000/mo flywheel, 8% Amplicons, 36-month terms", () => {
     // regression.
     expect(o.metrics.continuingMonthlyIncome).toBeCloseTo(0, 6);
   });
+
+  it("matches the pinned payback", () => {
+    // Never, on cash alone: no withdrawal is configured, so the owner
+    // receives nothing during accumulation and pays tax besides. That is the
+    // honest-but-uninformative reading paybackMonthIncludingSale exists for.
+    expect(o.metrics.paybackMonth).toBeNull();
+    // Month 9, and the pin matters. This read month 0 — "you are whole
+    // immediately, on the first $2,000 you contribute" — while an
+    // interest-bearing savings account took until month 8. That came from
+    // deriving each month's book value from the horizon's short-remaining-term
+    // book scaled by a uniform haircut, which valued month 0's equity at
+    // $2,929 against a true $1,916.67. Each month is now valued on its own
+    // book, and the flywheel pays back on a sale a month LATER than cash — it
+    // is levered at 10% against 8% assets, so early equity builds slowly.
+    expect(o.metrics.paybackMonthIncludingSale).toBe(9);
+  });
 });
