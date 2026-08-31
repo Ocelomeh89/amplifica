@@ -79,6 +79,11 @@ export interface ProjectionSimResult {
   finalDeployedCapital: number;
   finalDistributionsReceived: number;
   perpetualsLaunched: number;
+  // The positions still paying when the horizon ends. Exposed so a consumer
+  // can value the book on its own terms — discounted at a chosen rate, say —
+  // rather than accepting the undiscounted convention of
+  // expectedFuturePayments. Nothing in the Amplifier reads it.
+  finalBook: ActiveInvestment[];
 }
 
 // A relaunch owed since the last payoff but not yet executed: it waits,
@@ -311,5 +316,6 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
     finalMarketBaseline: state.marketBalance,
     finalDeployedCapital: state.deployed,
     finalDistributionsReceived: state.distributions,
+    finalBook: state.book.slice(),
   };
 }
