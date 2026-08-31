@@ -80,5 +80,17 @@ describe("golden — $2,000/mo flywheel, 8% Amplicons, 36-month terms", () => {
     // the integration test), so this is the raw deflated month-83 after-tax
     // figure, unmodified.
     expect(o.metrics.yearSevenMonthlyCashFlow).toBeCloseTo(-286.28, 0);
+    // Exactly 0, and that is the important pin, not a throwaway one. Year 6's
+    // pre-tax cash is 0 (no withdrawal), so afterTaxContinuingIncome's
+    // raw-passthrough fallback fires (metrics.ts: "if (pre <= 0 ...) return
+    // continuingMonthlyIncome") and hands back the builder's own raw value —
+    // which is 0 only because build/flywheel.ts defines continuingMonthlyIncome
+    // as the withdrawal run rate (also 0 here), not the raw distribution. That
+    // builder comment warns explicitly: if continuingMonthlyIncome were ever
+    // reverted to report the raw distribution instead, this same fallback
+    // path would hand out ~$15,600/mo untaxed, right beside every other
+    // option's properly haircut figure. This pin is the tripwire for that
+    // regression.
+    expect(o.metrics.continuingMonthlyIncome).toBeCloseTo(0, 6);
   });
 });

@@ -91,7 +91,12 @@ describe("flywheel through the pipeline", () => {
     expect(o.metrics.yearSevenMonthlyCashFlow).toBeLessThan(0);
   });
 
-  it("compares against cash on identical funding without either throwing", () => {
+  // Retitled from "compares against cash on identical funding without either
+  // throwing" — the very next test proves funding is NOT identical between
+  // these two, so that title contradicted itself. What this test actually
+  // checks is that both options run through the full pipeline side by side,
+  // together, without either producing garbage.
+  it("runs alongside cash through the pipeline without either throwing", () => {
     const both = runComparison(globals(), [flywheel, hysa]);
     expect(both.options).toHaveLength(2);
     for (const o of both.options) {
@@ -102,20 +107,36 @@ describe("flywheel through the pipeline", () => {
 
   // `buildSeries` is exported for exactly this kind of check: ComparisonOption
   // does not carry capitalIn, and comparing series lengths would prove
-  // nothing. The brief's title assumed these fund "dollar for dollar" —
-  // running it turned that up false, by exactly one month's contribution:
-  // buildCash treats month 0 as lump-sum-only and starts its `monthly`
-  // contribution at month 1, while buildFlywheel mirrors its underlying
-  // simulator (projection-sim.ts's loop starts at m = 0 and draws MSC there
-  // too), so the flywheel counts a month-0 contribution cash does not. That
-  // is a real, narrow inconsistency between two builders in when "month 0"
-  // starts counting monthly capital — worth fixing, but in build/cash.ts or
-  // build/flywheel.ts, not here. Recorded precisely rather than papered over.
-  it("funds both from the same $/mo rate, offset by the flywheel's month-0 contribution", () => {
+  // nothing. The brief's title assumed these fund "dollar for dollar." At
+  // lumpSum: 0 that's false by exactly one month's contribution: buildCash
+  // treats month 0 as lump-sum-only and starts its `monthly` contribution at
+  // month 1, while buildFlywheel mirrors its underlying simulator
+  // (projection-sim.ts's loop starts at m = 0 and draws MSC there too), so
+  // the flywheel counts a month-0 contribution cash does not.
+  //
+  // Run at a nonzero lump sum, as here, a second and much larger divergence
+  // swamps that one: build/flywheel.ts reads only `capital.monthly` —
+  // `capital.lumpSum` never enters its `capitalIn` at all. This is
+  // deliberate, not a bug — the simulator it wraps has no lump-sum input, so
+  // the flywheel is a PURE CONTRIBUTION STRATEGY by design (see FlywheelSpec's
+  // own docs on mscOverride). But it means the two options are NOT comparable
+  // on capital totals whenever lumpSum > 0: cash deploys the full lump sum on
+  // top of its (one-month-later) monthly schedule; the flywheel deploys
+  // nothing extra. A UI built on this engine must flag that funding is
+  // unequal rather than silently plotting the two as if it were — the whole
+  // lump sum is capital a saver would have to leave uninvested, or deploy
+  // some other way, to run the flywheel side by side with a lump-sum-funded
+  // alternative.
+  it("does not fund a lump sum into the flywheel at all — a real, UI-relevant gap", () => {
     const g = globals();
+    g.capital.lumpSum = 100_000;
     const a = buildSeries(flywheel, g).capitalIn.reduce((x, v) => x + v, 0);
     const b = buildSeries(hysa, g).capitalIn.reduce((x, v) => x + v, 0);
-    expect(a - b).toBeCloseTo(g.capital.monthly, 6);
+    // Cash: lumpSum at month 0, plus monthly from month 1. Flywheel: monthly
+    // from month 0, no lumpSum ever. Net, cash out-funds the flywheel by the
+    // lump sum less the one month's contribution the flywheel picks up that
+    // cash does not.
+    expect(b - a).toBeCloseTo(g.capital.lumpSum - g.capital.monthly, 6);
     expect(a).toBeGreaterThan(0);
   });
 });
