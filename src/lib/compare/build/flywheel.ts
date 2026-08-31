@@ -12,8 +12,9 @@ import {
 } from "../types";
 import {
   runSimulation,
-  DEFAULT_MONTHLY_WITHDRAWAL,
+  sanitizeSimInput,
   type ActiveInvestment,
+  type ProjectionSimInput,
 } from "@/lib/finance/projection-sim";
 
 export interface FlywheelSpec {
@@ -77,12 +78,38 @@ function valueBookAt(book: ActiveInvestment[], month: number, annualRate: number
   return total;
 }
 
-export function buildFlywheel(spec: FlywheelSpec, capital: CapitalSchedule): OptionSeries {
-  const msc = spec.mscOverride ?? capital.monthly;
-  const monthlyWithdrawal = spec.monthlyWithdrawal ?? DEFAULT_MONTHLY_WITHDRAWAL;
+// What was PAID for a position that is still on the books at `month` — its
+// cost basis, per position, because the two kinds recover capital differently.
+//
+// A term Amplicon amortizes, so the capital still at work in it is its
+// outstanding principal: discounting its own remaining payments at its own
+// rate returns exactly that (the identity discountedValue documents).
+//
+// A perpetual returns NO principal within its term, so nothing has come back:
+// its basis is its face value, unchanged for the life of the position.
+// Discounting its coupon stream instead — which is what a single book-wide
+// valuation at the Amplicon rate did — prices a 10% coupon at an 8% discount
+// rate and lands roughly 10% ABOVE face. That is a market price, not a cost,
+// and using it as basis wrote off capital that was never spent: on an
+// all-perpetual book it reported $281,048.89 of basis against $255,000 of face,
+// hiding a real $26,048.89 gain at the default rates and inflating a real
+// $51,272.68 loss to $77,321.57 at a 12% exit discount.
+function positionBasis(inv: ActiveInvestment, month: number): number {
+  const elapsed = month - inv.startMonth;
+  if (elapsed < 0 || elapsed >= inv.termMonths) return 0;
+  if (inv.kind === "perpetual") return inv.faceValue;
+  return discountedValue(inv, month, inv.monthlyRate * 12);
+}
 
-  const sim = runSimulation({
-    msc,
+function basisOfBookAt(book: ActiveInvestment[], month: number): number {
+  let total = 0;
+  for (const inv of book) total += positionBasis(inv, month);
+  return total;
+}
+
+export function buildFlywheel(spec: FlywheelSpec, capital: CapitalSchedule): OptionSeries {
+  const simInput: ProjectionSimInput = {
+    msc: spec.mscOverride ?? capital.monthly,
     investmentSizeFactor: spec.investmentSizeFactor,
     termMonths: spec.termMonths,
     investmentInterestPct: spec.investmentInterestPct,
@@ -94,17 +121,29 @@ export function buildFlywheel(spec: FlywheelSpec, capital: CapitalSchedule): Opt
     totalMonths: HORIZON_MONTHS,
     mscEndMonth: capital.monthlyEndMonth ?? undefined,
     withdrawalStartMonth: spec.withdrawalStartMonth,
-    monthlyWithdrawal,
-  });
+    monthlyWithdrawal: spec.monthlyWithdrawal,
+  };
+
+  // Everything REPORTED about the funding schedule is read off the resolved
+  // config, not the raw spec. runSimulation clamps its input through
+  // sanitizeSimInput, so a raw `monthly: -1000` runs at an msc of 0; reporting
+  // the raw figure would show $1,000/mo of capital leaving your pocket against
+  // a simulation that never received it, and a NaN would report NaN capital
+  // against a zero exit. Sanitizing twice is free — it is a pure function of
+  // the same input.
+  const { config } = sanitizeSimInput(simInput);
+  const sim = runSimulation(simInput);
+  const msc = config.msc;
+  const monthlyWithdrawal = config.monthlyWithdrawal;
 
   const capitalIn = zeroSeries();
   const preTaxCash = zeroSeries();
   const bookValue = zeroSeries();
   const taxItems: TaxItem[] = [];
 
-  const mscActive = (m: number) => capital.monthlyEndMonth == null || m < capital.monthlyEndMonth;
+  const mscActive = (m: number) => config.mscEndMonth == null || m < config.mscEndMonth;
   const withdrawingAt = (m: number) =>
-    spec.withdrawalStartMonth != null && m >= spec.withdrawalStartMonth;
+    config.withdrawalStartMonth != null && m >= config.withdrawalStartMonth;
 
   for (let m = 0; m < HORIZON_MONTHS; m++) {
     const point = sim.series[m];
@@ -145,8 +184,16 @@ export function buildFlywheel(spec: FlywheelSpec, capital: CapitalSchedule): Opt
       // month's paydown and before any new draw, so point.outstandingAmount
       // (this month's closing balance, after both) overstates the balance
       // interest actually accrued on. Month 1 reads month 0's balance.
+      //
+      // Month 0 accrues interest of its own, on the bootstrap draw, and the
+      // month convention gives it nowhere to go: this loop starts at month 1
+      // and month 0 is the deployment month, which carries no legal TaxItem
+      // slot. That interest is real and deductible, so it is folded into month
+      // 1's accrual rather than dropped — a deduction deferred by one month,
+      // not invented. Left out it silently cost ~$25 of tax over the horizon.
       const priorOutstanding = sim.series[m - 1].outstandingAmount;
-      const locInterest = priorOutstanding * (spec.locInterestPct / 12);
+      const monthZeroAccrual = m === 1 ? sim.initialInvestmentSize : 0;
+      const locInterest = (priorOutstanding + monthZeroAccrual) * (config.locInterestPct / 12);
       if (locInterest !== 0) {
         taxItems.push({
           month: m,
@@ -165,16 +212,14 @@ export function buildFlywheel(spec: FlywheelSpec, capital: CapitalSchedule): Opt
 
   // grossProceeds is the amount realized on the book alone — before debt, per
   // the exit contract in types.ts — plus the cash sitting in the system,
-  // which is unambiguously the owner's. costBasis is the same book, valued at
-  // the Amplicon rate instead (the outstanding principal on the term
-  // positions; see the note on discountedValue's own limits for perpetuals),
-  // plus the same cash. debtPayoff is the LoC balance still owed, carried
-  // separately so it reduces the cash walked away with but never the taxable
-  // gain.
+  // which is unambiguously the owner's. costBasis is the capital still at work
+  // in that same book, taken position by position (see positionBasis), plus
+  // the same cash — cash is its own basis, so it nets to no gain either way.
+  // debtPayoff is the LoC balance still owed, carried separately so it reduces
+  // the cash walked away with but never the taxable gain.
   const bookAtDiscount = valueBookAt(sim.finalBook, HORIZON_MONTHS, spec.exitDiscountPct);
-  const bookAtOwnRate = valueBookAt(sim.finalBook, HORIZON_MONTHS, spec.investmentInterestPct);
   const grossProceeds = bookAtDiscount + lastPoint.cash;
-  const costBasis = bookAtOwnRate + lastPoint.cash;
+  const costBasis = basisOfBookAt(sim.finalBook, HORIZON_MONTHS) + lastPoint.cash;
   const debtPayoff = lastPoint.outstandingAmount;
 
   // Monthly book value rides the simulator's own per-month

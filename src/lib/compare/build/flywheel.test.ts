@@ -158,9 +158,23 @@ describe("buildFlywheel — interest income and LoC interest expense", () => {
     );
   });
 
-  it("reads month 0's balance for month 1's accrual", () => {
+  it("folds month 0's own accrual into month 1, since month 0 has no TaxItem slot", () => {
+    // Month 1's accrual is month 0's closing balance PLUS the interest month 0
+    // itself accrued on the bootstrap draw ($10,000 × 10%/12 = $83.33). The
+    // tax loop starts at month 1 and month 0 is the deployment month, so that
+    // interest would otherwise be dropped — a real deduction, deferred one
+    // month rather than lost.
     const item = s.taxItems.find((t) => t.month === 1 && t.amount < 0);
-    expect(item?.amount).toBeCloseTo(-(sim.series[0].outstandingAmount * (0.1 / 12)), 6);
+    const bootstrapDraw = 2_000 * 5;
+    expect(item?.amount).toBeCloseTo(
+      -((sim.series[0].outstandingAmount + bootstrapDraw) * (0.1 / 12)),
+      6
+    );
+    // And that fold is worth exactly month 0's accrual, not more.
+    expect(item!.amount).toBeCloseTo(
+      -(sim.series[0].outstandingAmount * (0.1 / 12)) - 83.3333333,
+      6
+    );
   });
 
   it("nets the LoC interest expense against interest income — net taxable is materially below gross", () => {
@@ -233,6 +247,78 @@ describe("buildFlywheel — the exit", () => {
       s.exit.grossProceeds - s.exit.debtPayoff,
       4
     );
+  });
+});
+
+describe("buildFlywheel — cost basis is per position", () => {
+  // perpetualTriggerSize: 0 puts every launch, including the small early ones,
+  // into a perpetual, so the horizon book is perpetuals only and the basis
+  // rule can be checked against a figure with no term-note component in it.
+  const allPerpetual: FlywheelSpec = {
+    ...spec,
+    perpetualMix: 1,
+    perpetualTriggerSize: 0,
+  };
+
+  function horizonFace(s: FlywheelSpec): { face: number; cash: number; count: number } {
+    const sim = runSimulation({
+      msc: 2_000,
+      investmentSizeFactor: s.investmentSizeFactor,
+      termMonths: s.termMonths,
+      investmentInterestPct: s.investmentInterestPct,
+      locIncrease: s.locIncrease,
+      locInterestPct: s.locInterestPct,
+      perpetualMix: s.perpetualMix,
+      perpetualTriggerSize: s.perpetualTriggerSize,
+      totalMonths: HORIZON_MONTHS,
+    });
+    let face = 0;
+    for (const inv of sim.finalBook) face += inv.faceValue;
+    return { face, cash: sim.series[LAST_INCOME_MONTH].cash, count: sim.finalBook.length };
+  }
+
+  it("bases a perpetual at its face value — it has returned no principal", () => {
+    const { face, cash, count } = horizonFace(allPerpetual);
+    expect(count).toBeGreaterThan(0);
+    const s = buildFlywheel(allPerpetual, capital);
+    expect(s.exit.costBasis).toBeCloseTo(face + cash, 4);
+    // The book here is $255,000 of face. Discounting its 10% coupons at 8%
+    // instead — the old book-wide valuation — returned $281,048.89, ten per
+    // cent above the capital actually at work.
+    expect(s.exit.costBasis).toBeCloseTo(255_000, 2);
+  });
+
+  it("shows the real gain a perpetual book earns at the default discount rate", () => {
+    const s = buildFlywheel(allPerpetual, capital);
+    // A 10% coupon discounted at 8% is worth more than face: that is a genuine
+    // $26,048.89 gain, and pricing the basis off the same discounting hid it
+    // entirely by reporting proceeds and basis as the same number.
+    expect(s.exit.grossProceeds).toBeGreaterThan(s.exit.costBasis);
+    expect(s.exit.grossProceeds - s.exit.costBasis).toBeCloseTo(26_048.89, 1);
+  });
+
+  it("still reports a loss when the book really is sold below cost", () => {
+    // At a 12% discount the same coupons are worth less than face — a real
+    // loss of $51,272.68. The old basis inflated it to $77,321.57.
+    const cheap = buildFlywheel({ ...allPerpetual, exitDiscountPct: 0.12 }, capital);
+    expect(cheap.exit.costBasis - cheap.exit.grossProceeds).toBeCloseTo(51_272.68, 1);
+  });
+});
+
+describe("buildFlywheel — reports what the simulator actually ran", () => {
+  it("reports no negative capital when the contribution is negative", () => {
+    // runSimulation clamps a negative msc to 0, so the simulation never
+    // received the money; reporting -$1,000/mo of capital leaving your pocket
+    // against it would be a straight fiction.
+    const s = buildFlywheel(spec, { ...capital, monthly: -1_000 });
+    expect(s.capitalIn.every((v) => v >= 0)).toBe(true);
+    expect(s.capitalIn.every((v) => v === 0)).toBe(true);
+  });
+
+  it("reports finite capital against a NaN contribution", () => {
+    const s = buildFlywheel(spec, { ...capital, monthly: NaN });
+    expect(s.capitalIn.every(Number.isFinite)).toBe(true);
+    expect(Number.isFinite(s.exit.grossProceeds)).toBe(true);
   });
 });
 

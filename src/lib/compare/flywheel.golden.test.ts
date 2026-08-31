@@ -60,7 +60,7 @@ describe("golden — $2,000/mo flywheel, 8% Amplicons, 36-month terms", () => {
     // untouched interest income every year) and above the ~4% a savings
     // account pays. A figure outside [0.04, 0.08] would deserve scrutiny;
     // 5.4% sits comfortably inside it.
-    expect(o.metrics.irrNominal).toBeCloseTo(0.05405337, 4);
+    expect(o.metrics.irrNominal).toBeCloseTo(0.05409606, 4);
     // Meaningfully above 1, but modest at year 7 — this strategy is a
     // multi-decade compounder (the $45k/mo cash-flow target takes roughly 15
     // years at these rates; see FlywheelSpec's own docs), and capital here is
@@ -68,11 +68,11 @@ describe("golden — $2,000/mo flywheel, 8% Amplicons, 36-month terms", () => {
     // month 83 have had essentially no time to compound. IRR (which weights
     // cash flow timing correctly) reads a healthy 5.4%; the aggregate
     // multiple, diluted by late contributions, reads lower. Not a bug.
-    expect(o.metrics.equityMultiple).toBeCloseTo(1.09406186, 4);
+    expect(o.metrics.equityMultiple).toBeCloseTo(1.09421192, 4);
     // Negative: this is cumulative NOMINAL-then-real after-tax cash, and
     // with zero cash ever distributed, every dollar here is tax paid on
     // interest earned but not received — a pure, real out-of-pocket drag.
-    expect(o.metrics.totalCashCollected).toBeCloseTo(-12_585.27, 0);
+    expect(o.metrics.totalCashCollected).toBeCloseTo(-12_562.47, 0);
     // Zero cash in, real tax out: with no withdrawal configured, month 83
     // still owes ordinary tax on that month's earned interest even though
     // preTaxCash[83] is 0. A small negative number, not a refund artifact —
