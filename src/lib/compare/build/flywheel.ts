@@ -140,8 +140,13 @@ export function buildFlywheel(spec: FlywheelSpec, capital: CapitalSchedule): Opt
       // The LoC interest is deductible investment interest expense (§163(d)),
       // offsetting the interest income above. Left out, the tax layer would
       // see the gross interest income with no offset for the cost of the
-      // leverage that produced it.
-      const locInterest = point.outstandingAmount * (spec.locInterestPct / 12);
+      // leverage that produced it. Accrues on the PRIOR month's closing
+      // balance — the simulator charges this month's LoC interest before this
+      // month's paydown and before any new draw, so point.outstandingAmount
+      // (this month's closing balance, after both) overstates the balance
+      // interest actually accrued on. Month 1 reads month 0's balance.
+      const priorOutstanding = sim.series[m - 1].outstandingAmount;
+      const locInterest = priorOutstanding * (spec.locInterestPct / 12);
       if (locInterest !== 0) {
         taxItems.push({
           month: m,
@@ -179,8 +184,14 @@ export function buildFlywheel(spec: FlywheelSpec, capital: CapitalSchedule): Opt
   // undiscounted sum. That haircut is an approximation (the true discount
   // varies with each position's remaining term, which shortens as the
   // horizon approaches), but it beats the undiscounted figure at every month
-  // instead of matching it only at the very last one. Month LAST_INCOME_MONTH
-  // is then overwritten with the exact exit figures so the required identity
+  // instead of matching it only at the very last one. Also note:
+  // expectedFuturePayments is book + cash - debt, so the haircut — a
+  // book-only ratio — gets applied to the cash and debt terms too, not just
+  // the book; that overstates equity by roughly 8.4% of the outstanding
+  // balance in mid-horizon months at the default rates. This is the
+  // approximation as prescribed; it is documented, not fixed, because it only
+  // touches paybackMonthIncludingSale — month LAST_INCOME_MONTH is then
+  // overwritten with the exact exit figures so the required identity
   // (bookValue[LAST_INCOME_MONTH] === grossProceeds - debtPayoff) holds
   // exactly rather than approximately.
   const undiscounted = valueBookAt(sim.finalBook, HORIZON_MONTHS, 0);
@@ -203,7 +214,21 @@ export function buildFlywheel(spec: FlywheelSpec, capital: CapitalSchedule): Opt
       recapture: [],
       debtPayoff,
     },
-    continuingMonthlyIncome: lastPoint.distributionCashFlow,
+    // The month-85 run rate is the owner's withdrawal, matching preTaxCash's
+    // definition — not the raw distribution. This field is contractually
+    // consumed as RECEIPTS: run.ts's afterTaxContinuingIncome falls back to
+    // it raw, untaxed, whenever pre-tax cash is <= 0 or after-tax recurring
+    // cash is negative, which describes the flywheel with no withdrawal
+    // configured every month of accumulation (pre-tax cash is exactly 0 and
+    // after-tax cash is negative — tax on interest earned with nothing
+    // distributed to pay it). Reporting the raw distribution here would let
+    // that fallback hand out ~$15,600/mo untaxed, in a UI block metrics.ts
+    // documents as uniformly after-tax, right beside options that were
+    // properly haircut — the exact "flattering the hardest-taxed option"
+    // failure the after-tax conversion exists to prevent. The system's
+    // underlying distribution capacity is real and worth surfacing, but it
+    // belongs in its own labeled figure, not this one.
+    continuingMonthlyIncome: withdrawingAt(LAST_INCOME_MONTH) ? monthlyWithdrawal : 0,
     entryBasis: "nominal",
   };
 }

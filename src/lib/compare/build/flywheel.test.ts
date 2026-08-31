@@ -100,6 +100,18 @@ describe("buildFlywheel — owner cash flow is the withdrawal, not the distribut
     // book is smaller than the otherwise-identical run that withdraws nothing.
     expect(withdrawing.exit.grossProceeds).toBeLessThan(notWithdrawing.exit.grossProceeds);
   });
+
+  it("reports continuingMonthlyIncome as the withdrawal run rate, not the raw distribution", () => {
+    // Contractually consumed as after-tax RECEIPTS downstream (run.ts /
+    // metrics.ts): reporting the raw distribution here would let an
+    // untaxed-fallback branch hand out the flywheel's gross payout figure
+    // beside options that were properly haircut for tax.
+    const noWithdrawal = buildFlywheel(spec, capital);
+    expect(noWithdrawal.continuingMonthlyIncome).toBe(0);
+
+    const withdrawing = buildFlywheel({ ...spec, withdrawalStartMonth: 24, monthlyWithdrawal: 900 }, capital);
+    expect(withdrawing.continuingMonthlyIncome).toBeCloseTo(900, 6);
+  });
 });
 
 describe("buildFlywheel — interest income and LoC interest expense", () => {
@@ -131,16 +143,24 @@ describe("buildFlywheel — interest income and LoC interest expense", () => {
     expect(incomeItem?.basisAffecting).toBe(false);
   });
 
-  it("deducts the LoC interest expense as a negative ordinary item", () => {
+  it("deducts the LoC interest expense as a negative ordinary item, accrued on the PRIOR month's balance", () => {
     const expenseItem = s.taxItems.find((t) => t.month === 40 && t.amount < 0);
     expect(expenseItem).toBeDefined();
     expect(expenseItem?.character).toBe("ordinary");
     expect(expenseItem?.activity).toBe("portfolio");
     expect(expenseItem?.basisAffecting).toBe(false);
+    // Month 40's LoC interest accrues on month 39's closing balance — the
+    // simulator charges interest before that month's paydown and any new
+    // draw. Using month 40's own closing balance would overstate the accrual.
     expect(expenseItem?.amount).toBeCloseTo(
-      -(sim.series[40].outstandingAmount * (0.1 / 12)),
+      -(sim.series[39].outstandingAmount * (0.1 / 12)),
       6
     );
+  });
+
+  it("reads month 0's balance for month 1's accrual", () => {
+    const item = s.taxItems.find((t) => t.month === 1 && t.amount < 0);
+    expect(item?.amount).toBeCloseTo(-(sim.series[0].outstandingAmount * (0.1 / 12)), 6);
   });
 
   it("nets the LoC interest expense against interest income — net taxable is materially below gross", () => {
