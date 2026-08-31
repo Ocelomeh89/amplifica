@@ -129,6 +129,16 @@ export function afterTaxContinuingIncome(
   if (pre <= 0 || recurringPost < 0) return continuingMonthlyIncome;
   const ratio = recurringPost / pre;
   if (!Number.isFinite(ratio)) return continuingMonthlyIncome;
+  // Backstop, not a substitute for the netting above. The netting removes the
+  // one cause of a year-6 tax benefit this model knows about — the disposition
+  // release — but it is not the only one possible: a heavy first-year
+  // deduction carried forward, or any year-6 loss elsewhere in the option,
+  // leaves post above pre with nothing to net out. A ratio above 1 says tax
+  // PAID you money that year, and multiplying a run rate by it hands out more
+  // after-tax income than the position earns pre-tax — the model reported
+  // $1,000/mo on a $500 run rate before this line existed. Tax can never
+  // increase a recurring receipt, so an unexplained benefit caps at untaxed.
+  if (ratio > 1) return continuingMonthlyIncome;
   return continuingMonthlyIncome * ratio;
 }
 

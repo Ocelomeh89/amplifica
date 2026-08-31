@@ -286,3 +286,30 @@ describe("afterTaxContinuingIncome nets out the disposition release", () => {
     expect(afterTaxContinuingIncome(p, a, 200, 0)).toBeCloseTo(140, 6);
   });
 });
+
+describe("afterTaxContinuingIncome clamps an unexplained year-6 tax benefit", () => {
+  const yearSix = (pre: number, post: number) => {
+    const p = zeroSeries();
+    const a = zeroSeries();
+    for (let m = 73; m <= 83; m++) {
+      p[m] = pre;
+      a[m] = post;
+    }
+    return { p, a };
+  };
+
+  it("never reports more after-tax income than the pre-tax run rate", () => {
+    // After-tax cash is double pre-tax cash with NO disposition release to
+    // explain it — the shape a heavy carried-forward deduction produces. The
+    // blended ratio is 2.0, and before the backstop this returned 1,000: twice
+    // the pre-tax run rate, reported as after-tax income.
+    const { p, a } = yearSix(100, 200);
+    expect(afterTaxContinuingIncome(p, a, 500, 0)).toBe(500);
+  });
+
+  it("leaves a ratio of exactly 1 alone", () => {
+    // The netted rental case lands here; the clamp must not perturb it.
+    const { p, a } = yearSix(100, 100);
+    expect(afterTaxContinuingIncome(p, a, 500, 0)).toBeCloseTo(500, 6);
+  });
+});
