@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import EmailGate from "./EmailGate";
 import CalculatorClient from "./CalculatorClient";
 import InfoSections from "./InfoSections";
+import { SIGN_IN_URL } from "@/lib/links";
 
 export const metadata: Metadata = {
   title: "Financial Optionality Calculator",
@@ -70,9 +71,9 @@ export default function CalculatorPage({
             <Link href="/" className="text-sub hover:text-purple transition-colors">
               Home
             </Link>
-            <Link href="/login" className="text-purple hover:underline">
+            <a href={SIGN_IN_URL} className="text-purple hover:underline">
               Sign in
-            </Link>
+            </a>
           </nav>
         </div>
       </header>

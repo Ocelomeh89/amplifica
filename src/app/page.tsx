@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { SIGN_IN_URL } from "@/lib/links";
 
 export const metadata: Metadata = {
   title: { absolute: "Amplifica Wealth — savings into monthly investment income" },
@@ -122,9 +123,9 @@ export default async function Home() {
           <a href={COMMUNITY_URL} className="hover:text-purple transition-colors hidden md:inline">
             Community
           </a>
-          <Link href="/login" className="text-purple hover:underline">
+          <a href={SIGN_IN_URL} className="text-purple hover:underline">
             Sign in
-          </Link>
+          </a>
         </nav>
       </header>
 
@@ -159,9 +160,6 @@ export default async function Home() {
               Find your optionality date
             </Link>
           </div>
-          <p className="rise mt-5 text-xs text-sub" style={{ animationDelay: "360ms" }}>
-            Free. No promised returns, ever.
-          </p>
         </div>
         <div className="lg:col-span-5 hidden lg:flex justify-end">
           <AmplitudeField />
@@ -305,7 +303,7 @@ export default async function Home() {
               <Link href="/calculator" className="hover:text-purple">Calculator</Link>
               <a href={NEWSLETTER_URL} className="hover:text-purple">Newsletter</a>
               <a href={COMMUNITY_URL} className="hover:text-purple">Community</a>
-              <Link href="/login" className="hover:text-purple">Sign in</Link>
+              <a href={SIGN_IN_URL} className="hover:text-purple">Sign in</a>
             </nav>
           </div>
           <p className="text-xs text-sub max-w-3xl">
