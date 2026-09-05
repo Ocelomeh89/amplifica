@@ -24,6 +24,9 @@ export interface ComparisonOption {
   // tax only). Summing taxPaid alone can show a net benefit for an option that
   // pays substantial tax at the sale.
   exitTaxPaid: number;
+  // Reported, never monetized — see TaxResult in tax/engine.ts.
+  residualNonPassiveCarryforward: number;
+  residualDeductionValue: number;
   metrics: OptionMetrics;
 }
 
@@ -70,6 +73,8 @@ export function runComparison(
       afterTaxCash,
       exitProceedsAfterTax,
       exitTaxPaid: tax.exitTaxCash,
+      residualNonPassiveCarryforward: tax.residualNonPassiveCarryforward,
+      residualDeductionValue: tax.residualDeductionValue,
       metrics: computeMetrics({
         afterTaxCash,
         capitalIn: nominal.capitalIn,

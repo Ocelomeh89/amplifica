@@ -122,6 +122,14 @@ export interface TaxResult {
   // The horizon's disposition release, in tax dollars (negative = a benefit).
   // Metrics net this out before reading the final year as a recurring rate.
   dispositionTaxBenefit: number;
+  // A non-passive loss still unused at month 84. REPORTED, NEVER RELEASED:
+  // §469(g) frees suspended PASSIVE losses on a complete disposition and an
+  // NOL has no equivalent trigger, so releasing this would hand a deal a
+  // deduction years before the law allows it. Neither field touches
+  // monthlyTaxCash, taxDelta, or any cash flow metric.
+  residualNonPassiveCarryforward: number;
+  // What that balance would be worth at the year-6 marginal ordinary rate.
+  residualDeductionValue: number;
 }
 
 // The household's federal + state bill on a given slug of ordinary income and
@@ -144,6 +152,22 @@ function householdTax(
   const federal = taxOn(ordinaryTaxable + Math.max(0, preferentialIncome), brackets);
   const state = Math.max(0, ordinaryIncome + preferentialIncome) * profile.stateRatePct;
   return federal + state;
+}
+
+// The marginal ordinary rate at a given income, found by probing rather than
+// by reading brackets: householdTax already folds in the standard deduction
+// and the state rate, and a probe cannot drift out of sync with it.
+const MARGINAL_PROBE = 1_000;
+
+function marginalOrdinaryRate(
+  ordinaryIncome: number,
+  profile: TaxProfile,
+  year: number,
+  inflationPct: number
+): number {
+  const at = householdTax(ordinaryIncome, 0, profile, year, inflationPct);
+  const above = householdTax(ordinaryIncome + MARGINAL_PROBE, 0, profile, year, inflationPct);
+  return (above - at) / MARGINAL_PROBE;
 }
 
 export function computeTaxSeries(
@@ -278,8 +302,27 @@ export function computeTaxSeries(
     });
   }
 
+  // Whatever is still carried after the last year is never used inside this
+  // horizon. Surface it; do not release it.
+  const residualNonPassiveCarryforward = nonPassiveCarryforward;
+  const finalYearIncome = indexAmount(
+    profile.otherOrdinaryIncome,
+    inflationPct,
+    HORIZON_YEARS - 1
+  );
+  const residualDeductionValue =
+    residualNonPassiveCarryforward *
+    marginalOrdinaryRate(finalYearIncome, profile, HORIZON_YEARS - 1, inflationPct);
+
   const exitTaxCash = exitTax(series.exit, profile, HORIZON_YEARS - 1, inflationPct);
   const dispositionTaxBenefit = years[HORIZON_YEARS - 1].dispositionTaxBenefit;
 
-  return { monthlyTaxCash, exitTaxCash, years, dispositionTaxBenefit };
+  return {
+    monthlyTaxCash,
+    exitTaxCash,
+    years,
+    dispositionTaxBenefit,
+    residualNonPassiveCarryforward,
+    residualDeductionValue,
+  };
 }
