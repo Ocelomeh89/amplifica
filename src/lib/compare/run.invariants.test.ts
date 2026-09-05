@@ -59,7 +59,14 @@ const flywheelSpec: OptionSpec = {
   exitDiscountPct: 0.08,
 };
 
-const ALL_SPECS: OptionSpec[] = [spec, rentalSpec, flywheelSpec];
+const indexSpec: OptionSpec = {
+  kind: "index",
+  id: "vti",
+  label: "Index fund",
+  returnPct: { bear: 0.02, base: 0.07, bull: 0.1 },
+};
+
+const ALL_SPECS: OptionSpec[] = [spec, rentalSpec, flywheelSpec, indexSpec];
 
 function globals(over: Partial<GlobalInputs> = {}): GlobalInputs {
   return {

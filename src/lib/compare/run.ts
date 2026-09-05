@@ -11,9 +11,9 @@ import { buildCash, type CashSpec } from "./build/cash";
 import { buildRental, rentalCapitalDemand, type RentalSpec } from "./build/rental";
 import { buildFlywheel, type FlywheelSpec } from "./build/flywheel";
 import { entryMonth, withSleeve } from "./build/sleeve";
+import { buildIndexFund, type IndexFundSpec } from "./build/index-fund";
 
-// Plan B extends this union with the remaining six option kinds.
-export type OptionSpec = CashSpec | RentalSpec | FlywheelSpec;
+export type OptionSpec = CashSpec | RentalSpec | FlywheelSpec | IndexFundSpec;
 
 export interface ComparisonOption {
   id: string;
@@ -54,6 +54,8 @@ export function buildSeries(spec: OptionSpec, globals: GlobalInputs): OptionSeri
       );
     case "flywheel":
       return buildFlywheel(spec, globals.capital);
+    case "index":
+      return buildIndexFund(spec, globals.capital, globals.scenario);
   }
 }
 
