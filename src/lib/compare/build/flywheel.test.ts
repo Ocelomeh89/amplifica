@@ -16,7 +16,7 @@ const spec: FlywheelSpec = {
   exitDiscountPct: 0.08,
 };
 
-const capital: CapitalSchedule = { lumpSum: 0, monthly: 2_000, monthlyEndMonth: null };
+const capital: CapitalSchedule = { lumpSum: 0, monthly: 2_000, monthlyEndMonth: null, idleYieldPct: 0 };
 
 describe("buildFlywheel — shape", () => {
   const s = buildFlywheel(spec, capital);
@@ -72,7 +72,7 @@ describe("buildFlywheel — capital", () => {
   });
 
   it("honours the shared monthly cutoff — and stops feeding the simulator too", () => {
-    const capped: CapitalSchedule = { ...capital, monthlyEndMonth: 24 };
+    const capped: CapitalSchedule = { ...capital, monthlyEndMonth: 24, idleYieldPct: 0 };
     const s = buildFlywheel(spec, capped);
     expect(s.capitalIn[23]).toBeCloseTo(2_000, 6);
     expect(s.capitalIn[24]).toBe(0);

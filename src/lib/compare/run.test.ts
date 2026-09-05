@@ -14,7 +14,7 @@ const globals: GlobalInputs = {
   inflationPct: 0,
   scenario: "base",
   display: "real",
-  capital: { lumpSum: 100_000, monthly: 0, monthlyEndMonth: null },
+  capital: { lumpSum: 100_000, monthly: 0, monthlyEndMonth: null, idleYieldPct: 0 },
   tax: {
     filingStatus: "mfj",
     otherOrdinaryIncome: 400_000,
@@ -130,7 +130,7 @@ describe("debtPayoff", () => {
     const globalsNoTax: GlobalInputs = {
       ...globals,
       inflationPct: 0,
-      capital: { lumpSum: 40_000, monthly: 0, monthlyEndMonth: null },
+      capital: { lumpSum: 40_000, monthly: 0, monthlyEndMonth: null, idleYieldPct: 0 },
     };
     const levered = runComparison(globalsNoTax, [
       { ...spec, yieldPct: { bear: 0, base: 0, bull: 0 } },

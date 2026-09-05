@@ -21,7 +21,7 @@ function globals(over: Partial<GlobalInputs["tax"]> = {}): GlobalInputs {
     // The rental sets its own outlay from price and down payment: $125,000
     // down plus $10,000 closing = $135,000 at month 0. Cash is given the same
     // lump sum and nothing monthly, so both options are funded identically.
-    capital: { lumpSum: 135_000, monthly: 0, monthlyEndMonth: null },
+    capital: { lumpSum: 135_000, monthly: 0, monthlyEndMonth: null, idleYieldPct: 0 },
     tax: {
       filingStatus: "mfj",
       otherOrdinaryIncome: 400_000,
@@ -110,7 +110,7 @@ function table(title: string, note: string, columns: Column[]) {
 
 function contrib(): GlobalInputs {
   const g = globals();
-  return { ...g, capital: { lumpSum: 0, monthly: 2_000, monthlyEndMonth: null } };
+  return { ...g, capital: { lumpSum: 0, monthly: 2_000, monthlyEndMonth: null, idleYieldPct: 0 } };
 }
 
 it("comparison runner", () => {

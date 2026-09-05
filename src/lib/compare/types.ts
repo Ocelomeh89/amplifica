@@ -100,10 +100,19 @@ export interface TaxProfile {
   qbiEnabled: boolean;
 }
 
+// The shared basis. EVERY option consumes this in full — capital an option
+// does not absorb is not missing, it is idle, and sits in a sleeve earning
+// idleYieldPct. See "The capital contract" in the design doc: three builders
+// with three funding conventions made totalCashCollected, exitProceeds,
+// peakCapitalAtRisk and both paybacks compare unequal amounts of money.
 export interface CapitalSchedule {
   lumpSum: number; // at month 0
   monthly: number;
   monthlyEndMonth: number | null; // null = for the whole horizon
+  // What uncommitted capital earns. Annual, decimal. Required rather than
+  // defaulted: whether idle money earns nothing or earns 4% is a modelling
+  // choice, and silently choosing zero is still choosing.
+  idleYieldPct: number;
 }
 
 export type Scenario = "bear" | "base" | "bull";

@@ -63,7 +63,7 @@ function globals(over: Partial<GlobalInputs> = {}): GlobalInputs {
     inflationPct: 0.03,
     scenario: "base",
     display: "real",
-    capital: { lumpSum: 100_000, monthly: 2_000, monthlyEndMonth: null },
+    capital: { lumpSum: 100_000, monthly: 2_000, monthlyEndMonth: null, idleYieldPct: 0 },
     tax: {
       filingStatus: "mfj",
       otherOrdinaryIncome: 400_000,
@@ -178,7 +178,7 @@ describe("pipeline invariants", () => {
     for (const inflationPct of [0, 0.03, 0.25]) {
       for (const lumpSum of [0, 1, 5_000_000]) {
         for (const monthly of [0, 10_000]) {
-          const g = globals({ inflationPct, capital: { lumpSum, monthly, monthlyEndMonth: null } });
+          const g = globals({ inflationPct, capital: { lumpSum, monthly, monthlyEndMonth: null, idleYieldPct: 0 } });
           const o = runComparison(g, [spec]).options[0];
           for (const v of [...o.preTaxCash, ...o.taxPaid, ...o.afterTaxCash]) {
             expect(Number.isFinite(v)).toBe(true);
@@ -191,7 +191,7 @@ describe("pipeline invariants", () => {
   });
 
   it("returns null rather than a misleading IRR when no capital goes in", () => {
-    const g = globals({ capital: { lumpSum: 0, monthly: 0, monthlyEndMonth: null } });
+    const g = globals({ capital: { lumpSum: 0, monthly: 0, monthlyEndMonth: null, idleYieldPct: 0 } });
     const o = runComparison(g, [spec]).options[0];
     expect(o.metrics.irrNominal).toBeNull();
     expect(o.metrics.irrUnavailableReason).not.toBeNull();

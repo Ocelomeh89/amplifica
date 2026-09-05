@@ -29,7 +29,7 @@ function globals(): GlobalInputs {
     inflationPct: 0.03,
     scenario: "base",
     display: "real",
-    capital: { lumpSum: 0, monthly: 2_000, monthlyEndMonth: null },
+    capital: { lumpSum: 0, monthly: 2_000, monthlyEndMonth: null, idleYieldPct: 0 },
     tax: {
       filingStatus: "mfj",
       otherOrdinaryIncome: 400_000,
