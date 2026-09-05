@@ -125,6 +125,54 @@ options default to `"nominal"` so a sponsor's pro forma is never silently
 inflated on top of growth it already assumes. The flywheel is always
 `"nominal"` — its payments are contractually fixed.
 
+### The capital contract
+
+Every option consumes the shared schedule **in full**. This is not a
+preference; it is what makes four of the six metrics mean anything.
+
+The first design let each builder take what it needed and flagged the
+deviation in the UI. Three builders produced three conventions — cash took a
+lump sum plus monthly, the flywheel ignored `lumpSum` entirely, the rental
+ignored the schedule and sized itself from price and down payment. IRR and
+equity multiple are scale-normalised and survived it. `totalCashCollected`,
+`exitProceeds`, `peakCapitalAtRisk` and both payback figures did not: at
+`lumpSum: 100_000` cash was funded with $266k against the flywheel's $168k and
+the tool compared them anyway.
+
+**The sleeve.** Capital an option does not absorb is not missing, it is idle.
+It sits in an implicit cash account earning `capital.idleYieldPct`, taxed as
+ordinary portfolio income like any other cash. `run.ts` computes the residual
+as `cumulative(schedule) − cumulative(option.capitalIn)`, runs the cash
+construction over it, and merges the result into the option's series:
+`capitalIn` becomes the schedule outright, and the sleeve's interest, tax
+items, book value and terminal balance are added to the option's own.
+
+Cash equivalents are the degenerate case — an option that absorbs nothing, so
+the sleeve is the entire schedule. The cash builder and the sleeve are
+therefore one construction, not two.
+
+**The sleeve attaches after escalation.** The pipeline is
+`build → escalateToNominal → withSleeve → tax → metrics`. A quoted yield is
+nominal, so a sleeve bolted onto a `"real"` option before escalation would be
+inflated along with it. Running the wrap after escalation means the sleeve
+never has to reason about `entryBasis` and a `"real"` option never has to
+declare itself levered to accommodate one. The schedule itself is flat
+nominal: $2,000 a month means $2,000 in every month, not $2,000 of today's
+purchasing power.
+
+**Deferred entry.** A builder declares `capitalDemand(spec): number` — its
+upfront outlay — and receives a `startMonth`. `run.ts` walks the schedule,
+finds the first month the sleeve balance covers the demand, and builds from
+there. The entry month is a reported output, not an input.
+
+This is what makes a deal-shaped option runnable against a savings-shaped
+schedule. A $135k duplex against a $100k lump plus $2k a month is not an
+error and is not a capital override; it is a purchase in roughly month 18,
+with the sleeve earning the idle yield until then. It is also what makes debt
+paydown well-defined without a special case: a $50k balance retired in month
+25 simply stops absorbing capital, and the sleeve takes every contribution
+after that.
+
 ## Required engine change
 
 `ActiveInvestment` in `src/lib/finance/sim-book.ts` stores only
@@ -160,10 +208,11 @@ interface GlobalInputs {
   inflationPct: number;              // annual, decimal
   scenario: "bear" | "base" | "bull";
   display: "real" | "nominal";
-  capital: {                         // the shared basis, per-option overridable
+  capital: {                         // the shared basis, consumed in full by every option
     lumpSum: number;                 // at month 0
     monthly: number;
     monthlyEndMonth: number | null;
+    idleYieldPct: number;            // annual, decimal; what uncommitted capital earns
   };
   tax: TaxProfile;
 }
@@ -187,9 +236,11 @@ independent input in this tool: it is bound to `capital.monthly`, and
 `capital.monthlyEndMonth` drives `mscEndMonth`. Leaving them separate would
 allow the flywheel to be silently funded at a different rate than every option
 it is compared against, which is the exact failure the shared schedule exists
-to prevent. A per-option capital override is still available, but taking it is
-an explicit act and the UI flags any option whose capital deviates from the
-shared basis.
+to prevent.
+
+Per-option capital overrides are gone. They were the first design's answer and
+they did not survive contact with a third builder — see **The capital
+contract** above.
 
 ## Tax engine
 
@@ -231,6 +282,26 @@ a single flat rate applied to ordinary income.
   the tool and must be labeled as such in the UI.
 - The **$25,000 active-participation rental allowance** is modeled, phasing out
   between $100k and $150k MAGI at 50 cents per dollar. Above $150k it is zero.
+
+**The non-passive residual is reported, never released.** The two carryforwards
+are not symmetric and must not be made so. §469(g) frees suspended *passive*
+losses on a complete disposition, which is why the passive bucket releases at
+month 84 and `dispositionTaxBenefit` isolates what that release was worth. A
+non-passive loss has no such trigger — it is an NOL that carries forward
+indefinitely under the 80% limitation, and nothing about reaching the end of a
+84-month measurement window causes it to be used.
+
+So a balance still outstanding at the horizon is surfaced, not monetized.
+`TaxResult` carries `residualNonPassiveCarryforward` and
+`residualDeductionValue` — the balance and what it would be worth at the
+year-7 marginal ordinary rate — and neither figure touches `monthlyTaxCash`,
+`taxDelta` or any cash flow metric.
+
+The bug this fixes is the silence. A first-year IDC deduction larger than the
+owner's other income used to expire unnoticed at month 84, understating the
+one deal whose entire pitch is its tax treatment. Releasing it instead would
+have been the opposite error: handing the same deal a deduction seven years
+before the law allows it.
 
 ### NIIT
 
@@ -377,15 +448,47 @@ step to inflate a mortgage payment that is contractually fixed. `"real"`
 remains the right basis for the manual-grid options, whose entries are a
 sponsor's pro forma with no embedded financing mismatch to reconcile.
 
+### Conventions for the rate-driven three
+
+**The index fund pays nothing.** It accumulates: no distributions, no annual
+tax items, the entire gain realized at exit as LTCG plus NIIT.
+`continuingMonthlyIncome` is 0. On a tool whose first metric is cash flow that
+reads as a weakness, and it should — an index fund genuinely does not pay you,
+in the same way the flywheel's year-7 flow is genuinely −$286. The equity
+multiple and purchasing-power figures are where its case gets made. Reporting
+a notional 4% withdrawal instead would be inventing a distribution the asset
+does not make.
+
+**The dividend portfolio pays out rather than reinvests.** This follows the
+convention `cash.ts` already set and the tool's own framing: distributions are
+owner income. Reinvesting would make it an index fund carrying a tax drag, and
+the comparison the option exists to support — yield now against growth later —
+would collapse. A `qualifiedPct` input splits qualified from ordinary
+treatment; it defaults to 100%.
+
+**Debt paydown's return is the interest avoided.** Schedule contributions are
+*extra* principal; the minimum payment is a fact of life in both the paydown
+world and the alternative, so it cancels and never appears. `preTaxCash` is
+the month's avoided interest, `bookValue` the cumulative principal retired,
+and the exit is that same figure at basis for a gain of exactly zero. When
+`deductible` is set, the avoided interest was a deduction the owner no longer
+takes, so it emits a **positive** ordinary tax item — that is the whole of
+"nets down by marginal rate".
+
+This construction has a property worth testing rather than trusting: a
+non-deductible paydown's pre-tax IRR must come out exactly equal to the debt's
+interest rate. If it does not, the builder is wrong.
+
 ## UI
 
 Route `/compare`, standalone, outside the authed `(app)` group. Reuses `Card`,
 `InfoBox`, `fmtCurrency` and the existing Recharts styling.
 
 - **Global panel** — inflation, scenario selector, display toggle, tax profile,
-  shared capital schedule.
+  shared capital schedule including the idle yield.
 - **Option cards** — enable/disable, inputs in an accordion, `entryBasis`
-  selector, optional per-option capital override.
+  selector. No capital override: the card instead reports what the option
+  absorbed, what sat in the sleeve, and the month it entered.
 - **Manual grids** — 84 individually editable monthly cells, driven by fill
   helpers so they are never typed by hand: flat-from-month, annual-amount
   spread evenly, exponential decline curve (oil & gas), and paste-a-column from
@@ -419,7 +522,20 @@ Follows the existing `projection-sim.*.test.ts` patterns (Vitest).
 - **Invariants** — after-tax total equals pre-tax total minus tax for every
   option; deflation at `i = 0` is the identity; `entryBasis: "nominal"` is
   untouched at any inflation rate; every builder emits exactly
-  `HORIZON_MONTHS` entries.
+  `HORIZON_MONTHS` entries; **every option's `capitalIn` equals the shared
+  schedule month for month**, which is the whole purpose of the capital
+  contract and the single assertion most likely to catch a builder that
+  quietly reverted to funding itself.
+- **Sleeve** — conservation, in that the schedule always equals what the
+  option absorbed plus what the sleeve held; a sleeve balance that never goes
+  negative; a deferred entry month derived correctly from an outlay the lump
+  sum alone cannot cover.
+- **Debt paydown** — a non-deductible paydown's pre-tax IRR equals the debt
+  rate exactly.
+- **Carryforward** — an IDC-shaped year-1 loss exceeding other income leaves a
+  nonzero `residualNonPassiveCarryforward` *and* leaves the horizon year's
+  `taxDelta` unchanged. Both halves matter: the first proves it is reported,
+  the second proves it was not released.
 - **Golden** — one fixed full scenario snapshotted, in the style of
   `projection-sim.golden.test.ts`.
 - **Serialize** — round-trip equality, and a rejected future version.
@@ -430,21 +546,49 @@ Follows the existing `projection-sim.*.test.ts` patterns (Vitest).
 
 Each phase is independently testable and leaves the branch working.
 
-1. **Engine change** — the interest/principal split in `src/lib/finance/`,
-   proven by the existing golden tests passing unmodified.
-2. **Contract and pipeline** — `types.ts`, `inflation.ts`, `metrics.ts`,
+1. ~~**Engine change**~~ — the interest/principal split in `src/lib/finance/`,
+   proven by the existing golden tests passing unmodified. **Done.**
+2. ~~**Contract and pipeline**~~ — `types.ts`, `inflation.ts`, `metrics.ts`,
    `run.ts`, with one trivial builder (cash equivalents) as the walking
-   skeleton end to end.
-3. **Tax engine** — brackets, the three activity buckets, NIIT, QBI. The
+   skeleton end to end. **Done.**
+3. ~~**Tax engine**~~ — brackets, the three activity buckets, NIIT, QBI. The
    largest and highest-risk piece; it is built against the walking skeleton
-   before any complex option exists.
-4. **Rate-driven builders** — index, dividend, debt paydown, flywheel.
-5. **Manual-grid builders** — commercial RE, business, oil & gas, plus the fill
-   helpers. Rental real estate last, as the most input-heavy template.
-6. **UI** — global panel, option cards, comparison table, charts.
-7. **Serialization** and the "what this model does not do" panel.
+   before any complex option exists. **Done**, QBI inert pending an eligible
+   option.
+4. ~~**Rental real estate**~~ — taken out of order, ahead of the rate-driven
+   builders, to exercise `exitTax` and the passive-loss machinery end to end
+   while the tax engine was still fresh. **Done.**
+5. ~~**Flywheel**~~ — **Done.**
+6. **The capital contract** — the sleeve, deferred entry, and the non-passive
+   residual. Must land before any further builder: every option built after it
+   inherits the convention, and every option built before it has to be
+   revisited. The invariant it exists to establish is that each option's
+   `capitalIn` equals the shared schedule month for month.
+7. **Remaining rate-driven builders** — index, dividend, debt paydown.
+8. **Manual-grid builders** — commercial RE, business, oil & gas, plus the fill
+   helpers.
+9. **UI** — global panel, option cards, comparison table, charts.
+10. **Serialization** and the "what this model does not do" panel.
 
 ## Open items
 
 None. Every question raised during design was resolved before this document
 was written.
+
+## Amendments
+
+**2026-09-05.** Building three options revealed that one design decision had
+not survived contact with them, and one omission had gone unnoticed. Both were
+resolved before the next builder rather than after, because every option built
+under the old conventions would have had to be revisited.
+
+- **The capital contract** replaces per-option capital overrides. Added as a
+  subsection of Architecture; the override language in **Global inputs** and
+  **UI** was removed rather than left to contradict it.
+- **The non-passive residual is reported, never released.** Added to **Loss
+  usability**. The passive and non-passive carryforwards are deliberately
+  asymmetric and the section now says why.
+- **Conventions for the rate-driven three** records the calls made for the
+  index fund, the dividend portfolio and debt paydown before they were built.
+- **Implementation order** was rewritten to record what is actually done, and
+  that the rental was taken out of order ahead of the rate-driven builders.
