@@ -66,7 +66,15 @@ const indexSpec: OptionSpec = {
   returnPct: { bear: 0.02, base: 0.07, bull: 0.1 },
 };
 
-const ALL_SPECS: OptionSpec[] = [spec, rentalSpec, flywheelSpec, indexSpec];
+const dividendSpec: OptionSpec = {
+  kind: "dividend",
+  id: "schd",
+  label: "Dividend portfolio",
+  dividendYieldPct: 0.036,
+  priceGrowthPct: { bear: 0, base: 0.04, bull: 0.06 },
+};
+
+const ALL_SPECS: OptionSpec[] = [spec, rentalSpec, flywheelSpec, indexSpec, dividendSpec];
 
 function globals(over: Partial<GlobalInputs> = {}): GlobalInputs {
   return {

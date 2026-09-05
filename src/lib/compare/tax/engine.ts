@@ -17,6 +17,7 @@ import {
   type TaxProfile,
 } from "../types";
 import {
+  LTCG_BRACKETS,
   NIIT_RATE,
   NIIT_THRESHOLD,
   ORDINARY_BRACKETS,
@@ -144,12 +145,21 @@ function householdTax(
   const brackets = indexBrackets(ORDINARY_BRACKETS[profile.filingStatus], inflationPct, year);
   const deduction = indexAmount(STANDARD_DEDUCTION[profile.filingStatus], inflationPct, year);
   const ordinaryTaxable = Math.max(0, ordinaryIncome - deduction);
-  // Annual preferential income is layered on top of ordinary income and taxed
-  // at ordinary rates for the whole of Plan A. Only the year-7 exit gets true
-  // capital-gains brackets (Task 6). This is conservative — it never silently
-  // favours an option — and it costs nothing until Plan B adds the dividend
-  // portfolio, which is where the distinction starts to matter.
-  const federal = taxOn(ordinaryTaxable + Math.max(0, preferentialIncome), brackets);
+  // Annual preferential income — qualified dividends and realized LTCG —
+  // stacks ON TOP of ordinary income and is taxed at capital-gains rates, the
+  // same construction tax/exit.ts already uses for the sale.
+  //
+  // It used to be taxed at ordinary rates, which was deliberately
+  // conservative and cost nothing while no option produced any. The dividend
+  // portfolio is the option that produces some, and its whole case is the
+  // qualified rate: taxing a 3.6% yield at 24% instead of 15% is most of the
+  // difference between it and a HYSA.
+  const preferential = Math.max(0, preferentialIncome);
+  const ltcgBrackets = indexBrackets(LTCG_BRACKETS[profile.filingStatus], inflationPct, year);
+  const federal =
+    taxOn(ordinaryTaxable, brackets) +
+    (taxOn(ordinaryTaxable + preferential, ltcgBrackets) -
+      taxOn(ordinaryTaxable, ltcgBrackets));
   const state = Math.max(0, ordinaryIncome + preferentialIncome) * profile.stateRatePct;
   return federal + state;
 }

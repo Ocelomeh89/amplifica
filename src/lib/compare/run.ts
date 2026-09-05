@@ -12,8 +12,14 @@ import { buildRental, rentalCapitalDemand, type RentalSpec } from "./build/renta
 import { buildFlywheel, type FlywheelSpec } from "./build/flywheel";
 import { entryMonth, withSleeve } from "./build/sleeve";
 import { buildIndexFund, type IndexFundSpec } from "./build/index-fund";
+import { buildDividend, type DividendSpec } from "./build/dividend";
 
-export type OptionSpec = CashSpec | RentalSpec | FlywheelSpec | IndexFundSpec;
+export type OptionSpec =
+  | CashSpec
+  | RentalSpec
+  | FlywheelSpec
+  | IndexFundSpec
+  | DividendSpec;
 
 export interface ComparisonOption {
   id: string;
@@ -56,6 +62,8 @@ export function buildSeries(spec: OptionSpec, globals: GlobalInputs): OptionSeri
       return buildFlywheel(spec, globals.capital);
     case "index":
       return buildIndexFund(spec, globals.capital, globals.scenario);
+    case "dividend":
+      return buildDividend(spec, globals.capital, globals.scenario);
   }
 }
 
