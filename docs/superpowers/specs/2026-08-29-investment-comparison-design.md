@@ -317,6 +317,18 @@ business and, where eligible, real estate income. Wage and qualified-property
 limits are modeled as a simple cap input per option rather than a full
 computation; the simplification is disclosed.
 
+**The exit is discounted one month too far.** `metrics.ts` places the exit at
+index 84, but every builder's `exit.grossProceeds` is its month-83 book value
+— `bookValue[LAST_INCOME_MONTH]` must equal it, by the contract above. So a
+value as of the end of month 83 is discounted as though received at month 84.
+
+Measured 2026-09-05: a paid-out option gains roughly **+3bp per 100bp** of
+yield, an accruing one loses roughly **7 to 16bp**. It is systematic, it runs
+against accruing options, and because it is nearly uniform it barely disturbs
+rankings — which is why it went unnoticed. Fixing it means accruing every
+builder's exit one month forward and re-baselining every golden, so it is
+recorded rather than done.
+
 ### Asset-specific treatment
 
 - **Oil & gas.** IDC percentage expensed in year 1 as a `non-passive`
@@ -476,8 +488,16 @@ takes, so it emits a **positive** ordinary tax item — that is the whole of
 "nets down by marginal rate".
 
 This construction has a property worth testing rather than trusting: a
-non-deductible paydown's pre-tax IRR must come out exactly equal to the debt's
+non-deductible paydown's pre-tax IRR must come out equal to the debt's
 interest rate. If it does not, the builder is wrong.
+
+Two things have to be right to read that test, and both were got wrong first.
+`ratePct` is an APR, so the target for a compounded IRR is its effective
+equivalent — 6% APR is 6.168% effective, and comparing against 6% looks like
+a 17bp defect that is only a units mismatch. What is left after that is a
+real shortfall of roughly 7bp, caused by the exit convention below and shared
+by every accruing option. So the assertion is "within 15bp and never above",
+not "exactly equal".
 
 ## UI
 
@@ -592,3 +612,17 @@ under the old conventions would have had to be revisited.
   index fund, the dividend portfolio and debt paydown before they were built.
 - **Implementation order** was rewritten to record what is actually done, and
   that the rental was taken out of order ahead of the rate-driven builders.
+
+**2026-09-05, after building it.** Three things the design did not anticipate,
+all recorded above where they belong:
+
+- **A fourth funding convention.** The flywheel simulator has always drawn its
+  first MSC at month 0 while cash started at month 1, so cash made 83
+  contributions against the flywheel's 84. `scheduleFlow` now contributes from
+  month 0 for every option.
+- **The qualified rate was not real.** `householdTax` taxed annual
+  preferential income at ordinary rates — free while no option produced any,
+  as its own comment predicted. Building the dividend portfolio required
+  stacking it at LTCG rates first.
+- **"IRR equals the debt rate exactly" was wrong**, for one reason of units
+  and one of substance. See the debt paydown section.
