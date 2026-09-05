@@ -74,7 +74,24 @@ const dividendSpec: OptionSpec = {
   priceGrowthPct: { bear: 0, base: 0.04, bull: 0.06 },
 };
 
-const ALL_SPECS: OptionSpec[] = [spec, rentalSpec, flywheelSpec, indexSpec, dividendSpec];
+const debtSpec: OptionSpec = {
+  kind: "debt",
+  id: "heloc",
+  label: "Pay down the HELOC",
+  balance: 50_000,
+  ratePct: 0.1,
+  termMonths: 240,
+  deductible: false,
+};
+
+const ALL_SPECS: OptionSpec[] = [
+  spec,
+  rentalSpec,
+  flywheelSpec,
+  indexSpec,
+  dividendSpec,
+  debtSpec,
+];
 
 function globals(over: Partial<GlobalInputs> = {}): GlobalInputs {
   return {

@@ -13,13 +13,15 @@ import { buildFlywheel, type FlywheelSpec } from "./build/flywheel";
 import { entryMonth, withSleeve } from "./build/sleeve";
 import { buildIndexFund, type IndexFundSpec } from "./build/index-fund";
 import { buildDividend, type DividendSpec } from "./build/dividend";
+import { buildDebtPaydown, type DebtPaydownSpec } from "./build/debt-paydown";
 
 export type OptionSpec =
   | CashSpec
   | RentalSpec
   | FlywheelSpec
   | IndexFundSpec
-  | DividendSpec;
+  | DividendSpec
+  | DebtPaydownSpec;
 
 export interface ComparisonOption {
   id: string;
@@ -64,6 +66,8 @@ export function buildSeries(spec: OptionSpec, globals: GlobalInputs): OptionSeri
       return buildIndexFund(spec, globals.capital, globals.scenario);
     case "dividend":
       return buildDividend(spec, globals.capital, globals.scenario);
+    case "debt":
+      return buildDebtPaydown(spec, globals.capital);
   }
 }
 
