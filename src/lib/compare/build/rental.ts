@@ -47,11 +47,22 @@ export interface RentalSpec {
   appreciationPct: Record<Scenario, number>;
 }
 
-// This builder ignores the shared CapitalSchedule: a property's outlay is set
-// by its price and down payment. That is the per-option capital override the
-// spec allows, and the UI flags an option whose capital deviates from the
-// shared basis.
-export function buildRental(spec: RentalSpec, scenario: Scenario): OptionSeries {
+// What the purchase costs on day one. run.ts uses this to find the first
+// month the schedule can fund it; the builder is then told when it entered.
+export function rentalCapitalDemand(spec: RentalSpec): number {
+  return spec.purchasePrice * spec.downPct + spec.purchasePrice * spec.closingCostPct;
+}
+
+// `startMonth` is the month the purchase closes, resolved by run.ts from the
+// shared schedule — a property is bought when the capital is there, not when
+// the horizon happens to begin. Everything before it is silent: no outlay, no
+// rent, no depreciation. The exit still lands at month 84 regardless, so a
+// rental bought in month 18 simply has 66 months of operation behind it.
+export function buildRental(
+  spec: RentalSpec,
+  scenario: Scenario,
+  startMonth: number
+): OptionSeries {
   const down = spec.purchasePrice * spec.downPct;
   const closing = spec.purchasePrice * spec.closingCostPct;
   const loan = spec.purchasePrice - down;
@@ -68,11 +79,11 @@ export function buildRental(spec: RentalSpec, scenario: Scenario): OptionSeries 
   const bookValue = zeroSeries();
   const taxItems: TaxItem[] = [];
 
-  capitalIn[0] = down + closing;
+  capitalIn[startMonth] = down + closing;
   // Netted by selling costs like every other entry: this is what a sale would
   // hand you, not what you paid. Closing costs are spent, not equity, so they
   // do not appear here.
-  bookValue[0] = spec.purchasePrice * (1 - spec.sellingCostPct) - loan;
+  bookValue[startMonth] = spec.purchasePrice * (1 - spec.sellingCostPct) - loan;
 
   const appreciation = spec.appreciationPct[scenario];
   const monthlyRate = spec.mortgageRatePct / 12;
@@ -82,8 +93,11 @@ export function buildRental(spec: RentalSpec, scenario: Scenario): OptionSeries 
   let accumulatedDep = 0;
   let balance = loan;
 
-  for (let m = 1; m <= LAST_INCOME_MONTH; m++) {
-    const years = (m - 1) / 12;
+  for (let m = startMonth + 1; m <= LAST_INCOME_MONTH; m++) {
+    // Elapsed time is measured from the purchase, not from the horizon: a
+    // rental bought in month 18 collects its month-1 rent in month 19.
+    const held = m - startMonth;
+    const years = (held - 1) / 12;
     const grossRent = spec.monthlyRent * Math.pow(1 + spec.rentGrowthPct, years);
     const effectiveRent = grossRent * (1 - spec.vacancyPct);
     // operatingExpensePct is a share of month-1 effective rent; the expense
@@ -97,7 +111,7 @@ export function buildRental(spec: RentalSpec, scenario: Scenario): OptionSeries 
 
     // The loan is retired once its term ends; no payment is owed after that,
     // even though the horizon continues.
-    const paymentDue = m <= spec.mortgageTermMonths ? payment : 0;
+    const paymentDue = held <= spec.mortgageTermMonths ? payment : 0;
 
     // Split this month's payment before applying it, so the interest deduction
     // uses the opening balance rather than the closing one.
@@ -135,11 +149,12 @@ export function buildRental(spec: RentalSpec, scenario: Scenario): OptionSeries 
     // Net of selling costs at every month, not just the last one: this is what
     // a sale would hand you, so it must be stated on the same basis throughout
     // rather than jumping at the horizon's edge.
-    const value = spec.purchasePrice * Math.pow(1 + appreciation, m / 12);
+    const value = spec.purchasePrice * Math.pow(1 + appreciation, held / 12);
     bookValue[m] = value * (1 - spec.sellingCostPct) - balance;
   }
 
-  const salePrice = spec.purchasePrice * Math.pow(1 + appreciation, HORIZON_MONTHS / 12);
+  const salePrice =
+    spec.purchasePrice * Math.pow(1 + appreciation, (HORIZON_MONTHS - startMonth) / 12);
   const realized = salePrice * (1 - spec.sellingCostPct);
   // The loop's own running balance, not a second independent amortization
   // call. remainingPrincipalAfter returns 0 whenever monthsElapsed >= term,

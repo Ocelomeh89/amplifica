@@ -20,10 +20,10 @@ const schedule: CapitalSchedule = {
 // entirely — exactly the flywheel's shape, and the reason the gate was raised.
 function absorbsMonthlyOnly(): OptionSeries {
   const capitalIn = zeroSeries();
-  for (let m = 1; m < HORIZON_MONTHS; m++) capitalIn[m] = 2_000;
   const bookValue = zeroSeries();
   let cum = 0;
-  for (let m = 1; m < HORIZON_MONTHS; m++) {
+  for (let m = 0; m < HORIZON_MONTHS; m++) {
+    capitalIn[m] = 2_000;
     cum += 2_000;
     bookValue[m] = cum;
   }

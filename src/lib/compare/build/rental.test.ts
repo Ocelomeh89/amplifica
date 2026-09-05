@@ -30,7 +30,7 @@ const DEPRECIABLE = BASIS * 0.8; // land is 20%
 const MONTHLY_DEP = DEPRECIABLE / (27.5 * 12);
 
 describe("buildRental — shape", () => {
-  const s = buildRental(spec, "base");
+  const s = buildRental(spec, "base", 0);
 
   it("emits exactly the horizon length in every series", () => {
     expect(s.capitalIn).toHaveLength(HORIZON_MONTHS);
@@ -53,7 +53,7 @@ describe("buildRental — shape", () => {
 });
 
 describe("buildRental — operating cash flow", () => {
-  const s = buildRental(spec, "base");
+  const s = buildRental(spec, "base", 0);
 
   it("nets vacancy, expenses and debt service in month 1", () => {
     const effective = 3_500 * 0.94;
@@ -78,7 +78,7 @@ describe("buildRental — operating cash flow", () => {
 });
 
 describe("buildRental — tax items", () => {
-  const s = buildRental(spec, "base");
+  const s = buildRental(spec, "base", 0);
   const at = (m: number) => s.taxItems.filter((t) => t.month === m);
 
   it("tags everything passive, against this property's own activity", () => {
@@ -119,7 +119,7 @@ describe("buildRental — amortization actually runs", () => {
   // after month 1 fails here. debtPayoff now reads that same balance, so it
   // fails too — it used to be an independent remainingPrincipalAfter call and
   // could not see the difference.
-  const s = buildRental(spec, "base");
+  const s = buildRental(spec, "base", 0);
   const at = (m: number) => s.taxItems.filter((t) => t.month === m);
   const noiAt = (m: number) => {
     const years = (m - 1) / 12;
@@ -147,7 +147,7 @@ describe("buildRental — amortization actually runs", () => {
 });
 
 describe("buildRental — the sale", () => {
-  const s = buildRental(spec, "base");
+  const s = buildRental(spec, "base", 0);
   const salePrice = 500_000 * Math.pow(1.035, 7);
   const realized = salePrice * 0.94; // 6% selling costs
   const payoff = remainingPrincipalAfter(LOAN, 0.065, 360, LAST_INCOME_MONTH);
@@ -201,14 +201,14 @@ describe("buildRental — the sale", () => {
 
 describe("buildRental — scenarios", () => {
   it("appreciates less in bear than base than bull", () => {
-    const g = (sc: "bear" | "base" | "bull") => buildRental(spec, sc).exit.grossProceeds;
+    const g = (sc: "bear" | "base" | "bull") => buildRental(spec, sc, 0).exit.grossProceeds;
     expect(g("bear")).toBeLessThan(g("base"));
     expect(g("base")).toBeLessThan(g("bull"));
   });
 
   it("leaves operating cash flow untouched by the appreciation scenario", () => {
-    expect(buildRental(spec, "bear").preTaxCash[12]).toBeCloseTo(
-      buildRental(spec, "bull").preTaxCash[12],
+    expect(buildRental(spec, "bear", 0).preTaxCash[12]).toBeCloseTo(
+      buildRental(spec, "bull", 0).preTaxCash[12],
       6
     );
   });
@@ -216,7 +216,7 @@ describe("buildRental — scenarios", () => {
 
 describe("buildRental — mortgage term shorter than the horizon", () => {
   it("stops paying once the loan is retired, so cash flow steps up and no debt remains at exit", () => {
-    const s = buildRental({ ...spec, mortgageTermMonths: 60 }, "base");
+    const s = buildRental({ ...spec, mortgageTermMonths: 60 }, "base", 0);
     // Rent grows a little every month regardless, so a plain "greater than"
     // would also pass if the payment never actually stopped. Pin the size of
     // the step to (most of) a full payment, which only a retired loan produces.
@@ -232,8 +232,8 @@ describe("buildRental — expense growth", () => {
     // Expenses used to ride rent implicitly, as a fixed share of that month's
     // effective rent. The default has to reproduce that to the dollar, or this
     // shape change would have quietly moved every rental figure in the tool.
-    const implicit = buildRental(spec, "base");
-    const explicit = buildRental({ ...spec, expenseGrowthPct: spec.rentGrowthPct }, "base");
+    const implicit = buildRental(spec, "base", 0);
+    const explicit = buildRental({ ...spec, expenseGrowthPct: spec.rentGrowthPct }, "base", 0);
     for (let m = 0; m < HORIZON_MONTHS; m++) {
       expect(explicit.preTaxCash[m]).toBeCloseTo(implicit.preTaxCash[m], 8);
     }
@@ -241,14 +241,14 @@ describe("buildRental — expense growth", () => {
   });
 
   it("leaves month 1 alone — expenses are stated at month-1 rent", () => {
-    const hot = buildRental({ ...spec, expenseGrowthPct: 0.08 }, "base");
-    const base = buildRental(spec, "base");
+    const hot = buildRental({ ...spec, expenseGrowthPct: 0.08 }, "base", 0);
+    const base = buildRental(spec, "base", 0);
     expect(hot.preTaxCash[1]).toBeCloseTo(base.preTaxCash[1], 8);
   });
 
   it("compresses the margin when expenses outrun rent", () => {
-    const hot = buildRental({ ...spec, expenseGrowthPct: 0.08 }, "base");
-    const base = buildRental(spec, "base");
+    const hot = buildRental({ ...spec, expenseGrowthPct: 0.08 }, "base", 0);
+    const base = buildRental(spec, "base", 0);
     // Five years of 8% expense growth against 3% rent growth.
     expect(hot.preTaxCash[LAST_INCOME_MONTH]).toBeLessThan(base.preTaxCash[LAST_INCOME_MONTH]);
     // And the tax items follow the cash, so the deduction is not left behind.
@@ -258,8 +258,8 @@ describe("buildRental — expense growth", () => {
   });
 
   it("lifts it when expenses grow slower than rent", () => {
-    const cool = buildRental({ ...spec, expenseGrowthPct: 0 }, "base");
-    const base = buildRental(spec, "base");
+    const cool = buildRental({ ...spec, expenseGrowthPct: 0 }, "base", 0);
+    const base = buildRental(spec, "base", 0);
     expect(cool.preTaxCash[LAST_INCOME_MONTH]).toBeGreaterThan(base.preTaxCash[LAST_INCOME_MONTH]);
   });
 });
@@ -272,7 +272,7 @@ describe("buildRental — a zero mortgage term does not forgive the loan", () =>
     // $375,000 of debt simply vanished at the sale — a finite, plausible-
     // looking ~38% IRR out of an input the field accepts. The payoff now comes
     // off the loop's own running balance, which is right in every case.
-    const s = buildRental({ ...spec, mortgageTermMonths: 0 }, "base");
+    const s = buildRental({ ...spec, mortgageTermMonths: 0 }, "base", 0);
     expect(s.exit.debtPayoff).toBeCloseTo(LOAN, 6);
     expect(s.exit.debtPayoff).not.toBe(0);
     // And the equity handed over at exit is netted by that debt.
@@ -282,14 +282,14 @@ describe("buildRental — a zero mortgage term does not forgive the loan", () =>
 
 describe("buildRental — degenerate inputs stay finite", () => {
   it("handles an all-cash purchase with no mortgage", () => {
-    const s = buildRental({ ...spec, downPct: 1, mortgageRatePct: 0 }, "base");
+    const s = buildRental({ ...spec, downPct: 1, mortgageRatePct: 0 }, "base", 0);
     expect(s.exit.debtPayoff).toBeCloseTo(0, 6);
     expect(s.preTaxCash.every(Number.isFinite)).toBe(true);
     expect(s.preTaxCash[1]).toBeGreaterThan(0);
   });
 
   it("handles a property that is all land and depreciates nothing", () => {
-    const s = buildRental({ ...spec, landPct: 1 }, "base");
+    const s = buildRental({ ...spec, landPct: 1 }, "base", 0);
     expect(s.exit.recapture[0].amount).toBeCloseTo(0, 6);
     expect(s.exit.costBasis).toBeCloseTo(BASIS, 6);
   });

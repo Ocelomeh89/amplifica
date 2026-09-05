@@ -14,16 +14,24 @@ export interface CashAccount {
   taxItems: TaxItem[];
 }
 
-// The shared schedule as a per-month flow. Month 0 is the lump sum; the
-// monthly contribution runs from month 1 until monthlyEndMonth (exclusive),
-// or the whole horizon when that is null.
+// The shared schedule as a per-month flow. The monthly contribution runs from
+// MONTH 0 — a savings plan's first deposit is made on day one, and month 0 is
+// a capital-deployment month by the convention in types.ts — until
+// monthlyEndMonth (exclusive), or the whole horizon when that is null. The
+// lump sum lands on top of month 0.
+//
+// Month 0 matters more than it looks. The flywheel simulator has always
+// applied its MSC at m = 0 while the cash builder started at m = 1, so cash
+// made 83 contributions against the flywheel's 84 and the tool compared them
+// anyway. That is the same class of inequality the sleeve exists to end, so
+// the schedule settles it in one place instead of per builder.
 export function scheduleFlow(capital: CapitalSchedule): number[] {
   const flow = zeroSeries();
-  flow[0] = capital.lumpSum;
-  for (let m = 1; m < HORIZON_MONTHS; m++) {
+  for (let m = 0; m < HORIZON_MONTHS; m++) {
     const contributing = capital.monthlyEndMonth === null || m < capital.monthlyEndMonth;
     if (contributing && capital.monthly > 0) flow[m] = capital.monthly;
   }
+  flow[0] += capital.lumpSum;
   return flow;
 }
 

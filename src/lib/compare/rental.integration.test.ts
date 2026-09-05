@@ -32,7 +32,7 @@ function globals(over: Partial<GlobalInputs["tax"]> = {}): GlobalInputs {
     inflationPct: 0.03,
     scenario: "base",
     display: "real",
-    capital: { lumpSum: 0, monthly: 0, monthlyEndMonth: null, idleYieldPct: 0 },
+    capital: { lumpSum: 135_000, monthly: 0, monthlyEndMonth: null, idleYieldPct: 0 },
     tax: {
       filingStatus: "mfj",
       otherOrdinaryIncome: 400_000,
@@ -127,7 +127,7 @@ describe("rental through the pipeline", () => {
   it("never taxes the same gain twice — no TaxItem carries the sale", () => {
     // bucketByYear rejects month 84, but the contract is that the builder never
     // emits one at all. This pins the contract, not the bounds check.
-    const built = buildRental(rental, "base");
+    const built = buildRental(rental, "base", 0);
     expect(built.taxItems.every((t) => t.month >= 1 && t.month <= LAST_INCOME_MONTH)).toBe(true);
   });
 

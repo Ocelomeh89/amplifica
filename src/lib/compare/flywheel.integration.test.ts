@@ -4,6 +4,8 @@
 import { describe, it, expect } from "vitest";
 import { HORIZON_MONTHS, type GlobalInputs } from "./types";
 import { buildSeries, runComparison, type OptionSpec } from "./run";
+import { escalateToNominal } from "./inflation";
+import { withSleeve } from "./build/sleeve";
 
 const flywheel: OptionSpec = {
   kind: "flywheel",
@@ -108,35 +110,44 @@ describe("flywheel through the pipeline", () => {
   // `buildSeries` is exported for exactly this kind of check: ComparisonOption
   // does not carry capitalIn, and comparing series lengths would prove
   // nothing. The brief's title assumed these fund "dollar for dollar." At
-  // lumpSum: 0 that's false by exactly one month's contribution: buildCash
-  // treats month 0 as lump-sum-only and starts its `monthly` contribution at
-  // month 1, while buildFlywheel mirrors its underlying simulator
-  // (projection-sim.ts's loop starts at m = 0 and draws MSC there too), so
-  // the flywheel counts a month-0 contribution cash does not.
+  // lumpSum: 0 that is now true: scheduleFlow contributes from month 0, which
+  // is where projection-sim.ts's loop has always drawn its first MSC. Cash
+  // used to start at month 1 and so made 83 contributions to the flywheel's
+  // 84 — that one-month gap is closed.
   //
-  // Run at a nonzero lump sum, as here, a second and much larger divergence
-  // swamps that one: build/flywheel.ts reads only `capital.monthly` —
-  // `capital.lumpSum` never enters its `capitalIn` at all. This is
-  // deliberate, not a bug — the simulator it wraps has no lump-sum input, so
-  // the flywheel is a PURE CONTRIBUTION STRATEGY by design (see FlywheelSpec's
-  // own docs on mscOverride). But it means the two options are NOT comparable
-  // on capital totals whenever lumpSum > 0: cash deploys the full lump sum on
-  // top of its (one-month-later) monthly schedule; the flywheel deploys
-  // nothing extra. A UI built on this engine must flag that funding is
-  // unequal rather than silently plotting the two as if it were — the whole
-  // lump sum is capital a saver would have to leave uninvested, or deploy
-  // some other way, to run the flywheel side by side with a lump-sum-funded
-  // alternative.
-  it("does not fund a lump sum into the flywheel at all — a real, UI-relevant gap", () => {
+  // Run at a nonzero lump sum, a second and much larger divergence appears:
+  // build/flywheel.ts reads only `capital.monthly` — `capital.lumpSum` never
+  // enters its `capitalIn` at all. That is deliberate and remains true: the
+  // simulator it wraps has no lump-sum input, so the flywheel is a PURE
+  // CONTRIBUTION STRATEGY by design (see FlywheelSpec's own docs on
+  // mscOverride), and the builder reports only what the simulation received.
+  //
+  // What has changed is what happens next. The lump sum the simulator cannot
+  // accept is no longer capital the tool quietly forgets — the sleeve holds
+  // it at the idle yield, so both options deploy the same dollars and their
+  // absolute metrics are comparable at last. The pair of tests below pins
+  // both halves: unequal at the builder, equal after the sleeve.
+  it("still cannot take a lump sum at the builder — the simulator has no input for one", () => {
     const g = globals();
     g.capital.lumpSum = 100_000;
     const a = buildSeries(flywheel, g).capitalIn.reduce((x, v) => x + v, 0);
     const b = buildSeries(hysa, g).capitalIn.reduce((x, v) => x + v, 0);
-    // Cash: lumpSum at month 0, plus monthly from month 1. Flywheel: monthly
-    // from month 0, no lumpSum ever. Net, cash out-funds the flywheel by the
-    // lump sum less the one month's contribution the flywheel picks up that
-    // cash does not.
-    expect(b - a).toBeCloseTo(g.capital.lumpSum - g.capital.monthly, 6);
+    // Unchanged and deliberate: runProjectionSim takes an MSC and nothing
+    // else, so buildFlywheel reports only what the simulation actually
+    // received. The gap is closed downstream, not here — see below.
+    expect(b - a).toBeCloseTo(g.capital.lumpSum, 6);
     expect(a).toBeGreaterThan(0);
+  });
+
+  it("is nonetheless funded identically to cash once the sleeve attaches", () => {
+    const g = globals();
+    g.capital.lumpSum = 100_000;
+    const sleeved = (o: OptionSpec) =>
+      withSleeve(escalateToNominal(buildSeries(o, g), g.inflationPct), g.capital);
+    // THE point of the capital contract. The lump sum the simulator cannot
+    // accept is not lost, it sits in the sleeve — so both options deploy the
+    // same dollars, month for month, and their absolute metrics are finally
+    // comparable.
+    expect(sleeved(flywheel).capitalIn).toEqual(sleeved(hysa).capitalIn);
   });
 });

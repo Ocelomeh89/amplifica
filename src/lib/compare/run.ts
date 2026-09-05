@@ -1,14 +1,16 @@
-// The orchestrator. Every option travels the same four stages in the same
-// order — build, escalate, tax, deflate — which is what makes the comparison
-// structurally fair rather than a discipline anyone has to maintain.
+// The orchestrator. Every option travels the same five stages in the same
+// order — build, escalate, sleeve, tax, deflate — which is what makes the
+// comparison structurally fair rather than a discipline anyone has to
+// maintain.
 
 import { HORIZON_MONTHS, type GlobalInputs, type OptionSeries } from "./types";
 import { escalateToNominal } from "./inflation";
 import { computeTaxSeries } from "./tax/engine";
 import { afterTaxContinuingIncome, computeMetrics, type OptionMetrics } from "./metrics";
 import { buildCash, type CashSpec } from "./build/cash";
-import { buildRental, type RentalSpec } from "./build/rental";
+import { buildRental, rentalCapitalDemand, type RentalSpec } from "./build/rental";
 import { buildFlywheel, type FlywheelSpec } from "./build/flywheel";
+import { entryMonth, withSleeve } from "./build/sleeve";
 
 // Plan B extends this union with the remaining six option kinds.
 export type OptionSpec = CashSpec | RentalSpec | FlywheelSpec;
@@ -43,7 +45,13 @@ export function buildSeries(spec: OptionSpec, globals: GlobalInputs): OptionSeri
     case "cash":
       return buildCash(spec, globals.capital, globals.scenario);
     case "rental":
-      return buildRental(spec, globals.scenario);
+      // Bought the first month the schedule can fund the outlay, not
+      // necessarily month 0.
+      return buildRental(
+        spec,
+        globals.scenario,
+        entryMonth(rentalCapitalDemand(spec), globals.capital)
+      );
     case "flywheel":
       return buildFlywheel(spec, globals.capital);
   }
@@ -55,7 +63,10 @@ export function runComparison(
 ): ComparisonResult {
   const options = specs.map((spec) => {
     const built = buildSeries(spec, globals);
-    const nominal = escalateToNominal(built, globals.inflationPct);
+    // Escalate first, then sleeve: a quoted yield is nominal, so attaching
+    // the sleeve to a "real" option beforehand would inflate it too.
+    const escalated = escalateToNominal(built, globals.inflationPct);
+    const nominal = withSleeve(escalated, globals.capital);
     const tax = computeTaxSeries(nominal, globals.tax, globals.inflationPct);
 
     const afterTaxCash = new Array(HORIZON_MONTHS);

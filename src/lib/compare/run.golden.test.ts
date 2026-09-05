@@ -36,16 +36,18 @@ describe("golden — $100k lump plus $2k/mo into a 4% HYSA", () => {
   it("matches the pinned pre-tax and after-tax totals", () => {
     const pre = o.preTaxCash.reduce((a, v) => a + v, 0);
     const post = o.afterTaxCash.reduce((a, v) => a + v, 0);
-    // Both are unchanged from the pre-fix pin, and that is the check: no fix
-    // in this wave touches pre-tax cash, and spreading each year's tax across
-    // its months redistributes the bill WITHIN a year without altering the
-    // year's total. Either of these moving would mean a fix overreached.
-    expect(pre).toBeCloseTo(50906.666666666664, 0);
-    expect(post).toBeCloseTo(34209.28000000002, 0);
+    // Re-baselined when the capital contract landed. The schedule now makes
+    // its first contribution at month 0 rather than month 1, where the
+    // flywheel simulator has always drawn its first MSC — so cash made 83
+    // contributions to the flywheel's 84 and the tool compared them anyway.
+    // The whole delta is that one extra $2,000 earning 4% for 83 months:
+    // 2000 * 0.04/12 * 83 = 553.33, to the cent.
+    expect(pre).toBeCloseTo(51460, 0);
+    expect(post).toBeCloseTo(34581.12000000001, 0);
   });
 
   it("matches the pinned metrics", () => {
-    expect(o.metrics.irrNominal).toBeCloseTo(0.02707164460776679, 4);
+    expect(o.metrics.irrNominal).toBeCloseTo(0.027069925440801335, 4);
     // Below 1, and that is correct, not a bug: every figure here is stated in
     // today's dollars (see metrics.ts). A 4% nominal HYSA yield taxed at
     // ~33% (24% federal bracket + 5% state + 3.8% NIIT, at this household's
@@ -53,10 +55,10 @@ describe("golden — $100k lump plus $2k/mo into a 4% HYSA", () => {
     // So this account quietly loses purchasing power: the after-tax, after-
     // inflation value returned is less than what went in. That is exactly the
     // kind of result this tool exists to surface, not a defect to "fix."
-    expect(o.metrics.equityMultiple).toBeCloseTo(0.9870300744365342, 4);
+    expect(o.metrics.equityMultiple).toBeCloseTo(0.9869824494064344, 4);
     expect(o.metrics.equityMultiple as number).toBeLessThan(1);
-    expect(o.metrics.totalCashCollected).toBeCloseTo(30421.510374792935, 0);
-    expect(o.metrics.peakCapitalAtRisk).toBeCloseTo(219524.11821505608, 0);
+    expect(o.metrics.totalCashCollected).toBeCloseTo(30757.388582834188, 0);
+    expect(o.metrics.peakCapitalAtRisk).toBeCloseTo(221188.24000701483, 0);
   });
 
   it("pays back including sale at month 0, though cash alone never catches up", () => {
@@ -76,17 +78,18 @@ describe("golden — $100k lump plus $2k/mo into a 4% HYSA", () => {
     // and then compared against that one month's income — which made the
     // option earning the most income score worst on the row.
     //
-    // Month 83 holds $266,000 at 4%: $886.67 of nominal interest, less
-    // $279.89 of that year's tax, deflated by 1.03^(83/12).
+    // Month 83 holds $268,000 at 4% — 84 contributions, not 83, since the
+    // schedule now starts at month 0 — for $893.33 of nominal interest, less
+    // that year's tax, deflated by 1.03^(83/12).
     expect(o.metrics.yearSevenMonthlyCashFlow).toBeGreaterThan(0);
-    expect(o.metrics.yearSevenMonthlyCashFlow).toBeCloseTo(494.57901103853607, 2);
-    const nominalMonth83 = (100_000 + 2_000 * 83) * (0.04 / 12);
+    expect(o.metrics.yearSevenMonthlyCashFlow).toBeCloseTo(498.2306447668686, 2);
+    const nominalMonth83 = (100_000 + 2_000 * 84) * (0.04 / 12);
     expect(o.preTaxCash[83]).toBeCloseTo(nominalMonth83, 6);
     expect(o.metrics.yearSevenMonthlyCashFlow).toBeLessThan(nominalMonth83);
   });
 
   it("averages over the 83 months that can carry income, not 84", () => {
-    expect(o.metrics.averageMonthlyCashFlow).toBeCloseTo(366.5242213830474, 2);
+    expect(o.metrics.averageMonthlyCashFlow).toBeCloseTo(370.5709467811348, 2);
     expect(o.metrics.averageMonthlyCashFlow).toBeCloseTo(
       o.metrics.totalCashCollected / 83,
       6
@@ -96,8 +99,8 @@ describe("golden — $100k lump plus $2k/mo into a 4% HYSA", () => {
   it("states continuing income after tax, on the same basis as its exit pair", () => {
     // Read together with exitProceeds, per the spec. Pre-tax it would pin at
     // ~$721; the year-6 blended rate takes it to ~$484.
-    expect(o.metrics.continuingMonthlyIncome).toBeCloseTo(484.4724461188243, 2);
-    expect(o.metrics.exitProceeds).toBeCloseTo(216282.34201733206, 0);
+    expect(o.metrics.continuingMonthlyIncome).toBeCloseTo(488.1150960896429, 2);
+    expect(o.metrics.exitProceeds).toBeCloseTo(217908.52504001878, 0);
     expect(o.metrics.continuingMonthlyIncome).toBeLessThan(
       o.metrics.exitProceeds * (0.04 / 12)
     );

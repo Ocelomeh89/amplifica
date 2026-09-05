@@ -20,8 +20,9 @@ describe("entryMonth", () => {
   });
 
   it("waits until the contributions cover the shortfall", () => {
-    // $135k needed, $100k at month 0, $2k a month: 18 months of saving.
-    expect(entryMonth(135_000, schedule)).toBe(18);
+    // $135k needed. Month 0 provides $102k (the lump sum plus that month's
+    // own contribution), then $2k a month: seventeen months of saving.
+    expect(entryMonth(135_000, schedule)).toBe(17);
   });
 
   it("throws when the schedule never reaches the demand", () => {

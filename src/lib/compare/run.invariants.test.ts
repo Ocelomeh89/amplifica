@@ -10,6 +10,9 @@ import {
   type Scenario,
 } from "./types";
 import { buildSeries, runComparison, type OptionSpec } from "./run";
+import { escalateToNominal } from "./inflation";
+import { withSleeve } from "./build/sleeve";
+import { scheduleFlow } from "./build/cash-account";
 
 const spec: OptionSpec = {
   kind: "cash",
@@ -76,6 +79,25 @@ function globals(over: Partial<GlobalInputs> = {}): GlobalInputs {
     ...over,
   };
 }
+
+describe("the capital contract", () => {
+  it("every option consumes the shared schedule in full", () => {
+    // THE invariant the sleeve exists to establish. Before it, cash took a
+    // lump sum plus monthly, the flywheel ignored lumpSum entirely and the
+    // rental sized itself from price and down payment — and totalCashCollected,
+    // exitProceeds, peakCapitalAtRisk and both paybacks compared unequal
+    // amounts of money anyway.
+    const g = globals();
+    const expected = scheduleFlow(g.capital);
+    for (const s of ALL_SPECS) {
+      const series = withSleeve(
+        escalateToNominal(buildSeries(s, g), g.inflationPct),
+        g.capital
+      );
+      expect(series.capitalIn, `${s.id} capitalIn`).toEqual(expected);
+    }
+  });
+});
 
 const STATUSES: FilingStatus[] = ["single", "mfj", "mfs", "hoh"];
 const SCENARIOS: Scenario[] = ["bear", "base", "bull"];

@@ -10,12 +10,22 @@ const schedule: CapitalSchedule = {
 };
 
 describe("scheduleFlow", () => {
-  it("puts the lump sum at month 0 and the monthly from month 1", () => {
+  it("contributes from month 0, with the lump sum stacked on top of it", () => {
     const f = scheduleFlow(schedule);
     expect(f).toHaveLength(HORIZON_MONTHS);
-    expect(f[0]).toBe(10_000);
+    // Month 0 carries both: a savings plan's first deposit is made on day
+    // one, and month 0 is a capital-deployment month.
+    expect(f[0]).toBe(11_000);
     expect(f[1]).toBe(1_000);
     expect(f[LAST_INCOME_MONTH]).toBe(1_000);
+  });
+
+  it("makes HORIZON_MONTHS contributions, not one fewer", () => {
+    // The flywheel simulator always contributed at month 0 while cash started
+    // at month 1, so the two were funded unequally. Pinned here so it cannot
+    // drift back.
+    const f = scheduleFlow({ ...schedule, lumpSum: 0 });
+    expect(f.filter((v) => v === 1_000)).toHaveLength(HORIZON_MONTHS);
   });
 
   it("stops contributing at monthlyEndMonth", () => {
