@@ -5,15 +5,13 @@
 // The whole tool runs client-side — the comparison engine is pure, with no
 // Next or Supabase imports anywhere beneath src/lib/compare.
 
+import CompareClient from "@/components/compare/CompareClient";
+
 export const metadata = {
   title: "Compare investments",
   robots: { index: false, follow: false },
 };
 
 export default function ComparePage() {
-  return (
-    <div className="max-w-6xl">
-      <h1 className="text-xl font-semibold mb-4">Compare investments</h1>
-    </div>
-  );
+  return <CompareClient />;
 }
