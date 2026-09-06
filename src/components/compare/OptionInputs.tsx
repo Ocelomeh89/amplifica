@@ -1,11 +1,9 @@
 "use client";
 
 import NumberField from "./NumberField";
+import { fromPct, toPct } from "@/lib/compare/present";
 import type { OptionSpec } from "@/lib/compare/run";
 import type { Scenario } from "@/lib/compare/types";
-
-const toPct = (d: number) => d * 100;
-const fromPct = (n: number) => n / 100;
 
 const GRID = "grid grid-cols-1 sm:grid-cols-2 gap-x-4";
 

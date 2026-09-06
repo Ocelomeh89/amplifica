@@ -32,7 +32,7 @@ export default function CompareClient() {
   const byId = useMemo(() => new Map(options.map((o) => [o.id, o])), [options]);
 
   return (
-    <div className="max-w-6xl">
+    <div className="max-w-7xl">
       <h1 className="text-xl font-semibold mb-1">Compare investments</h1>
       <p className="text-sm text-sub mb-4">
         The same money in each, over seven years, after tax and in today&apos;s

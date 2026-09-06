@@ -2,13 +2,8 @@
 
 import Card from "@/components/Card";
 import NumberField from "./NumberField";
+import { fromPct, toPct } from "@/lib/compare/present";
 import type { FilingStatus, GlobalInputs, Scenario } from "@/lib/compare/types";
-
-// Percentages are decimals in the engine and whole numbers on screen. The
-// conversion lives here, once, rather than in every field — getting it
-// backwards runs a 4% yield at 400% and everything still renders plausibly.
-const toPct = (decimal: number) => decimal * 100;
-const fromPct = (shown: number) => shown / 100;
 
 const selectClass =
   "w-full border border-edge rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";

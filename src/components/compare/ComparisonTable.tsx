@@ -9,13 +9,17 @@ export default function ComparisonTable({ options }: { options: ComparisonOption
   }
 
   return (
+    // Six options of full-precision currency do not fit beside the app sidebar on
+    // a laptop, so the table scrolls. The metric column is pinned: scrolling to
+    // reach the last option while the row labels slide away leaves you reading
+    // numbers with no idea what they mean.
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-[11px] text-sub uppercase tracking-wide border-b border-edge">
-            <th className="py-2 pr-4">Metric</th>
+            <th className="py-2 pr-4 whitespace-nowrap sticky left-0 bg-card z-10">Metric</th>
             {options.map((o) => (
-              <th key={o.id} className="py-2 px-3 text-right whitespace-nowrap">
+              <th key={o.id} className="py-2 px-2 text-right whitespace-nowrap">
                 {o.label}
               </th>
             ))}
@@ -26,13 +30,15 @@ export default function ComparisonTable({ options }: { options: ComparisonOption
             const best = bestIndex(row, options);
             return (
               <tr key={row.key} className="border-b border-edge/50">
-                <td className="py-2 pr-4 text-sub">{row.label}</td>
+                <td className="py-2 pr-4 text-sub whitespace-nowrap sticky left-0 bg-card z-10">
+                  {row.label}
+                </td>
                 {options.map((o, i) => (
                   <td
                     key={o.id}
                     data-testid={`cell-${row.key}-${i}`}
                     className={
-                      "py-2 px-3 text-right tabular-nums" +
+                      "py-2 px-2 text-right tabular-nums whitespace-nowrap" +
                       (i === best ? " font-semibold text-aqua" : "")
                     }
                   >

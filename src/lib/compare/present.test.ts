@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { METRIC_ROWS, bestIndex, sleeveSummary, type MetricRow } from "./present";
+import {
+  METRIC_ROWS,
+  bestIndex,
+  fromPct,
+  sleeveSummary,
+  toPct,
+  type MetricRow,
+} from "./present";
 import { runComparison, type ComparisonOption } from "./run";
 import { DEFAULT_GLOBALS, DEFAULT_SPECS } from "./defaults";
 
@@ -101,5 +108,27 @@ describe("sleeveSummary", () => {
   it("says nothing about entry when the option starts at month 0", () => {
     const o = { capitalAbsorbed: 100, capitalIdle: 5, entryMonth: 0 };
     expect(sleeveSummary(o as ComparisonOption)).not.toMatch(/month 0/);
+  });
+});
+
+describe("percent conversion", () => {
+  it("does not show IEEE 754 noise", () => {
+    // 0.036 * 100 is 3.5999999999999996 unrounded, and an input field showing
+    // that is both ugly and horrible to edit.
+    expect(toPct(0.036)).toBe(3.6);
+    expect(toPct(0.07)).toBe(7);
+    expect(toPct(0.035)).toBe(3.5);
+    expect(toPct(0.065)).toBe(6.5);
+  });
+
+  it("round-trips every rate a user might type", () => {
+    for (const shown of [0, 3.5, 4, 6.5, 7, 10, 12.75, 0.125]) {
+      expect(toPct(fromPct(shown)), `${shown}`).toBe(shown);
+    }
+  });
+
+  it("keeps enough precision for a fractional basis point", () => {
+    expect(fromPct(0.0001)).toBeCloseTo(0.000001, 12);
+    expect(toPct(0.000001)).toBe(0.0001);
   });
 });

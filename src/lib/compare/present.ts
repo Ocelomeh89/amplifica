@@ -17,6 +17,18 @@ export interface MetricRow {
   betterIs: "higher" | "lower" | null;
 }
 
+// Percentages are decimals in the engine and whole numbers on screen. The
+// round matters: 0.036 * 100 is 3.5999999999999996 in IEEE 754, and an input
+// showing that is both ugly and horrible to edit. Six decimal places of a
+// percent is finer than any rate anyone types.
+export function toPct(decimal: number): number {
+  return Number((decimal * 100).toFixed(6));
+}
+
+export function fromPct(shown: number): number {
+  return shown / 100;
+}
+
 const usd = (v: number | null) => (v === null ? "—" : fmtUSD0(v));
 const pct = (v: number | null) => (v === null ? "—" : fmtPct(v, 2));
 const month = (v: number | null) => (v === null ? "never" : `month ${v}`);
