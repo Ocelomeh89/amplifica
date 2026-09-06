@@ -195,3 +195,95 @@ describe("runSimulation — deployed capital & distribution cash flow", () => {
     expect(r.finalDistributionsReceived).toBeCloseTo(running, 2);
   });
 });
+
+describe("finalBook", () => {
+  const result = runSimulation({
+    msc: 2000,
+    investmentSizeFactor: 5,
+    termMonths: 36,
+    investmentInterestPct: 0.08,
+    locIncrease: 1.5,
+    locInterestPct: 0.1,
+    totalMonths: 84,
+  });
+
+  it("returns the positions still paying at the horizon", () => {
+    expect(result.finalBook.length).toBeGreaterThan(0);
+    for (const inv of result.finalBook) {
+      expect(inv.startMonth).toBeLessThanOrEqual(84);
+      expect(inv.startMonth + inv.termMonths).toBeGreaterThan(84);
+    }
+  });
+
+  it("carries the fields needed to value a position", () => {
+    for (const inv of result.finalBook) {
+      expect(inv.monthlyPayout).toBeGreaterThan(0);
+      expect(inv.faceValue).toBeGreaterThan(0);
+      expect(Number.isFinite(inv.monthlyRate)).toBe(true);
+    }
+  });
+
+  it("agrees with the last point's undiscounted book value", () => {
+    // expectedFuturePayments folds in cash and the outstanding LoC; the book's
+    // own remaining payments are the piece this exposes.
+    const last = result.series[result.series.length - 1];
+    let remaining = 0;
+    for (const inv of result.finalBook) {
+      const elapsed = 84 - inv.startMonth;
+      remaining += inv.monthlyPayout * (inv.termMonths - elapsed);
+    }
+    expect(remaining).toBeCloseTo(
+      last.expectedFuturePayments - last.cash + last.outstandingAmount,
+      4
+    );
+  });
+
+  it("returns an array on a short horizon rather than undefined", () => {
+    const short = runSimulation({
+      msc: 2000,
+      investmentSizeFactor: 5,
+      termMonths: 12,
+      investmentInterestPct: 0.08,
+      locIncrease: 1,
+      locInterestPct: 0.1,
+      totalMonths: 6,
+    });
+    expect(Array.isArray(short.finalBook)).toBe(true);
+  });
+});
+
+describe("bookByMonth", () => {
+  const result = runSimulation({ ...baseInput, totalMonths: 84 });
+
+  it("carries one snapshot per month", () => {
+    expect(result.bookByMonth).toHaveLength(84);
+  });
+
+  it("is captured at the same instant expectedFuturePayments is valued", () => {
+    // The snapshot's own undiscounted remaining payments, valued at m + 1,
+    // must reconstruct that month's expectedFuturePayments exactly. This is
+    // the alignment build/compare's per-month equity calculation relies on.
+    for (const m of [0, 1, 17, 42, 83]) {
+      let remaining = 0;
+      for (const inv of result.bookByMonth[m]) {
+        const elapsed = m + 1 - inv.startMonth;
+        if (elapsed < 0 || elapsed >= inv.termMonths) continue;
+        remaining += inv.monthlyPayout * (inv.termMonths - elapsed);
+      }
+      const p = result.series[m];
+      expect(remaining + p.cash - p.outstandingAmount).toBeCloseTo(p.expectedFuturePayments, 6);
+    }
+  });
+
+  it("ends on the same positions finalBook keeps, pruning aside", () => {
+    // The last snapshot precedes the final prune, so it may carry positions
+    // finalBook has dropped — but every one of those is already expired at the
+    // horizon and contributes nothing to any valuation.
+    const last = result.bookByMonth[83];
+    expect(last.length).toBeGreaterThanOrEqual(result.finalBook.length);
+    for (const inv of result.finalBook) expect(last).toContain(inv);
+    for (const inv of last) {
+      if (!result.finalBook.includes(inv)) expect(84 - inv.startMonth).toBeGreaterThanOrEqual(inv.termMonths);
+    }
+  });
+});
