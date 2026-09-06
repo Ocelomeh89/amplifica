@@ -17,6 +17,7 @@ export default function robots(): MetadataRoute.Robots {
           "/projections",
           "/settings",
           "/compare",
+          "/amortization",
           "/auth/",
           "/reset-password",
         ],

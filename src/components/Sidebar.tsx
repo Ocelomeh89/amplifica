@@ -15,12 +15,14 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { logout } from "@/app/login/actions";
+import { amortizationNavItem } from "@/app/(app)/amortization/nav";
 
 const items = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/amplicons", label: "Amplicons", icon: Coins },
   { to: "/loc", label: "Lines of Credit", icon: CreditCard },
   { to: "/projections", label: "Projections", icon: TrendingUp },
+  amortizationNavItem,
 ];
 
 // The Amplitude Mark — five bars on an exponential curve (height ratio ≈ 1.7× per
