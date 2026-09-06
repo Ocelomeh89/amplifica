@@ -501,8 +501,21 @@ not "exactly equal".
 
 ## UI
 
-Route `/compare`, standalone, outside the authed `(app)` group. Reuses `Card`,
-`InfoBox`, `fmtCurrency` and the existing Recharts styling.
+Route `/compare`, **inside** the authed `(app)` group, whose layout already
+redirects anonymous visitors to `/login`. Deliberately unlinked: no entry in
+`Sidebar`'s nav array, listed in `robots.ts`'s disallow, absent from
+`sitemap.ts`. Anyone logged in who has the link gets it and nobody else finds
+it. This reverses the original "standalone, outside the authed group" — the
+tool reports a household's tax position against real deals, and that is not a
+public page.
+
+The engine is pure: no Next, Supabase or server-only imports anywhere under
+`src/lib/compare` or `src/lib/finance`. So the page computes client-side
+through a `useMemo` over `runComparison` — no API route, no server round-trip.
+Six options across 84 months recompute in microseconds, so every keystroke can
+recompute without debouncing.
+
+Reuses `Card`, `InfoBox`, `fmtCurrency` and the existing Recharts styling.
 
 - **Global panel** — inflation, scenario selector, display toggle, tax profile,
   shared capital schedule including the idle yield.
@@ -518,14 +531,45 @@ Route `/compare`, standalone, outside the authed `(app)` group. Reuses `Card`,
 - **Charts** — cumulative after-tax cash, monthly cash flow, and net position
   over time; all in today's dollars.
 - **"What this model does not do"** panel — the simplifications above plus the
-  not-tax-advice statement.
+  not-tax-advice statement. A collapsed accordion rather than an open panel.
 - **JSON export / import**, versioned.
+
+### What the first release carries
+
+The table is the answer the tool exists to give; the charts are supporting
+evidence for it. So v1 ships everything that makes the comparison *work* and
+nothing that only makes it prettier:
+
+**In** — the global panel, a card per built option with its own inputs and an
+enable toggle, the comparison table with best-in-row highlighting, and the
+collapsed limits accordion. Every input live, results recomputing as they
+change.
+
+**Out, deliberately** — charts, JSON export/import, sortable columns, and the
+manual grids (whose three options are not built anyway).
+
+**The three unbuilt options appear as disabled cards** reading "not yet
+modelled", rather than being omitted. A comparison missing commercial real
+estate, the business investment and oil & gas should not *look* complete —
+least of all for oil & gas, whose entire case is a tax treatment none of the
+six built options share.
+
+**Each card reports its own capital.** What the option absorbed, what sat in
+the sleeve, and the month it entered. That is the capital contract made
+visible, and it is how the flywheel's inability to take a lump sum becomes
+something a reader can see rather than something a doc warns about.
 
 ## Persistence
 
-Versioned JSON file download and upload. No database, no auth, no migration.
+Versioned JSON file download and upload. No database, no migration.
 `serialize.ts` owns a `version` field and rejects unknown future versions with
-a readable message rather than partially applying them.
+a readable message rather than partially applying them. Deferred past the
+first release; until it lands, a session's inputs live only in React state and
+are lost on reload.
+
+("No auth" was true of the original standalone page and is not true now — the
+route sits behind the app's login. Persistence still means a file, not a
+database row.)
 
 ## Testing
 
@@ -626,3 +670,8 @@ all recorded above where they belong:
   stacking it at LTCG rates first.
 - **"IRR equals the debt rate exactly" was wrong**, for one reason of units
   and one of substance. See the debt paydown section.
+
+**2026-09-05, shipping decision.** `/compare` moves **inside** the authed
+`(app)` group and stays unlinked, reversing the original standalone routing.
+The **UI** section now records what the first release carries and what it
+defers.
