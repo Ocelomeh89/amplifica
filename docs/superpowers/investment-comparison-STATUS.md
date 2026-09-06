@@ -1,6 +1,6 @@
 # Investment Comparison Tool — status and resume point
 
-**Last worked:** 2026-09-05 · **Branch:** `feat/investment-comparison` (unmerged, ~74 commits ahead of `main`) · **Tests:** 467 passing, typecheck clean
+**Last worked:** 2026-09-05 · **Branch:** `feat/investment-comparison` (unmerged, ~85 commits ahead of `main`) · **Tests:** 520 passing, typecheck clean, `pnpm build` green
 
 Read this first when picking the work back up. The spec and plans carry the
 design; this file carries what they cannot — what is done, what is decided,
@@ -12,6 +12,7 @@ what is deliberately wrong, and what must be settled before the next builder.
 - Plan C (flywheel + metric fixes): `docs/superpowers/plans/2026-08-30-flywheel-builder.md` — **complete**
 - Plan D (capital contract + rate-driven builders):
   `docs/superpowers/plans/2026-09-05-capital-contract-and-rate-driven-builders.md` — **complete**
+- Plan E (the UI): `docs/superpowers/plans/2026-09-05-compare-ui.md` — **complete**
 
 ## What the tool does today
 
@@ -25,8 +26,19 @@ architecture's whole point — see the contract at the top of
 **Six options built:** cash equivalents, a leveraged rental, the amplification
 flywheel, an index fund, a dividend portfolio, debt paydown.
 
-**Three remaining:** commercial real estate, business investment, oil & gas.
-Plus the manual monthly grid all three need, and the whole UI.
+**Three remaining:** commercial real estate, business investment, oil & gas,
+plus the manual monthly grid all three need.
+
+**It has a UI.** `/compare` is live behind login and deliberately unlinked —
+inside the `(app)` group so the layout redirects anonymous visitors, absent
+from `Sidebar`, `robots.ts` and `sitemap.ts`. Verified: logged out it returns
+307 to `/login`. Anyone logged in with the link gets it; nobody else finds it.
+
+The page carries the global panel, a card per option, and the comparison
+table with best-in-row highlighting. Every input recomputes live — the engine
+is pure, so it all runs client-side with no API route. **Charts, JSON
+export/import, sortable columns and the manual grids are deferred**, so a
+reload loses the inputs.
 
 ## Run it
 
@@ -140,6 +152,17 @@ used across the horizon. It was only ever the last $50k that vanished.
   accrues inside the loan as faster principal reduction. Counting it as cash
   as well as balance reduction double-counts it, the same error that once
   reported the flywheel at 4.45x.
+- **`/compare` must stay unlinked.** Inside `(app)`, out of `Sidebar`,
+  `robots.ts` and `sitemap.ts`. `src/app/compare-route.test.ts` asserts all
+  four, because "unlinked" is the kind of property that quietly stops being
+  true.
+- **Presentation logic lives in `present.ts`, not in components.** Which
+  metrics appear, how each formats, and which direction wins are testable
+  without rendering. Keep it that way.
+- **A tie crowns nobody** in `bestIndex`. Highlighting the first of two
+  identical values is a lie the eye reads as a finding.
+- **`toPct` rounds.** 0.036 * 100 is 3.5999999999999996 in IEEE 754, and an
+  input field showing that is unusable. Do not "simplify" it back to `* 100`.
 - **Annual preferential income stacks at LTCG rates.** `householdTax` used to
   tax it as ordinary, which was free while no option produced any. The
   dividend portfolio produces some and its whole case is the qualified rate.
@@ -209,6 +232,11 @@ forwarded; basis is now correct per position but the path has thin coverage).
   `site/circle-sign-in` mid-session. That path is excluded via
   `.git/info/exclude` rather than `.gitignore`, so the other session's branch
   was never touched.
+- **Inputs are lost on reload.** `serialize.ts` and the versioned JSON
+  export/import are specced and unbuilt.
+- The worktree needs `.env.local` copied in from the main checkout before
+  `pnpm dev` will boot — it is gitignored, so it does not travel with the
+  branch.
 - The branch has never been merged or pushed. `superpowers:finishing-a-development-branch`
   was deliberately deferred until the requested work is done.
 - Interactive tax explorer (private artifact): https://claude.ai/code/artifact/e7a71e60-0170-4fda-8e52-e218a0e4d24b
