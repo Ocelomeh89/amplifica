@@ -37,6 +37,13 @@ export interface ComparisonOption {
   // Reported, never monetized — see TaxResult in tax/engine.ts.
   residualNonPassiveCarryforward: number;
   residualDeductionValue: number;
+  // What this option actually put to work, what sat in the sleeve, and the
+  // month it entered. The capital contract says every option consumes the
+  // whole schedule; these three say what it DID with it, which is the part a
+  // reader needs to see.
+  capitalAbsorbed: number;
+  capitalIdle: number;
+  entryMonth: number;
   metrics: OptionMetrics;
 }
 
@@ -83,6 +90,15 @@ export function runComparison(
     const nominal = withSleeve(escalated, globals.capital);
     const tax = computeTaxSeries(nominal, globals.tax, globals.inflationPct);
 
+    // `escalated` is pre-sleeve, so its capitalIn is what the option itself
+    // asked for; `nominal.capitalIn` is the full schedule. The difference is
+    // what never got deployed.
+    const capitalAbsorbed = escalated.capitalIn.reduce((a, v) => a + v, 0);
+    const scheduleTotal = nominal.capitalIn.reduce((a, v) => a + v, 0);
+    const capitalIdle = scheduleTotal - capitalAbsorbed;
+    const firstOutlay = escalated.capitalIn.findIndex((v) => v > 0);
+    const entryMonth = firstOutlay === -1 ? 0 : firstOutlay;
+
     const afterTaxCash = new Array(HORIZON_MONTHS);
     for (let m = 0; m < HORIZON_MONTHS; m++) {
       afterTaxCash[m] = nominal.preTaxCash[m] - tax.monthlyTaxCash[m];
@@ -100,6 +116,9 @@ export function runComparison(
       exitTaxPaid: tax.exitTaxCash,
       residualNonPassiveCarryforward: tax.residualNonPassiveCarryforward,
       residualDeductionValue: tax.residualDeductionValue,
+      capitalAbsorbed,
+      capitalIdle,
+      entryMonth,
       metrics: computeMetrics({
         afterTaxCash,
         capitalIn: nominal.capitalIn,
