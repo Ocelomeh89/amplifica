@@ -1,14 +1,10 @@
 "use server";
 
-import { createClient } from "@/shared/supabase/server";
+import { requireUser } from "@/shared/supabase/auth";
 import { redirect } from "next/navigation";
 
 export async function updatePassword(formData: FormData) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { supabase } = await requireUser();
 
   const password = String(formData.get("password") ?? "");
   if (password.length < 8) {

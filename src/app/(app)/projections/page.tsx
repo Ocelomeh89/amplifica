@@ -1,16 +1,13 @@
 import Link from "next/link";
 import { Trash2 } from "lucide-react";
-import { createClient } from "@/shared/supabase/server";
-import { redirect } from "next/navigation";
+import { requireUser } from "@/shared/supabase/auth";
 import Card from "@/shared/ui/Card";
 import NewProjectionButton from "@/features/projections/ui/NewProjectionButton";
 import { deleteProjection } from "@/features/projections/data/actions";
 import { fmtCurrency, fmtPct, fmtDate } from "@/shared/format";
 
 export default async function ProjectionsPage() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { supabase } = await requireUser();
 
   const { data: projections } = await supabase
     .from("projections")

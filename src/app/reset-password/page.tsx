@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/shared/supabase/server";
+import { requireUser } from "@/shared/supabase/auth";
 import PasswordInput from "@/shared/ui/PasswordInput";
 import { updatePassword } from "@/features/auth/data/reset-password";
 
@@ -8,12 +7,8 @@ export default async function ResetPasswordPage({
 }: {
   searchParams: { error?: string };
 }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
   // Reached via the recovery link (which sets a session through /auth/callback).
-  if (!user) redirect("/login");
+  const { user } = await requireUser();
 
   return (
     <main className="min-h-screen flex items-center justify-center p-8 bg-cream">

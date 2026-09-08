@@ -1,6 +1,5 @@
 import { Trash2 } from "lucide-react";
-import { createClient } from "@/shared/supabase/server";
-import { redirect } from "next/navigation";
+import { requireUser } from "@/shared/supabase/auth";
 import { fmtCurrency, fmtPct, fmtDate } from "@/shared/format";
 import Card from "@/shared/ui/Card";
 import NewLoCForm from "@/features/loc/ui/NewLoCForm";
@@ -8,9 +7,7 @@ import UtilizationCell from "@/features/loc/ui/UtilizationCell";
 import { deleteLoC } from "@/features/loc/data/actions";
 
 export default async function LoCPage() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { supabase } = await requireUser();
 
   const { data: locs } = await supabase
     .from("locs")

@@ -1,13 +1,11 @@
 "use server";
 
-import { createClient } from "@/shared/supabase/server";
+import { requireUser } from "@/shared/supabase/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 export async function saveSettings(formData: FormData) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { supabase, user } = await requireUser();
 
   const monthly_savings_contribution = Number(formData.get("monthly_savings_contribution") ?? 0);
   const net_worth_goal = Number(formData.get("net_worth_goal") ?? 0);

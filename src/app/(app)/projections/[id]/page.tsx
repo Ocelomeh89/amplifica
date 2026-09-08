@@ -1,5 +1,5 @@
-import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/shared/supabase/server";
+import { notFound } from "next/navigation";
+import { requireUser } from "@/shared/supabase/auth";
 import EditorForm from "@/features/projections/ui/EditorForm";
 
 export default async function ProjectionEditorPage({
@@ -9,9 +9,7 @@ export default async function ProjectionEditorPage({
   params: { id: string };
   searchParams: { saved?: string };
 }) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { supabase } = await requireUser();
 
   const { data: projection, error } = await supabase
     .from("projections")

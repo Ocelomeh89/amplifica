@@ -1,5 +1,4 @@
-import { createClient } from "@/shared/supabase/server";
-import { redirect } from "next/navigation";
+import { requireUser } from "@/shared/supabase/auth";
 import { isoToYearMonth, addMonths } from "@/shared/finance/dates";
 import { monthlyPayoutOf, isActiveAt } from "@/shared/finance/projection";
 import Card from "@/shared/ui/Card";
@@ -7,9 +6,7 @@ import NewAmpliconForm from "@/features/amplicons/ui/NewAmpliconForm";
 import AmpliconRow from "@/features/amplicons/ui/AmpliconRow";
 
 export default async function AmpliconsPage() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { supabase } = await requireUser();
 
   const { data: amplicons } = await supabase
     .from("amplicons")
