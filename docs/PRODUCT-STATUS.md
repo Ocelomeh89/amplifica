@@ -47,36 +47,73 @@ and the date of financial independence (FI).
 ## 3. Architecture
 
 - **App Router with a route group `(app)`** for authenticated pages, which share `src/app/(app)/layout.tsx` (renders the `Sidebar` + page shell). Public routes (`/login`, `/signup`, `/reset-password`, `/auth/callback`, `/`, `/calculator`) live outside the group.
-- **Auth via Supabase SSR cookies.** `src/lib/supabase/middleware.ts` (wired through Next middleware) refreshes the session on every request; `server.ts` creates a request-scoped server client (used in Server Components + Actions), `client.ts` a browser client. Unauthenticated access to `(app)` pages redirects to `/login`. `/calculator` is intentionally public — the middleware early-returns before the auth round-trip.
-- **Mutations are Next.js Server Actions** (`actions.ts` per feature folder), never client-side DB calls. Each action calls `supabase.auth.getUser()`, then a scoped query, then `revalidatePath`. Writes are additionally scoped `.eq("user_id", user.id)` as defense-in-depth on top of RLS.
-- **Security model: RLS-first.** Every user-owned table has `enable row level security` and per-operation policies keyed on `auth.uid()`. A user can only ever see/modify their own rows. The one non-user table, `leads`, has RLS enabled with **no policies** (anon key hard-denied); it is written only via the service-role client (`src/lib/supabase/admin.ts`, `import "server-only"`).
-- **The finance engine is pure and isolated** in `src/lib/finance/` — no I/O, no React. It is the most heavily tested part of the app (Vitest, property/invariant tests). UI reads persisted rows, runs the engine in-memory (client-side `useMemo`, debounced), and renders.
+- **Auth via Supabase SSR cookies.** `src/shared/supabase/middleware.ts` (wired through Next middleware) refreshes the session on every request; `server.ts` creates a request-scoped server client (used in Server Components + Actions); `auth.ts` wraps it as `requireUser()`, which every protected page and mutation calls to get `{ supabase, user }` or redirect to `/login`. Unauthenticated access to `(app)` pages redirects to `/login`. `/calculator` is intentionally public — the middleware early-returns before the auth round-trip.
+- **Mutations are Next.js Server Actions** (`actions.ts` per feature folder), never client-side DB calls. Each action calls `requireUser()`, then a scoped query, then `revalidatePath`. Writes are additionally scoped `.eq("user_id", user.id)` as defense-in-depth on top of RLS.
+- **Security model: RLS-first.** Every user-owned table has `enable row level security` and per-operation policies keyed on `auth.uid()`. A user can only ever see/modify their own rows. The one non-user table, `leads`, has RLS enabled with **no policies** (anon key hard-denied); it is written only via the service-role client (`src/shared/supabase/admin.ts`, `import "server-only"`).
+- **The finance engine is pure and isolated** in `src/shared/finance/` — no I/O, no React. It is the most heavily tested part of the app (Vitest, property/invariant tests). UI reads persisted rows, runs the engine in-memory (client-side `useMemo`, debounced), and renders.
 - **Profiles auto-provision**: a Postgres trigger (`on_auth_user_created`) inserts a `profiles` row on signup.
 
 Directory map:
 ```
 src/
-  app/
-    (app)/              # authenticated route group (shares Sidebar layout)
-      dashboard/        # net-worth & cash-flow charts over time
-      amplicons/        # CRUD list of Amplicons
-      loc/              # CRUD list of Lines of Credit
-      projections/      # list + [id] editor (the flywheel simulator UI)
-      settings/         # profile settings + theme toggle
-      layout.tsx
-    calculator/         # PUBLIC email-gated simulator (page, EmailGate, CalculatorClient, actions)
-    login/ signup/ reset-password/ auth/callback/  # auth
-    layout.tsx  page.tsx  globals.css
-  components/           # Card, Field, InfoBox, NumberInput, PasswordInput, Sidebar
-    simulator/          # shared simulator UI: sim-values, useSimulation, SimInputsGrid, SimResults, SimCharts, FlywheelExplainer
-  lib/
-    beehiiv.ts          # server-only Beehiiv subscribe (best-effort)
-    finance/            # PURE engine (see §5)
-    supabase/           # client.ts, server.ts, admin.ts (service role), middleware.ts, database.types.ts
+  app/                  # routes + the (app) shell. NOTHING imports this.
+    (app)/              # authenticated route group
+      dashboard/ amplicons/ loc/ projections/ settings/ amortization/ compare/
+      layout.tsx  Sidebar.tsx
+    calculator/         # PUBLIC email-gated simulator
+    login/ signup/ reset-password/ auth/callback/
+    layout.tsx  page.tsx  globals.css  robots.ts  sitemap.ts
+
+  features/             # one folder per product surface: engine/ ui/ data/
+    compare/            # investment comparison (see investment-comparison-STATUS.md)
+      engine/           #   run, types, metrics, present, defaults, inflation
+        builders/       #   six option builders + sleeve/depreciation helpers
+        tax/            #   brackets, engine, exit, passive
+      ui/               #   CompareClient, ComparisonTable, GlobalPanel, OptionCard...
+    simulator/          # shared simulator UI — used by projections AND calculator
+    projections/        # ui/ (EditorForm, NewProjectionButton) + data/actions
+    calculator/         # ui/ (CalculatorClient, EmailGate, InfoSections) + data/
+    amortization/       # engine/schedule + ui/ + nav.ts  (removable in one delete)
+    amplicons/  loc/  dashboard/  settings/  auth/
+
+  shared/               # anything two or more features use
+    finance/            # THE PURE ENGINE (see §5) — no I/O, no React
+    ui/                 # Card, Field, InfoBox, NumberInput, PasswordInput
+    supabase/           # server, admin (service role), middleware, auth, database.types
     format.ts           # currency/percent/date formatters
-supabase/migrations/    # 0001–0007 (see §4)
+    forms.ts            # FormData coercion for Server Actions
+    links.ts
+  boundaries.test.ts    # asserts the three rules below
+
+supabase/migrations/    # 0001-0007 (see §4)
 docs/                   # specs, plans, this status doc
 ```
+
+**The three rules**, enforced by `src/boundaries.test.ts` rather than by
+discipline:
+
+1. `app/` may import from `features/` and `shared/`. **Nothing imports `app/`.**
+2. `features/X` may import from `shared/`, and from a feature named in that
+   test's `SHARED_FEATURES` allowlist (today: `simulator` alone). Not from
+   other features.
+3. `shared/` may import only from `shared/`.
+
+`shared/` membership follows the import graph, not taste: a module two or more
+features use belongs there. That is why the finance engine is in `shared/`
+(the amortization page, the dashboard, the simulator and three compare builders
+all use it) while `compare/` is a feature (only its own UI uses it).
+
+**Pointing an LLM at one part:** `features/compare/engine/` is the comparison
+math (50 files, 2.5k lines excluding tests); `shared/finance/` is the projection
+kernel (17 files, 0.9k); a CRUD feature like `features/loc/` is 3. Each feature folder carries a `CLAUDE.md` naming its
+entry point and invariants. Tests sit beside their source — read `*.ts` first
+and open `*.test.ts` only when changing behavior.
+
+> **Note on older docs.** Plans and specs under `docs/superpowers/` predate this
+> restructure and reference the former `src/lib/**` and `src/components/**`
+> paths. They are dated records and were left as written; map them through the
+> tree above.
+
 
 ---
 
@@ -152,11 +189,11 @@ Unique index on `(lower(email), source)` — repeat submits are idempotent (2350
 
 **Triggers/functions (0001):** `touch_updated_at()` (auto `updated_at`), `handle_new_user()` (auto-insert profile on signup, `security definer`).
 
-**TypeScript mirror:** `src/lib/supabase/database.types.ts` mirrors all tables as `Row`/`Insert`/`Update`; exported aliases `Projection`, `Amplicon`, `LoC`, `Profile`, `Lead`.
+**TypeScript mirror:** `src/shared/supabase/database.types.ts` mirrors all tables as `Row`/`Insert`/`Update`; exported aliases `Projection`, `Amplicon`, `LoC`, `Profile`, `Lead`.
 
 ---
 
-## 5. The finance engine (`src/lib/finance/`) — pure, fully tested
+## 5. The finance engine (`src/shared/finance/`) — pure, fully tested
 
 | Module | Responsibility |
 |---|---|
@@ -215,13 +252,13 @@ first payment the month after). So month 0 sees MSC only.
 ## 7. Routes & pages
 
 **Public:** `/` (landing/redirect), `/login`, `/signup`, `/reset-password`, `/auth/callback` (OAuth/email-link handler, a Route Handler), and:
-- `/calculator` — **email-gated public simulator** (lead gen). The server component reads the `amp_calc_unlocked` httpOnly cookie (path `/calculator`, 1yr) and renders either `EmailGate` or `CalculatorClient` — no client-side flash. `captureLead` (server action): honeypot check → email validation → **insert into `leads` via the service-role client (required for unlock; duplicate = success)** → awaited best-effort Beehiiv subscribe (`utm_source: calculator`) → set cookie. The simulator is the shared UI (`components/simulator/`) seeded from `PUBLIC_DEFAULT_VALUES`, **beginner-simplified: only the eight core inputs** (`advanced="hidden"` — perpetual/stop-MSC/withdrawal fields are not rendered; the engine runs on the defaults). Extra public-only input: **"Your annual income ($)"** (local state, not an engine input) — the first month `currentInvestmentSize` exceeds it renders as a vertical amber `ReferenceLine` on all three charts plus a sentence under the input. No save; CTAs to `/signup`. Abuse resistance is deliberately lightweight (honeypot + validation + unique index + service-role-only writes); escalate to Vercel Firewall rate limiting if spam appears.
+- `/calculator` — **email-gated public simulator** (lead gen). The server component reads the `amp_calc_unlocked` httpOnly cookie (path `/calculator`, 1yr) and renders either `EmailGate` or `CalculatorClient` — no client-side flash. `captureLead` (server action): honeypot check → email validation → **insert into `leads` via the service-role client (required for unlock; duplicate = success)** → awaited best-effort Beehiiv subscribe (`utm_source: calculator`) → set cookie. The simulator is the shared UI (`features/simulator/`) seeded from `PUBLIC_DEFAULT_VALUES`, **beginner-simplified: only the eight core inputs** (`advanced="hidden"` — perpetual/stop-MSC/withdrawal fields are not rendered; the engine runs on the defaults). Extra public-only input: **"Your annual income ($)"** (local state, not an engine input) — the first month `currentInvestmentSize` exceeds it renders as a vertical amber `ReferenceLine` on all three charts plus a sentence under the input. No save; CTAs to `/signup`. Abuse resistance is deliberately lightweight (honeypot + validation + unique index + service-role-only writes); escalate to Vercel Firewall rate limiting if spam appears.
 
 **Authenticated `(app)`** (shared `Sidebar` layout):
 - `/dashboard` — net-worth & cash-flow charts over time (`ChartPair`), driven by the user's Amplicons via `projection.ts`.
 - `/amplicons` — list + inline create/edit/delete (`AmpliconRow`, `NewAmpliconForm`, `actions.ts`).
 - `/loc` — list + create; `UtilizationCell` for live utilization edits.
-- `/projections` — list + "New projection" button; `/[id]` opens `EditorForm` (the live simulator: inputs, perpetual + drawdown controls, **Expected future payments @ 5/10/15yr (accumulation)** card, **financial-optionality readout**, `SimCharts`, `FlywheelExplainer`). `EditorForm` is a thin composition over the shared simulator UI in `src/components/simulator/` (`useSimulation` hook + `SimInputsGrid` + `SimResults`); the grid's `name=` attributes carry the `updateProjection` FormData contract. The five expert inputs (perpetual yield/mix/trigger, stop-MSC, withdrawal) sit behind a collapsed **"Advanced" ribbon**; collapsed fields are CSS-hidden, not unmounted, so the save FormData still posts them. **UI copy says "financial optionality"** (renamed from "financial independence" — engine names like `projection-fi.ts` are internal and unchanged).
+- `/projections` — list + "New projection" button; `/[id]` opens `EditorForm` (the live simulator: inputs, perpetual + drawdown controls, **Expected future payments @ 5/10/15yr (accumulation)** card, **financial-optionality readout**, `SimCharts`, `FlywheelExplainer`). `EditorForm` is a thin composition over the shared simulator UI in `src/features/simulator/` (`useSimulation` hook + `SimInputsGrid` + `SimResults`); the grid's `name=` attributes carry the `updateProjection` FormData contract. The five expert inputs (perpetual yield/mix/trigger, stop-MSC, withdrawal) sit behind a collapsed **"Advanced" ribbon**; collapsed fields are CSS-hidden, not unmounted, so the save FormData still posts them. **UI copy says "financial optionality"** (renamed from "financial independence" — engine names like `projection-fi.ts` are internal and unchanged).
 - `/settings` — profile settings form + light/dark `ThemeToggle`.
 
 Each feature folder pairs a Server Component `page.tsx` (reads rows) with `actions.ts` (Server Actions for mutations) and small client components for interactivity.
@@ -233,7 +270,7 @@ Each feature folder pairs a Server Component `page.tsx` (reads rows) with `actio
 - Tailwind with brand tokens (`tailwind.config.ts`): theme-aware `ink/sub/cream/card/edge` (flip via CSS variables in `globals.css`) and fixed brand colors `plum #221338`, `purple #6C4BD3`, `amethyst #A88BE8`, `aqua #3EC9C0`, `mauve #8D8295`. Display serif + body sans font variables.
 - **Mobile-friendly throughout**: input/result grids collapse to 1–2 columns below `sm`/`lg`, list tables scroll horizontally in `overflow-x-auto` wrappers, the Sidebar starts collapsed on viewports < 640px (saved preference wins), and the calculator footer/CTA stack vertically on small screens.
 - Shared components: `Card`, `Field`, `InfoBox`, `NumberInput`, `PasswordInput`, `Sidebar` (sticky; keeps Settings + Log out visible while content scrolls).
-- Shared simulator UI in `src/components/simulator/`: `sim-values.ts` (the `SimValues` UI shape, `toSimInput` / `projectionToSimValues` mappers, `PUBLIC_DEFAULT_VALUES`), `useSimulation.ts` (state + 200ms debounce + engine memos), `SimInputsGrid`, `SimResults`, `SimCharts`, `FlywheelExplainer`. Used by both the projection editor and `/calculator`.
+- Shared simulator UI in `src/features/simulator/`: `sim-values.ts` (the `SimValues` UI shape, `toSimInput` / `projectionToSimValues` mappers, `PUBLIC_DEFAULT_VALUES`), `useSimulation.ts` (state + 200ms debounce + engine memos), `SimInputsGrid`, `SimResults`, `SimCharts`, `FlywheelExplainer`. Used by both the projection editor and `/calculator`.
 - Formatters in `lib/format.ts`: `fmtCurrency` (k/M abbreviations), `fmtUSD0`, `fmtPct`, `fmtMonth`, `fmtDate`.
 
 ---

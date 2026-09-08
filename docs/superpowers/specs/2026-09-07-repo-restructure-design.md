@@ -11,7 +11,7 @@ part of the codebase. Net neutral on functionality.
 
 The tree is layer-first (`app/` `components/` `lib/`), so every domain is
 smeared across three places. "Work on the comparison tool" today means reading
-`src/lib/compare/` (42 files) plus `src/components/compare/` (11 files) plus a
+`src/lib/compare/` (50 files) plus `src/components/compare/` (11 files) plus a
 route, and a naive `src/lib/**` glob drags in the unrelated finance kernel too.
 
 The code itself is in good shape — 14.4k lines in `src/`, largest file 383
@@ -89,10 +89,10 @@ Context sizes this buys:
 
 | Point the LLM at | Files | ~Lines |
 |---|---|---|
-| `features/compare/engine/` | 42 | ~4.4k (2.2k excl. tests) |
-| `features/compare/ui/` | 11 | ~1.3k |
-| `shared/finance/` | 17 | ~2.3k |
-| `features/loc/` | 4 | ~250 |
+| `features/compare/engine/` | 50 | 6.9k (2.5k excl. tests) |
+| `features/compare/ui/` | 11 | 0.9k (0.7k excl. tests) |
+| `shared/finance/` | 17 | 2.1k (0.9k excl. tests) |
+| `features/loc/` | 3 | 173 |
 
 ### Decisions
 

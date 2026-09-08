@@ -21,7 +21,7 @@ flow, IRR, equity multiple and purchasing power. Every option compiles to one
 canonical pre-tax `OptionSeries`; inflation, a baseline-delta tax engine and
 the metrics layer then run identically on all of them. That uniformity is the
 architecture's whole point — see the contract at the top of
-`src/lib/compare/types.ts`.
+`src/features/compare/engine/types.ts`.
 
 **Six options built:** cash equivalents, a leveraged rental, the amplification
 flywheel, an index fund, a dividend portfolio, debt paydown.
@@ -43,10 +43,10 @@ reload loses the inputs.
 ## Run it
 
 ```
-pnpm vitest run src/lib/compare/scenario.manual.test.ts
+pnpm vitest run src/features/compare/engine/scenario.manual.test.ts
 ```
 
-`src/lib/compare/scenario.manual.test.ts` is a committed hand-runner. It
+`src/features/compare/engine/scenario.manual.test.ts` is a committed hand-runner. It
 asserts nothing and prints comparison tables. Edit the specs at the bottom and
 re-run. It is deliberately not a test — do not add assertions to it.
 
@@ -169,7 +169,7 @@ used across the horizon. It was only ever the last $50k that vanished.
 
 ## Three additive changes to shipped code
 
-Each was gated on every pre-existing `src/lib/finance/` test passing unmodified.
+Each was gated on every pre-existing `src/shared/finance/` test passing unmodified.
 
 1. `distributionInterest` on `ProjectionSimPoint` — the interest/principal split.
 2. `finalBook` on `ProjectionSimResult` — positions still paying at the horizon.
