@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import PasswordInput from "@/components/PasswordInput";
-import { updatePassword } from "./actions";
+import { createClient } from "@/shared/supabase/server";
+import PasswordInput from "@/shared/ui/PasswordInput";
+import { updatePassword } from "@/features/auth/data/reset-password";
 
 export default async function ResetPasswordPage({
   searchParams,

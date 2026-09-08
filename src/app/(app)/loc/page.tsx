@@ -1,11 +1,11 @@
 import { Trash2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/shared/supabase/server";
 import { redirect } from "next/navigation";
-import { fmtCurrency, fmtPct, fmtDate } from "@/lib/format";
-import Card from "@/components/Card";
-import NewLoCForm from "./NewLoCForm";
-import UtilizationCell from "./UtilizationCell";
-import { deleteLoC } from "./actions";
+import { fmtCurrency, fmtPct, fmtDate } from "@/shared/format";
+import Card from "@/shared/ui/Card";
+import NewLoCForm from "@/features/loc/ui/NewLoCForm";
+import UtilizationCell from "@/features/loc/ui/UtilizationCell";
+import { deleteLoC } from "@/features/loc/data/actions";
 
 export default async function LoCPage() {
   const supabase = createClient();

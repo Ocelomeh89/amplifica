@@ -1,10 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/shared/supabase/server";
 import { redirect } from "next/navigation";
-import { isoToYearMonth, addMonths } from "@/lib/finance/dates";
-import { monthlyPayoutOf, isActiveAt } from "@/lib/finance/projection";
-import Card from "@/components/Card";
-import NewAmpliconForm from "./NewAmpliconForm";
-import AmpliconRow from "./AmpliconRow";
+import { isoToYearMonth, addMonths } from "@/shared/finance/dates";
+import { monthlyPayoutOf, isActiveAt } from "@/shared/finance/projection";
+import Card from "@/shared/ui/Card";
+import NewAmpliconForm from "@/features/amplicons/ui/NewAmpliconForm";
+import AmpliconRow from "@/features/amplicons/ui/AmpliconRow";
 
 export default async function AmpliconsPage() {
   const supabase = createClient();

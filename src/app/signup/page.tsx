@@ -1,5 +1,5 @@
-import { signup } from "./actions";
-import PasswordInput from "@/components/PasswordInput";
+import { signup } from "@/features/auth/data/signup";
+import PasswordInput from "@/shared/ui/PasswordInput";
 import Link from "next/link";
 
 export default function SignupPage({ searchParams }: { searchParams: { error?: string; sent?: string } }) {

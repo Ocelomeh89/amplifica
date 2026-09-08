@@ -1,6 +1,6 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/shared/supabase/server";
 import { redirect } from "next/navigation";
-import Sidebar from "@/components/Sidebar";
+import Sidebar from "./Sidebar";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();

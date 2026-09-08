@@ -1,10 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/shared/supabase/server";
 import { redirect } from "next/navigation";
-import Card from "@/components/Card";
-import Field from "@/components/Field";
-import NumberInput from "@/components/NumberInput";
-import ThemeToggle from "./ThemeToggle";
-import { saveSettings } from "./actions";
+import Card from "@/shared/ui/Card";
+import Field from "@/shared/ui/Field";
+import NumberInput from "@/shared/ui/NumberInput";
+import ThemeToggle from "@/features/settings/ui/ThemeToggle";
+import { saveSettings } from "@/features/settings/data/actions";
 
 export default async function SettingsPage({
   searchParams,

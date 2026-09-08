@@ -1,4 +1,4 @@
-import AmortizationClient from "./AmortizationClient";
+import AmortizationClient from "@/features/amortization/ui/AmortizationClient";
 
 // Behind the login screen: the (app) route group's layout redirects to /login
 // when there is no session.

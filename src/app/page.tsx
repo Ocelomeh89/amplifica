@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/shared/supabase/server";
 import { redirect } from "next/navigation";
-import { SIGN_IN_URL } from "@/lib/links";
+import { SIGN_IN_URL } from "@/shared/links";
 
 export const metadata: Metadata = {
   title: { absolute: "Amplifica Wealth — savings into monthly investment income" },

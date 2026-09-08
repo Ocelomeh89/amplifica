@@ -25,7 +25,7 @@ describe("/compare stays private and unlinked", () => {
   });
 
   it("is not linked from the sidebar", () => {
-    const sidebar = readFileSync("src/components/Sidebar.tsx", "utf8");
+    const sidebar = readFileSync("src/app/(app)/Sidebar.tsx", "utf8");
     expect(sidebar).not.toContain("/compare");
   });
 });

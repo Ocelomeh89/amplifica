@@ -1,5 +1,5 @@
-import { login, requestMagicLink, requestPasswordReset } from "./actions";
-import PasswordInput from "@/components/PasswordInput";
+import { login, requestMagicLink, requestPasswordReset } from "@/features/auth/data/login";
+import PasswordInput from "@/shared/ui/PasswordInput";
 import Link from "next/link";
 
 export default function LoginPage({

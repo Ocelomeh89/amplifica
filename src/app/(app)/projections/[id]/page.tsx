@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import EditorForm from "./EditorForm";
+import { createClient } from "@/shared/supabase/server";
+import EditorForm from "@/features/projections/ui/EditorForm";
 
 export default async function ProjectionEditorPage({
   params,
