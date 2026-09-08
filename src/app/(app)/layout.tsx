@@ -1,11 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
-import Sidebar from "@/components/Sidebar";
+import { requireUser } from "@/shared/supabase/auth";
+import Sidebar from "./Sidebar";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { user } = await requireUser();
 
   return (
     <div className="flex min-h-screen bg-cream">

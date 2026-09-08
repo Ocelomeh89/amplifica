@@ -5,7 +5,7 @@
 // The whole tool runs client-side — the comparison engine is pure, with no
 // Next or Supabase imports anywhere beneath src/lib/compare.
 
-import CompareClient from "@/components/compare/CompareClient";
+import CompareClient from "@/features/compare/ui/CompareClient";
 
 export const metadata = {
   title: "Compare investments",

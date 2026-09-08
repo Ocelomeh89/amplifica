@@ -1,19 +1,16 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
-import Card from "@/components/Card";
-import Field from "@/components/Field";
-import NumberInput from "@/components/NumberInput";
-import ThemeToggle from "./ThemeToggle";
-import { saveSettings } from "./actions";
+import { requireUser } from "@/shared/supabase/auth";
+import Card from "@/shared/ui/Card";
+import Field from "@/shared/ui/Field";
+import NumberInput from "@/shared/ui/NumberInput";
+import ThemeToggle from "@/features/settings/ui/ThemeToggle";
+import { saveSettings } from "@/features/settings/data/actions";
 
 export default async function SettingsPage({
   searchParams,
 }: {
   searchParams: { saved?: string };
 }) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { supabase, user } = await requireUser();
 
   const { data: profile } = await supabase
     .from("profiles")

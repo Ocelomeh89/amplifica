@@ -1,7 +1,6 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
-import { fmtUSD0, fmtKUSD } from "@/lib/format";
-import { isoToYearMonth, currentYearMonth } from "@/lib/finance/dates";
+import { requireUser } from "@/shared/supabase/auth";
+import { fmtUSD0, fmtKUSD } from "@/shared/format";
+import { isoToYearMonth, currentYearMonth } from "@/shared/finance/dates";
 import {
   monthlyPayoutOf,
   isActiveAt,
@@ -9,14 +8,12 @@ import {
   buildSeries,
   GLOBAL_DISCOUNT_RATE_PCT,
   type AmpliconLite,
-} from "@/lib/finance/projection";
-import InfoBox from "@/components/InfoBox";
-import ChartPair from "./ChartPair";
+} from "@/shared/finance/projection";
+import InfoBox from "@/shared/ui/InfoBox";
+import ChartPair from "@/features/dashboard/ui/ChartPair";
 
 export default async function DashboardPage() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { supabase, user } = await requireUser();
 
   const [{ data: profile }, { data: amplicons }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),

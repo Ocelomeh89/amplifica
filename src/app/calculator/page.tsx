@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import EmailGate from "./EmailGate";
-import CalculatorClient from "./CalculatorClient";
-import InfoSections from "./InfoSections";
-import { SIGN_IN_URL } from "@/lib/links";
+import EmailGate from "@/features/calculator/ui/EmailGate";
+import CalculatorClient from "@/features/calculator/ui/CalculatorClient";
+import InfoSections from "@/features/calculator/ui/InfoSections";
+import { SIGN_IN_URL } from "@/shared/links";
 
 export const metadata: Metadata = {
   title: "Financial Optionality Calculator",

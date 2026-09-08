@@ -11,7 +11,7 @@ all new knobs unset, `runSimulation` reproduces the original flywheel exactly.
 
 ---
 
-## 1. Engine mechanics (`src/lib/finance/projection-sim.ts`)
+## 1. Engine mechanics (`src/shared/finance/projection-sim.ts`)
 
 All added as optional `ProjectionSimInput` fields. Each defaults to original behavior.
 

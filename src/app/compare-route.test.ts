@@ -7,8 +7,13 @@ import sitemap from "./sitemap";
 // four halves of it are asserted rather than assumed.
 describe("/compare stays private and unlinked", () => {
   it("sits inside the authed (app) group, which redirects anonymous users", () => {
+    // The gate is one hop away now: the layout calls requireUser, and
+    // requireUser is what bounces anonymous callers. Both halves are asserted,
+    // because either one going missing opens the route.
     const layout = readFileSync("src/app/(app)/layout.tsx", "utf8");
-    expect(layout).toContain('redirect("/login")');
+    expect(layout).toContain("requireUser()");
+    const guard = readFileSync("src/shared/supabase/auth.ts", "utf8");
+    expect(guard).toContain('redirect("/login")');
     // The page's mere existence at this path is what gates it.
     expect(() => readFileSync("src/app/(app)/compare/page.tsx", "utf8")).not.toThrow();
   });
@@ -25,7 +30,7 @@ describe("/compare stays private and unlinked", () => {
   });
 
   it("is not linked from the sidebar", () => {
-    const sidebar = readFileSync("src/components/Sidebar.tsx", "utf8");
+    const sidebar = readFileSync("src/app/(app)/Sidebar.tsx", "utf8");
     expect(sidebar).not.toContain("/compare");
   });
 });
