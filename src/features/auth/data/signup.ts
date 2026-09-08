@@ -2,11 +2,12 @@
 
 import { createClient } from "@/shared/supabase/server";
 import { redirect } from "next/navigation";
+import { str } from "@/shared/forms";
 
 export async function signup(formData: FormData) {
   const supabase = createClient();
-  const email = String(formData.get("email") ?? "");
-  const password = String(formData.get("password") ?? "");
+  const email = str(formData, "email");
+  const password = str(formData, "password");
   const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
   const { error } = await supabase.auth.signUp({

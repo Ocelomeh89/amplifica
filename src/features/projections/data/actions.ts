@@ -3,6 +3,7 @@
 import { requireUser } from "@/shared/supabase/auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { checkbox, num, pct, str } from "@/shared/forms";
 
 export async function createProjection() {
   const { supabase, user } = await requireUser();
@@ -31,25 +32,25 @@ export async function createProjection() {
 export async function updateProjection(formData: FormData) {
   const { supabase, user } = await requireUser();
 
-  const id = String(formData.get("id") ?? "");
+  const id = str(formData, "id");
   if (!id) throw new Error("Missing projection id");
 
-  const name = String(formData.get("name") ?? "").trim() || "Untitled projection";
-  const msc = Number(formData.get("msc") ?? 0);
-  const investment_size_factor = Number(formData.get("investment_size_factor") ?? 5);
-  const term_months = Number(formData.get("term_months") ?? 36);
-  const investment_interest_pct = Number(formData.get("investment_interest_pct") ?? 0) / 100;
-  const loc_increase = Number(formData.get("loc_increase") ?? 1.5);
-  const loc_interest_pct = Number(formData.get("loc_interest_pct") ?? 0) / 100;
-  const payoff_upgrade_months = Number(formData.get("payoff_upgrade_months") ?? 4);
-  const continuous_growth = formData.get("continuous_growth") === "on";
-  const perpetual_mix = Number(formData.get("perpetual_mix") ?? 0) / 100;
-  const perpetual_yield_pct = Number(formData.get("perpetual_yield_pct") ?? 10) / 100;
-  const perpetual_trigger_size = Number(formData.get("perpetual_trigger_size") ?? 50000);
-  const mscEndRaw = String(formData.get("msc_end_month") ?? "").trim();
+  const name = str(formData, "name").trim() || "Untitled projection";
+  const msc = num(formData, "msc");
+  const investment_size_factor = num(formData, "investment_size_factor", 5);
+  const term_months = num(formData, "term_months", 36);
+  const investment_interest_pct = pct(formData, "investment_interest_pct");
+  const loc_increase = num(formData, "loc_increase", 1.5);
+  const loc_interest_pct = pct(formData, "loc_interest_pct");
+  const payoff_upgrade_months = num(formData, "payoff_upgrade_months", 4);
+  const continuous_growth = checkbox(formData, "continuous_growth");
+  const perpetual_mix = pct(formData, "perpetual_mix");
+  const perpetual_yield_pct = pct(formData, "perpetual_yield_pct", 10);
+  const perpetual_trigger_size = num(formData, "perpetual_trigger_size", 50000);
+  const mscEndRaw = str(formData, "msc_end_month").trim();
   const msc_end_month = mscEndRaw === "" ? null : Number(mscEndRaw);
-  const withdrawal_amount = Number(formData.get("withdrawal_amount") ?? 4500);
-  const market_return_pct = Number(formData.get("market_return_pct") ?? 10) / 100;
+  const withdrawal_amount = num(formData, "withdrawal_amount", 4500);
+  const market_return_pct = pct(formData, "market_return_pct", 10);
 
   const { error } = await supabase
     .from("projections")
@@ -82,7 +83,7 @@ export async function updateProjection(formData: FormData) {
 export async function deleteProjection(formData: FormData) {
   const { supabase, user } = await requireUser();
 
-  const id = String(formData.get("id") ?? "");
+  const id = str(formData, "id");
   if (!id) return;
 
   const { error } = await supabase

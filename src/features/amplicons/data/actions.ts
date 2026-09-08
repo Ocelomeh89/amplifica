@@ -3,16 +3,17 @@
 import { createClient } from "@/shared/supabase/server";
 import { requireUser } from "@/shared/supabase/auth";
 import { revalidatePath } from "next/cache";
+import { num, pct, str } from "@/shared/forms";
 
 export async function createAmplicon(formData: FormData) {
   const { supabase, user } = await requireUser();
 
-  const name = String(formData.get("name") ?? "").trim();
-  const ai_type = String(formData.get("ai_type") ?? "").trim();
-  const face_value = Number(formData.get("face_value") ?? 0);
-  const term_months = Number(formData.get("term_months") ?? 0);
-  const interest_pct = Number(formData.get("interest_pct") ?? 0) / 100;
-  const start_date = String(formData.get("start_date") ?? "");
+  const name = str(formData, "name").trim();
+  const ai_type = str(formData, "ai_type").trim();
+  const face_value = num(formData, "face_value");
+  const term_months = num(formData, "term_months");
+  const interest_pct = pct(formData, "interest_pct");
+  const start_date = str(formData, "start_date");
 
   if (!name || face_value <= 0 || term_months <= 0 || !start_date) {
     throw new Error("Missing or invalid required fields.");
@@ -36,15 +37,15 @@ export async function createAmplicon(formData: FormData) {
 export async function editAmplicon(formData: FormData) {
   const { supabase } = await requireUser();
 
-  const id = String(formData.get("id") ?? "");
+  const id = str(formData, "id");
   if (!id) throw new Error("Missing amplicon id");
 
-  const name = String(formData.get("name") ?? "").trim();
-  const ai_type = String(formData.get("ai_type") ?? "").trim();
-  const face_value = Number(formData.get("face_value") ?? 0);
-  const term_months = Number(formData.get("term_months") ?? 0);
-  const interest_pct = Number(formData.get("interest_pct") ?? 0) / 100;
-  const start_date = String(formData.get("start_date") ?? "");
+  const name = str(formData, "name").trim();
+  const ai_type = str(formData, "ai_type").trim();
+  const face_value = num(formData, "face_value");
+  const term_months = num(formData, "term_months");
+  const interest_pct = pct(formData, "interest_pct");
+  const start_date = str(formData, "start_date");
 
   if (!name || face_value <= 0 || term_months <= 0 || !start_date) {
     throw new Error("Missing or invalid required fields.");
@@ -63,7 +64,7 @@ export async function editAmplicon(formData: FormData) {
 export async function duplicateAmplicon(formData: FormData) {
   const { supabase, user } = await requireUser();
 
-  const id = String(formData.get("id") ?? "");
+  const id = str(formData, "id");
   if (!id) return;
 
   // RLS scopes this read to the signed-in user, so they can only copy their own.
@@ -91,7 +92,7 @@ export async function duplicateAmplicon(formData: FormData) {
 
 export async function deleteAmplicon(formData: FormData) {
   const supabase = createClient();
-  const id = String(formData.get("id") ?? "");
+  const id = str(formData, "id");
   if (!id) return;
 
   const { error } = await supabase.from("amplicons").delete().eq("id", id);

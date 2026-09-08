@@ -3,6 +3,7 @@
 import { cookies, headers } from "next/headers";
 import { createAdminClient } from "@/shared/supabase/admin";
 import { subscribeToNewsletter } from "@/features/calculator/data/beehiiv";
+import { str } from "@/shared/forms";
 
 export interface CaptureLeadState {
   error: string | null;
@@ -26,18 +27,18 @@ export async function captureLead(
   formData: FormData
 ): Promise<CaptureLeadState> {
   // Honeypot: bots fill every field. Pretend to succeed, store nothing.
-  if (String(formData.get("website") ?? "") !== "") {
+  if (str(formData, "website") !== "") {
     unlock();
     return { error: null };
   }
 
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const email = str(formData, "email").trim().toLowerCase();
   if (!EMAIL_RE.test(email)) {
     return { error: "Please enter a valid email address." };
   }
 
   const utm = (key: string) => {
-    const v = String(formData.get(key) ?? "").trim();
+    const v = str(formData, key).trim();
     return v === "" ? null : v.slice(0, 200);
   };
 

@@ -2,11 +2,12 @@
 
 import { requireUser } from "@/shared/supabase/auth";
 import { redirect } from "next/navigation";
+import { str } from "@/shared/forms";
 
 export async function updatePassword(formData: FormData) {
   const { supabase } = await requireUser();
 
-  const password = String(formData.get("password") ?? "");
+  const password = str(formData, "password");
   if (password.length < 8) {
     redirect("/reset-password?error=Password must be at least 8 characters.");
   }

@@ -2,11 +2,12 @@
 
 import { createClient } from "@/shared/supabase/server";
 import { redirect } from "next/navigation";
+import { str } from "@/shared/forms";
 
 export async function login(formData: FormData) {
   const supabase = createClient();
-  const email = String(formData.get("email") ?? "");
-  const password = String(formData.get("password") ?? "");
+  const email = str(formData, "email");
+  const password = str(formData, "password");
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
@@ -17,7 +18,7 @@ export async function login(formData: FormData) {
 
 export async function requestMagicLink(formData: FormData) {
   const supabase = createClient();
-  const email = String(formData.get("email") ?? "");
+  const email = str(formData, "email");
   const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
   const { error } = await supabase.auth.signInWithOtp({
@@ -32,7 +33,7 @@ export async function requestMagicLink(formData: FormData) {
 
 export async function requestPasswordReset(formData: FormData) {
   const supabase = createClient();
-  const email = String(formData.get("email") ?? "").trim();
+  const email = str(formData, "email").trim();
   const origin = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
   if (!email) {
