@@ -16,6 +16,7 @@ import {
 import clsx from "clsx";
 import { logout } from "@/features/auth/data/login";
 import { amortizationNavItem } from "@/features/amortization/nav";
+import { contentNavItem } from "@/features/content/nav";
 
 const items = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -47,7 +48,7 @@ function AmplitudeMark() {
   );
 }
 
-export default function Sidebar({ email }: { email: string }) {
+export default function Sidebar({ email, showContent }: { email: string; showContent: boolean }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -98,7 +99,7 @@ export default function Sidebar({ email }: { email: string }) {
       {!collapsed && <div className="text-xs text-white/40 mb-6 px-2 truncate">{email}</div>}
       {collapsed && <div className="mb-6" />}
 
-      {items.map((item) => {
+      {[...items, ...(showContent ? [contentNavItem] : [])].map((item) => {
         const isActive = pathname.startsWith(item.to);
         return (
           <Link
