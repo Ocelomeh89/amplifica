@@ -133,6 +133,7 @@ create table public.content_posts (
   unique (user_id, platform, external_id)
 );
 create index content_posts_user_id_idx on public.content_posts(user_id);
+create index content_posts_idea_idx on public.content_posts(idea_id);
 
 -- Append-only metric snapshots per post.
 create table public.content_metrics (

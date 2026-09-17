@@ -31,7 +31,14 @@ export default async function ContentIdeaPage({ params }: { params: { id: string
           .eq("user_id", user.id)
           .neq("id", idea.id)
       : Promise.resolve({ data: [] as { id: string; format: Format; hook: string; status: string }[] }),
-    supabase.from("content_posts").select("*").eq("idea_id", idea.id).eq("user_id", user.id).maybeSingle(),
+    supabase
+      .from("content_posts")
+      .select("*")
+      .eq("idea_id", idea.id)
+      .eq("user_id", user.id)
+      .order("posted_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   return (

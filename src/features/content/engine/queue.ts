@@ -6,27 +6,6 @@ export function nextRank(ranks: (number | null)[]): number {
 }
 
 /**
- * For an Up or Down press: which two rows swap ranks. `ordered` is the
- * format's queue in display order. Ranks may be null on rows queued before
- * ranking existed, so the new ranks come from positions, which also heals
- * gaps as the user reorders.
- */
-export function neighborToSwap(
-  ordered: { id: string; queue_rank: number | null }[],
-  id: string,
-  direction: "up" | "down"
-): { a: { id: string; rank: number }; b: { id: string; rank: number } } | null {
-  const i = ordered.findIndex((r) => r.id === id);
-  if (i === -1) return null;
-  const j = direction === "up" ? i - 1 : i + 1;
-  if (j < 0 || j >= ordered.length) return null;
-  return {
-    a: { id: ordered[i].id, rank: j + 1 },
-    b: { id: ordered[j].id, rank: i + 1 },
-  };
-}
-
-/**
  * The full rank assignment after moving `id` one step: every row's rank is
  * its 1-based position in the new order. Returns only the rows whose stored
  * rank differs, so a healthy queue costs two writes and a drifted queue

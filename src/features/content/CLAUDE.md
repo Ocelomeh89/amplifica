@@ -15,7 +15,8 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
 ## Invariants
 
 - Ingest is all-or-nothing: zod validates the whole body before any write.
-- A source that already exists keeps its status on re-ingest (insert-ignore).
+- A source that already exists keeps its status on re-ingest (insert-ignore),
+  unless the payload carries `mined_at`, which sets it to `mined`.
 - An idea's provenance is mandatory except newsletter ideas flagged
   `from_hook_backlog`.
 - Ranks are per format; every move renumbers the queue from positions via
@@ -31,6 +32,10 @@ curl -sS -X POST "$NEXT_PUBLIC_SITE_URL/api/content/ingest" \
   -H "Content-Type: application/json" \
   --data @routines/examples/daily-ingest.json
 ```
+
+Ideas are not deduplicated on ingest (the routine dedupes against the
+context's `known_titles`), so running this twice inserts the two example
+ideas twice.
 
 Then read the context a routine would see:
 

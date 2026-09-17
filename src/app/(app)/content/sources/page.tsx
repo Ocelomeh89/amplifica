@@ -71,7 +71,7 @@ export default async function ContentSourcesPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-[11px] text-sub uppercase tracking-wide border-b border-edge">
-              <th className="py-2">Source</th><th>Rows (last 200)</th><th>Last written</th>
+              <th className="py-2">Source</th><th>Rows (last 200)</th><th>Last written (last 200)</th>
             </tr>
           </thead>
           <tbody>

@@ -9,6 +9,7 @@ const example = ingestSchema.parse(JSON.parse(readFileSync("routines/examples/da
 function fakeDb() {
   const sources: ContentSourceInsert[] = [];
   const ideas: ContentIdeaInsert[] = [];
+  const mined: { kind: string; external_id: string; mined_at: string }[] = [];
   const db: IngestDb = {
     async upsertSources(rows) {
       sources.push(...rows);
@@ -18,8 +19,12 @@ function fakeDb() {
       ideas.push(...rows);
       return rows.length;
     },
+    async markMined(rows) {
+      mined.push(...rows);
+      return rows.length;
+    },
   };
-  return { db, sources, ideas };
+  return { db, sources, ideas, mined };
 }
 
 describe("ingestPayload", () => {
@@ -71,5 +76,21 @@ describe("ingestPayload", () => {
     backlog.ideas[0].from_hook_backlog = true;
     await ingestPayload(db, backlog, "owner-1");
     expect(ideas[0].source_id).toBeNull();
+  });
+
+  it("marks only the sources that carry mined_at", async () => {
+    const { db, mined } = fakeDb();
+    const withMined = structuredClone(example);
+    withMined.sources[0].mined_at = "2026-09-17T12:00:00Z";
+    await ingestPayload(db, withMined, "owner-1");
+    expect(mined).toEqual([
+      { kind: "granola", external_id: "830179d0-d2b4-40d4-9d3f-bfd2adf32f50", mined_at: "2026-09-17T12:00:00Z" },
+    ]);
+  });
+
+  it("does not call markMined when no source carries mined_at", async () => {
+    const { db, mined } = fakeDb();
+    await ingestPayload(db, example, "owner-1");
+    expect(mined).toEqual([]);
   });
 });

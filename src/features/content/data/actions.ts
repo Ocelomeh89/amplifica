@@ -54,7 +54,12 @@ export async function passIdea(formData: FormData) {
   if (!id) return;
   const { error } = await supabase
     .from("content_ideas")
-    .update({ status: "rejected", feedback_reason: reason || null, feedback_at: new Date().toISOString() })
+    .update({
+      status: "rejected",
+      queue_rank: null,
+      feedback_reason: reason || null,
+      feedback_at: new Date().toISOString(),
+    })
     .eq("id", id)
     .eq("user_id", user.id);
   if (error) throw new Error(error.message);
@@ -111,7 +116,10 @@ export async function markPosted(formData: FormData): Promise<{ error: string | 
   const id = str(formData, "id");
   const url = str(formData, "url").trim();
   const platform = platformFromUrl(url);
-  if (!id || !platform) return { error: "Paste a post URL from Instagram, YouTube, beehiiv, or X." };
+  const externalId = platform ? externalIdFromUrl(url, platform) : "";
+  if (!id || !platform || !externalId) {
+    return { error: "Paste a post URL from Instagram, YouTube, beehiiv, or X." };
+  }
 
   const { data: idea } = await supabase
     .from("content_ideas")
@@ -126,7 +134,7 @@ export async function markPosted(formData: FormData): Promise<{ error: string | 
       user_id: user.id,
       idea_id: idea.id,
       platform,
-      external_id: externalIdFromUrl(url, platform),
+      external_id: externalId,
       url,
       format: idea.format,
       hook_used: idea.hook,

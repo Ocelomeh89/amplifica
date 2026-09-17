@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/shared/supabase/database.types";
+import type { ContentSourceInsert, Database } from "@/shared/supabase/database.types";
 import type { IngestDb } from "./ingest";
 import { FORMATS, type Format } from "@/features/content/engine/types";
 import type { ContextDb } from "./context";
@@ -39,6 +39,18 @@ export function supabaseIngestDb(client: Client, userId: string): IngestDb {
         .insert(rows, { count: "exact" });
       if (error) throw new Error(`content_ideas insert: ${error.message}`);
       return count ?? rows.length;
+    },
+    async markMined(rows) {
+      for (const row of rows) {
+        const { error } = await client
+          .from("content_sources")
+          .update({ status: "mined", mined_at: row.mined_at })
+          .eq("user_id", userId)
+          .eq("kind", row.kind as ContentSourceInsert["kind"])
+          .eq("external_id", row.external_id);
+        if (error) throw new Error(`content_sources mark mined: ${error.message}`);
+      }
+      return rows.length;
     },
   };
 }

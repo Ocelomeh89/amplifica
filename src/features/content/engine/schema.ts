@@ -17,6 +17,7 @@ export const ingestSourceSchema = z.object({
   url: z.string().url().nullable().optional(),
   occurred_at: z.string().datetime({ offset: true }).nullable().optional(),
   status: z.enum(SOURCE_STATUSES).default("pending"),
+  mined_at: z.string().datetime({ offset: true }).nullable().optional(),
   meta: z.record(z.string(), z.unknown()).optional(),
 });
 

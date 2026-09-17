@@ -50,4 +50,10 @@ describe("ingestSchema", () => {
   it("rejects an empty body", () => {
     expect(ingestSchema.safeParse({ sources: [], ideas: [] }).success).toBe(false);
   });
+
+  it("accepts a source with mined_at", () => {
+    const ok = structuredClone(example);
+    ok.sources[0].mined_at = "2026-09-17T12:00:00Z";
+    expect(ingestSchema.safeParse(ok).success).toBe(true);
+  });
 });

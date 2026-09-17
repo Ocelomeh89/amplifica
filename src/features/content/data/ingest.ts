@@ -16,6 +16,9 @@ export interface IngestDb {
     rows: ContentSourceInsert[]
   ): Promise<{ id: string; kind: string; external_id: string }[]>;
   insertIdeas(rows: ContentIdeaInsert[]): Promise<number>;
+  /** Set status = mined and mined_at for these keys. Only sources the payload
+   *  explicitly marks with mined_at reach here; everything else keeps its status. */
+  markMined(rows: { kind: string; external_id: string; mined_at: string }[]): Promise<number>;
 }
 
 export async function ingestPayload(
@@ -37,6 +40,11 @@ export async function ingestPayload(
 
   const written = sourceRows.length > 0 ? await db.upsertSources(sourceRows) : [];
   const idByRef = new Map(written.map((w) => [`${w.kind}:${w.external_id}`, w.id]));
+
+  const mined = payload.sources
+    .filter((s): s is typeof s & { mined_at: string } => typeof s.mined_at === "string")
+    .map((s) => ({ kind: s.kind, external_id: s.external_id, mined_at: s.mined_at }));
+  if (mined.length > 0) await db.markMined(mined);
 
   const chainIds = new Map<string, string>();
   const chainIdFor = (key: string | undefined) => {

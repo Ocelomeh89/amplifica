@@ -26,4 +26,9 @@ describe("externalIdFromUrl", () => {
     expect(externalIdFromUrl("https://newsletter.amplificawealth.com/p/net-worth-is-a-vanity-metric", "beehiiv")).toBe("net-worth-is-a-vanity-metric");
     expect(externalIdFromUrl("https://x.com/amplifica/status/1234567890", "x")).toBe("1234567890");
   });
+
+  it("returns an empty id for a platform root URL, which the action must reject", () => {
+    expect(externalIdFromUrl("https://www.instagram.com/", "instagram")).toBe("");
+    expect(externalIdFromUrl("https://x.com/amplifica", "x")).toBe("amplifica");
+  });
 });
