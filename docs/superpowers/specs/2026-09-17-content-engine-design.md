@@ -18,9 +18,10 @@ and it opens with a hook that stops the scroll. Every idea says why it meets bot
 ## Scope
 
 **In scope:** a `content` feature folder and `/content` routes; nine Supabase
-tables; two secret-protected API endpoints for routines; three Vercel crons that
-pull metrics; on-demand drafting, humanizing, and taste distillation through the
-Claude API; two cloud-scheduled Claude routines; three local companion commands;
+tables and one private storage bucket; two secret-protected API endpoints for
+routines; three Vercel crons that pull metrics; on-demand drafting, humanizing,
+taste distillation, and idea generation from found content through the Claude
+API; two cloud-scheduled Claude routines; four local companion commands;
 ClickUp digest and task creation.
 
 **Out of scope:** posting to any platform; multi-user access; paid social;
@@ -44,6 +45,8 @@ for the owner.
 | Drafting voice | A voice profile built from the Obsidian vault, plus a humanize pass encoding the delete-ai-words and no-ai-slop rules |
 | Obsidian vault | Local disk only, so vault mining and voice building are local companion commands |
 | YouTube channel | `https://www.youtube.com/@amplificawealth` |
+| Plaud recordings | Swept by the daily routine like meetings, with device highlights ranked first; an on-demand kickoff from the Sources page and a local companion for immediate mining |
+| Found content | A URL or an uploaded file, submitted in the app, generates ideas immediately through the Claude API with the same prompt the routine uses |
 
 ## Architecture
 
@@ -67,6 +70,8 @@ src/features/content/
   data/
     actions.ts           Server Actions: feedback, queue order, mark posted, draft, allow/deny source, taste edits
     claude.ts            the one Anthropic SDK wrapper (server-only)
+    ideas.ts             in-app idea generation from a source that carries its own text
+    found.ts             URL fetch + readable-text extraction; upload handling
     clickup.ts           REST: create task, post chat message (server-only)
     pulls/
       instagram.ts       Composio REST -> IG media, insights, comments
@@ -95,7 +100,7 @@ routines/                the two routine prompts, checked in and versioned
   content-daily.md
   content-weekly.md
 .claude/skills/          local companions (repo-local skills)
-  content-vault/  content-ig-scan/  content-voice/
+  content-vault/  content-ig-scan/  content-voice/  content-plaud/
 ```
 
 `content` is an ordinary feature under the three rules. It imports from `shared/`
@@ -127,8 +132,10 @@ ideas and reviews back, and post to ClickUp. The routine prompts live in
 `routines/` so they are versioned with the schema they write to.
 
 **Local companions** are repo-local skills run from Claude Code on the Mac for
-sources a cloud routine cannot reach: the Obsidian vault and Instagram pages
-that need a browser. They write through the same ingest endpoint.
+sources a cloud routine cannot reach, the Obsidian vault and Instagram pages
+that need a browser, and for the one case where waiting overnight is wrong: a
+Plaud recording Miguel wants mined right now. They write through the same
+ingest endpoint.
 
 ## Data model (migration 0008)
 
@@ -138,7 +145,7 @@ All tables: `id uuid pk`, `user_id uuid -> auth.users cascade`, `created_at`,
 
 | Table | Columns beyond the standard set |
 |---|---|
-| `content_sources` | `kind` (granola, wispr, vault, comment, scan, manual), `external_id`, `title`, `url`, `occurred_at`, `status` (allowed, denied, pending), `meta jsonb`. Unique on `(user_id, kind, external_id)`. Comments store `post_id`, `author`, `text`, `replied` in `meta`. Scan items store `account`, `hook`, `metrics` in `meta`. |
+| `content_sources` | `kind` (granola, wispr, plaud, vault, url, upload, comment, scan, manual), `external_id`, `title`, `url`, `occurred_at`, `status` (allowed, denied, pending, mined), `requested_at` nullable, `mined_at` nullable, `meta jsonb`. Unique on `(user_id, kind, external_id)`. Comments store `post_id`, `author`, `text`, `replied` in `meta`. Scan items store `account`, `hook`, `metrics` in `meta`. Plaud rows store `has_highlights` and `duration_s`. URL and upload rows store `text` (the extracted readable text, capped at 200k characters), and uploads also store `filename`, `mime`, `storage_path`. |
 | `content_source_rules` | `kind` (allow, deny), `field` (title, participant), `pattern` text, case-insensitive substring match. |
 | `content_ideas` | `source_id` nullable, `format` (reel, youtube, newsletter, story, x), `title`, `hook`, `hook_alt` nullable, `belief_attacked`, `value_to_listener`, `why_it_stops` (the scroll-stopping reason), `outline jsonb`, `quote`, `quote_ref` (transcript timestamp or note path), `pillar`, `hook_type`, `chain_id` uuid nullable, `score numeric`, `batch_date date`, `status` (inbox, queued, rejected, posted, archived), `queue_rank int`, `feedback_reason` text, `feedback_at`, `clickup_task_id` text nullable. |
 | `content_drafts` | `idea_id`, `version int`, `stage` (raw, humanized, edited), `body` text markdown, `lint jsonb`, `model` text. Unique on `(idea_id, version)`. |
@@ -156,6 +163,10 @@ profile_visits, follows, opens, open_rate, clicks, click_rate, unsubscribes`.
 is null unless `format` is `newsletter` and the idea came from the hook backlog,
 or the source kind is `manual`.
 
+**Storage bucket `content-uploads`**, private, with a policy that allows the
+owner's user id only. Uploaded files are kept at
+`{user_id}/{source_id}/{filename}` so a PDF can be re-read for a later draft.
+
 ## The daily idea run
 
 **Schedule:** cloud routine, 06:00 America/Chicago, prompt in
@@ -165,12 +176,16 @@ or the source kind is `manual`.
    feedback with reasons, queue depth per format, titles of every idea that is
    queued, drafted, or posted in the last 90 days, titles of every beehiiv post,
    the source rules, the timestamp of the last run, and the voice profile summary.
-2. List Granola and Wispr Flow meetings since the last run. For each, apply the
-   allow rules then the deny rules over title and participants. A meeting that
-   matches neither is written as a `pending` source and is not read. A denied
-   meeting is written as `denied` and is not read. Only `allowed` meetings are
-   opened.
-3. Read allowed transcripts. Produce up to 10 ideas, ranked, spread across
+2. List Granola and Wispr Flow meetings and Plaud recordings since the last run.
+   For each, apply the allow rules then the deny rules over title and
+   participants. A recording that matches neither is written as a `pending`
+   source and is not read. A denied one is written as `denied` and is not read.
+   Only `allowed` recordings are opened. Sources whose `requested_at` is set
+   (see Kicking off a Plaud pull) are opened first regardless of age.
+3. Read allowed transcripts. For Plaud, read the `mark_memo` highlights first,
+   then the `transaction_polish` block, and rank ideas that come from a
+   highlighted moment above the rest, because the button press is Miguel saying
+   "this matters" in the moment. Produce up to 10 ideas, ranked, spread across
    formats, each with: the source quote and reference, the belief it attacks,
    what the listener walks away with, why the hook stops the scroll, an outline,
    a pillar, a hook type, and, for Reels, an alternate hook for a Trial Reel.
@@ -189,6 +204,54 @@ status:** client engagements are never read. The seed deny list covers the
 current client names; the seed allow list covers Joe, AAC, Jackie, community
 calls, and any title containing "Amplifica". Both lists are edited on
 `/content/sources`.
+
+### Kicking off a Plaud pull
+
+Plaud recordings are rarer than meetings and often the richest source: a
+conversation Miguel chose to record on the device. Two paths, one immediate and
+one overnight, both ending in the same ideas shape.
+
+- **Overnight, from the app.** The Sources page has a Plaud section listing the
+  Plaud rows the routine has discovered, with status and whether highlights
+  exist. "Mine this" sets `status = allowed` and `requested_at = now()`. The
+  next daily run opens requested sources first. The section also shows the
+  time of the last Plaud sweep so a recording made today is expected tomorrow.
+- **Immediate, from the Mac.** `/content-plaud` lists recent recordings through
+  the Plaud connector, takes a name or date to pick one, reads highlights and
+  the polished transcript, generates ideas with the same prompt as the routine,
+  and ingests them with `kind = plaud`. It marks the source `mined`. This is the
+  path for "I just recorded something and want ideas now".
+
+The routine skips any Plaud source already `mined` so the two paths never
+double-mine one recording.
+
+### Found content: a URL or a file
+
+Anything Miguel finds interesting becomes ideas without waiting for a routine,
+because the text is in the app and nothing needs a connector.
+
+- **Entry point.** A form on the Sources page and a quick-add on the Inbox:
+  paste a URL, or upload a PDF, text, or Markdown file up to 20 MB. An optional
+  one-line note says why it caught his eye; the note goes into the prompt.
+- **URL handling** in `data/found.ts`: server-side fetch with a browser user
+  agent, readable text extracted with `@mozilla/readability` over `jsdom`,
+  stored in `meta.text` with the page title as the source title. A YouTube URL
+  stores the title and description from the Data API; transcript capture is a
+  roadmap item. A fetch that yields under 200 characters of text is rejected
+  with a message rather than mined.
+- **File handling**: the file is written to the `content-uploads` bucket. Text
+  and Markdown are stored in `meta.text`. A PDF is passed to Claude as a
+  document block, so no text extraction dependency is needed; `meta.text` holds
+  the first 2,000 characters Claude reports back for display.
+- **Generation** in `data/ideas.ts`: one Claude call with `prompts/ideas.ts`
+  as the system prompt, the same context the routine receives (taste rules,
+  recent feedback, dedupe titles, queue depth), and the source text or document
+  as the user turn. Up to 10 ideas are written with `source_id` set, `quote_ref`
+  as the URL or filename, and today's `batch_date`. They appear at the top of
+  the Inbox tagged "found" and do not trigger a ClickUp digest, since Miguel is
+  already in the app. The source is marked `mined`.
+- **Re-mining.** A "Generate again" button on a mined found source runs the same
+  call with the note replaced, for a second angle.
 
 ## The weekly review
 
@@ -344,8 +407,10 @@ All under `/content`. Every page calls `requireContentOwner()`.
   the plan grid. Slots are editable and link to their ideas. The narrative from
   the latest review sits at the top with replies owed.
 - **Taste** (`/content/taste`). Rules tab and Voice tab.
-- **Sources** (`/content/sources`). Allow and deny rules, pending meetings, and
-  the mined log with the last run time of each routine and companion.
+- **Sources** (`/content/sources`). The found-content form at the top. Then
+  allow and deny rules, pending meetings and recordings with Allow and Deny, the
+  Plaud section with "Mine this", and the mined log with the last run time of
+  each routine and companion.
 
 ## ClickUp
 
@@ -371,6 +436,8 @@ All under `/content`. Every page calls `requireContentOwner()`.
 | `BEEHIIV_API_KEY`, `BEEHIIV_PUBLICATION_ID` | existing |
 
 `vercel.json` gains three cron entries. `.env.example` gains the new names.
+New runtime dependencies: `@anthropic-ai/sdk`, `zod`, `@mozilla/readability`,
+and `jsdom` promoted from devDependencies.
 
 ## Error handling
 
@@ -390,6 +457,9 @@ All under `/content`. Every page calls `requireContentOwner()`.
   against a cadence and queue fixture; scoring against rule matches.
 - `schema.test.ts` asserts the ingest schema accepts the routine's example
   payload from `routines/` and rejects an idea with no provenance.
+- `found.test.ts` runs the readable-text extraction against saved HTML fixtures
+  (an article, a paywalled stub, a YouTube page) and asserts the short-text
+  rejection.
 - Cron and pull modules are tested with recorded fixtures, no network.
 - `boundaries.test.ts` needs no change: `content` imports only from `shared/`.
 
@@ -400,18 +470,21 @@ Five pull requests, each shippable and useful alone:
 1. **Inbox and queues.** Migration 0008, owner gate, nav item, ingest and
    context endpoints, inbox, queues, idea page without drafting, sources page.
    Seeded by hand-posting a few ideas.
-2. **Daily routine.** `routines/content-daily.md`, the schedule, the ClickUp
-   digest, the task on Like.
+2. **Daily routine.** `routines/content-daily.md` covering Granola, Wispr
+   Flow, and Plaud, the schedule, the ClickUp digest, the task on Like, the
+   Plaud section on Sources, and the `/content-plaud` companion.
 3. **Metrics and performance.** The three crons, performance and week views,
    best times, plan builder.
-4. **Drafting.** Voice companion, draft and humanize pipeline, lint, taste
-   distillation and the taste page.
+4. **Drafting and found content.** The Claude wrapper, voice companion, draft
+   and humanize pipeline, lint, taste distillation and the taste page, the
+   found-content form, URL and upload handling, in-app idea generation.
 5. **Weekly review and local scans.** `routines/content-weekly.md`, the
    review view on `/content/week`, `/content-vault` and `/content-ig-scan`.
 
 ## Roadmap after v1
 
-YouTube Analytics API with OAuth for watch time and retention; X metrics;
+YouTube transcript capture for pasted video URLs; audio uploads transcribed
+before mining; YouTube Analytics API with OAuth for watch time and retention; X metrics;
 metric-weighted taste scoring once 20 or more posted ideas carry metrics;
 Trial Reel outcome capture (which hook won); Story metrics from the IG API;
 a "record day" mode that groups a week's Reels by chain into one shot list.
