@@ -49,6 +49,7 @@ changing behavior.** In `compare/engine/` 31 of 50 files are tests; in
 | `calculator/` | Public email-gated simulator. `data/actions.ts` writes leads via the **service-role** client and subscribes to Beehiiv. |
 | `amortization/` | A loan calculator that is **removable in one delete**: nothing outside the folder imports it, apart from `nav.ts` in the Sidebar. |
 | `auth/` | login / signup / reset-password server actions. |
+| `content/` | Owner-only content engine: idea inbox, per-format queues, sources. Routines write through `api/content/ingest`. Spec in `docs/superpowers/specs/2026-09-17-content-engine-design.md`. |
 
 ## Conventions
 
