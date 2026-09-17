@@ -1,3 +1,5 @@
+export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+
 export type Database = {
   public: {
     Tables: {
@@ -171,6 +173,307 @@ export type Database = {
         };
         Relationships: [];
       };
+      content_sources: {
+        Row: {
+          id: string;
+          user_id: string;
+          kind: "granola" | "wispr" | "plaud" | "vault" | "url" | "upload" | "comment" | "scan" | "manual";
+          external_id: string;
+          title: string;
+          url: string | null;
+          occurred_at: string | null;
+          status: "allowed" | "denied" | "pending" | "mined";
+          requested_at: string | null;
+          mined_at: string | null;
+          meta: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          kind: "granola" | "wispr" | "plaud" | "vault" | "url" | "upload" | "comment" | "scan" | "manual";
+          external_id: string;
+          title?: string;
+          url?: string | null;
+          occurred_at?: string | null;
+          status?: "allowed" | "denied" | "pending" | "mined";
+          requested_at?: string | null;
+          mined_at?: string | null;
+          meta?: Json;
+        };
+        Update: {
+          title?: string;
+          url?: string | null;
+          occurred_at?: string | null;
+          status?: "allowed" | "denied" | "pending" | "mined";
+          requested_at?: string | null;
+          mined_at?: string | null;
+          meta?: Json;
+        };
+        Relationships: [];
+      };
+      content_source_rules: {
+        Row: {
+          id: string;
+          user_id: string;
+          kind: "allow" | "deny";
+          field: "title" | "participant";
+          pattern: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          kind: "allow" | "deny";
+          field: "title" | "participant";
+          pattern: string;
+        };
+        Update: {
+          kind?: "allow" | "deny";
+          field?: "title" | "participant";
+          pattern?: string;
+        };
+        Relationships: [];
+      };
+      content_ideas: {
+        Row: {
+          id: string;
+          user_id: string;
+          source_id: string | null;
+          format: "reel" | "youtube" | "newsletter" | "story" | "x";
+          title: string;
+          hook: string;
+          hook_alt: string | null;
+          belief_attacked: string;
+          value_to_listener: string;
+          why_it_stops: string;
+          outline: Json;
+          quote: string;
+          quote_ref: string;
+          pillar: string;
+          hook_type: string;
+          chain_id: string | null;
+          score: number;
+          batch_date: string;
+          status: "inbox" | "queued" | "rejected" | "posted" | "archived";
+          queue_rank: number | null;
+          feedback_reason: string | null;
+          feedback_at: string | null;
+          clickup_task_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          source_id?: string | null;
+          format: "reel" | "youtube" | "newsletter" | "story" | "x";
+          title: string;
+          hook: string;
+          hook_alt?: string | null;
+          belief_attacked?: string;
+          value_to_listener?: string;
+          why_it_stops?: string;
+          outline?: Json;
+          quote?: string;
+          quote_ref?: string;
+          pillar?: string;
+          hook_type?: string;
+          chain_id?: string | null;
+          score?: number;
+          batch_date?: string;
+          status?: "inbox" | "queued" | "rejected" | "posted" | "archived";
+          queue_rank?: number | null;
+        };
+        Update: {
+          status?: "inbox" | "queued" | "rejected" | "posted" | "archived";
+          queue_rank?: number | null;
+          feedback_reason?: string | null;
+          feedback_at?: string | null;
+          clickup_task_id?: string | null;
+          score?: number;
+        };
+        Relationships: [];
+      };
+      content_drafts: {
+        Row: {
+          id: string;
+          user_id: string;
+          idea_id: string;
+          version: number;
+          stage: "raw" | "humanized" | "edited";
+          body: string;
+          lint: Json;
+          model: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          idea_id: string;
+          version: number;
+          stage: "raw" | "humanized" | "edited";
+          body?: string;
+          lint?: Json;
+          model?: string;
+        };
+        Update: {
+          body?: string;
+          lint?: Json;
+          stage?: "raw" | "humanized" | "edited";
+        };
+        Relationships: [];
+      };
+      content_taste_rules: {
+        Row: {
+          id: string;
+          user_id: string;
+          rule: string;
+          evidence_count: number;
+          origin: "derived" | "manual";
+          active: boolean;
+          last_evidence_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          rule: string;
+          evidence_count?: number;
+          origin?: "derived" | "manual";
+          active?: boolean;
+          last_evidence_at?: string | null;
+        };
+        Update: {
+          rule?: string;
+          evidence_count?: number;
+          active?: boolean;
+          last_evidence_at?: string | null;
+        };
+        Relationships: [];
+      };
+      content_voice: {
+        Row: {
+          id: string;
+          user_id: string;
+          profile_md: string;
+          exemplars: Json;
+          built_from: Json;
+          built_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          profile_md?: string;
+          exemplars?: Json;
+          built_from?: Json;
+          built_at?: string | null;
+        };
+        Update: {
+          profile_md?: string;
+          exemplars?: Json;
+          built_from?: Json;
+          built_at?: string | null;
+        };
+        Relationships: [];
+      };
+      content_posts: {
+        Row: {
+          id: string;
+          user_id: string;
+          idea_id: string | null;
+          platform: "instagram" | "youtube" | "beehiiv" | "x";
+          external_id: string;
+          url: string;
+          format: string;
+          posted_at: string;
+          hook_used: string;
+          caption: string;
+          pillar: string;
+          hook_type: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          idea_id?: string | null;
+          platform: "instagram" | "youtube" | "beehiiv" | "x";
+          external_id: string;
+          url?: string;
+          format?: string;
+          posted_at?: string;
+          hook_used?: string;
+          caption?: string;
+          pillar?: string;
+          hook_type?: string;
+        };
+        Update: {
+          idea_id?: string | null;
+          url?: string;
+          format?: string;
+          posted_at?: string;
+          hook_used?: string;
+          caption?: string;
+          pillar?: string;
+          hook_type?: string;
+        };
+        Relationships: [];
+      };
+      content_metrics: {
+        Row: {
+          id: string;
+          user_id: string;
+          post_id: string;
+          captured_at: string;
+          metrics: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          post_id: string;
+          captured_at?: string;
+          metrics?: Json;
+        };
+        Update: {
+          metrics?: Json;
+        };
+        Relationships: [];
+      };
+      content_reviews: {
+        Row: {
+          id: string;
+          user_id: string;
+          week_start: string;
+          narrative_md: string;
+          double_down: Json;
+          stop: Json;
+          best_times: Json;
+          plan: Json;
+          replies_owed: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          week_start: string;
+          narrative_md?: string;
+          double_down?: Json;
+          stop?: Json;
+          best_times?: Json;
+          plan?: Json;
+          replies_owed?: Json;
+        };
+        Update: {
+          narrative_md?: string;
+          double_down?: Json;
+          stop?: Json;
+          best_times?: Json;
+          plan?: Json;
+          replies_owed?: Json;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -191,3 +494,16 @@ export type ProjectionInsert = Database["public"]["Tables"]["projections"]["Inse
 export type ProjectionUpdate = Database["public"]["Tables"]["projections"]["Update"];
 export type Lead = Database["public"]["Tables"]["leads"]["Row"];
 export type LeadInsert = Database["public"]["Tables"]["leads"]["Insert"];
+export type ContentSource = Database["public"]["Tables"]["content_sources"]["Row"];
+export type ContentSourceInsert = Database["public"]["Tables"]["content_sources"]["Insert"];
+export type ContentSourceRule = Database["public"]["Tables"]["content_source_rules"]["Row"];
+export type ContentIdea = Database["public"]["Tables"]["content_ideas"]["Row"];
+export type ContentIdeaInsert = Database["public"]["Tables"]["content_ideas"]["Insert"];
+export type ContentIdeaUpdate = Database["public"]["Tables"]["content_ideas"]["Update"];
+export type ContentDraft = Database["public"]["Tables"]["content_drafts"]["Row"];
+export type ContentTasteRule = Database["public"]["Tables"]["content_taste_rules"]["Row"];
+export type ContentVoice = Database["public"]["Tables"]["content_voice"]["Row"];
+export type ContentPost = Database["public"]["Tables"]["content_posts"]["Row"];
+export type ContentPostInsert = Database["public"]["Tables"]["content_posts"]["Insert"];
+export type ContentMetric = Database["public"]["Tables"]["content_metrics"]["Row"];
+export type ContentReview = Database["public"]["Tables"]["content_reviews"]["Row"];
