@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireContentOwner } from "@/features/content/data/owner";
 import { str } from "@/shared/forms";
-import { nextRank, neighborToSwap } from "@/features/content/engine/queue";
+import { nextRank, ranksAfterMove } from "@/features/content/engine/queue";
 import { externalIdFromUrl, platformFromUrl } from "@/features/content/engine/posts";
 import { FORMATS, type Format } from "@/features/content/engine/types";
 
@@ -25,12 +25,13 @@ export async function likeIdea(formData: FormData) {
     .single();
   if (!idea) return;
 
-  const { data: queued } = await supabase
+  const { data: queued, error: rankError } = await supabase
     .from("content_ideas")
     .select("queue_rank")
     .eq("user_id", user.id)
     .eq("format", idea.format)
     .eq("status", "queued");
+  if (rankError) throw new Error(rankError.message);
 
   const { error } = await supabase
     .from("content_ideas")
@@ -89,10 +90,10 @@ export async function moveIdea(formData: FormData) {
     .order("queue_rank", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
 
-  const swap = neighborToSwap(ordered ?? [], id, direction);
-  if (!swap) return;
+  const ranks = ranksAfterMove(ordered ?? [], id, direction);
+  if (!ranks) return;
 
-  for (const row of [swap.a, swap.b]) {
+  for (const row of ranks) {
     const { error } = await supabase
       .from("content_ideas")
       .update({ queue_rank: row.rank })

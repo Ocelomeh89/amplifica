@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextRank, neighborToSwap } from "./queue";
+import { nextRank, neighborToSwap, ranksAfterMove } from "./queue";
 
 describe("nextRank", () => {
   it("is one past the largest rank, ignoring nulls", () => {
@@ -34,5 +34,46 @@ describe("neighborToSwap", () => {
       { id: "b", queue_rank: null },
     ];
     expect(neighborToSwap(gaps, "b", "up")).toEqual({ a: { id: "b", rank: 1 }, b: { id: "a", rank: 2 } });
+  });
+});
+
+describe("ranksAfterMove", () => {
+  const q = [
+    { id: "a", queue_rank: 1 },
+    { id: "b", queue_rank: 2 },
+    { id: "c", queue_rank: 3 },
+  ];
+  it("writes only the two swapped rows on a healthy queue", () => {
+    expect(ranksAfterMove(q, "b", "up")).toEqual([
+      { id: "b", rank: 1 },
+      { id: "a", rank: 2 },
+    ]);
+  });
+  it("heals a duplicate rank left by an earlier partial failure", () => {
+    const drifted = [
+      { id: "a", queue_rank: 2 },
+      { id: "b", queue_rank: 2 },
+      { id: "c", queue_rank: 3 },
+    ];
+    expect(ranksAfterMove(drifted, "c", "up")).toEqual([
+      { id: "a", rank: 1 },
+      { id: "c", rank: 2 },
+      { id: "b", rank: 3 },
+    ]);
+  });
+  it("heals null ranks from positions", () => {
+    const nulls = [
+      { id: "a", queue_rank: null },
+      { id: "b", queue_rank: null },
+    ];
+    expect(ranksAfterMove(nulls, "b", "up")).toEqual([
+      { id: "b", rank: 1 },
+      { id: "a", rank: 2 },
+    ]);
+  });
+  it("is null at the edges and for an unknown id", () => {
+    expect(ranksAfterMove(q, "a", "up")).toBeNull();
+    expect(ranksAfterMove(q, "c", "down")).toBeNull();
+    expect(ranksAfterMove(q, "zz", "down")).toBeNull();
   });
 });
