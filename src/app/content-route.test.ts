@@ -31,6 +31,7 @@ describe("/content stays private and owner-only", () => {
   it("every content page and action opens with requireContentOwner", () => {
     const files = [
       "src/app/(app)/content/page.tsx",
+      "src/features/content/data/actions.ts",
     ];
     for (const f of files) {
       expect(readFileSync(f, "utf8"), f).toContain("requireContentOwner()");
