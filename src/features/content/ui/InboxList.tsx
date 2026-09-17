@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ContentIdea } from "@/shared/supabase/database.types";
 import type { Format } from "@/features/content/engine/types";
 import { likeIdea } from "@/features/content/data/actions";
@@ -13,33 +13,55 @@ type Props = {
 };
 
 // J/K move focus, L likes the focused idea, X opens its Pass box. Keys are
-// ignored while typing in an input so the reason box works.
+// ignored while typing in an input so the reason box works. Focus is tracked
+// by idea id, not index: the array shrinks by one every time a keyboard
+// like/pass goes through the Server Action + revalidation round trip, so an
+// index would drift onto the wrong idea mid-sequence.
 export default function InboxList({ ideas, sourceUrls, siblingsById }: Props) {
-  const [focus, setFocus] = useState(0);
+  const [focusId, setFocusId] = useState<string | null>(ideas[0]?.id ?? null);
   const [passOpenId, setPassOpenId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const lastIndex = useRef(0);
+
+  // Where the focused idea sits now. When it has left the list (liked or
+  // passed), focus moves to whatever now occupies its old position, clamped.
+  const focusIndex = (() => {
+    const i = ideas.findIndex((idea) => idea.id === focusId);
+    return i === -1 ? Math.min(lastIndex.current, Math.max(ideas.length - 1, 0)) : i;
+  })();
+
+  useEffect(() => {
+    lastIndex.current = focusIndex;
+    const current = ideas[focusIndex]?.id ?? null;
+    if (current !== focusId) setFocusId(current);
+  }, [ideas, focusIndex, focusId]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
       if (ideas.length === 0) return;
-      if (e.key === "j") setFocus((f) => Math.min(f + 1, ideas.length - 1));
-      else if (e.key === "k") setFocus((f) => Math.max(f - 1, 0));
+      if (e.key === "j") setFocusId(ideas[Math.min(focusIndex + 1, ideas.length - 1)].id);
+      else if (e.key === "k") setFocusId(ideas[Math.max(focusIndex - 1, 0)].id);
       else if (e.key === "l") {
+        if (busy) return;
         const fd = new FormData();
-        fd.set("id", ideas[focus].id);
-        void likeIdea(fd);
-      } else if (e.key === "x") setPassOpenId(ideas[focus].id);
-      else return;
+        fd.set("id", ideas[focusIndex].id);
+        setBusy(true);
+        void likeIdea(fd).finally(() => setBusy(false));
+      } else if (e.key === "x") {
+        if (busy) return;
+        setPassOpenId(ideas[focusIndex].id);
+      } else return;
       e.preventDefault();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [ideas, focus]);
+  }, [ideas, focusIndex, busy]);
 
   useEffect(() => {
-    document.querySelector(`[data-idea-id="${ideas[focus]?.id}"]`)?.scrollIntoView({ block: "nearest" });
-  }, [focus, ideas]);
+    document.querySelector(`[data-idea-id="${ideas[focusIndex]?.id}"]`)?.scrollIntoView?.({ block: "nearest" });
+  }, [focusIndex, ideas]);
 
   if (ideas.length === 0) {
     return <p className="text-sm text-sub">Inbox is clear. New ideas land here each morning.</p>;
@@ -54,7 +76,7 @@ export default function InboxList({ ideas, sourceUrls, siblingsById }: Props) {
           idea={idea}
           sourceUrl={idea.source_id ? sourceUrls[idea.source_id] ?? null : null}
           siblings={siblingsById[idea.id] ?? []}
-          focused={i === focus}
+          focused={i === focusIndex}
           passOpen={passOpenId === idea.id}
           onPassOpenChange={(open) => setPassOpenId(open ? idea.id : null)}
         />

@@ -29,10 +29,10 @@ export default async function ContentInboxPage() {
 
   const [{ data: sources }, { data: chainMates }] = await Promise.all([
     sourceIds.length
-      ? supabase.from("content_sources").select("id, url").in("id", sourceIds)
+      ? supabase.from("content_sources").select("id, url").eq("user_id", user.id).in("id", sourceIds)
       : Promise.resolve({ data: [] as { id: string; url: string | null }[] }),
     chainIds.length
-      ? supabase.from("content_ideas").select("id, format, chain_id").in("chain_id", chainIds)
+      ? supabase.from("content_ideas").select("id, format, chain_id").eq("user_id", user.id).in("chain_id", chainIds)
       : Promise.resolve({ data: [] as { id: string; format: Format; chain_id: string | null }[] }),
   ]);
 
