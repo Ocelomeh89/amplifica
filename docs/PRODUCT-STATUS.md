@@ -40,7 +40,7 @@ and the date of financial independence (FI).
 | Tests | Vitest 2.1 (+ jsdom, Testing Library) |
 | Package manager | pnpm |
 
-**Env vars:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`; server-only: `SUPABASE_SERVICE_ROLE_KEY` (lead capture), `BEEHIIV_API_KEY` + `BEEHIIV_PUBLICATION_ID` (newsletter subscribe), `NEXT_PUBLIC_SITE_URL` (auth redirects + `metadataBase`). See `.env.example`.
+**Env vars:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`; server-only: `SUPABASE_SERVICE_ROLE_KEY` (lead capture), `BEEHIIV_API_KEY` + `BEEHIIV_PUBLICATION_ID` (newsletter subscribe), `NEXT_PUBLIC_SITE_URL` (auth redirects + `metadataBase`), `CONTENT_OWNER_USER_ID` + `CONTENT_ENGINE_SECRET` (content engine). See `.env.example`.
 
 ---
 
@@ -75,6 +75,7 @@ src/
     calculator/         # ui/ (CalculatorClient, EmailGate, InfoSections) + data/
     amortization/       # engine/schedule + ui/ + nav.ts  (removable in one delete)
     amplicons/  loc/  dashboard/  settings/  auth/
+    content/            # owner-only content engine (inbox, queues, sources) — see its CLAUDE.md
 
   shared/               # anything two or more features use
     finance/            # THE PURE ENGINE (see §5) — no I/O, no React

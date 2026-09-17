@@ -1,0 +1,67 @@
+{
+  "run": { "kind": "daily", "started_at": "2026-09-17T11:00:00Z" },
+  "sources": [
+    {
+      "kind": "granola",
+      "external_id": "830179d0-d2b4-40d4-9d3f-bfd2adf32f50",
+      "title": "Joe/Miguel",
+      "url": "https://notes.granola.ai/d/830179d0-d2b4-40d4-9d3f-bfd2adf32f50",
+      "occurred_at": "2026-09-17T15:00:00Z",
+      "status": "allowed",
+      "meta": { "participants": ["Joe", "Miguel"] }
+    },
+    {
+      "kind": "granola",
+      "external_id": "7110b1e1-c279-465c-b04b-55a19e5287a1",
+      "title": "Technical accounting training and submission ingestion go-live",
+      "occurred_at": "2026-09-17T14:01:00Z",
+      "status": "pending"
+    }
+  ],
+  "ideas": [
+    {
+      "source_ref": { "kind": "granola", "external_id": "830179d0-d2b4-40d4-9d3f-bfd2adf32f50" },
+      "format": "reel",
+      "title": "A W-2 is a runway, not a cage",
+      "hook": "I took a new W-2 job this month. Here's why that speeds up leaving W-2 work for good.",
+      "hook_alt": "The fastest way out of a paycheck is a bigger paycheck.",
+      "belief_attacked": "You have to quit your job to build financial independence",
+      "value_to_listener": "A concrete rule for how much of a raise goes to the flywheel before lifestyle sees a dollar",
+      "why_it_stops": "The first line contradicts what the audience expects from someone selling freedom",
+      "outline": [
+        { "beat": "New job starts Monday. On screen: the offer letter, salary redacted." },
+        { "beat": "The rule: 100% of the raise funds the monthly savings contribution." },
+        { "beat": "Show the calculator with the old MSC vs the new MSC and the FI date moving." },
+        { "beat": "Loop back: the job is the runway." }
+      ],
+      "quote": "the new job gives me the morning focus time back, and every extra dollar goes to the machine",
+      "quote_ref": "Joe/Miguel 2026-09-17 ~00:12:40",
+      "pillar": "optionality",
+      "hook_type": "belief-attacking",
+      "chain_key": "runway",
+      "score": 0.82,
+      "batch_date": "2026-09-17"
+    },
+    {
+      "source_ref": { "kind": "granola", "external_id": "830179d0-d2b4-40d4-9d3f-bfd2adf32f50" },
+      "format": "story",
+      "title": "Poll: what do you do with a raise?",
+      "hook": "Got a raise. Where does the first dollar go?",
+      "belief_attacked": "A raise is for lifestyle",
+      "value_to_listener": "Sees their own answer against the room's",
+      "why_it_stops": "A poll is a tap, not a read",
+      "outline": [
+        { "beat": "Slide 1: the question with a 3-option poll sticker" },
+        { "beat": "Slide 2: my answer, with the MSC field on the calculator" },
+        { "beat": "Slide 3: link sticker to /calculator" }
+      ],
+      "quote": "every extra dollar goes to the machine",
+      "quote_ref": "Joe/Miguel 2026-09-17 ~00:12:40",
+      "pillar": "optionality",
+      "hook_type": "question",
+      "chain_key": "runway",
+      "score": 0.61,
+      "batch_date": "2026-09-17"
+    }
+  ]
+}
