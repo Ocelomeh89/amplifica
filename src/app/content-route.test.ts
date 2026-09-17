@@ -31,6 +31,8 @@ describe("/content stays private and owner-only", () => {
   it("every content page and action opens with requireContentOwner", () => {
     const files = [
       "src/app/(app)/content/page.tsx",
+      "src/app/(app)/content/queue/page.tsx",
+      "src/app/(app)/content/ideas/[id]/page.tsx",
       "src/features/content/data/actions.ts",
     ];
     for (const f of files) {
