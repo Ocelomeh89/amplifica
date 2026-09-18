@@ -31,7 +31,12 @@ export async function POST(req: Request) {
   try {
     const client = createAdminClient();
     const result = await ingestPayload(supabaseIngestDb(client, owner), parsed.data, owner);
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json({
+      ok: true,
+      sources: result.sources,
+      ideas: result.ideas,
+      counts: { sources: result.sources.length, ideas: result.ideas.length },
+    });
   } catch (e) {
     console.error("content ingest failed", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

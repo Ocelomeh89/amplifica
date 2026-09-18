@@ -13,6 +13,11 @@ function fakeDb(overrides: Partial<ContextDb> = {}): ContextDb {
     sourceRules: async () => [{ kind: "allow", field: "title", pattern: "amplifica" }],
     sourceRuns: async () => [{ kind: "granola", created_at: "2026-09-17T11:00:00Z" }],
     voiceSummary: async () => null,
+    knownSources: async () => [
+      { kind: "plaud", external_id: "p1", title: "Walk with Jackie", status: "allowed", requested_at: "2026-09-16T20:00:00Z", mined_at: null },
+      { kind: "plaud", external_id: "p2", title: "Old one", status: "mined", requested_at: "2026-09-10T20:00:00Z", mined_at: "2026-09-11T11:00:00Z" },
+      { kind: "granola", external_id: "g1", title: "Client call", status: "denied", requested_at: null, mined_at: null },
+    ],
     ...overrides,
   };
 }
@@ -54,5 +59,23 @@ describe("buildContext", () => {
     expect(ctx.source_rules[0].pattern).toBe("amplifica");
     expect(ctx.last_run_by_kind.granola).toBe("2026-09-17T11:00:00Z");
     expect(ctx.voice_summary).toBeNull();
+  });
+
+  it("passes known sources through and derives the requested ones", async () => {
+    const ctx = await buildContext(fakeDb(), now);
+    expect(ctx.known_sources).toHaveLength(3);
+    expect(ctx.requested_sources.map((s) => s.external_id)).toEqual(["p1"]);
+  });
+
+  it("asks for 90 days of known sources", async () => {
+    const seen: string[] = [];
+    const db = fakeDb({
+      knownSources: async (iso) => {
+        seen.push(iso);
+        return [];
+      },
+    });
+    await buildContext(db, now);
+    expect(seen).toEqual(["2026-06-19T12:00:00.000Z"]);
   });
 });

@@ -56,4 +56,13 @@ describe("ingestSchema", () => {
     ok.sources[0].mined_at = "2026-09-17T12:00:00Z";
     expect(ingestSchema.safeParse(ok).success).toBe(true);
   });
+
+  it("rejects more than 10 ideas", () => {
+    const bad = structuredClone(example);
+    for (let i = 0; i < 9; i++) {
+      bad.ideas.push({ ...bad.ideas[0], title: `${bad.ideas[0].title} ${i}` });
+    }
+    expect(bad.ideas.length).toBe(11);
+    expect(ingestSchema.safeParse(bad).success).toBe(false);
+  });
 });

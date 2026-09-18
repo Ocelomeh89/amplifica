@@ -16,6 +16,15 @@
       "title": "Technical accounting training and submission ingestion go-live",
       "occurred_at": "2026-09-17T14:01:00Z",
       "status": "pending"
+    },
+    {
+      "kind": "plaud",
+      "external_id": "plaud-file-123",
+      "title": "Walk with Jackie: what a raise is for",
+      "occurred_at": "2026-09-16T23:10:00Z",
+      "status": "allowed",
+      "mined_at": "2026-09-17T11:05:00Z",
+      "meta": { "has_highlights": true, "duration_s": 1500 }
     }
   ],
   "ideas": [
