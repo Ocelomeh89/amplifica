@@ -162,7 +162,7 @@ async function setSourceStatus(formData: FormData, status: "allowed" | "denied")
   if (!id) return;
   const { error } = await supabase
     .from("content_sources")
-    .update({ status })
+    .update(status === "denied" ? { status, requested_at: null } : { status })
     .eq("id", id)
     .eq("user_id", user.id);
   if (error) throw new Error(error.message);
@@ -216,7 +216,7 @@ export async function requestMining(formData: FormData) {
     .update({ status: "allowed", requested_at: new Date().toISOString() })
     .eq("id", id)
     .eq("user_id", user.id)
-    .neq("status", "mined");
+    .not("status", "in", "(mined,denied)");
   if (error) throw new Error(error.message);
   revalidate();
 }

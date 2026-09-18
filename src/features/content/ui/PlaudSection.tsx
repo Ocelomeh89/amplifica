@@ -21,7 +21,7 @@ export default function PlaudSection({ sources, lastSweep }: { sources: ContentS
           {sources.map((s) => {
             const meta = (s.meta ?? {}) as Meta;
             const mins = meta.duration_s ? Math.round(meta.duration_s / 60) : null;
-            const canRequest = s.status !== "mined" && !s.requested_at;
+            const canRequest = s.status !== "mined" && s.status !== "denied" && !s.requested_at;
             return (
               <li key={s.id} className="flex items-center gap-2">
                 <span className="flex-1 truncate">{s.title || s.external_id}</span>
@@ -29,7 +29,7 @@ export default function PlaudSection({ sources, lastSweep }: { sources: ContentS
                 {mins !== null && <span className="text-xs text-sub">{mins} min</span>}
                 <span className="text-xs text-sub">{s.occurred_at ? fmtDate(s.occurred_at) : ""}</span>
                 <span className="text-xs text-sub w-16 text-right">
-                  {s.status === "mined" ? "mined" : s.requested_at ? "requested" : s.status}
+                  {s.status === "mined" ? "mined" : s.status === "denied" ? "denied" : s.requested_at ? "requested" : s.status}
                 </span>
                 {canRequest && (
                   <form action={requestMining}>
