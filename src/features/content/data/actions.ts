@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireContentOwner } from "@/features/content/data/owner";
+import { syncQueuedIdeasToClickUp } from "@/features/content/data/clickup";
 import { str } from "@/shared/forms";
 import { nextRank, ranksAfterMove } from "@/features/content/engine/queue";
 import { externalIdFromUrl, platformFromUrl } from "@/features/content/engine/posts";
@@ -44,6 +45,10 @@ export async function likeIdea(formData: FormData) {
     .eq("id", id)
     .eq("user_id", user.id);
   if (error) throw new Error(error.message);
+
+  // Mirror to ClickUp. Awaited, because fire-and-forget work can be killed
+  // after the response on Vercel; never throws.
+  await syncQueuedIdeasToClickUp(supabase, user.id);
   revalidate();
 }
 
