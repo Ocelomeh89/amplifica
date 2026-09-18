@@ -15,6 +15,7 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
   from its checkout; PR 4 uses it as a Claude system prompt. `ideas.test.ts`
   asserts it names every ingest field.
 - `data/clickup.ts` — task per liked idea, best effort, healed on the next Like.
+  The spec's format tag is deferred; the format is in the task name.
 - `routines/` (repo root) — routine instructions and README; `.claude/skills/`
   holds the local companions `/content-plaud` and `/content-daily`.
 

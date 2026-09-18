@@ -13,7 +13,7 @@ If either is missing, stop and post the ClickUp message in step 7 saying so.
 ## 1. Read the context
 
 ```bash
-curl -sS -o /tmp/context.json -w '%{http_code}' "$CONTENT_API_BASE/api/content/context" -H "Authorization: Bearer $CONTENT_ENGINE_SECRET"
+curl -sS --max-time 60 -o /tmp/context.json -w '%{http_code}' "$CONTENT_API_BASE/api/content/context" -H "Authorization: Bearer $CONTENT_ENGINE_SECRET"
 ```
 
 Anything other than 200 is a failure — stop and post the step-7 failure line.
@@ -42,26 +42,37 @@ takes a date, floored as described below. List:
 - Granola: `list_meetings` with `time_range: "last_30_days"` always, then keep
   meetings whose start time is after `since`. Do not use `this_week` — a
   calendar week can be shorter than the window you need. Participants come
-  from `known_participants`.
+  from `known_participants`. If the listing does not carry participants at
+  all, classify Granola recordings on title deny rules only and leave
+  everything else `pending`; say so in the digest so Miguel can allow them
+  from the Sources page.
 - Wispr-Flow: `search_meetings` with `since`. Participants come from
   `attendees`. When `search_meetings` summarizes the attendee list rather
   than giving it whole, call `get_meeting_attendee_emails` for that meeting —
   it returns addresses only, no content — and classify on the full list.
-  Never call `get_meeting` on an unclassified recording.
+  Never call `get_meeting` on an unclassified recording. `search_meetings`
+  pages 25 at a time; when `has_more` is true, call again with `cursor` =
+  `next_cursor` until it is false. Its `since` filters on modified time, so
+  take `occurred_at` from the meeting's `start`, not from the filter.
 - Plaud: `list_files` with `date_from` = the date of `since`. `date_from` is a
   date in the server's timezone, so floor `since` to the previous calendar
   day. Check the response's `complete` flag; when false, say so in the digest
   rather than treating the listing as exhaustive. Plaud has no participants;
-  classify on title only. Set `has_highlights` from the listing only. If the
-  listing does not say, call `get_file` — it returns metadata and an
-  inventory of the recording's transcript blocks and notes without any
-  transcript body — and set `has_highlights` from whether a `mark_memo`
-  block is listed. Never call `get_transcript` before step 5, and only on an
-  `allowed` recording. Note duration from the listing.
+  classify on title only. Set `has_highlights` from the listing when it says;
+  otherwise leave it unset for now. Never call `get_file` or `get_transcript`
+  before step 5, and only on an `allowed` recording — `get_file` returns a
+  signed audio link. Note duration from the listing.
 
 Skip any recording whose `(kind, external_id)` is already in `known_sources`
 with status `denied`, `mined`, or `pending`; those are decided. A known source
 with status `allowed` and no `mined_at` is still open: include it.
+
+Then add every entry in `requested_sources`, and every `known_sources` entry
+with status `allowed` and no `mined_at`, even if the listing did not return
+it. They already carry the `kind` and `external_id` the read tools take
+(`get_meeting_transcript(meeting_id)`, `get_meeting(meeting_id)`,
+`get_transcript(file_id)`). They are already classified — do not reclassify
+them, and never add a `denied` or `pending` one this way.
 
 ## 4. Classify every new recording
 
@@ -100,10 +111,12 @@ Requested sources are opened first and count toward both caps.
 - Wispr-Flow: `get_meeting` with `view_transcript: {}`; page with
   `start_char` when truncated.
 - Plaud: `get_transcript` with block `mark_memo` first (the moments Miguel
-  flagged with the button), then block `transaction_polish` (paged with
-  `next_cursor`), then `get_note` for the summary. An empty or missing
-  `mark_memo` block is normal — continue to `transaction_polish`. Ideas from
-  a flagged moment rank above the rest.
+  flagged with the button), then block `transaction_polish` (paged by passing
+  the previous response's `next_cursor` as `cursor`), then `get_note` for the
+  summary. An empty or missing `mark_memo` block is normal — continue to
+  `transaction_polish`. Ideas from a flagged moment rank above the rest. If
+  `has_highlights` is still unset, call `get_file` first (metadata and block
+  inventory) and set it from whether a `mark_memo` block is listed.
 
 Generate ideas per the rules file: at most 10 in total across all sources,
 ranked, spread across formats, each with provenance. Drop anything matching
@@ -135,7 +148,7 @@ Write the body to `/tmp/ingest.json` (a Bash heredoc is fine), then check it
 parses before sending: `python3 -m json.tool /tmp/ingest.json > /dev/null`.
 
 ```bash
-curl -sS -X POST "$CONTENT_API_BASE/api/content/ingest" \
+curl -sS --max-time 60 -X POST "$CONTENT_API_BASE/api/content/ingest" \
   -H "Authorization: Bearer $CONTENT_ENGINE_SECRET" \
   -H "Content-Type: application/json" \
   --data @/tmp/ingest.json \

@@ -79,6 +79,9 @@ export async function syncQueuedIdeasToClickUp(
   userId: string
 ): Promise<number> {
   const env: ClickUpEnv = { token: process.env.CLICKUP_API_TOKEN, listId: process.env.CLICKUP_TASK_LIST_ID };
+  if (!process.env.NEXT_PUBLIC_SITE_URL) {
+    console.warn("clickup: NEXT_PUBLIC_SITE_URL not set; task links will point at localhost");
+  }
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   if (!env.token || !env.listId) return 0;
 

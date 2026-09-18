@@ -42,16 +42,24 @@ export function supabaseIngestDb(client: Client, userId: string): IngestDb {
       return data ?? [];
     },
     async markMined(rows) {
+      let updated = 0;
       for (const row of rows) {
-        const { error } = await client
+        const { data, error } = await client
           .from("content_sources")
           .update({ status: "mined", mined_at: row.mined_at })
           .eq("user_id", userId)
           .eq("kind", row.kind as ContentSourceInsert["kind"])
-          .eq("external_id", row.external_id);
+          .eq("external_id", row.external_id)
+          .eq("status", "allowed")
+          .select("id");
         if (error) throw new Error(`content_sources mark mined: ${error.message}`);
+        if (!data || data.length === 0) {
+          console.error(`content_sources: refused to mark ${row.kind}:${row.external_id} mined — status is not allowed`);
+          continue;
+        }
+        updated += 1;
       }
-      return rows.length;
+      return updated;
     },
   };
 }
@@ -136,6 +144,9 @@ export function supabaseContextDb(client: Client, userId: string): ContextDb {
       if (error) throw fail("voice", error.message);
       return data?.profile_md ? data.profile_md.slice(0, 2000) : null;
     },
+    // 500 rows over 90 days is a ceiling, not pagination: `since` in the
+    // routine never reaches back more than 7 days, so the rows that matter
+    // are always within it.
     async knownSources(iso) {
       const { data, error } = await client
         .from("content_sources")

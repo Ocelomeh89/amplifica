@@ -21,10 +21,12 @@ The immediate path for the content engine. The overnight routine
    the titles with dates and durations; ask which one. One question, then go.
 2. Read it: `get_transcript` block `mark_memo` (highlights) first, then
    `transaction_polish` paged to the end, then `get_note`.
-3. Read `src/features/content/engine/prompts/ideas.ts` and generate up to 10
-   ideas from this one recording per those rules. Highlighted moments rank first.
-   Fetch `GET $CONTENT_API_BASE/api/content/context` first and honor
-   `taste_rules`, `recent_feedback`, and `known_titles`.
+3. Fetch `GET $CONTENT_API_BASE/api/content/context` with the bearer. If
+   `known_sources` already lists this recording as `denied`, stop and say so.
+   Then read `src/features/content/engine/prompts/ideas.ts` and generate up
+   to 10 ideas from this one recording per those rules, honoring
+   `taste_rules`, `recent_feedback`, and `known_titles`. Highlighted moments
+   rank first.
 4. Build one ingest body: the single source with `kind: "plaud"`,
    `external_id` = the Plaud file id, `status: "allowed"`, `mined_at` = now,
    `meta: { has_highlights, duration_s }`; the ideas with `source_ref` pointing

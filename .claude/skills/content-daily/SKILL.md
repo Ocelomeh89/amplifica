@@ -15,3 +15,7 @@ substitutions:
 The connectors it names (Granola, Wispr-Flow, Plaud, ClickUp) are the same
 ones attached to this session. Post the ClickUp digest as the file says, then
 tell Miguel what landed.
+
+If the cloud routine already ran today, this posts a second digest and may
+re-list the same recordings (already-mined ones are skipped); say so before
+running.

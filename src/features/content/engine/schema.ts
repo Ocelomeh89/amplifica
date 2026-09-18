@@ -55,7 +55,7 @@ export const ingestSchema = z
       })
       .optional(),
     sources: z.array(ingestSourceSchema).default([]),
-    ideas: z.array(ingestIdeaSchema).default([]),
+    ideas: z.array(ingestIdeaSchema).max(10).default([]),
   })
   .superRefine((body, ctx) => {
     if (body.sources.length === 0 && body.ideas.length === 0) {

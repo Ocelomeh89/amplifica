@@ -34,6 +34,7 @@ describe("ingestPayload", () => {
     expect(result.sources).toEqual([
       { id: "src-0", kind: "granola", external_id: "830179d0-d2b4-40d4-9d3f-bfd2adf32f50" },
       { id: "src-1", kind: "granola", external_id: "7110b1e1-c279-465c-b04b-55a19e5287a1" },
+      { id: "src-2", kind: "plaud", external_id: "plaud-file-123" },
     ]);
     expect(result.ideas.map((i) => i.id)).toEqual(["idea-0", "idea-1"]);
     expect(result.ideas[0]).toMatchObject({ format: "reel", title: "A W-2 is a runway, not a cage" });
@@ -90,12 +91,15 @@ describe("ingestPayload", () => {
     await ingestPayload(db, withMined, "owner-1");
     expect(mined).toEqual([
       { kind: "granola", external_id: "830179d0-d2b4-40d4-9d3f-bfd2adf32f50", mined_at: "2026-09-17T12:00:00Z" },
+      { kind: "plaud", external_id: "plaud-file-123", mined_at: "2026-09-17T11:05:00Z" },
     ]);
   });
 
-  it("does not call markMined when no source carries mined_at", async () => {
+  it("calls markMined only for the source that already carries mined_at", async () => {
     const { db, mined } = fakeDb();
     await ingestPayload(db, example, "owner-1");
-    expect(mined).toEqual([]);
+    expect(mined).toEqual([
+      { kind: "plaud", external_id: "plaud-file-123", mined_at: "2026-09-17T11:05:00Z" },
+    ]);
   });
 });
