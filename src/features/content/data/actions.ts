@@ -202,3 +202,21 @@ export async function deleteSourceRule(formData: FormData) {
   if (error) throw new Error(error.message);
   revalidate();
 }
+
+/**
+ * "Mine this": open a recording to the next daily run and put it first in
+ * line. Idempotent; a mined recording is left alone.
+ */
+export async function requestMining(formData: FormData) {
+  const { supabase, user } = await requireContentOwner();
+  const id = str(formData, "id");
+  if (!id) return;
+  const { error } = await supabase
+    .from("content_sources")
+    .update({ status: "allowed", requested_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .neq("status", "mined");
+  if (error) throw new Error(error.message);
+  revalidate();
+}

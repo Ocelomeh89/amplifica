@@ -3,6 +3,7 @@ import { requireContentOwner } from "@/features/content/data/owner";
 import { addSourceRule, deleteSourceRule } from "@/features/content/data/actions";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import PendingSourcesStrip from "@/features/content/ui/PendingSourcesStrip";
+import PlaudSection from "@/features/content/ui/PlaudSection";
 import { lastRunByKind } from "@/features/content/engine/runs";
 import { SOURCE_KINDS } from "@/features/content/engine/types";
 import Card from "@/shared/ui/Card";
@@ -11,10 +12,11 @@ import { fmtDate } from "@/shared/format";
 export default async function ContentSourcesPage() {
   const { supabase, user } = await requireContentOwner();
 
-  const [{ data: rules }, { data: pending }, { data: recent }] = await Promise.all([
+  const [{ data: rules }, { data: pending }, { data: recent }, { data: plaud }] = await Promise.all([
     supabase.from("content_source_rules").select("*").eq("user_id", user.id).order("kind").order("pattern"),
     supabase.from("content_sources").select("*").eq("user_id", user.id).eq("status", "pending").order("occurred_at", { ascending: false }),
     supabase.from("content_sources").select("id, kind, title, external_id, status, occurred_at, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(200),
+    supabase.from("content_sources").select("*").eq("user_id", user.id).eq("kind", "plaud").order("occurred_at", { ascending: false }).limit(50),
   ]);
 
   const lastRun = lastRunByKind(recent ?? []);
@@ -26,6 +28,7 @@ export default async function ContentSourcesPage() {
       <ContentTabs />
 
       <PendingSourcesStrip sources={pending ?? []} />
+      <PlaudSection sources={plaud ?? []} lastSweep={lastRun.plaud ?? null} />
 
       <Card title="Who gets read">
         <p className="text-xs text-sub mb-3">
