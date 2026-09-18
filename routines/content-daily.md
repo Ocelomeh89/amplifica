@@ -35,8 +35,9 @@ it. Follow it exactly; the ingest endpoint rejects anything off-shape.
 
 `since` = `last_run_by_kind[kind]` minus 24 hours, or 7 days ago when the kind
 has never run. Re-listing a day twice is free — the `known_sources` check
-below drops anything already decided. Compare against the meeting's start
-time in UTC. List:
+below drops anything already decided. For Granola, compare the meeting's
+start time (UTC) against `since`; Wispr-Flow takes `since` directly; Plaud
+takes a date, floored as described below. List:
 
 - Granola: `list_meetings` with `time_range: "last_30_days"` always, then keep
   meetings whose start time is after `since`. Do not use `this_week` — a
@@ -74,10 +75,12 @@ Apply the `source_rules` as case-insensitive substring matches on the title
 - Else if any allow rule matches: status `allowed`.
 - Else: status `pending`.
 
-Participant rules can only be applied to a recording whose participant list
-the connector actually returned. If a recording has no participant data, or
-a truncated list you could not complete, it may not be `allowed` on a title
-rule alone — classify it `pending`.
+Participant rules apply only to connectors that return participants (Granola,
+Wispr-Flow). For those, a recording with no participant data, or a truncated
+list you could not complete, may not be `allowed` on a title rule alone —
+classify it `pending`. Plaud never returns participants: classify a Plaud
+recording on its title alone (a title deny rule → `denied`, a title allow
+rule → `allowed`, no match → `pending`).
 
 You never open a `denied` or `pending` recording. Not its transcript, not its
 notes, not its summary. Client engagements are confidential and the deny list
