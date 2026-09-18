@@ -70,7 +70,9 @@ export async function createClickUpTask(
 
 /**
  * Create tasks for queued ideas that do not have one yet, newest first, a
- * few at a time. Called after every Like so an earlier failure heals.
+ * few at a time. Called after every Like so an earlier failure heals. The
+ * creations run in parallel, so a degraded ClickUp costs one timeout, not
+ * five sequential ones.
  */
 export async function syncQueuedIdeasToClickUp(
   supabase: SupabaseClient<Database>,
@@ -90,16 +92,17 @@ export async function syncQueuedIdeasToClickUp(
     .limit(5);
   if (error || !ideas) return 0;
 
-  let created = 0;
-  for (const idea of ideas) {
-    const task = await createClickUpTask(taskFor(idea, siteUrl), env);
-    if (!task) continue;
-    const { error: updateError } = await supabase
-      .from("content_ideas")
-      .update({ clickup_task_id: task.id })
-      .eq("id", idea.id)
-      .eq("user_id", userId);
-    if (!updateError) created += 1;
-  }
-  return created;
+  const results = await Promise.allSettled(
+    ideas.map(async (idea) => {
+      const task = await createClickUpTask(taskFor(idea, siteUrl), env);
+      if (!task) return false;
+      const { error: updateError } = await supabase
+        .from("content_ideas")
+        .update({ clickup_task_id: task.id })
+        .eq("id", idea.id)
+        .eq("user_id", userId);
+      return !updateError;
+    })
+  );
+  return results.filter((r) => r.status === "fulfilled" && r.value).length;
 }
