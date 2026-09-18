@@ -34,11 +34,12 @@ export function supabaseIngestDb(client: Client, userId: string): IngestDb {
       return (data ?? []).filter((d) => wanted.has(`${d.kind}:${d.external_id}`));
     },
     async insertIdeas(rows) {
-      const { error, count } = await client
+      const { data, error } = await client
         .from("content_ideas")
-        .insert(rows, { count: "exact" });
+        .insert(rows)
+        .select("id, format, title, hook");
       if (error) throw new Error(`content_ideas insert: ${error.message}`);
-      return count ?? rows.length;
+      return data ?? [];
     },
     async markMined(rows) {
       for (const row of rows) {
@@ -90,12 +91,12 @@ export function supabaseContextDb(client: Client, userId: string): ContextDb {
       for (const row of data ?? []) depth[row.format as Format] += 1;
       return depth;
     },
+    // every status: a passed idea must not come back as new.
     async ideaTitlesSince(iso) {
       const { data, error } = await client
         .from("content_ideas")
         .select("title")
         .eq("user_id", userId)
-        .in("status", ["inbox", "queued", "posted"])
         .gte("created_at", iso);
       if (error) throw fail("idea titles", error.message);
       return (data ?? []).map((d) => d.title);
@@ -134,6 +135,17 @@ export function supabaseContextDb(client: Client, userId: string): ContextDb {
         .maybeSingle();
       if (error) throw fail("voice", error.message);
       return data?.profile_md ? data.profile_md.slice(0, 2000) : null;
+    },
+    async knownSources(iso) {
+      const { data, error } = await client
+        .from("content_sources")
+        .select("kind, external_id, title, status, requested_at, mined_at")
+        .eq("user_id", userId)
+        .gte("created_at", iso)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (error) throw fail("known sources", error.message);
+      return data ?? [];
     },
   };
 }

@@ -15,7 +15,8 @@ export interface IngestDb {
   upsertSources(
     rows: ContentSourceInsert[]
   ): Promise<{ id: string; kind: string; external_id: string }[]>;
-  insertIdeas(rows: ContentIdeaInsert[]): Promise<number>;
+  /** Returns the written rows in insert order; the routine needs ids for deep links. */
+  insertIdeas(rows: ContentIdeaInsert[]): Promise<{ id: string; format: string; title: string; hook: string }[]>;
   /** Set status = mined and mined_at for these keys. Only sources the payload
    *  explicitly marks with mined_at reach here; everything else keeps its status. */
   markMined(rows: { kind: string; external_id: string; mined_at: string }[]): Promise<number>;
@@ -26,7 +27,10 @@ export async function ingestPayload(
   payload: IngestPayload,
   userId: string,
   newId: () => string = randomUUID
-): Promise<{ sources: number; ideas: number }> {
+): Promise<{
+  sources: { id: string; kind: string; external_id: string }[];
+  ideas: { id: string; format: string; title: string; hook: string }[];
+}> {
   const sourceRows: ContentSourceInsert[] = payload.sources.map((s) => ({
     user_id: userId,
     kind: s.kind,
@@ -84,6 +88,6 @@ export async function ingestPayload(
     };
   });
 
-  const ideas = ideaRows.length > 0 ? await db.insertIdeas(ideaRows) : 0;
-  return { sources: written.length, ideas };
+  const ideas = ideaRows.length > 0 ? await db.insertIdeas(ideaRows) : [];
+  return { sources: written, ideas };
 }

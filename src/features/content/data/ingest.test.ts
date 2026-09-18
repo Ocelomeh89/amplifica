@@ -17,7 +17,7 @@ function fakeDb() {
     },
     async insertIdeas(rows) {
       ideas.push(...rows);
-      return rows.length;
+      return rows.map((r, i) => ({ id: `idea-${i}`, format: r.format, title: r.title, hook: r.hook }));
     },
     async markMined(rows) {
       mined.push(...rows);
@@ -31,7 +31,12 @@ describe("ingestPayload", () => {
   it("writes sources first and stamps the owner on every row", async () => {
     const { db, sources, ideas } = fakeDb();
     const result = await ingestPayload(db, example, "owner-1");
-    expect(result).toEqual({ sources: 2, ideas: 2 });
+    expect(result.sources).toEqual([
+      { id: "src-0", kind: "granola", external_id: "830179d0-d2b4-40d4-9d3f-bfd2adf32f50" },
+      { id: "src-1", kind: "granola", external_id: "7110b1e1-c279-465c-b04b-55a19e5287a1" },
+    ]);
+    expect(result.ideas.map((i) => i.id)).toEqual(["idea-0", "idea-1"]);
+    expect(result.ideas[0]).toMatchObject({ format: "reel", title: "A W-2 is a runway, not a cage" });
     expect(sources.every((s) => s.user_id === "owner-1")).toBe(true);
     expect(ideas.every((i) => i.user_id === "owner-1")).toBe(true);
   });
