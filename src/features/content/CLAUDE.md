@@ -11,6 +11,12 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
   logic behind an interface), `supabase-db.ts` (the adapter), `api-auth.ts`.
 - `ui/` — one file per component. `IdeaCard` is used by the inbox and the idea page.
 - Routes: `src/app/(app)/content/**` and `src/app/api/content/**`.
+- `engine/prompts/ideas.ts` — the generation rules. The daily routine reads it
+  from its checkout; PR 4 uses it as a Claude system prompt. `ideas.test.ts`
+  asserts it names every ingest field.
+- `data/clickup.ts` — task per liked idea, best effort, healed on the next Like.
+- `routines/` (repo root) — routine instructions and README; `.claude/skills/`
+  holds the local companions `/content-plaud` and `/content-daily`.
 
 ## Invariants
 
@@ -21,6 +27,10 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
   `from_hook_backlog`.
 - Ranks are per format; every move renumbers the queue from positions via
   `ranksAfterMove`, so drift heals itself.
+- The routine never opens a `denied` or `pending` source; deny rules win.
+- Ingest returns the rows it wrote; the digest links to `/content/ideas/<id>`.
+- The context's `known_titles` covers every idea status, so a passed idea does
+  not come back as new.
 
 ## Seeding by hand
 
@@ -33,9 +43,8 @@ curl -sS -X POST "$NEXT_PUBLIC_SITE_URL/api/content/ingest" \
   --data @routines/examples/daily-ingest.json
 ```
 
-Ideas are not deduplicated on ingest (the routine dedupes against the
-context's `known_titles`), so running this twice inserts the two example
-ideas twice.
+Ideas are deduplicated by the routine against `known_titles`, not by ingest,
+so running this twice inserts the two example ideas twice.
 
 Then read the context a routine would see:
 

@@ -11,7 +11,7 @@ export default function PlaudSection({ sources, lastSweep }: { sources: ContentS
   return (
     <Card title="Plaud recordings">
       <p className="text-xs text-sub mb-3">
-        Last sweep: {lastSweep ? fmtDate(lastSweep) : "never"}. A recording made today shows up after tomorrow's run.
+        Last sweep: {lastSweep ? fmtDate(lastSweep) : "never"}. A recording made today shows up after tomorrow&apos;s run.
         For ideas right now, run <code>/content-plaud</code> from Claude Code.
       </p>
       {sources.length === 0 ? (
