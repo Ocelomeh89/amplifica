@@ -69,7 +69,7 @@ export async function storePull(db: MetricsDb, userId: string, pull: Pull, captu
 }
 
 export type CronPlatform = "instagram" | "youtube" | "beehiiv";
-export type CronReport = { ok: boolean; captured_at: string; platforms: Record<CronPlatform, StoreCounts & { errors: string[] }> };
+export type CronReport = { ok: boolean; captured_at: string; platforms: Partial<Record<CronPlatform, StoreCounts & { errors: string[] }>> };
 
 /** Every pull runs; one platform's failure is reported, not propagated (spec "Error handling"). */
 export async function runMetricsCron(input: {
@@ -79,7 +79,7 @@ export async function runMetricsCron(input: {
   pulls: Partial<Record<CronPlatform, () => Promise<Pull>>>;
 }): Promise<CronReport> {
   const captured_at = input.now.toISOString();
-  const platforms = {} as CronReport["platforms"];
+  const platforms: CronReport["platforms"] = {};
   let failures = 0;
   const keys = Object.keys(input.pulls) as CronPlatform[];
   for (const platform of keys) {

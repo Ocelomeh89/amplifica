@@ -87,7 +87,7 @@ describe("runMetricsCron", () => {
     expect(report.ok).toBe(true);
     expect(report.platforms.instagram).toEqual({ posts: 1, snapshots: 1, comments: 1, errors: ["instagram: insights x: boom"] });
     expect(report.platforms.youtube).toEqual({ posts: 0, snapshots: 0, comments: 0, errors: ["youtube: quota"] });
-    expect(report.platforms.beehiiv.posts).toBe(0);
+    expect(report.platforms.beehiiv).toEqual({ posts: 0, snapshots: 0, comments: 0, errors: [] });
   });
 
   it("is not ok when every pull failed", async () => {
