@@ -1,10 +1,11 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ContentSourceInsert, Database } from "@/shared/supabase/database.types";
+import type { ContentSourceInsert, Database, Json } from "@/shared/supabase/database.types";
 import type { IngestDb } from "./ingest";
 import { FORMATS, type Format } from "@/features/content/engine/types";
 import type { ContextDb } from "./context";
+import type { MetricsDb } from "./metrics";
 
 type Client = SupabaseClient<Database>;
 
@@ -130,6 +131,8 @@ export function supabaseContextDb(client: Client, userId: string): ContextDb {
         .from("content_sources")
         .select("kind, created_at")
         .eq("user_id", userId)
+        // Comments are read by kind in the weekly review (PR 5), not here.
+        .neq("kind", "comment")
         .order("created_at", { ascending: false })
         .limit(500);
       if (error) throw fail("source runs", error.message);
@@ -153,10 +156,53 @@ export function supabaseContextDb(client: Client, userId: string): ContextDb {
         .select("kind, external_id, title, status, requested_at, mined_at")
         .eq("user_id", userId)
         .gte("created_at", iso)
+        // Comments are read by kind in the weekly review (PR 5), not here.
+        .neq("kind", "comment")
         .order("created_at", { ascending: false })
         .limit(500);
       if (error) throw fail("known sources", error.message);
       return data ?? [];
+    },
+  };
+}
+
+/**
+ * MetricsDb over the service-role client. Posts and comments are
+ * insert-ignored so a hand-logged post keeps its idea link and a re-run
+ * changes nothing but the snapshot it appends.
+ */
+export function supabaseMetricsDb(client: Client, userId: string): MetricsDb {
+  return {
+    async upsertPosts(rows) {
+      const { error } = await client
+        .from("content_posts")
+        .upsert(rows, { onConflict: "user_id,platform,external_id", ignoreDuplicates: true });
+      if (error) throw new Error(`content_posts upsert: ${error.message}`);
+      const { data, error: readError } = await client
+        .from("content_posts")
+        .select("id, platform, external_id")
+        .eq("user_id", userId)
+        .in("external_id", rows.map((r) => r.external_id));
+      if (readError) throw new Error(`content_posts read: ${readError.message}`);
+      const wanted = new Set(rows.map((r) => `${r.platform}:${r.external_id}`));
+      return (data ?? []).filter((d) => wanted.has(`${d.platform}:${d.external_id}`));
+    },
+    async insertSnapshots(rows) {
+      const { error } = await client
+        .from("content_metrics")
+        .insert(rows.map((r) => ({ ...r, metrics: r.metrics as Json })));
+      if (error) throw new Error(`content_metrics insert: ${error.message}`);
+      return rows.length;
+    },
+    async upsertComments(rows) {
+      const { error } = await client
+        .from("content_sources")
+        .upsert(
+          rows.map((r) => ({ ...r, meta: r.meta as unknown as Json })),
+          { onConflict: "user_id,kind,external_id", ignoreDuplicates: true }
+        );
+      if (error) throw new Error(`content_sources comments upsert: ${error.message}`);
+      return rows.length;
     },
   };
 }
