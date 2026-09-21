@@ -5,7 +5,7 @@ import Heatmap from "@/features/content/ui/Heatmap";
 import PlanGrid from "@/features/content/ui/PlanGrid";
 import Card from "@/shared/ui/Card";
 import { normalizePosts } from "@/features/content/engine/normalize";
-import { bestTimes } from "@/features/content/engine/best-times";
+import { bestTimes, chicagoIsoDate } from "@/features/content/engine/best-times";
 import { buildPlan, DEFAULT_CADENCE, mondayOf, type QueueIdea } from "@/features/content/engine/plan";
 import { FORMATS, type Format } from "@/features/content/engine/types";
 
@@ -27,7 +27,7 @@ export default async function ContentWeekPage() {
   for (const q of queued ?? []) queues[q.format as Format].push({ id: q.id, format: q.format as Format, hook: q.hook, chain_id: q.chain_id });
 
   const now = new Date();
-  const thisMonday = mondayOf(now);
+  const thisMonday = mondayOf(new Date(`${chicagoIsoDate(now)}T00:00:00Z`));
   const nextMondayDate = new Date(`${thisMonday}T00:00:00Z`);
   nextMondayDate.setUTCDate(nextMondayDate.getUTCDate() + 7);
   const weekStart = nextMondayDate.toISOString().slice(0, 10);

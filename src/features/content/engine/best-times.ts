@@ -17,6 +17,13 @@ export function chicagoWeekdayHour(iso: string): { weekday: number; hour: number
   return { weekday: weekday < 0 ? 0 : weekday, hour: hr };
 }
 
+/** The calendar date in Chicago for an instant, as YYYY-MM-DD. */
+export function chicagoIsoDate(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
 export function tierFor(count: number): Tier {
   return count === 0 ? "none" : count === 1 ? "one data point" : count === 2 ? "thin" : "usable";
 }

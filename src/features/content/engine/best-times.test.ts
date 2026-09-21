@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bestTimes, chicagoWeekdayHour, topCells } from "./best-times";
+import { bestTimes, chicagoIsoDate, chicagoWeekdayHour, topCells } from "./best-times";
 import type { NormalizedPost } from "./normalize";
 
 function np(posted_at: string, n_reach: number | null): NormalizedPost {
@@ -18,6 +18,14 @@ describe("chicagoWeekdayHour", () => {
     expect(chicagoWeekdayHour("2026-09-21T04:00:00Z")).toEqual({ weekday: 6, hour: 23 });
     // Midnight local must be hour 0, not 24.
     expect(chicagoWeekdayHour("2026-09-21T05:00:00Z")).toEqual({ weekday: 0, hour: 0 });
+  });
+});
+
+describe("chicagoIsoDate", () => {
+  it("uses the Chicago calendar date, not the UTC one", () => {
+    // Sunday 19:30 CDT (00:30Z Monday) is still Sunday in Chicago.
+    expect(chicagoIsoDate(new Date("2026-09-28T00:30:00Z"))).toBe("2026-09-27");
+    expect(chicagoIsoDate(new Date("2026-09-28T13:00:00Z"))).toBe("2026-09-28");
   });
 });
 
