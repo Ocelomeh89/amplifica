@@ -100,6 +100,41 @@ const cycle = [
   },
 ];
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+const testimonials = [
+  {
+    name: "Nick S.",
+    quote:
+      "Miguel and Jackie helped my wife and me create a debt payoff and investment plan that reflects both of our priorities. The combination of practical tools, clear education, and personalized support has given us the confidence to move forward and we’re preparing our next stack.",
+  },
+  {
+    name: "Allie G.",
+    quote:
+      "Amplification got me excited about investing. Prior to this, I only ever put my savings in ETFs and watched it grow slowly over time. Seeing the potential and having a plan into the future has motivated me to put even more money into my CYCLE, accelerating my time to financial optionality.",
+  },
+  {
+    name: "Tracy T.",
+    quote:
+      "We started Amplification 3 years ago, consistently investing $2,000 a month. Now we get paid 7x that amount every month. The CYCLE is becoming independent of our input, which is incredibly powerful.",
+  },
+];
+
+// Review markup for the testimonials above. Each review points at the
+// Organization node the root layout declares, so the graph stays linked. No
+// reviewRating: the members gave words, not stars, and schema must match the
+// page.
+const reviewSchema = {
+  "@context": "https://schema.org",
+  "@graph": testimonials.map((t) => ({
+    "@type": "Review",
+    author: { "@type": "Person", name: t.name },
+    reviewBody: t.quote,
+    itemReviewed: { "@id": `${siteUrl}/#organization` },
+    publisher: { "@id": `${siteUrl}/#organization` },
+  })),
+};
+
 export default async function Home() {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -256,6 +291,43 @@ export default async function Home() {
               <li className="flex gap-3"><span>—</span> You&apos;re chasing a promised return. We never make one.</li>
               <li className="flex gap-3"><span>—</span> You want someone to do it for you. This is a skill, not a service.</li>
             </ul>
+          </div>
+        </div>
+      </section>
+
+      {/* ——— Testimonials ——— */}
+      <section className="border-y border-edge bg-card">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(reviewSchema) }}
+        />
+        <div className="max-w-6xl mx-auto px-6 py-20">
+          <h2 className="text-2xl sm:text-3xl leading-snug max-w-2xl">
+            People already running the CYCLE.
+          </h2>
+          <p className="mt-4 text-sm text-sub leading-relaxed max-w-2xl">
+            Three members, in their own words. Their numbers are theirs, not a
+            promise about yours.
+          </p>
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-8">
+            {testimonials.map((t) => (
+              <figure key={t.name} className="flex flex-col">
+                <span
+                  className="font-display text-5xl leading-none text-aqua select-none"
+                  aria-hidden="true"
+                >
+                  “
+                </span>
+                <blockquote className="mt-2 text-sm leading-relaxed text-ink">
+                  {t.quote}
+                </blockquote>
+                <figcaption className="mt-5 pt-4 border-t border-edge text-sm text-sub">
+                  <span className="text-ink font-medium">{t.name}</span>
+                  <span className="mx-2 text-edge">·</span>
+                  Amplifica member
+                </figcaption>
+              </figure>
+            ))}
           </div>
         </div>
       </section>
