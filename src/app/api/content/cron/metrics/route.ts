@@ -33,7 +33,7 @@ export async function GET(req: Request) {
     youtube: () => pullYouTube({ apiKey: process.env.YOUTUBE_API_KEY, channelId: process.env.YOUTUBE_CHANNEL_ID, handle: CHANNEL_HANDLE }),
     beehiiv: () => pullBeehiiv({ apiKey: process.env.BEEHIIV_API_KEY, publicationId: process.env.BEEHIIV_PUBLICATION_ID }),
   };
-  const pulls = Object.fromEntries(wanted.map((p) => [p, all[p]])) as typeof all;
+  const pulls = Object.fromEntries(wanted.map((p) => [p, all[p]])) as Partial<typeof all>;
 
   try {
     const report = await runMetricsCron({ db: supabaseMetricsDb(createAdminClient(), owner), userId: owner, now: new Date(), pulls });

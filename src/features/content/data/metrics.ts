@@ -76,21 +76,24 @@ export async function runMetricsCron(input: {
   db: MetricsDb;
   userId: string;
   now: Date;
-  pulls: Record<CronPlatform, () => Promise<Pull>>;
+  pulls: Partial<Record<CronPlatform, () => Promise<Pull>>>;
 }): Promise<CronReport> {
   const captured_at = input.now.toISOString();
   const platforms = {} as CronReport["platforms"];
   let failures = 0;
-  for (const platform of Object.keys(input.pulls) as CronPlatform[]) {
+  const keys = Object.keys(input.pulls) as CronPlatform[];
+  for (const platform of keys) {
+    const pull = input.pulls[platform];
+    if (!pull) continue;
     try {
-      const pull = await input.pulls[platform]();
-      const counts = await storePull(input.db, input.userId, pull, captured_at);
-      platforms[platform] = { ...counts, errors: pull.errors };
+      const result = await pull();
+      const counts = await storePull(input.db, input.userId, result, captured_at);
+      platforms[platform] = { ...counts, errors: result.errors };
     } catch (e) {
       console.error(`content metrics: ${platform} failed`, e);
       platforms[platform] = { posts: 0, snapshots: 0, comments: 0, errors: [`${platform}: ${(e as Error).message}`] };
       failures += 1;
     }
   }
-  return { ok: failures < Object.keys(input.pulls).length, captured_at, platforms };
+  return { ok: failures < keys.length, captured_at, platforms };
 }

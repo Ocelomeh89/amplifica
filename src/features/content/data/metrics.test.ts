@@ -97,4 +97,16 @@ describe("runMetricsCron", () => {
     const report = await runMetricsCron({ db, userId: "u", now: new Date(), pulls: { instagram: boom, youtube: boom, beehiiv: boom } });
     expect(report.ok).toBe(false);
   });
+
+  it("accepts a partial set of pulls, e.g. a manual ?platform= run", async () => {
+    const { db } = fakeDb();
+    const report = await runMetricsCron({
+      db,
+      userId: "u",
+      now: new Date("2026-09-22T10:00:00.000Z"),
+      pulls: { beehiiv: async () => ({ posts: [], errors: [] }) },
+    });
+    expect(report.ok).toBe(true);
+    expect(Object.keys(report.platforms)).toEqual(["beehiiv"]);
+  });
 });
