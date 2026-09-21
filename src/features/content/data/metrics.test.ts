@@ -98,6 +98,29 @@ describe("runMetricsCron", () => {
     expect(report.ok).toBe(false);
   });
 
+  it("is not ok when a pull returns zero posts and at least one error (a dead credential)", async () => {
+    const { db } = fakeDb();
+    const report = await runMetricsCron({
+      db,
+      userId: "u",
+      now: new Date("2026-09-22T10:00:00.000Z"),
+      pulls: { youtube: async () => ({ posts: [], errors: ["youtube: YOUTUBE_API_KEY not set"] }) },
+    });
+    expect(report.ok).toBe(false);
+    expect(report.platforms.youtube).toEqual({ posts: 0, snapshots: 0, comments: 0, errors: ["youtube: YOUTUBE_API_KEY not set"] });
+  });
+
+  it("is ok when a pull returns a post alongside a per-item error", async () => {
+    const { db } = fakeDb();
+    const report = await runMetricsCron({
+      db,
+      userId: "u",
+      now: new Date("2026-09-22T10:00:00.000Z"),
+      pulls: { instagram: async () => ({ posts: [post], errors: ["instagram: comments x: disabled"] }) },
+    });
+    expect(report.ok).toBe(true);
+  });
+
   it("accepts a partial set of pulls, e.g. a manual ?platform= run", async () => {
     const { db } = fakeDb();
     const report = await runMetricsCron({

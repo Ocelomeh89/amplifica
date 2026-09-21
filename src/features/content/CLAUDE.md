@@ -75,7 +75,8 @@ curl -sS "$NEXT_PUBLIC_SITE_URL/api/content/cron/metrics?platform=beehiiv" \
 ```
 
 Drop `?platform=` to run all three. The response lists posts, snapshots,
-comments, and errors per platform; HTTP 500 only when every platform failed.
+comments, and errors per platform; HTTP 500 when every platform failed, where
+a platform that returned no posts and reported errors counts as failed.
 
 ## Applying the migration
 

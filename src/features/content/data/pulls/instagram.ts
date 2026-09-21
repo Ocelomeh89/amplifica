@@ -1,4 +1,5 @@
 import type { Format, MetricSnapshot } from "@/features/content/engine/types";
+import { externalIdFromUrl } from "@/features/content/engine/posts";
 import type { Pull, PulledComment, PulledPost } from "./types";
 
 // Instagram Graph API through Composio's REST API, using the existing
@@ -70,20 +71,13 @@ export function mapInsights(rows: InsightRow[]): MetricSnapshot {
   return out;
 }
 
-/** The shortcode from a permalink, the same id `externalIdFromUrl` derives from a pasted URL. */
-function shortcode(permalink: string): string {
-  const parts = new URL(permalink).pathname.split("/").filter(Boolean);
-  const i = parts.findIndex((p) => p === "reel" || p === "p" || p === "reels");
-  return i >= 0 && parts[i + 1] ? parts[i + 1] : parts[parts.length - 1] ?? "";
-}
-
 export function mapIgMedia(m: IgMedia, insights: InsightRow[] | null, comments: IgComment[]): PulledPost {
   const metrics: MetricSnapshot = insights
     ? mapInsights(insights)
     : { likes: m.like_count ?? null, comments: m.comments_count ?? null };
   return {
     platform: "instagram",
-    external_id: shortcode(m.permalink),
+    external_id: externalIdFromUrl(m.permalink, "instagram"),
     url: m.permalink,
     format: igFormat(m),
     posted_at: new Date(m.timestamp).toISOString(),

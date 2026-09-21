@@ -43,6 +43,13 @@ describe("/content stays private and owner-only", () => {
     }
   });
 
+  it("comments do not crowd the routine's dedup window or the Sources page", () => {
+    const db = readFileSync("src/features/content/data/supabase-db.ts", "utf8");
+    expect(db.match(/\.neq\("kind", "comment"\)/g)?.length).toBe(2);
+    const sources = readFileSync("src/app/(app)/content/sources/page.tsx", "utf8");
+    expect(sources.match(/\.neq\("kind", "comment"\)/g)?.length).toBe(1);
+  });
+
   it("the metrics cron is bearer-protected by CRON_SECRET and scheduled once", () => {
     const route = readFileSync("src/app/api/content/cron/metrics/route.ts", "utf8");
     expect(route).toContain("isAuthorized(req, process.env.CRON_SECRET)");

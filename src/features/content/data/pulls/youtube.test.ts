@@ -21,6 +21,7 @@ describe("duration and format", () => {
     expect(parseIsoDuration("P1DT2H3M4S")).toBe(93784);
     expect(parseIsoDuration("PT4.5S")).toBe(4.5);
     expect(parseIsoDuration("garbage")).toBe(null);
+    expect(parseIsoDuration("P0D")).toBe(null);
   });
   it("a video of 60 seconds or less is a reel", () => {
     expect(ytFormat(60)).toBe("reel");
@@ -49,6 +50,9 @@ describe("mapVideo", () => {
   });
   it("treats missing contentDetails as youtube format", () => {
     expect(mapVideo({ ...long, contentDetails: undefined }, []).format).toBe("youtube");
+  });
+  it("treats a P0D duration (live/upcoming broadcasts) as youtube format, not a reel", () => {
+    expect(mapVideo({ ...long, contentDetails: { duration: "P0D" } }, []).format).toBe("youtube");
   });
 });
 

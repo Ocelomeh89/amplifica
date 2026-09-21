@@ -8,12 +8,11 @@ export const DEFAULT_CADENCE: Cadence = { reel: 3, youtube: 0.5, newsletter: 1, 
 export type QueueIdea = { id: string; format: Format; hook: string; chain_id: string | null };
 export type Slot = { day: string; weekday: number; hour: number; format: Format; idea_id: string | null; hook: string | null };
 
-/** Where a slot lands when the heatmap has nothing to say. Weekday 0 = Monday. */
-export const FALLBACK_TIMES: Record<Format, { weekday: number; hour: number }[]> = {
+/** Where a slot lands when the heatmap has nothing to say. Weekday 0 = Monday. Story has no entry: its hour comes from STORY_HOUR. */
+export const FALLBACK_TIMES: Record<Exclude<Format, "story">, { weekday: number; hour: number }[]> = {
   reel: [{ weekday: 1, hour: 8 }, { weekday: 3, hour: 8 }, { weekday: 5, hour: 9 }],
   youtube: [{ weekday: 2, hour: 12 }],
   newsletter: [{ weekday: 6, hour: 9 }],
-  story: [{ weekday: 0, hour: 18 }],
   x: [{ weekday: 0, hour: 12 }, { weekday: 2, hour: 12 }, { weekday: 4, hour: 12 }],
 };
 const STORY_HOUR = 18;

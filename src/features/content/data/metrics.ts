@@ -89,6 +89,11 @@ export async function runMetricsCron(input: {
       const result = await pull();
       const counts = await storePull(input.db, input.userId, result, captured_at);
       platforms[platform] = { ...counts, errors: result.errors };
+      // Zero posts plus an error is a dead credential (e.g. an unset API
+      // key); zero posts with no error is just an empty account, and posts
+      // alongside a handful of per-item errors (comments disabled on a few
+      // videos) is still a success.
+      if (counts.posts === 0 && result.errors.length > 0) failures += 1;
     } catch (e) {
       console.error(`content metrics: ${platform} failed`, e);
       platforms[platform] = { posts: 0, snapshots: 0, comments: 0, errors: [`${platform}: ${(e as Error).message}`] };

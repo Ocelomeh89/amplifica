@@ -134,22 +134,42 @@ export async function markPosted(formData: FormData): Promise<{ error: string | 
     .single();
   if (!idea) return { error: "Idea not found." };
 
-  const { error: postError } = await supabase.from("content_posts").upsert(
-    {
-      user_id: user.id,
-      idea_id: idea.id,
-      platform,
-      external_id: externalId,
-      url,
-      format: idea.format,
-      hook_used: idea.hook,
-      pillar: idea.pillar,
-      hook_type: idea.hook_type,
-      posted_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id,platform,external_id" }
-  );
-  if (postError) return { error: postError.message };
+  // The cron discovers posts with their true timestamp; a later Mark posted
+  // only links the idea, so an existing row keeps its posted_at.
+  const { data: existing, error: findError } = await supabase
+    .from("content_posts")
+    .select("id, posted_at")
+    .eq("user_id", user.id)
+    .eq("platform", platform)
+    .eq("external_id", externalId)
+    .maybeSingle();
+  if (findError) return { error: findError.message };
+
+  if (existing) {
+    const { error: updateError } = await supabase
+      .from("content_posts")
+      .update({ idea_id: idea.id, hook_used: idea.hook, pillar: idea.pillar, hook_type: idea.hook_type })
+      .eq("id", existing.id)
+      .eq("user_id", user.id);
+    if (updateError) return { error: updateError.message };
+  } else {
+    const { error: postError } = await supabase.from("content_posts").upsert(
+      {
+        user_id: user.id,
+        idea_id: idea.id,
+        platform,
+        external_id: externalId,
+        url,
+        format: idea.format,
+        hook_used: idea.hook,
+        pillar: idea.pillar,
+        hook_type: idea.hook_type,
+        posted_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,platform,external_id" }
+    );
+    if (postError) return { error: postError.message };
+  }
 
   const { error } = await supabase
     .from("content_ideas")

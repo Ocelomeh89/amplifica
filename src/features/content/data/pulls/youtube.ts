@@ -23,7 +23,10 @@ export function parseIsoDuration(s: string): number | null {
   if (!s) return null;
   const m = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/.exec(s);
   if (!m) return null;
-  return Number(m[1] ?? 0) * 86400 + Number(m[2] ?? 0) * 3600 + Number(m[3] ?? 0) * 60 + Number(m[4] ?? 0);
+  const total = Number(m[1] ?? 0) * 86400 + Number(m[2] ?? 0) * 3600 + Number(m[3] ?? 0) * 60 + Number(m[4] ?? 0);
+  // YouTube reports P0D for live and upcoming broadcasts: a zero-length
+  // duration is unknown, not evidence of a Short.
+  return total === 0 ? null : total;
 }
 
 /** A video is a Reel (Short) only if its length is 60 seconds or less; an unknown length is not evidence of a Short. */

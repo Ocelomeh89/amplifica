@@ -131,6 +131,8 @@ export function supabaseContextDb(client: Client, userId: string): ContextDb {
         .from("content_sources")
         .select("kind, created_at")
         .eq("user_id", userId)
+        // Comments are read by kind in the weekly review (PR 5), not here.
+        .neq("kind", "comment")
         .order("created_at", { ascending: false })
         .limit(500);
       if (error) throw fail("source runs", error.message);
@@ -154,6 +156,8 @@ export function supabaseContextDb(client: Client, userId: string): ContextDb {
         .select("kind, external_id, title, status, requested_at, mined_at")
         .eq("user_id", userId)
         .gte("created_at", iso)
+        // Comments are read by kind in the weekly review (PR 5), not here.
+        .neq("kind", "comment")
         .order("created_at", { ascending: false })
         .limit(500);
       if (error) throw fail("known sources", error.message);
