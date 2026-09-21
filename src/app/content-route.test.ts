@@ -40,4 +40,12 @@ describe("/content stays private and owner-only", () => {
       expect(readFileSync(f, "utf8"), f).toContain("requireContentOwner()");
     }
   });
+
+  it("the metrics cron is bearer-protected by CRON_SECRET and scheduled once", () => {
+    const route = readFileSync("src/app/api/content/cron/metrics/route.ts", "utf8");
+    expect(route).toContain("isAuthorized(req, process.env.CRON_SECRET)");
+    expect(route).toContain("createAdminClient()");
+    const vercel = JSON.parse(readFileSync("vercel.json", "utf8")) as { crons: { path: string; schedule: string }[] };
+    expect(vercel.crons).toEqual([{ path: "/api/content/cron/metrics", schedule: "0 10 * * *" }]);
+  });
 });
