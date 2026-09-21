@@ -26,4 +26,25 @@ The same file works from Claude Code on the Mac with the connectors attached:
 
 ## Examples
 
-`examples/daily-ingest.json` is a valid ingest body; the schema test asserts it.
+`examples/daily-ingest.json` is an illustrative ingest body; the schema test
+asserts its shape. Do not treat its quotes as verified biography or resend it
+as a production batch.
+
+## Messaging
+
+`CONTENT_POSITIONING` in `src/features/content/engine/prompts/ideas.ts` is the
+canonical audience, founder-story, evidence, and offer brief, embedded in
+`IDEAS_PROMPT`. Keep the owner's dated manual positioning rule in
+`content_taste_rules` in sync when changing it: the context API supplies that
+rule to live routines, including those running an older checkout. Updating a
+local prompt alone does not update a cloud routine's checkout.
+
+The current brief centers on employed $1,000-$2,000/month savers building the
+freedom to say no, not a requirement to quit. Proposed onboarding, refunds,
+and unconfirmed prices are not live offers.
+
+Refreshing existing ideas is separate from the daily run. Back up the rows,
+review inbox/queued ideas, and update only their copy with owner and
+`updated_at` checks. Preserve source quotes, approval status, queue order,
+feedback, and any drafts; leave rejected, archived, and posted ideas alone.
+Ingest inserts new rows and must not be used to rewrite existing ones.
