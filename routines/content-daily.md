@@ -27,9 +27,14 @@ seen, with `status`), `requested_sources` (open these first),
 ## 2. Read the generation rules
 
 Read `src/features/content/engine/prompts/ideas.ts` from the checkout. The
-string it exports is the complete rule set for what an idea is and how to rank
-it. Follow it exactly; the ingest endpoint rejects anything off-shape.
-`routines/examples/daily-ingest.json` is a valid example body.
+`IDEAS_PROMPT` export embeds `CONTENT_POSITIONING`: the approved audience,
+founder evidence, offer boundaries, and framing. Use the full prompt, including
+that positioning. A dated manual positioning rule in `taste_rules` supplies
+the live approved guidance when the checkout is older. Later explicitly approved
+positioning supersedes older messaging, never source permissions or verbatim
+quotes. Follow the output contract; ingest rejects anything off-shape.
+`routines/examples/daily-ingest.json` is an illustrative schema fixture, not
+biographical evidence or a production batch to resend.
 
 ## 3. List new recordings
 
@@ -122,6 +127,18 @@ Generate ideas per the rules file: at most 10 in total across all sources,
 ranked, spread across formats, each with provenance. Drop anything matching
 `known_titles`. If nothing allowed was new, produce zero ideas and still do
 steps 6 and 7.
+
+Before ingest, check every hook and outline against `CONTENT_POSITIONING` and
+the live dated positioning rule: choice rather than required corporate escape;
+founder figures with their cash-flow context; repayment plans rather than
+guarantees; ongoing routine time distinct from setup; proposed offers are not
+live benefits. Each idea should give a useful next decision, not just a warning
+or a sales pitch. Preserve source quotations, but do not endorse obsolete claims.
+
+This routine only creates new ideas. Ingest is not an update or regeneration
+endpoint: do not repost existing ideas to refresh their messaging. Existing
+ideas need a separately reviewed, owner-scoped update preserving approvals,
+queue positions, provenance, feedback, and drafts.
 
 ## 6. Write everything in one request
 
