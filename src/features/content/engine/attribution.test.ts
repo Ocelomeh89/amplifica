@@ -73,4 +73,21 @@ describe("attribute", () => {
     expect(r.groups.some((g) => g.dimension === "pillar")).toBe(false);
     expect(r.groups.find((g) => g.dimension === "format")!.score).toBe(3);
   });
+
+  it("orders tied groups in stop list by dimension then key ascending, matching double-down convention", () => {
+    // 6 posts: 3 with pillar "a", 3 with pillar "b", all at score 0.5
+    // Creates groups: format:reel, hook_length:short, hook_type:belief, pillar:a, pillar:b
+    // All non-thin, all score 0.5. Stop should contain the first 3 alphabetically by dimension then key.
+    const tiedPosts = [
+      np({ id: "1a", pillar: "a", n_saves: 0.5, n_shares: 0.5 }),
+      np({ id: "2a", pillar: "a", n_saves: 0.5, n_shares: 0.5 }),
+      np({ id: "3a", pillar: "a", n_saves: 0.5, n_shares: 0.5 }),
+      np({ id: "1b", pillar: "b", n_saves: 0.5, n_shares: 0.5 }),
+      np({ id: "2b", pillar: "b", n_saves: 0.5, n_shares: 0.5 }),
+      np({ id: "3b", pillar: "b", n_saves: 0.5, n_shares: 0.5 }),
+    ];
+    const r = attribute(tiedPosts);
+    // All groups have score 0.5; stop contains bottom 3 by dimension then key order
+    expect(r.stop.map((g) => `${g.dimension}:${g.key}`)).toEqual(["format:reel", "hook_length:short", "hook_type:belief"]);
+  });
 });

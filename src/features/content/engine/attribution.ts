@@ -57,6 +57,9 @@ export function attribute(posts: NormalizedPost[]): { groups: Group[]; doubleDow
   // 1.0 is the typical post. Double down only on what beats it, stop only
   // what falls short, so thin data never puts a winner on the stop list.
   const doubleDown = ranked.filter((g) => g.score! >= 1).slice(0, LIST_SIZE);
-  const stop = ranked.filter((g) => g.score! < 1).slice(-LIST_SIZE).reverse();
+  const stop = ranked
+    .filter((g) => g.score! < 1)
+    .sort((a, b) => a.score! - b.score! || a.dimension.localeCompare(b.dimension) || a.key.localeCompare(b.key))
+    .slice(0, LIST_SIZE);
   return { groups, doubleDown, stop };
 }
