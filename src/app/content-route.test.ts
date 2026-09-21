@@ -32,6 +32,7 @@ describe("/content stays private and owner-only", () => {
     const files = [
       "src/app/(app)/content/page.tsx",
       "src/app/(app)/content/queue/page.tsx",
+      "src/app/(app)/content/performance/page.tsx",
       "src/app/(app)/content/ideas/[id]/page.tsx",
       "src/app/(app)/content/sources/page.tsx",
       "src/features/content/data/actions.ts",
