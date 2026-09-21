@@ -16,6 +16,14 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
   asserts it names every ingest field.
 - `data/clickup.ts` — task per liked idea, best effort, healed on the next Like.
   The spec's format tag is deferred; the format is in the task name.
+- `data/pulls/` — one file per platform (`instagram.ts` via Composio, `youtube.ts`,
+  `beehiiv.ts`), each returning the same `Pull` shape; the mappers are pure and
+  tested with recorded fixtures. `data/metrics.ts` stores a pull through
+  `MetricsDb`; `api/content/cron/metrics` runs all three daily (one route, not
+  three: Vercel Hobby allows two crons).
+- `engine/snapshots.ts`, `normalize.ts`, `attribution.ts`, `best-times.ts`,
+  `plan.ts` — the performance math, pure. `data/performance.ts` loads posts
+  with first and latest snapshots for the Performance and Week pages.
 - `routines/` (repo root) — routine instructions and README; `.claude/skills/`
   holds the local companions `/content-plaud` and `/content-daily`.
 
@@ -32,6 +40,11 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
 - Ingest returns the rows it wrote; the digest links to `/content/ideas/<id>`.
 - The context's `known_titles` covers every idea status, so a passed idea does
   not come back as new.
+- A metrics re-run appends a snapshot and changes nothing else: posts and
+  comments are insert-ignore, so a hand-logged post keeps its idea link.
+- External ids match `engine/posts.ts`: Instagram shortcode, YouTube video id,
+  beehiiv slug. A YouTube video of 60 seconds or less is a `reel`.
+- Weekday 0 is Monday everywhere in the engine; times are America/Chicago.
 
 ## Seeding by hand
 
@@ -53,6 +66,16 @@ Then read the context a routine would see:
 curl -sS "$NEXT_PUBLIC_SITE_URL/api/content/context" \
   -H "Authorization: Bearer $CONTENT_ENGINE_SECRET" | jq .
 ```
+
+## Running the cron by hand
+
+```bash
+curl -sS "$NEXT_PUBLIC_SITE_URL/api/content/cron/metrics?platform=beehiiv" \
+  -H "Authorization: Bearer $CRON_SECRET" | jq .
+```
+
+Drop `?platform=` to run all three. The response lists posts, snapshots,
+comments, and errors per platform; HTTP 500 only when every platform failed.
 
 ## Applying the migration
 
