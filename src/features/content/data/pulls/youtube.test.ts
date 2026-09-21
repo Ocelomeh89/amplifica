@@ -18,11 +18,14 @@ describe("duration and format", () => {
     expect(parseIsoDuration("PT12M4S")).toBe(724);
     expect(parseIsoDuration("PT1H2M3S")).toBe(3723);
     expect(parseIsoDuration("PT58S")).toBe(58);
-    expect(parseIsoDuration("garbage")).toBe(0);
+    expect(parseIsoDuration("P1DT2H3M4S")).toBe(93784);
+    expect(parseIsoDuration("PT4.5S")).toBe(4.5);
+    expect(parseIsoDuration("garbage")).toBe(null);
   });
   it("a video of 60 seconds or less is a reel", () => {
     expect(ytFormat(60)).toBe("reel");
     expect(ytFormat(61)).toBe("youtube");
+    expect(ytFormat(null)).toBe("youtube");
   });
 });
 
@@ -43,6 +46,9 @@ describe("mapVideo", () => {
   });
   it("uses null for hidden counts", () => {
     expect(mapVideo({ ...long, statistics: { viewCount: "5" } }, []).metrics).toEqual({ views: 5, likes: null, comments: null });
+  });
+  it("treats missing contentDetails as youtube format", () => {
+    expect(mapVideo({ ...long, contentDetails: undefined }, []).format).toBe("youtube");
   });
 });
 

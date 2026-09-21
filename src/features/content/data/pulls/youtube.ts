@@ -19,15 +19,16 @@ type Thread = {
 const API = "https://www.googleapis.com/youtube/v3";
 export const CHANNEL_HANDLE = "amplificawealth";
 
-export function parseIsoDuration(s: string): number {
-  const m = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(s);
-  if (!m) return 0;
-  return Number(m[1] ?? 0) * 3600 + Number(m[2] ?? 0) * 60 + Number(m[3] ?? 0);
+export function parseIsoDuration(s: string): number | null {
+  if (!s) return null;
+  const m = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/.exec(s);
+  if (!m) return null;
+  return Number(m[1] ?? 0) * 86400 + Number(m[2] ?? 0) * 3600 + Number(m[3] ?? 0) * 60 + Number(m[4] ?? 0);
 }
 
-/** A Short doubles as a Reel (spec decisions table). */
-export function ytFormat(seconds: number): "reel" | "youtube" {
-  return seconds <= 60 ? "reel" : "youtube";
+/** A video is a Reel (Short) only if its length is 60 seconds or less; an unknown length is not evidence of a Short. */
+export function ytFormat(seconds: number | null): "reel" | "youtube" {
+  return seconds != null && seconds <= 60 ? "reel" : "youtube";
 }
 
 const int = (v: string | undefined): number | null => (v == null ? null : Number.isFinite(Number(v)) ? Number(v) : null);
