@@ -58,7 +58,11 @@ export function mapVideo(v: YtVideo, threads: Thread[]): PulledPost {
 
 async function get<T>(path: string, params: Record<string, string>, fetchImpl: typeof fetch): Promise<T> {
   const res = await fetchImpl(`${API}/${path}?${new URLSearchParams(params)}`, { signal: AbortSignal.timeout(15000) });
-  if (!res.ok) throw new Error(`youtube ${path}: HTTP ${res.status}`);
+  if (!res.ok) {
+    const err = new Error(`youtube ${path}: HTTP ${res.status}`) as Error & { status: number };
+    err.status = res.status;
+    throw err;
+  }
   return (await res.json()) as T;
 }
 
@@ -84,11 +88,18 @@ export async function pullYouTube(env: YouTubeEnv, fetchImpl: typeof fetch = fet
     const ids: string[] = [];
     let pageToken: string | undefined;
     while (ids.length < MAX_VIDEOS) {
-      const page = await get<{ items: { contentDetails: { videoId: string } }[]; nextPageToken?: string }>(
-        "playlistItems",
-        { part: "contentDetails", playlistId: uploads, maxResults: "50", key, ...(pageToken ? { pageToken } : {}) },
-        fetchImpl
-      );
+      let page: { items: { contentDetails: { videoId: string } }[]; nextPageToken?: string };
+      try {
+        page = await get(
+          "playlistItems",
+          { part: "contentDetails", playlistId: uploads, maxResults: "50", key, ...(pageToken ? { pageToken } : {}) },
+          fetchImpl
+        );
+      } catch (e) {
+        // A channel with no uploads yet has no uploads playlist: YouTube answers 404, not an empty list.
+        if ((e as { status?: number }).status === 404 && ids.length === 0) return { posts: [], errors: [] };
+        throw e;
+      }
       ids.push(...page.items.map((i) => i.contentDetails.videoId));
       pageToken = page.nextPageToken;
       if (!pageToken) break;

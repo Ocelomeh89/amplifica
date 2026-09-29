@@ -58,7 +58,7 @@ describe("mapVideo", () => {
 
 describe("pullYouTube", () => {
   const env = { apiKey: "k", handle: "amplificawealth" };
-  function fake(disableComments = false) {
+  function fake(disableComments = false, emptyChannel = false) {
     return vi.fn(async (url: string) => {
       const u = new URL(url);
       expect(u.searchParams.get("key")).toBe("k");
@@ -68,6 +68,7 @@ describe("pullYouTube", () => {
       }
       if (u.pathname.endsWith("/playlistItems")) {
         expect(u.searchParams.get("playlistId")).toBe("UUx");
+        if (emptyChannel) return new Response(JSON.stringify({ error: { code: 404, errors: [{ reason: "playlistNotFound" }] } }), { status: 404 });
         return new Response(JSON.stringify({ items: [{ contentDetails: { videoId: "abc123XYZ" } }, { contentDetails: { videoId: "short1" } }] }));
       }
       if (u.pathname.endsWith("/videos")) {
@@ -103,6 +104,11 @@ describe("pullYouTube", () => {
     expect(out.posts).toHaveLength(2);
     expect(out.posts[0].comments).toEqual([]);
     expect(out.errors).toHaveLength(2);
+  });
+
+  it("treats a missing uploads playlist as an empty channel, not a failure", async () => {
+    const out = await pullYouTube(env, fake(false, true) as unknown as typeof fetch);
+    expect(out).toEqual({ posts: [], errors: [] });
   });
 
   it("reports a missing key as an error, never throws", async () => {
