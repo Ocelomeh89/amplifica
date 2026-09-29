@@ -4,6 +4,8 @@ import { requireContentOwner } from "@/features/content/data/owner";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import IdeaCard from "@/features/content/ui/IdeaCard";
 import FormatBadge from "@/features/content/ui/FormatBadge";
+import MetricsPanel from "@/features/content/ui/MetricsPanel";
+import { pickSnapshots } from "@/features/content/engine/snapshots";
 import Card from "@/shared/ui/Card";
 import { fmtDate } from "@/shared/format";
 import type { Format } from "@/features/content/engine/types";
@@ -41,6 +43,11 @@ export default async function ContentIdeaPage({ params }: { params: { id: string
       .maybeSingle(),
   ]);
 
+  const { data: snapshotRows } = post
+    ? await supabase.from("content_metrics").select("post_id, captured_at, metrics").eq("user_id", user.id).eq("post_id", post.id)
+    : { data: [] as { post_id: string; captured_at: string; metrics: unknown }[] };
+  const snapshot = post ? pickSnapshots(snapshotRows ?? []).get(post.id) ?? null : null;
+
   return (
     <div className="max-w-3xl">
       <h1 className="text-xl font-semibold mb-2">Content</h1>
@@ -72,6 +79,12 @@ export default async function ContentIdeaPage({ params }: { params: { id: string
           )}
         </dl>
       </Card>
+
+      {post && (
+        <Card title="Metrics">
+          <MetricsPanel platform={post.platform} metrics={snapshot?.latest ?? {}} capturedAt={snapshot?.latest_at ?? null} />
+        </Card>
+      )}
 
       {source && (
         <Card title="Source">

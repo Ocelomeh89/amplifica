@@ -15,7 +15,8 @@ export default async function ContentSourcesPage() {
   const [{ data: rules }, { data: pending }, { data: recent }, { data: plaud }] = await Promise.all([
     supabase.from("content_source_rules").select("*").eq("user_id", user.id).order("kind").order("pattern"),
     supabase.from("content_sources").select("*").eq("user_id", user.id).eq("status", "pending").order("occurred_at", { ascending: false }),
-    supabase.from("content_sources").select("id, kind, title, external_id, status, occurred_at, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(200),
+    // Comments are read by kind in the weekly review (PR 5), not here.
+    supabase.from("content_sources").select("id, kind, title, external_id, status, occurred_at, created_at").eq("user_id", user.id).neq("kind", "comment").order("created_at", { ascending: false }).limit(200),
     supabase.from("content_sources").select("*").eq("user_id", user.id).eq("kind", "plaud").order("occurred_at", { ascending: false }).limit(50),
   ]);
 

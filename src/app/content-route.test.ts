@@ -32,6 +32,8 @@ describe("/content stays private and owner-only", () => {
     const files = [
       "src/app/(app)/content/page.tsx",
       "src/app/(app)/content/queue/page.tsx",
+      "src/app/(app)/content/performance/page.tsx",
+      "src/app/(app)/content/week/page.tsx",
       "src/app/(app)/content/ideas/[id]/page.tsx",
       "src/app/(app)/content/sources/page.tsx",
       "src/features/content/data/actions.ts",
@@ -39,5 +41,20 @@ describe("/content stays private and owner-only", () => {
     for (const f of files) {
       expect(readFileSync(f, "utf8"), f).toContain("requireContentOwner()");
     }
+  });
+
+  it("comments do not crowd the routine's dedup window or the Sources page", () => {
+    const db = readFileSync("src/features/content/data/supabase-db.ts", "utf8");
+    expect(db.match(/\.neq\("kind", "comment"\)/g)?.length).toBe(2);
+    const sources = readFileSync("src/app/(app)/content/sources/page.tsx", "utf8");
+    expect(sources.match(/\.neq\("kind", "comment"\)/g)?.length).toBe(1);
+  });
+
+  it("the metrics cron is bearer-protected by CRON_SECRET and scheduled once", () => {
+    const route = readFileSync("src/app/api/content/cron/metrics/route.ts", "utf8");
+    expect(route).toContain("isAuthorized(req, process.env.CRON_SECRET)");
+    expect(route).toContain("createAdminClient()");
+    const vercel = JSON.parse(readFileSync("vercel.json", "utf8")) as { crons: { path: string; schedule: string }[] };
+    expect(vercel.crons).toEqual([{ path: "/api/content/cron/metrics", schedule: "0 10 * * *" }]);
   });
 });

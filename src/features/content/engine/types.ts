@@ -37,3 +37,24 @@ export type Platform = (typeof PLATFORMS)[number];
 
 /** One beat of an outline: what happens, and optionally what is on screen. */
 export type OutlineBeat = { beat: string; note?: string };
+
+/** Metric keys stored per snapshot (spec "Metric keys"). Null when a platform does not report one. */
+export const METRIC_KEYS = [
+  "views",
+  "reach",
+  "impressions",
+  "likes",
+  "comments",
+  "saves",
+  "shares",
+  "avg_watch_time_s",
+  "profile_visits",
+  "follows",
+  "opens",
+  "open_rate",
+  "clicks",
+  "click_rate",
+  "unsubscribes",
+] as const;
+export type MetricKey = (typeof METRIC_KEYS)[number];
+export type MetricSnapshot = Partial<Record<MetricKey, number | null>>;
