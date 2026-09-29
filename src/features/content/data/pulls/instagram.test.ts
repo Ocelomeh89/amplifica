@@ -68,15 +68,15 @@ describe("mappers", () => {
 describe("composioExecute", () => {
   it("posts the slug with the key and connection, and unwraps data", async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ successful: true, data: { ok: 1 }, error: null }), { status: 200 }));
-    const out = await composioExecute<{ ok: number }>("X_Y", { a: 1 }, { apiKey: "key", connectionId: "ca_1" }, fetchImpl as unknown as typeof fetch);
+    const out = await composioExecute<{ ok: number }>("X_Y", { a: 1 }, { apiKey: "key", connectionId: "ca_1", userId: "u1" }, fetchImpl as unknown as typeof fetch);
     expect(out).toEqual({ ok: 1 });
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://backend.composio.dev/api/v3.1/tools/execute/X_Y");
     expect((init.headers as Record<string, string>)["x-api-key"]).toBe("key");
-    expect(JSON.parse(init.body as string)).toEqual({ connected_account_id: "ca_1", arguments: { a: 1 } });
+    expect(JSON.parse(init.body as string)).toEqual({ connected_account_id: "ca_1", user_id: "u1", arguments: { a: 1 } });
   });
   it("throws on HTTP failure and on successful:false", async () => {
-    const env = { apiKey: "k", connectionId: "c" };
+    const env = { apiKey: "k", connectionId: "c", userId: "u" };
     await expect(composioExecute("X", {}, env, (async () => new Response("", { status: 401 })) as unknown as typeof fetch)).rejects.toThrow("401");
     const failed = async () => new Response(JSON.stringify({ successful: false, data: {}, error: "API Error: bad metric" }), { status: 200 });
     await expect(composioExecute("X", {}, env, failed as unknown as typeof fetch)).rejects.toThrow("bad metric");
@@ -85,6 +85,7 @@ describe("composioExecute", () => {
 
 describe("pullInstagram", () => {
   const env = { apiKey: "k", connectionId: "c" };
+  // no userId: the default must be sent
   function fake(routes: Record<string, (args: Record<string, unknown>) => unknown>) {
     return vi.fn(async (url: string, init: RequestInit) => {
       const slug = url.split("/").pop()!;
@@ -107,6 +108,8 @@ describe("pullInstagram", () => {
     expect(out.posts[0].metrics.avg_watch_time_s).toBe(9.826);
     expect(out.posts[1].metrics.reach).toBe(43);
     expect(out.posts[0].comments).toHaveLength(2);
+    const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(init.body as string).user_id).toBe("amplifica-owner");
   });
 
   it("follows the media paging cursor", async () => {

@@ -6,7 +6,10 @@ import type { Pull, PulledComment, PulledPost } from "./types";
 // `instagram_schism-beano` connected account. Tool slugs and shapes were
 // recorded with `composio execute <slug> --get-schema` on 2026-09-21.
 
-export type ComposioEnv = { apiKey?: string; connectionId?: string };
+export type ComposioEnv = { apiKey?: string; connectionId?: string; userId?: string };
+
+/** The user id the connected account was linked under (Composio requires it beside the account id). */
+export const DEFAULT_COMPOSIO_USER_ID = "amplifica-owner";
 
 export type IgMedia = {
   id: string;
@@ -33,7 +36,7 @@ export async function composioExecute<T>(
   const res = await fetchImpl(`${BASE}/${slug}`, {
     method: "POST",
     headers: { "x-api-key": env.apiKey, "Content-Type": "application/json" },
-    body: JSON.stringify({ connected_account_id: env.connectionId, arguments: args }),
+    body: JSON.stringify({ connected_account_id: env.connectionId, user_id: env.userId, arguments: args }),
     signal: AbortSignal.timeout(20000),
   });
   if (!res.ok) throw new Error(`composio ${slug}: HTTP ${res.status}`);
@@ -103,7 +106,7 @@ export async function pullInstagram(env: ComposioEnv, fetchImpl: typeof fetch = 
     console.warn("instagram: COMPOSIO_API_KEY / COMPOSIO_IG_CONNECTION_ID not set; skipping pull");
     return { posts: [], errors: ["instagram: COMPOSIO_API_KEY / COMPOSIO_IG_CONNECTION_ID not set"] };
   }
-  const full = env as Required<ComposioEnv>;
+  const full: Required<ComposioEnv> = { apiKey: env.apiKey, connectionId: env.connectionId, userId: env.userId ?? DEFAULT_COMPOSIO_USER_ID };
   const errors: string[] = [];
   const media: IgMedia[] = [];
   try {
