@@ -32,6 +32,15 @@ describe("normalizeUrl", () => {
       expect(normalizeUrl(bad).ok, bad).toBe(false);
     }
   });
+  it("rejects trailing-dot hostnames that bypass name checks", () => {
+    for (const bad of [
+      "http://localhost./", "http://printer.local./", "http://metadata.google.internal./",
+      "http://[::127.0.0.1]/", "http://[64:ff9b::7f00:1]/", "http://[2002:7f00:1::]/",
+      "http://[::ffff:127.0.0.1]/",
+    ]) {
+      expect(normalizeUrl(bad).ok, bad).toBe(false);
+    }
+  });
 });
 
 describe("isPrivateIp", () => {
@@ -45,6 +54,40 @@ describe("isPrivateIp", () => {
     expect(isPrivateIp("93.184.216.34")).toBe(false);
     expect(isPrivateIp("2606:2800:220:1:248:1893:25c8:1946")).toBe(false);
     expect(isPrivateIp("not an ip")).toBe(false);
+  });
+  it("handles all IPv6 embedded-v4 and special forms correctly", () => {
+    // Uncompressed IPv6-mapped
+    expect(isPrivateIp("0:0:0:0:0:ffff:a00:1")).toBe(true); // ::ffff:10.0.0.1
+    // Compressed forms
+    expect(isPrivateIp("::ffff:10.0.0.1")).toBe(true);
+    expect(isPrivateIp("::7f00:1")).toBe(true); // ::127.0.0.1
+    // 64:ff9b::/96 (well-known prefix)
+    expect(isPrivateIp("64:ff9b::a00:1")).toBe(true); // embeds 10.0.0.1
+    expect(isPrivateIp("64:ff9b::808:808")).toBe(false); // embeds 8.8.8.8
+    // 2002::/16 (6to4)
+    expect(isPrivateIp("2002:c0a8:101::")).toBe(true); // 192.168.1.1
+    expect(isPrivateIp("2002:7f00:1::")).toBe(true); // 127.0.0.1
+    // Link-local
+    expect(isPrivateIp("fe80::1")).toBe(true);
+    expect(isPrivateIp("febf::1")).toBe(true);
+    // Unique local
+    expect(isPrivateIp("fc00::1")).toBe(true);
+    expect(isPrivateIp("fdff::1")).toBe(true);
+    // Loopback and unspecified
+    expect(isPrivateIp("::1")).toBe(true);
+    expect(isPrivateIp("::")).toBe(true);
+    // Public addresses (not private)
+    expect(isPrivateIp("2606:2800:220:1:248:1893:25c8:1946")).toBe(false);
+    expect(isPrivateIp("2001:4860:4860::8888")).toBe(false);
+    expect(isPrivateIp("::ffff:8.8.8.8")).toBe(false);
+  });
+  it("boundaries for IPv4 ranges", () => {
+    expect(isPrivateIp("172.15.255.255")).toBe(false);
+    expect(isPrivateIp("172.16.0.0")).toBe(true);
+    expect(isPrivateIp("100.63.255.255")).toBe(false);
+    expect(isPrivateIp("100.64.0.0")).toBe(true);
+    expect(isPrivateIp("100.127.255.255")).toBe(true);
+    expect(isPrivateIp("100.128.0.0")).toBe(false);
   });
 });
 
