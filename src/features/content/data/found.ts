@@ -187,7 +187,7 @@ export async function mineFound(deps: FoundDeps, userId: string, input: FoundInp
         title: resolved.title,
         url: resolved.url,
         meta,
-        mined_at: resolved.existing?.status === "mined" ? null : now.toISOString(),
+        mined_at: null,
       },
       input.angle,
       chicagoIsoDate(now)
@@ -195,7 +195,17 @@ export async function mineFound(deps: FoundDeps, userId: string, input: FoundInp
 
     if (resolved.file) await deps.storeFile(resolved.file.path, resolved.file.bytes, resolved.file.mime);
     const written = await ingestPayload(deps.ingestDb, payload, userId);
-    if (resolved.existing) await deps.setMeta(resolved.existing.id, meta);
+
+    // The ideas are in the Inbox now, so bookkeeping failures must not turn this into an error.
+    // Mining is marked here, after the ideas exist, so a failed insert leaves the source unmined.
+    try {
+      if (!resolved.existing || resolved.existing.status === "allowed") {
+        await deps.ingestDb.markMined([{ kind: resolved.kind, external_id: resolved.external_id, mined_at: now.toISOString() }]);
+      }
+      if (resolved.existing) await deps.setMeta(resolved.existing.id, meta);
+    } catch (e) {
+      console.error("found content: bookkeeping failed after ideas were written", e instanceof Error ? e.message : "unknown error");
+    }
     return { ok: true, count: written.ideas.length, sourceId: written.sources[0].id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Something went wrong. Nothing was saved." };

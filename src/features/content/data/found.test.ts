@@ -20,7 +20,7 @@ const ARTICLE = `<html><head><title>Their post</title></head><body><article><h1>
 
 const NOW = new Date("2026-10-01T17:00:00Z"); // 12:00 in Chicago, same calendar day
 
-function setup(over: Partial<FoundDeps> = {}, stored: StoredSource | null = null) {
+function setup(over: Partial<FoundDeps> = {}, stored: StoredSource | null = null, dbOver: Partial<IngestDb> = {}) {
   const sources: ContentSourceInsert[] = [];
   const ideas: ContentIdeaInsert[] = [];
   const mined: { kind: string; external_id: string; mined_at: string }[] = [];
@@ -28,6 +28,7 @@ function setup(over: Partial<FoundDeps> = {}, stored: StoredSource | null = null
     async upsertSources(rows) { sources.push(...rows); return rows.map((r, i) => ({ id: `src-${i}`, kind: r.kind, external_id: r.external_id })); },
     async insertIdeas(rows) { ideas.push(...rows); return rows.map((r, i) => ({ id: `idea-${i}`, format: r.format, title: r.title, hook: r.hook })); },
     async markMined(rows) { mined.push(...rows); return rows.length; },
+    ...dbOver,
   };
   const generate = vi.fn(async (_i: { system: string; text: string; pdf?: { base64: string } }): Promise<unknown> => good);
   const setMeta = vi.fn(async (_id: string, _meta: Record<string, unknown>) => {});
@@ -224,5 +225,55 @@ describe("mineFound: generate again", () => {
     const t = setup({}, { id: "old-1", kind: "plaud", external_id: "x", title: "", url: null, status: "allowed", meta: {} });
     expect((await mineFound(t.deps, "o", again())).ok).toBe(false);
     expect((await mineFound(setup({ getSource: async () => null }).deps, "o", again())).ok).toBe(false);
+  });
+});
+
+describe("mineFound: failures around the write", () => {
+  const existing = (status: string): StoredSource => ({
+    id: "old-1", kind: "url", external_id: "https://example.com/post", title: "Their post", url: "https://example.com/post", status, meta: {},
+  });
+  const boom = async (): Promise<never> => { throw new Error("db down"); };
+
+  it("leaves the source unmined when the idea insert fails", async () => {
+    const t = setup({}, null, { insertIdeas: boom });
+    const r = await mineFound(t.deps, "o", url("https://example.com/post"));
+    expect(r.ok).toBe(false);
+    expect(t.mined).toEqual([]);
+    expect(t.setMeta).not.toHaveBeenCalled();
+  });
+  it("still succeeds when setMeta fails after the ideas were written", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const t = setup({ setMeta: boom }, existing("mined"));
+      const r = await mineFound(t.deps, "o", url("https://example.com/post"));
+      expect(r).toMatchObject({ ok: true, count: 2 });
+      expect(t.ideas).toHaveLength(2);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+  it("still succeeds when markMined fails for a new source", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const t = setup({}, null, { markMined: boom });
+      const r = await mineFound(t.deps, "o", url("https://example.com/post"));
+      expect(r).toMatchObject({ ok: true, count: 2 });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+  it("generates for a pending source without marking it mined", async () => {
+    const t = setup({}, existing("pending"));
+    const r = await mineFound(t.deps, "o", url("https://example.com/post"));
+    expect(r.ok).toBe(true);
+    expect(t.mined).toEqual([]);
+  });
+  it("writes nothing for a denied source", async () => {
+    const t = setup({}, existing("denied"));
+    await mineFound(t.deps, "o", url("https://example.com/post"));
+    expect(t.sources).toEqual([]);
+    expect(t.ideas).toEqual([]);
+    expect(t.mined).toEqual([]);
+    expect(t.storeFile).not.toHaveBeenCalled();
   });
 });
