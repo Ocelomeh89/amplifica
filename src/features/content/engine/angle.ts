@@ -29,3 +29,10 @@ export function angleBlock(angle: Angle, competitor = ""): string {
     "Set quote_ref to the source URL. Make the first outline beat read \"They said: <their claim> / We add: <our twist>\".",
   ].join("\n");
 }
+
+/** The chip an idea wears in the Inbox when its source was pasted in. */
+export function foundBadge(kind: string, meta: unknown): string | null {
+  if (kind !== "url" && kind !== "upload") return null;
+  const angle = typeof meta === "object" && meta !== null ? (meta as { angle?: unknown }).angle : undefined;
+  return angle === "counterpoint" || angle === "twist" ? `found · ${angle}` : "found";
+}

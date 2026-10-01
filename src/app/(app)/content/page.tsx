@@ -3,6 +3,10 @@ import ContentTabs from "@/features/content/ui/ContentTabs";
 import InboxList from "@/features/content/ui/InboxList";
 import PendingSourcesStrip from "@/features/content/ui/PendingSourcesStrip";
 import type { Format } from "@/features/content/engine/types";
+import FoundContentForm from "@/features/content/ui/FoundContentForm";
+import { foundBadge } from "@/features/content/engine/found";
+
+export const maxDuration = 120;
 
 export default async function ContentInboxPage() {
   const { supabase, user } = await requireContentOwner();
@@ -29,14 +33,21 @@ export default async function ContentInboxPage() {
 
   const [{ data: sources }, { data: chainMates }] = await Promise.all([
     sourceIds.length
-      ? supabase.from("content_sources").select("id, url").eq("user_id", user.id).in("id", sourceIds)
-      : Promise.resolve({ data: [] as { id: string; url: string | null }[] }),
+      ? supabase.from("content_sources").select("id, url, kind, meta").eq("user_id", user.id).in("id", sourceIds)
+      : Promise.resolve({ data: [] as { id: string; url: string | null; kind: string; meta: unknown }[] }),
     chainIds.length
       ? supabase.from("content_ideas").select("id, format, chain_id").eq("user_id", user.id).in("chain_id", chainIds)
       : Promise.resolve({ data: [] as { id: string; format: Format; chain_id: string | null }[] }),
   ]);
 
   const sourceUrls = Object.fromEntries((sources ?? []).map((s) => [s.id, s.url]));
+  const sourceById = Object.fromEntries((sources ?? []).map((s) => [s.id, s]));
+  const badges = Object.fromEntries(
+    list.map((i) => {
+      const s = i.source_id ? sourceById[i.source_id] : null;
+      return [i.id, s ? foundBadge(s.kind, s.meta) : null];
+    })
+  );
   const siblingsById: Record<string, { id: string; format: Format }[]> = {};
   for (const idea of list) {
     if (!idea.chain_id) continue;
@@ -50,7 +61,11 @@ export default async function ContentInboxPage() {
       <h1 className="text-xl font-semibold mb-2">Content</h1>
       <ContentTabs />
       <PendingSourcesStrip sources={pending ?? []} />
-      <InboxList ideas={list} sourceUrls={sourceUrls} siblingsById={siblingsById} />
+      <details className="mb-4 bg-card border border-edge rounded-lg p-3">
+        <summary className="text-sm cursor-pointer">Add found content</summary>
+        <div className="mt-3"><FoundContentForm /></div>
+      </details>
+      <InboxList ideas={list} sourceUrls={sourceUrls} siblingsById={siblingsById} badges={badges} />
     </div>
   );
 }

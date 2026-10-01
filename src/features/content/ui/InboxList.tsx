@@ -10,6 +10,7 @@ type Props = {
   ideas: ContentIdea[];
   sourceUrls: Record<string, string | null>;
   siblingsById: Record<string, { id: string; format: Format }[]>;
+  badges?: Record<string, string | null>;
 };
 
 // J/K move focus, L likes the focused idea, X opens its Pass box. Keys are
@@ -17,7 +18,7 @@ type Props = {
 // by idea id, not index: the array shrinks by one every time a keyboard
 // like/pass goes through the Server Action + revalidation round trip, so an
 // index would drift onto the wrong idea mid-sequence.
-export default function InboxList({ ideas, sourceUrls, siblingsById }: Props) {
+export default function InboxList({ ideas, sourceUrls, siblingsById, badges }: Props) {
   const [focusId, setFocusId] = useState<string | null>(ideas[0]?.id ?? null);
   const [passOpenId, setPassOpenId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -76,6 +77,7 @@ export default function InboxList({ ideas, sourceUrls, siblingsById }: Props) {
           idea={idea}
           sourceUrl={idea.source_id ? sourceUrls[idea.source_id] ?? null : null}
           siblings={siblingsById[idea.id] ?? []}
+          badge={badges?.[idea.id] ?? null}
           focused={i === focusIndex}
           passOpen={passOpenId === idea.id}
           onPassOpenChange={(open) => setPassOpenId(open ? idea.id : null)}

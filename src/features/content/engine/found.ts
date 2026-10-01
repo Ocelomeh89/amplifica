@@ -167,9 +167,6 @@ export function safeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 80) || "file";
 }
 
-/** The chip an idea wears in the Inbox when its source was pasted in. */
-export function foundBadge(kind: string, meta: unknown): string | null {
-  if (kind !== "url" && kind !== "upload") return null;
-  const angle = typeof meta === "object" && meta !== null ? (meta as { angle?: unknown }).angle : undefined;
-  return angle === "counterpoint" || angle === "twist" ? `found · ${angle}` : "found";
-}
+// Lives in angle.ts so client components can use it without pulling in this
+// file's node:net import.
+export { foundBadge } from "./angle";
