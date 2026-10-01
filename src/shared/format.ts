@@ -49,10 +49,16 @@ const CHICAGO_DATE_TIME = new Intl.DateTimeFormat("en-US", {
   hour12: true,
 });
 
+// Replace narrow no-break spaces (U+202F) with plain spaces (U+0020).
+// Newer ICU (72+) emits U+202F before AM/PM; this normalizes to plain space.
+export function plainSpaces(s: string): string {
+  return s.replace(/ /g, " ");
+}
+
 // "Sep 30, 3:42 PM" in Chicago time, the content engine's timezone. Newer ICU
 // puts a narrow no-break space before AM/PM; normalize it to a plain space.
 export function fmtDateTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return CHICAGO_DATE_TIME.format(d).replace(/ /g, " ");
+  return plainSpaces(CHICAGO_DATE_TIME.format(d));
 }
