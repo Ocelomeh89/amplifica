@@ -1,5 +1,6 @@
 import type { ContentSource } from "@/shared/supabase/database.types";
 import { allowSource, denySource } from "@/features/content/data/actions";
+import { fmtDateTime } from "@/shared/format";
 
 // Meetings the routine found but had no rule for. Nothing here has been read.
 export default function PendingSourcesStrip({ sources }: { sources: ContentSource[] }) {
@@ -14,6 +15,7 @@ export default function PendingSourcesStrip({ sources }: { sources: ContentSourc
           <li key={s.id} className="flex items-center gap-2 text-sm">
             <span className="text-[10px] uppercase text-sub w-14">{s.kind}</span>
             <span className="flex-1 truncate">{s.title || s.external_id}</span>
+            <span className="text-xs text-sub whitespace-nowrap">{fmtDateTime(s.occurred_at ?? s.created_at)}</span>
             <form action={allowSource}>
               <input type="hidden" name="id" value={s.id} />
               <button type="submit" className="text-xs text-purple hover:underline">Allow</button>

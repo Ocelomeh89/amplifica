@@ -39,3 +39,20 @@ export function fmtDate(iso: string): string {
   const d = new Date(iso);
   return `${d.toLocaleString("en-US", { month: "short" })} ${d.getDate()}, ${d.getFullYear()}`;
 }
+
+const CHICAGO_DATE_TIME = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Chicago",
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
+
+// "Sep 30, 3:42 PM" in Chicago time, the content engine's timezone. Newer ICU
+// puts a narrow no-break space before AM/PM; normalize it to a plain space.
+export function fmtDateTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return CHICAGO_DATE_TIME.format(d).replace(/ /g, " ");
+}

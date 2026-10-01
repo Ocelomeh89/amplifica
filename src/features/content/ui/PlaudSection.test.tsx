@@ -20,6 +20,7 @@ describe("PlaudSection", () => {
     expect(screen.getByRole("button", { name: "Mine this" })).toBeInTheDocument();
     expect(screen.getByText("highlights")).toBeInTheDocument();
     expect(screen.getByText("25 min")).toBeInTheDocument();
+    expect(screen.getByText("Sep 16, 3:00 PM")).toBeInTheDocument();
     expect(screen.getByText(/Last sweep: never/)).toBeInTheDocument();
   });
   it("hides the button and labels denied, mined, and requested rows", () => {
