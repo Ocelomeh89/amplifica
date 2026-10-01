@@ -6,6 +6,7 @@ import type { IngestDb } from "./ingest";
 import { FORMATS, type Format } from "@/features/content/engine/types";
 import type { ContextDb } from "./context";
 import type { MetricsDb } from "./metrics";
+import type { FoundDeps, StoredSource } from "./found";
 
 type Client = SupabaseClient<Database>;
 
@@ -203,6 +204,51 @@ export function supabaseMetricsDb(client: Client, userId: string): MetricsDb {
         );
       if (error) throw new Error(`content_sources comments upsert: ${error.message}`);
       return rows.length;
+    },
+  };
+}
+
+/**
+ * The database and storage half of FoundDeps, over the signed-in owner's
+ * client. Every query carries the user id on top of RLS; storage paths start
+ * with the user id, which the bucket policies enforce.
+ */
+export function supabaseFoundDb(
+  client: Client,
+  userId: string,
+  bucket = "content-uploads"
+): Pick<FoundDeps, "getSource" | "setMeta" | "storeFile" | "loadFile"> {
+  return {
+    async getSource(ref) {
+      let query = client
+        .from("content_sources")
+        .select("id, kind, external_id, title, url, status, meta")
+        .eq("user_id", userId);
+      query =
+        "id" in ref
+          ? query.eq("id", ref.id)
+          : query.eq("kind", ref.kind as ContentSourceInsert["kind"]).eq("external_id", ref.external_id);
+      const { data, error } = await query.maybeSingle();
+      if (error) throw new Error(`content_sources read: ${error.message}`);
+      return data ? ({ ...data, meta: (data.meta ?? {}) as Record<string, unknown> } as StoredSource) : null;
+    },
+    async setMeta(id, meta) {
+      const { error } = await client
+        .from("content_sources")
+        .update({ meta: meta as unknown as Json })
+        .eq("id", id)
+        .eq("user_id", userId);
+      if (error) throw new Error(`content_sources meta: ${error.message}`);
+    },
+    async storeFile(path, bytes, mime) {
+      const { error } = await client.storage.from(bucket).upload(path, bytes, { contentType: mime, upsert: true });
+      if (error) throw new Error(`upload: ${error.message}`);
+    },
+    async loadFile(path) {
+      if (!path.startsWith(`${userId}/`)) throw new Error("download: path is not in your folder");
+      const { data, error } = await client.storage.from(bucket).download(path);
+      if (error || !data) throw new Error(`download: ${error?.message ?? "no data"}`);
+      return new Uint8Array(await data.arrayBuffer());
     },
   };
 }
