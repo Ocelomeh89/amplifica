@@ -59,8 +59,9 @@ direct-to-Storage upload, a follow-up. Uploads are transcripts, so 4 MB is enoug
 2. Upsert a `content_sources` row, kind `url` or `upload`. `external_id` is the
    normalized URL or a file content hash. The unique key `(user_id, kind,
    external_id)` means a repeat paste reuses the row.
-3. `data/ideas.ts` makes one Claude call: system prompt is
-   `engine/prompts/ideas.ts` unchanged, followed by the same context the routine
+3. `mineFound` in `data/found.ts` makes one Claude call through `data/claude.ts`
+   (`engine/found-ideas.ts` holds the output schema, tool JSON schema and
+   `renderUserTurn`): system prompt is `engine/prompts/ideas.ts` unchanged, followed by the same context the routine
    receives (taste rules, recent feedback, `known_titles`, queue depth). The user
    turn is the source text or document, the note, and the angle block.
 4. Output is validated with the existing ingest zod schema and written through
@@ -78,7 +79,7 @@ direct-to-Storage upload, a follow-up. Uploads are transcripts, so 4 MB is enoug
 ## 4. Angle
 
 `engine/angle.ts` (pure, tested) maps the angle to a prompt block appended to
-the user turn only. `ideas.ts` and the daily routine are untouched, and
+the user turn only. `engine/prompts/ideas.ts` and the daily routine are untouched, and
 `ideas.test.ts` keeps passing.
 
 | Angle | Instruction |
@@ -101,6 +102,9 @@ the user turn only. `ideas.ts` and the daily routine are untouched, and
 - Claude failure or schema-invalid output: nothing is written, not even the
   source row. The form shows the error with a retry.
 - File over 4 MB or unsupported type: rejected before upload.
+- An uploaded file is stored just before ingest runs, so if the ingest insert
+  fails the (content-addressed, harmless) file stays in the bucket; no table rows
+  are written.
 - Missing `ANTHROPIC_API_KEY`: a setup message, not a stack trace.
 - URL fetch is SSRF-guarded: http and https only, no private or loopback
   addresses, including after redirects.
@@ -113,9 +117,14 @@ All inside `features/content` except the shared formatter, per
 - `engine/angle.ts`, `engine/found.ts` (URL normalization, text cap,
   200-character check): pure, tested. `engine/found.ts` imports `node:net`, so it
   is server-only; client components import `foundBadge` from `engine/angle.ts`.
-- `data/claude.ts`, `data/found.ts`, `data/ideas.ts`, `addFoundContent` in
+- `engine/found-ideas.ts` (output schema, tool JSON schema, `renderUserTurn`,
+  `toIngestPayload`) and `engine/readable.ts` (readable-text extraction): pure, tested.
+- `data/claude.ts`, `data/found.ts` (`mineFound` orchestration), `data/fetch-page.ts`
+  (SSRF-guarded bounded fetch), `data/found-form.ts` (reads the form),
+  `data/youtube-meta.ts`; the `addFoundContent` and `regenerateFound` actions in
   `data/actions.ts`.
-- `ui/FoundContentForm.tsx`.
+- `ui/FoundContentForm.tsx`, and `ui/FoundSourcesList.tsx` (the Generate again row,
+  calling `regenerateFound`).
 - `shared/format.ts`: `fmtDateTime`.
 - `features/content/CLAUDE.md` updated with the new files, the invariant that
   found ideas go through ingest, and `ANTHROPIC_API_KEY`.
