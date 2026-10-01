@@ -4,9 +4,9 @@ import InboxList from "@/features/content/ui/InboxList";
 import PendingSourcesStrip from "@/features/content/ui/PendingSourcesStrip";
 import type { Format } from "@/features/content/engine/types";
 import FoundContentForm from "@/features/content/ui/FoundContentForm";
-import { foundBadge } from "@/features/content/engine/found";
+import { foundBadge } from "@/features/content/engine/angle";
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 export default async function ContentInboxPage() {
   const { supabase, user } = await requireContentOwner();
@@ -33,8 +33,8 @@ export default async function ContentInboxPage() {
 
   const [{ data: sources }, { data: chainMates }] = await Promise.all([
     sourceIds.length
-      ? supabase.from("content_sources").select("id, url, kind, meta").eq("user_id", user.id).in("id", sourceIds)
-      : Promise.resolve({ data: [] as { id: string; url: string | null; kind: string; meta: unknown }[] }),
+      ? supabase.from("content_sources").select("id, url, kind, angle:meta->>angle").eq("user_id", user.id).in("id", sourceIds)
+      : Promise.resolve({ data: [] as { id: string; url: string | null; kind: string; angle: string | null }[] }),
     chainIds.length
       ? supabase.from("content_ideas").select("id, format, chain_id").eq("user_id", user.id).in("chain_id", chainIds)
       : Promise.resolve({ data: [] as { id: string; format: Format; chain_id: string | null }[] }),
@@ -45,7 +45,7 @@ export default async function ContentInboxPage() {
   const badges = Object.fromEntries(
     list.map((i) => {
       const s = i.source_id ? sourceById[i.source_id] : null;
-      return [i.id, s ? foundBadge(s.kind, s.meta) : null];
+      return [i.id, s ? foundBadge(s.kind, { angle: s.angle }) : null];
     })
   );
   const siblingsById: Record<string, { id: string; format: Format }[]> = {};

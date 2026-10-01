@@ -11,16 +11,12 @@ export type FoundSourceRow = {
   title: string;
   url: string | null;
   status: string;
-  meta: unknown;
+  angle: string;
+  note: string;
+  competitor: string;
 };
 
-function metaOf(meta: unknown): { angle: string; note: string; competitor: string } {
-  const m = (typeof meta === "object" && meta !== null ? meta : {}) as Record<string, unknown>;
-  return { angle: String(m.angle ?? "open"), note: String(m.note ?? ""), competitor: String(m.competitor ?? "") };
-}
-
 function Row({ source }: { source: FoundSourceRow }) {
-  const m = metaOf(source.meta);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -47,18 +43,18 @@ function Row({ source }: { source: FoundSourceRow }) {
       <details>
         <summary className="flex items-center gap-2 cursor-pointer text-sm">
           <span className="flex-1 truncate">{source.title || source.url}</span>
-          <span className="text-[10px] uppercase text-purple">{foundBadge(source.kind, source.meta)}</span>
+          <span className="text-[10px] uppercase text-purple">{foundBadge(source.kind, { angle: source.angle })}</span>
           <span className="text-xs text-sub">{source.status}</span>
         </summary>
         <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-2 mt-2">
           <input type="hidden" name="id" value={source.id} />
-          <select name="angle" defaultValue={m.angle} className="border border-edge rounded px-2 py-1.5 text-sm bg-card" disabled={pending}>
+          <select name="angle" defaultValue={source.angle} className="border border-edge rounded px-2 py-1.5 text-sm bg-card" disabled={pending}>
             {ANGLES.map((a) => (
               <option key={a} value={a}>{ANGLE_LABEL[a]}</option>
             ))}
           </select>
-          <input name="competitor" defaultValue={m.competitor} placeholder="Creator" className="border border-edge rounded px-2 py-1.5 text-sm bg-card w-36" disabled={pending} />
-          <input name="note" defaultValue={m.note} placeholder="New note" className="border border-edge rounded px-2 py-1.5 text-sm bg-card flex-1 min-w-40" disabled={pending} />
+          <input name="competitor" defaultValue={source.competitor} placeholder="Creator" className="border border-edge rounded px-2 py-1.5 text-sm bg-card w-36" disabled={pending} />
+          <input name="note" defaultValue={source.note} placeholder="New note" className="border border-edge rounded px-2 py-1.5 text-sm bg-card flex-1 min-w-40" disabled={pending} />
           <button type="submit" disabled={pending} className="text-xs px-2 py-1.5 rounded border border-edge hover:bg-edge disabled:opacity-60">
             Generate again
           </button>

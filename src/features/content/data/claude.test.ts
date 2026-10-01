@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CLAUDE_MODEL, MissingApiKeyError, anthropicIdeaGenerator, claudeIdeaGenerator } from "./claude";
+import { CLAUDE_CLIENT_OPTIONS, CLAUDE_MODEL, MissingApiKeyError, anthropicIdeaGenerator, claudeIdeaGenerator } from "./claude";
 
 function fakeClient(content: { type: string; input?: unknown }[]) {
   const create = vi.fn(async (_args: Record<string, unknown>) => ({ content }));
@@ -29,6 +29,25 @@ describe("claudeIdeaGenerator", () => {
   it("throws when the answer has no tool call", async () => {
     const { client } = fakeClient([{ type: "text" }]);
     await expect(claudeIdeaGenerator(client).generate({ system: "S", text: "U" })).rejects.toThrow(/no ideas/i);
+  });
+});
+
+describe("claudeIdeaGenerator stop reasons", () => {
+  it("rejects a truncated answer with a readable message", async () => {
+    const create = vi.fn(async () => ({ stop_reason: "max_tokens", content: [{ type: "tool_use", input: { ideas: [] } }] }));
+    await expect(claudeIdeaGenerator({ messages: { create } }).generate({ system: "S", text: "U" })).rejects.toThrow(
+      "Claude ran out of room before finishing the ideas. Try a shorter source, or add a note to narrow what you want."
+    );
+  });
+  it("accepts a normal tool_use stop", async () => {
+    const create = vi.fn(async () => ({ stop_reason: "tool_use", content: [{ type: "tool_use", input: { ideas: [] } }] }));
+    expect(await claudeIdeaGenerator({ messages: { create } }).generate({ system: "S", text: "U" })).toEqual({ ideas: [] });
+  });
+});
+
+describe("CLAUDE_CLIENT_OPTIONS", () => {
+  it("bounds the call below the page budget with one retry", () => {
+    expect(CLAUDE_CLIENT_OPTIONS("k")).toEqual({ apiKey: "k", timeout: 240_000, maxRetries: 1 });
   });
 });
 

@@ -11,9 +11,11 @@ import type { FoundDeps, StoredSource } from "./found";
 type Client = SupabaseClient<Database>;
 
 /**
- * IngestDb over a service-role client. Sources are insert-ignored on the
- * (user_id, kind, external_id) key so an existing row keeps its status, then
- * every key is read back to get ids for new and existing rows alike.
+ * IngestDb over either a service-role client (the ingest endpoint) or the
+ * owner's session client (found content, under RLS). Source upserts are
+ * insert-ignore on the (user_id, kind, external_id) key so an existing row
+ * keeps its status, then every key is read back to get ids for new and
+ * existing rows alike.
  */
 export function supabaseIngestDb(client: Client, userId: string): IngestDb {
   return {

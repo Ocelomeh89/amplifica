@@ -111,4 +111,13 @@ describe("fetchPublicPage body bounds", () => {
     expect(cancelled).toBe(true);
     expect(pulled).toBeLessThan(10);
   });
+  it("turns a timeout into a readable error", async () => {
+    const fetchImpl = (async () => {
+      const e = new Error("signal timed out");
+      e.name = "TimeoutError";
+      throw e;
+    }) as unknown as typeof fetch;
+    const lookup = async () => [{ address: "93.184.216.34" }];
+    await expect(fetchPublicPage("https://example.com/slow", { fetchImpl, lookup })).rejects.toThrow("The page took too long to load.");
+  });
 });

@@ -11,7 +11,7 @@ import { SOURCE_KINDS } from "@/features/content/engine/types";
 import Card from "@/shared/ui/Card";
 import { fmtDate } from "@/shared/format";
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 export default async function ContentSourcesPage() {
   const { supabase, user } = await requireContentOwner();
@@ -22,7 +22,7 @@ export default async function ContentSourcesPage() {
     // Comments are read by kind in the weekly review (PR 5), not here.
     supabase.from("content_sources").select("id, kind, title, external_id, status, occurred_at, created_at").eq("user_id", user.id).neq("kind", "comment").order("created_at", { ascending: false }).limit(200),
     supabase.from("content_sources").select("*").eq("user_id", user.id).eq("kind", "plaud").order("occurred_at", { ascending: false }).limit(50),
-    supabase.from("content_sources").select("id, kind, title, url, status, meta").eq("user_id", user.id).in("kind", ["url", "upload"]).order("created_at", { ascending: false }).limit(20),
+    supabase.from("content_sources").select("id, kind, title, url, status, angle:meta->>angle, note:meta->>note, competitor:meta->>competitor").eq("user_id", user.id).in("kind", ["url", "upload"]).order("created_at", { ascending: false }).limit(20),
   ]);
 
   const lastRun = lastRunByKind(recent ?? []);
@@ -45,7 +45,14 @@ export default async function ContentSourcesPage() {
       </Card>
 
       <Card title="Found sources">
-        <FoundSourcesList sources={found ?? []} />
+        <FoundSourcesList
+          sources={(found ?? []).map((s) => ({
+            ...s,
+            angle: s.angle ?? "open",
+            note: s.note ?? "",
+            competitor: s.competitor ?? "",
+          }))}
+        />
       </Card>
 
       <Card title="Who gets read">

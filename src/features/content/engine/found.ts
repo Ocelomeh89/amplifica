@@ -137,7 +137,9 @@ export function normalizeUrl(input: string): UrlResult {
     if (TRACKING_PARAM.test(key)) u.searchParams.delete(key);
   }
   if (u.pathname.length > 1) u.pathname = u.pathname.replace(/\/+$/, "") || "/";
-  return { ok: true, url: u.toString() };
+  const url = u.toString();
+  if (url.length > 2000) return { ok: false, error: "That link is too long to save (over 2,000 characters)." };
+  return { ok: true, url };
 }
 
 export type TextResult = { ok: true; text: string } | { ok: false; error: string };

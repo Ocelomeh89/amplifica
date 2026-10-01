@@ -176,7 +176,7 @@ export async function mineFound(deps: FoundDeps, userId: string, input: FoundInp
 
     // A PDF's text is not stored, so keep Claude's excerpt for display. On a re-mine the
     // existing excerpt is kept when Claude returns none.
-    const excerpt = parsed.data.source_excerpt.slice(0, EXCERPT_CHARS);
+    const excerpt = (parsed.data.source_excerpt ?? "").slice(0, EXCERPT_CHARS);
     const meta = resolved.pdf ? { ...resolved.meta, text: excerpt || String(resolved.meta.text ?? "") } : resolved.meta;
     const now = deps.now();
     const payload = toIngestPayload(

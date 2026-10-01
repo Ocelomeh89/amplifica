@@ -11,7 +11,7 @@ export const foundIdeaSchema = ingestIdeaSchema.omit({ source_ref: true, from_ho
 
 export const foundOutputSchema = z.object({
   /** For a PDF only: its first 2,000 characters, kept for display. */
-  source_excerpt: z.string().default(""),
+  source_excerpt: z.string().optional(),
   ideas: z.array(foundIdeaSchema).min(1).max(10),
 });
 export type FoundOutput = z.infer<typeof foundOutputSchema>;

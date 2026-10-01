@@ -1,22 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import FoundSourcesList from "./FoundSourcesList";
-import { foundBadge } from "@/features/content/engine/found";
 
 const regenerateFound = vi.fn(async (_fd: FormData): Promise<{ error: string | null; count?: number }> => ({ error: null, count: 3 }));
 vi.mock("@/features/content/data/actions", () => ({ regenerateFound: (fd: FormData) => regenerateFound(fd) }));
 
 const sources = [
-  { id: "s1", kind: "url", title: "Their post", url: "https://example.com/post", status: "mined", meta: { angle: "counterpoint", note: "old note" } },
-  { id: "s2", kind: "upload", title: "talk.pdf", url: null, status: "mined", meta: {} },
+  { id: "s1", kind: "url", title: "Their post", url: "https://example.com/post", status: "mined", angle: "counterpoint", note: "old note", competitor: "" },
+  { id: "s2", kind: "upload", title: "talk.pdf", url: null, status: "mined", angle: "open", note: "", competitor: "" },
 ];
 
 describe("FoundSourcesList", () => {
   it("lists found sources with their angle badge", () => {
     render(<FoundSourcesList sources={sources} />);
     expect(screen.getByText("Their post")).toBeInTheDocument();
-    expect(screen.getByText(foundBadge("url", { angle: "counterpoint" })!)).toBeInTheDocument();
+    expect(screen.getByText("found · counterpoint")).toBeInTheDocument();
     expect(screen.getByText("talk.pdf")).toBeInTheDocument();
+    expect(screen.getByText("found")).toBeInTheDocument();
   });
   it("says so when there are none", () => {
     render(<FoundSourcesList sources={[]} />);

@@ -107,6 +107,21 @@ describe("checkText", () => {
   });
 });
 
+describe("normalizeUrl length cap", () => {
+  const withLen = (n: number) => {
+    const base = "https://example.com/?q=";
+    return base + "a".repeat(n - base.length);
+  };
+  it("rejects a URL over 2000 characters", () => {
+    const r = normalizeUrl(withLen(2001));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/too long/);
+  });
+  it("accepts a 1900 character URL", () => {
+    expect(normalizeUrl(withLen(1900)).ok).toBe(true);
+  });
+});
+
 describe("fileKind, safeFilename, foundBadge", () => {
   it("classifies by extension, case-insensitively", () => {
     expect(fileKind("Notes.PDF")).toBe("pdf");

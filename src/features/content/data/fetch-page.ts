@@ -42,6 +42,7 @@ export async function fetchPublicPage(
 ): Promise<{ html: string; finalUrl: string }> {
   const lookup = deps.lookup ?? defaultLookup;
   const fetchImpl = deps.fetchImpl ?? fetch;
+  const deadline = AbortSignal.timeout(30_000);
   let target = startUrl;
   for (let hop = 0; hop <= MAX_HOPS; hop++) {
     const norm = normalizeUrl(target);
@@ -51,11 +52,19 @@ export async function fetchPublicPage(
     if (addresses.length === 0 || addresses.some((a) => isPrivateIp(a.address))) {
       throw new Error("That address is private and can't be read.");
     }
-    const res = await fetchImpl(norm.url, {
-      redirect: "manual",
-      headers: { "user-agent": USER_AGENT, accept: "text/html,application/xhtml+xml" },
-      signal: AbortSignal.timeout(15000),
-    });
+    let res: Response;
+    try {
+      res = await fetchImpl(norm.url, {
+        redirect: "manual",
+        headers: { "user-agent": USER_AGENT, accept: "text/html,application/xhtml+xml" },
+        signal: AbortSignal.any([deadline, AbortSignal.timeout(15000)]),
+      });
+    } catch (e) {
+      if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) {
+        throw new Error("The page took too long to load.");
+      }
+      throw e;
+    }
     if (res.status >= 300 && res.status < 400) {
       const location = res.headers.get("location");
       if (!location) throw new Error("The page redirected without saying where.");

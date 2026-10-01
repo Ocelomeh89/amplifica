@@ -15,6 +15,9 @@ export class MissingApiKeyError extends Error {
   }
 }
 
+/** Opus with a large answer can run long; fail inside the page's 300 s budget. */
+export const CLAUDE_CLIENT_OPTIONS = (apiKey: string) => ({ apiKey, timeout: 240_000, maxRetries: 1 });
+
 export type GenerateInput = { system: string; text: string; pdf?: { base64: string } };
 
 /** Returns the raw tool input; the caller validates it. */
@@ -23,7 +26,7 @@ export interface IdeaGenerator {
 }
 
 type MessagesClient = {
-  messages: { create(args: Record<string, unknown>): Promise<{ content: { type: string; input?: unknown }[] }> };
+  messages: { create(args: Record<string, unknown>): Promise<{ stop_reason?: string; content: { type: string; input?: unknown }[] }> };
 };
 
 export function claudeIdeaGenerator(client: MessagesClient): IdeaGenerator {
@@ -44,6 +47,9 @@ export function claudeIdeaGenerator(client: MessagesClient): IdeaGenerator {
         tool_choice: { type: "tool", name: FOUND_TOOL_NAME },
         messages: [{ role: "user", content }],
       });
+      if (res.stop_reason === "max_tokens") {
+        throw new Error("Claude ran out of room before finishing the ideas. Try a shorter source, or add a note to narrow what you want.");
+      }
       const block = res.content.find((b) => b.type === "tool_use");
       if (!block) throw new Error("Claude returned no ideas.");
       return block.input;
@@ -54,5 +60,5 @@ export function claudeIdeaGenerator(client: MessagesClient): IdeaGenerator {
 export function anthropicIdeaGenerator(): IdeaGenerator {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new MissingApiKeyError();
-  return claudeIdeaGenerator(new Anthropic({ apiKey }) as unknown as MessagesClient);
+  return claudeIdeaGenerator(new Anthropic(CLAUDE_CLIENT_OPTIONS(apiKey)) as unknown as MessagesClient);
 }

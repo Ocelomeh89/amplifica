@@ -71,7 +71,7 @@ export default function FoundContentForm() {
       </label>
       <div className="flex items-center gap-3">
         <button type="submit" disabled={pending} className="bg-purple hover:bg-purple/90 disabled:opacity-60 text-white text-sm px-3 py-1.5 rounded">
-          {pending ? "Generating... up to a minute" : "Generate ideas"}
+          {pending ? "Generating... this can take a couple of minutes" : "Generate ideas"}
         </button>
         {done && <span className="text-xs text-teal-700">{done}</span>}
         {error && <span className="text-xs text-red-600">{error}</span>}

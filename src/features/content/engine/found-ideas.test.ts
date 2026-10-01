@@ -19,7 +19,7 @@ const context: FoundContext = {
 
 describe("foundOutputSchema", () => {
   it("accepts 1 to 10 ideas and defaults the excerpt", () => {
-    expect(foundOutputSchema.parse({ ideas: [idea] }).source_excerpt).toBe("");
+    expect(foundOutputSchema.parse({ ideas: [idea] }).source_excerpt).toBeUndefined();
   });
   it("rejects zero ideas, more than ten, and malformed ideas", () => {
     expect(foundOutputSchema.safeParse({ ideas: [] }).success).toBe(false);
@@ -35,6 +35,9 @@ describe("foundToolSchema", () => {
     expect(FOUND_TOOL_NAME).toBe("record_ideas");
     expect(s.type).toBe("object");
     expect(Object.keys(s.properties)).toEqual(expect.arrayContaining(["ideas", "source_excerpt"]));
+    const required = (s as { required?: string[] }).required;
+    expect(required).toContain("ideas");
+    expect(required).not.toContain("source_excerpt");
     expect(s.$schema).toBeUndefined();
   });
 });
