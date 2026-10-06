@@ -7,6 +7,7 @@ import { FORMATS, type Format } from "@/features/content/engine/types";
 import type { ContextDb } from "./context";
 import type { MetricsDb } from "./metrics";
 import type { FoundDeps, StoredSource } from "./found";
+import type { QueueDb } from "./found-queue";
 
 type Client = SupabaseClient<Database>;
 
@@ -251,6 +252,41 @@ export function supabaseFoundDb(
       const { data, error } = await client.storage.from(bucket).download(path);
       if (error || !data) throw new Error(`download: ${error?.message ?? "no data"}`);
       return new Uint8Array(await data.arrayBuffer());
+    },
+  };
+}
+
+/**
+ * QueueDb over the service-role client for the owner. Reads a bounded window
+ * of the oldest queued found sources (their text can be 100k+ characters
+ * each) plus an exact count of everything queued.
+ */
+const QUEUE_WINDOW = 25;
+export function supabaseFoundQueueDb(client: Client, userId: string): QueueDb {
+  return {
+    async queuedFound() {
+      const { data, error } = await client
+        .from("content_sources")
+        .select("id, kind, external_id, title, url, meta, created_at")
+        .eq("user_id", userId)
+        .in("kind", ["url", "upload"])
+        .eq("status", "allowed")
+        .is("mined_at", null)
+        .order("created_at", { ascending: true })
+        .limit(QUEUE_WINDOW);
+      if (error) throw new Error(`queued found sources: ${error.message}`);
+      const { count, error: countError } = await client
+        .from("content_sources")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .in("kind", ["url", "upload"])
+        .eq("status", "allowed")
+        .is("mined_at", null);
+      if (countError) throw new Error(`queued found sources count: ${countError.message}`);
+      return {
+        rows: (data ?? []).map((r) => ({ ...r, meta: (r.meta ?? {}) as Record<string, unknown> })),
+        total: count ?? 0,
+      };
     },
   };
 }
