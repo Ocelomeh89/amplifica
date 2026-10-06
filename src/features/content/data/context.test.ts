@@ -78,4 +78,17 @@ describe("buildContext", () => {
     await buildContext(db, now);
     expect(seen).toEqual(["2026-06-19T12:00:00.000Z"]);
   });
+
+  it("keeps found-content sources (url, upload) out of known_sources and requested_sources", async () => {
+    const db = fakeDb({
+      knownSources: async () => [
+        { kind: "url", external_id: "https://example.com/a", title: "A", status: "allowed", requested_at: "2026-09-16T20:00:00Z", mined_at: null },
+        { kind: "upload", external_id: "abc", title: "t.txt", status: "allowed", requested_at: null, mined_at: null },
+        { kind: "plaud", external_id: "p1", title: "Walk", status: "allowed", requested_at: "2026-09-16T20:00:00Z", mined_at: null },
+      ],
+    });
+    const ctx = await buildContext(db, now);
+    expect(ctx.known_sources.map((s) => s.kind)).toEqual(["plaud"]);
+    expect(ctx.requested_sources.map((s) => s.kind)).toEqual(["plaud"]);
+  });
 });

@@ -6,6 +6,7 @@ import { MAX_UPLOAD_BYTES, checkText, fileKind, normalizeUrl, safeFilename } fro
 import { foundOutputSchema, renderUserTurn, toIngestPayload, type FoundContext } from "@/features/content/engine/found-ideas";
 import { externalIdFromUrl, platformFromUrl } from "@/features/content/engine/posts";
 import { extractReadable } from "@/features/content/engine/readable";
+import type { ContentSourceInsert, Json } from "@/shared/supabase/database.types";
 import type { IdeaGenerator } from "./claude";
 import { ingestPayload, type IngestDb } from "./ingest";
 
@@ -64,7 +65,9 @@ type Failed = { error: string };
 const YOUTUBE_MIN_CHARS = 40;
 const EXCERPT_CHARS = 2000;
 
-async function resolveUrl(deps: FoundDeps, input: Extract<FoundInput, { kind: "url" }>): Promise<Resolved | Failed> {
+type ResolveDeps = Pick<FoundDeps, "fetchPage" | "videoMeta" | "getSource">;
+
+async function resolveUrl(deps: ResolveDeps, input: Extract<FoundInput, { kind: "url" }>): Promise<Resolved | Failed> {
   const norm = normalizeUrl(input.url);
   if (!norm.ok) return { error: norm.error };
   let title: string;
@@ -97,7 +100,7 @@ async function resolveUrl(deps: FoundDeps, input: Extract<FoundInput, { kind: "u
   };
 }
 
-async function resolveUpload(deps: FoundDeps, userId: string, input: Extract<FoundInput, { kind: "upload" }>): Promise<Resolved | Failed> {
+async function resolveUpload(deps: Pick<FoundDeps, "getSource">, userId: string, input: Extract<FoundInput, { kind: "upload" }>): Promise<Resolved | Failed> {
   const kind = fileKind(input.filename);
   if (!kind) return { error: "Upload a PDF, a .txt, or a .md file." };
   if (input.bytes.length === 0) return { error: "That file is empty." };
@@ -207,6 +210,60 @@ export async function mineFound(deps: FoundDeps, userId: string, input: FoundInp
       console.error("found content: bookkeeping failed after ideas were written", e instanceof Error ? e.message : "unknown error");
     }
     return { ok: true, count: written.ideas.length, sourceId: written.sources[0].id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Something went wrong. Nothing was saved." };
+  }
+}
+
+export type QueueDeps = ResolveDeps & Pick<FoundDeps, "setMeta" | "storeFile" | "ingestDb">;
+export type QueueResult = { ok: true; message: string } | { ok: false; error: string };
+
+/**
+ * Queue mode: resolve the text exactly as mineFound does, then stop before
+ * Claude. The source is saved `allowed` and unmined; Claude Code turns the
+ * queue into ideas later (routines/content-found.md). Never throws, and
+ * writes nothing unless the source resolved and passed every check.
+ */
+export async function queueFound(
+  deps: QueueDeps,
+  userId: string,
+  input: Extract<FoundInput, { kind: "url" | "upload" }>
+): Promise<QueueResult> {
+  try {
+    const resolved = input.kind === "url" ? await resolveUrl(deps, input) : await resolveUpload(deps, userId, input);
+    if ("error" in resolved) return { ok: false, error: resolved.error };
+    if (resolved.pdf) {
+      return {
+        ok: false,
+        error: "Queue mode takes links and .txt or .md files. For a PDF, run /content-found with the file path, or set an API key.",
+      };
+    }
+    const existing = resolved.existing;
+    if (existing?.status === "denied") {
+      return { ok: false, error: "That source is denied. Remove the deny first if you want ideas from it." };
+    }
+    if (existing?.status === "mined") {
+      return { ok: false, error: "Already mined. To get new ideas from it, run /content-found with the link and a new angle." };
+    }
+    if (existing && existing.status !== "allowed") {
+      return { ok: false, error: "That source is waiting for a decision on the Sources page." };
+    }
+    if (existing) {
+      await deps.setMeta(existing.id, resolved.meta);
+      return { ok: true, message: "Already queued; updated." };
+    }
+    if (resolved.file) await deps.storeFile(resolved.file.path, resolved.file.bytes, resolved.file.mime);
+    const row: ContentSourceInsert = {
+      user_id: userId,
+      kind: resolved.kind,
+      external_id: resolved.external_id,
+      title: resolved.title,
+      url: resolved.url,
+      status: "allowed",
+      meta: resolved.meta as unknown as Json,
+    };
+    await deps.ingestDb.upsertSources([row]);
+    return { ok: true, message: "Added to the queue. Ideas come with Monday's run, or run /content-found now." };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Something went wrong. Nothing was saved." };
   }
