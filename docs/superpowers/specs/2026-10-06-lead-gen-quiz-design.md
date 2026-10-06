@@ -15,7 +15,7 @@ Success: completions that reach the email gate, emails captured, and clicks from
 - 8 archetypes (below). The primary button on every result is "Run the calculator", except the Recovering Debt-aholic (newsletter letter) and the Cash-Flow Builder (community join page).
 - Downloadable means a generated PDF, built with `pdf-lib`.
 - Reuse the existing lead pattern: service-role insert, honeypot, UTM capture, awaited best-effort Beehiiv subscribe.
-- Beehiiv gets `first_name` and a `quiz_archetype` custom field. The field does not exist yet and is created manually before the first test, with the owner's approval.
+- Beehiiv gets `first_name` only. No custom field. The archetype lives in `quiz_submissions` in Postgres, which is the source of truth for segmenting.
 - All copy passes the no-ai-slop skill. No em dashes.
 - The quiz stays out of the sitemap. Result pages are noindex.
 
@@ -23,7 +23,7 @@ Success: completions that reach the email gate, emails captured, and clicks from
 
 New folder `src/features/quiz/`, routes under `src/app/quiz/`. It follows the repo's three import rules: `app/` may import `features/quiz`, and `features/quiz` imports only `shared/`.
 
-One refactor comes with it. `features/calculator/data/beehiiv.ts` moves to `src/shared/beehiiv.ts`, since two features now use it. Its signature becomes `subscribeToNewsletter({ email, name?, source, customFields? })`. The calculator passes `source: "calculator"`, so its behavior does not change. `utm_source` takes the `source` value.
+One refactor comes with it. `features/calculator/data/beehiiv.ts` moves to `src/shared/beehiiv.ts`, since two features now use it. Its signature becomes `subscribeToNewsletter({ email, name?, source })`. The calculator passes `source: "calculator"`, so its behavior does not change. `utm_source` takes the `source` value.
 
 ```
 src/shared/beehiiv.ts
@@ -80,7 +80,7 @@ Each submit also inserts into `leads` with `source: "quiz"`. A duplicate there (
 3. Score on the server with `scoreAnswers`. Nothing from the browser is trusted except the raw answers.
 4. Insert into `quiz_submissions`. A hard failure returns "Something went wrong. Please try again." and shows no result.
 5. Insert into `leads` (`source: "quiz"`), duplicates ignored.
-6. Await `subscribeToNewsletter` with the first token of the name and `quiz_archetype`. On success, set `beehiiv_synced`. Failure never blocks the result.
+6. Await `subscribeToNewsletter` with the first token of the name as `first_name` and `source: "quiz"`. On success, set `beehiiv_synced`. Failure never blocks the result.
 7. Redirect to `/quiz/r/[token]`.
 
 Abuse resistance matches the calculator: honeypot, validation, service-role-only writes. Escalate to Vercel Firewall rate limiting if spam appears.
@@ -321,9 +321,9 @@ The route `/quiz/r/[token]/pdf` returns `application/pdf` with `Content-Disposit
 
 Delete `src/features/quiz/` and `src/app/quiz/`. Drop `quiz_submissions` in a new migration. Remove the `/quiz` line from the middleware and the `/quiz/r/` line from `robots.ts`. `shared/beehiiv.ts` stays because the calculator uses it.
 
-## Open items for the owner
+## Open items
 
-1. **Loss figure.** The narrative note says "nearly $1 million" and a newsletter issue says "$3m". The Speculator copy avoids the number. Confirm if a figure should appear.
-2. **Beehiiv field.** Approve creating the `quiz_archetype` custom field.
-3. **Domain.** Confirm that `amplificawealth.com/quiz` resolves to this Next.js app (the root domain is the hub).
-4. **Funnel tracking.** v1 records only completions. Starts and drop-off per question would need a small events table. Not in scope unless you want it.
+1. **Domain.** Confirm at deploy time that `amplificawealth.com/quiz` resolves to this Next.js app (the root domain is the hub).
+2. **Funnel tracking.** v1 records only completions. Starts and drop-off per question would need a small events table. Not in scope.
+
+Resolved: the Speculator copy keeps no loss figure, and there is no Beehiiv custom field.
