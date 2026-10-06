@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildQueuedResponse, getQueued, parseLimit, type QueueDb, type QueuedRow } from "./found-queue";
 
 const row = (id: string, created_at: string, meta: Record<string, unknown>): QueuedRow => ({
@@ -32,6 +32,13 @@ describe("buildQueuedResponse", () => {
     expect(r.sources[1].meta).toEqual({ text, note: "n", angle: "twist", competitor: "R" });
     expect(r.sources[0].meta).toEqual({ text, note: "", angle: "open", competitor: "" });
   });
+  it("orders timestamps with and without a fraction by code point, oldest first", () => {
+    const rows = [
+      row("b", "2026-10-01T10:00:00.5+00:00", { text }),
+      row("a", "2026-10-01T10:00:00+00:00", { text }),
+    ];
+    expect(buildQueuedResponse(rows, 2, 5).sources.map((s) => s.title)).toEqual(["Post a", "Post b"]);
+  });
   it("skips sources without stored text and does not count them as remaining", () => {
     const rows = [
       row("a", "2026-10-01T00:00:00Z", { text: "short" }),
@@ -62,5 +69,16 @@ describe("getQueued", () => {
     const r = await getQueued(db, "1");
     expect(r.sources).toHaveLength(1);
     expect(r.remaining).toBe(1);
+  });
+  it("logs when rows are queued but none has usable text", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const db: QueueDb = { queuedFound: async () => ({ rows: [row("a", "2026-10-01T00:00:00Z", { text: "short" })], total: 1 }) };
+      const r = await getQueued(db, null);
+      expect(r.sources).toEqual([]);
+      expect(spy).toHaveBeenCalledWith("found queue: rows are queued but none has usable text (under 40 characters)");
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

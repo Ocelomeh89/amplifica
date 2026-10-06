@@ -64,9 +64,9 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
 - Nothing is written for a found source until Claude's answer validates. A denied
   source is never mined. Re-pasting a mined source generates again and updates its
   meta (source upserts are insert-ignore, so `setMeta` does the update).
-- A found source is marked `mined` only after its ideas are written (an explicit
-  `markMined` in `mineFound`, not the ingest payload), so a failed insert leaves it
-  unmined. Bookkeeping failures after that are logged and do not turn the result
+- A found source is marked `mined` only after its ideas are written, on both paths:
+  an explicit `markMined` in `mineFound`, and `ingestPayload` calling `markMined`
+  after `insertIdeas`. A failed insert leaves it unmined (and queued). Bookkeeping failures after that are logged and do not turn the result
   into an error.
 - Uploads are capped at 4 MB (Vercel's request limit) and live in the private
   `content-uploads` bucket under `<user id>/<sha256>/<filename>`. `loadFile` refuses

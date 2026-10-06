@@ -11,9 +11,11 @@ export function parseFormatParam(value: string | string[] | undefined): Format |
 }
 
 /** Score descending, then newest first, then id: a total order, so ranks never shuffle between loads. */
+const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
 export function rankIdeas<T extends Rankable>(ideas: readonly T[]): T[] {
   return [...ideas].sort(
-    (a, b) => b.score - a.score || b.created_at.localeCompare(a.created_at) || a.id.localeCompare(b.id)
+    (a, b) => b.score - a.score || cmp(b.created_at, a.created_at) || cmp(a.id, b.id)
   );
 }
 

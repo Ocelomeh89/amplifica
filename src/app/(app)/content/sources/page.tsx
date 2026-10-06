@@ -48,6 +48,7 @@ export default async function ContentSourcesPage() {
 
       <Card title="Found sources">
         <FoundSourcesList
+          canGenerate={canGenerate}
           sources={(found ?? []).map((s) => ({
             ...s,
             angle: s.angle ?? "open",

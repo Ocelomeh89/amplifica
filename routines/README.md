@@ -43,7 +43,10 @@ but with no connectors:
    connectors, schedule `30 11 * * 1` UTC (06:30 America/Chicago in daylight
    time), with the message: "Read routines/content-found.md in this checkout and
    run it in queue mode."
-3. Run it once by hand with something queued, and check /content.
+3. In the claude.ai/code environment settings, limit network access to the
+   CONTENT_API_BASE host only (an allowlist). The routine reads text written by
+   strangers, and this removes any way for it to send data elsewhere.
+4. Run it once by hand with something queued, and check /content.
 
 It does nothing when the queue is empty. `/content-found` runs the same file from
 Claude Code on the Mac: with a link or file it mines that directly, with nothing

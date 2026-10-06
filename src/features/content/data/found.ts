@@ -249,7 +249,14 @@ export async function queueFound(
       return { ok: false, error: "That source is waiting for a decision on the Sources page." };
     }
     if (existing) {
-      await deps.setMeta(existing.id, resolved.meta);
+      // No file was stored for this paste, so keep the file reference the
+      // existing row already points at.
+      const old = existing.meta ?? {};
+      await deps.setMeta(existing.id, {
+        ...resolved.meta,
+        ...(old.filename !== undefined ? { filename: old.filename } : {}),
+        ...(old.storage_path !== undefined ? { storage_path: old.storage_path } : {}),
+      });
       return { ok: true, message: "Already queued; updated." };
     }
     if (resolved.file) await deps.storeFile(resolved.file.path, resolved.file.bytes, resolved.file.mime);

@@ -131,4 +131,21 @@ describe("queueFound: sources that already exist", () => {
     expect(t.setMeta.mock.calls[0][0]).toBe("old-1");
     expect(t.setMeta.mock.calls[0][1]).toMatchObject({ angle: "counterpoint", note: "saw this" });
   });
+
+  it("keeps the stored file reference when an upload is refreshed under a new filename", async () => {
+    const bytes = new TextEncoder().encode("Retirement math ".repeat(30));
+    const hash = createHash("sha256").update(bytes).digest("hex");
+    const existing: StoredSource = {
+      id: "old-2", kind: "upload", external_id: hash, title: "talk.txt", url: null, status: "allowed",
+      meta: { filename: "talk.txt", storage_path: `owner-1/${hash}/talk.txt` },
+    };
+    const t = setup({}, existing);
+    const r = await queueFound(t.deps, "owner-1", { kind: "upload", filename: "renamed.txt", bytes, ...opts });
+    expect(r.ok).toBe(true);
+    expect(t.setMeta).toHaveBeenCalledTimes(1);
+    expect(t.setMeta.mock.calls[0][1]).toMatchObject({
+      filename: "talk.txt", storage_path: `owner-1/${hash}/talk.txt`, angle: "counterpoint",
+    });
+    expect(t.storeFile).not.toHaveBeenCalled();
+  });
 });

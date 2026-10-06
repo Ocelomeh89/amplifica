@@ -24,6 +24,13 @@ describe("rankIdeas", () => {
     ]);
     expect(ranked.map((i) => i.id)).toEqual(["c", "d", "a", "b"]);
   });
+  it("compares timestamps by code point, newest first, with or without a fraction", () => {
+    const ranked = rankIdeas([
+      idea("a", "reel", 0.5, "2026-10-01T10:00:00+00:00"),
+      idea("b", "reel", 0.5, "2026-10-01T10:00:00.5+00:00"),
+    ]);
+    expect(ranked.map((i) => i.id)).toEqual(["b", "a"]);
+  });
   it("does not mutate its input", () => {
     const input = [idea("a", "reel", 0.1, "2026-10-01T00:00:00Z"), idea("b", "reel", 0.9, "2026-10-01T00:00:00Z")];
     rankIdeas(input);

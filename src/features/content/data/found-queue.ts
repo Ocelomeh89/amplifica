@@ -35,6 +35,7 @@ export type QueuedSource = {
   meta: { text: string; note: string; angle: string; competitor: string };
 };
 
+const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 const str = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
 
 export function buildQueuedResponse(
@@ -44,7 +45,7 @@ export function buildQueuedResponse(
 ): { sources: QueuedSource[]; remaining: number } {
   const usable = rows
     .filter((r) => str(r.meta.text).length >= QUEUE_MIN_TEXT)
-    .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
+    .sort((a, b) => cmp(a.created_at, b.created_at) || cmp(a.id, b.id));
   const picked = usable.slice(0, limit);
   const beyondWindow = Math.max(0, total - rows.length);
   return {
@@ -66,5 +67,9 @@ export function buildQueuedResponse(
 
 export async function getQueued(db: QueueDb, rawLimit: string | null) {
   const { rows, total } = await db.queuedFound();
-  return buildQueuedResponse(rows, total, parseLimit(rawLimit));
+  const result = buildQueuedResponse(rows, total, parseLimit(rawLimit));
+  if (rows.length > 0 && result.sources.length === 0) {
+    console.error("found queue: rows are queued but none has usable text (under 40 characters)");
+  }
+  return result;
 }

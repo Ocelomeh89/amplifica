@@ -12,18 +12,18 @@ const sources = [
 
 describe("FoundSourcesList", () => {
   it("lists found sources with their angle badge", () => {
-    render(<FoundSourcesList sources={sources} />);
+    render(<FoundSourcesList sources={sources} canGenerate />);
     expect(screen.getByText("Their post")).toBeInTheDocument();
     expect(screen.getByText("found · counterpoint")).toBeInTheDocument();
     expect(screen.getByText("talk.pdf")).toBeInTheDocument();
     expect(screen.getByText("found")).toBeInTheDocument();
   });
   it("says so when there are none", () => {
-    render(<FoundSourcesList sources={[]} />);
+    render(<FoundSourcesList sources={[]} canGenerate />);
     expect(screen.getByText(/Nothing pasted in yet/)).toBeInTheDocument();
   });
   it("submits the source id with the new angle and note", async () => {
-    render(<FoundSourcesList sources={sources} />);
+    render(<FoundSourcesList sources={sources} canGenerate />);
     // hidden: true because the buttons sit inside a closed <details>.
     const form = screen.getAllByRole("button", { name: "Generate again", hidden: true })[0].closest("form")!;
     fireEvent.change(form.querySelector("select[name=angle]")!, { target: { value: "twist" } });
@@ -37,10 +37,17 @@ describe("FoundSourcesList", () => {
   it("labels an allowed (unmined) source as queued", () => {
     render(
       <FoundSourcesList
+        canGenerate
         sources={[{ id: "s3", kind: "url", title: "Queued piece", url: "https://example.com/q", status: "allowed", angle: "open", note: "", competitor: "" }]}
       />
     );
     expect(screen.getByText("queued")).toBeInTheDocument();
     expect(screen.queryByText("allowed")).toBeNull();
+  });
+  it("hides Generate again when generation is unavailable but keeps the row", () => {
+    render(<FoundSourcesList sources={sources} canGenerate={false} />);
+    expect(screen.queryByRole("button", { name: "Generate again", hidden: true })).toBeNull();
+    expect(screen.getByText("Their post")).toBeInTheDocument();
+    expect(screen.getByText("found · counterpoint")).toBeInTheDocument();
   });
 });

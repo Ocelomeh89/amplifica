@@ -52,4 +52,17 @@ describe("routines/content-found.md", () => {
       expect(routine, needle).toContain(needle);
     }
   });
+  it("pins the one-at-a-time queue steps and the status-aware curls", () => {
+    for (const needle of ["limit=1", "-o /tmp/queued.json", "http_code", "fold", "ingest-response", "-o /tmp/context.json"]) {
+      expect(routine, needle).toContain(needle);
+    }
+    expect(routine).not.toContain("limit=5");
+  });
+  it("tells queue mode never to echo meta, and the example source has none", () => {
+    expect(routine).toContain("never echo `meta`");
+    const match = routine.match(/```json\n([\s\S]*?)\n```/);
+    const body = JSON.parse(match![1]);
+    expect(body.sources[0]).not.toHaveProperty("meta");
+    expect(ingestSchema.safeParse(body).success).toBe(true);
+  });
 });

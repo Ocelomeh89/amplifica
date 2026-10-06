@@ -16,7 +16,7 @@ export type FoundSourceRow = {
   competitor: string;
 };
 
-function Row({ source }: { source: FoundSourceRow }) {
+function Row({ source, canGenerate }: { source: FoundSourceRow; canGenerate: boolean }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -36,6 +36,18 @@ function Row({ source }: { source: FoundSourceRow }) {
     } finally {
       setPending(false);
     }
+  }
+
+  if (!canGenerate) {
+    return (
+      <li className="border-b border-edge py-2">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="flex-1 truncate">{source.title || source.url}</span>
+          <span className="text-[10px] uppercase text-purple">{foundBadge(source.kind, { angle: source.angle })}</span>
+          <span className="text-xs text-sub">{source.status === "allowed" ? "queued" : source.status}</span>
+        </div>
+      </li>
+    );
   }
 
   return (
@@ -66,12 +78,12 @@ function Row({ source }: { source: FoundSourceRow }) {
   );
 }
 
-export default function FoundSourcesList({ sources }: { sources: FoundSourceRow[] }) {
+export default function FoundSourcesList({ sources, canGenerate }: { sources: FoundSourceRow[]; canGenerate: boolean }) {
   if (sources.length === 0) return <p className="text-sm text-sub">Nothing pasted in yet.</p>;
   return (
     <ul>
       {sources.map((s) => (
-        <Row key={s.id} source={s} />
+        <Row key={s.id} source={s} canGenerate={canGenerate} />
       ))}
     </ul>
   );
