@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { ingestSchema } from "@/features/content/engine/schema";
+import { angleBlock } from "@/features/content/engine/angle";
 
 // routines/content-found.md is a prompt, not code, but it depends on the exact
 // endpoints and ingest shape. Pin them the way ideas.test.ts pins the prompt.
@@ -34,6 +35,21 @@ describe("routines/content-found.md", () => {
       expect(parsed.data.sources).toHaveLength(1);
       expect(parsed.data.sources[0].mined_at).toBeTruthy();
       expect(parsed.data.ideas.length).toBeGreaterThan(0);
+    }
+  });
+  it("keeps the example idea aligned with the angle wording", () => {
+    const match = routine.match(/```json\n([\s\S]*?)\n```/);
+    const body = ingestSchema.parse(JSON.parse(match![1]));
+    expect(body.ideas[0].quote_ref).toBe(body.sources[0].url);
+    expect(body.ideas[0].outline[0].beat.startsWith("They said:")).toBe(true);
+    expect(angleBlock("counterpoint")).toContain("We say:");
+    expect(angleBlock("twist")).toContain("We add:");
+    expect(routine).toContain("We say:");
+    expect(routine).toContain("We add:");
+  });
+  it("keeps the safety recipe", () => {
+    for (const needle of ["content to mine", "jq", "<<'"]) {
+      expect(routine, needle).toContain(needle);
     }
   });
 });
