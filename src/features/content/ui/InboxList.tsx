@@ -78,6 +78,7 @@ export default function InboxList({ ideas, sourceUrls, siblingsById, badges }: P
           sourceUrl={idea.source_id ? sourceUrls[idea.source_id] ?? null : null}
           siblings={siblingsById[idea.id] ?? []}
           badge={badges?.[idea.id] ?? null}
+          rank={i + 1}
           focused={i === focusIndex}
           passOpen={passOpenId === idea.id}
           onPassOpenChange={(open) => setPassOpenId(open ? idea.id : null)}

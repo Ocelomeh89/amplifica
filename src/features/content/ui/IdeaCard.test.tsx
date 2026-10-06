@@ -61,4 +61,10 @@ describe("IdeaCard", () => {
     rerender(<IdeaCard idea={idea} sourceUrl={null} siblings={[]} />);
     expect(screen.queryByText(/found/)).toBeNull();
   });
+  it("shows the rank when given one, and none otherwise", () => {
+    const { rerender } = render(<IdeaCard idea={idea} sourceUrl={null} siblings={[]} rank={3} />);
+    expect(screen.getByText("#3")).toBeInTheDocument();
+    rerender(<IdeaCard idea={idea} sourceUrl={null} siblings={[]} />);
+    expect(screen.queryByText(/^#\d/)).toBeNull();
+  });
 });

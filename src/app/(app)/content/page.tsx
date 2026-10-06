@@ -1,14 +1,20 @@
 import { requireContentOwner } from "@/features/content/data/owner";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import InboxList from "@/features/content/ui/InboxList";
+import InboxFilter from "@/features/content/ui/InboxFilter";
 import PendingSourcesStrip from "@/features/content/ui/PendingSourcesStrip";
-import type { Format } from "@/features/content/engine/types";
+import { FORMAT_LABEL, type Format } from "@/features/content/engine/types";
 import FoundContentForm from "@/features/content/ui/FoundContentForm";
 import { foundBadge } from "@/features/content/engine/angle";
+import { filterByFormat, formatCounts, parseFormatParam, rankIdeas } from "@/features/content/engine/inbox";
 
 export const maxDuration = 300;
 
-export default async function ContentInboxPage() {
+export default async function ContentInboxPage({
+  searchParams,
+}: {
+  searchParams?: { format?: string | string[] };
+}) {
   const { supabase, user } = await requireContentOwner();
 
   const [{ data: ideas }, { data: pending }] = await Promise.all([
@@ -17,8 +23,7 @@ export default async function ContentInboxPage() {
       .select("*")
       .eq("user_id", user.id)
       .eq("status", "inbox")
-      .order("batch_date", { ascending: false })
-      .order("score", { ascending: false }),
+      .order("created_at", { ascending: false }),
     supabase
       .from("content_sources")
       .select("*")
@@ -27,7 +32,13 @@ export default async function ContentInboxPage() {
       .order("occurred_at", { ascending: false }),
   ]);
 
-  const list = ideas ?? [];
+  // Rank the whole Inbox by score, count per type from the full list, then
+  // filter. The Inbox holds tens of ideas, so this stays in memory.
+  const ranked = rankIdeas(ideas ?? []);
+  const active = parseFormatParam(searchParams?.format);
+  const counts = formatCounts(ranked);
+  const list = filterByFormat(ranked, active);
+
   const sourceIds = Array.from(new Set(list.map((i) => i.source_id).filter((s): s is string => Boolean(s))));
   const chainIds = Array.from(new Set(list.map((i) => i.chain_id).filter((c): c is string => Boolean(c))));
 
@@ -65,7 +76,12 @@ export default async function ContentInboxPage() {
         <summary className="text-sm cursor-pointer">Add found content</summary>
         <div className="mt-3"><FoundContentForm /></div>
       </details>
-      <InboxList ideas={list} sourceUrls={sourceUrls} siblingsById={siblingsById} badges={badges} />
+      <InboxFilter active={active} counts={counts} />
+      {active && list.length === 0 ? (
+        <p className="text-sm text-sub">No {FORMAT_LABEL[active]} ideas in the Inbox.</p>
+      ) : (
+        <InboxList ideas={list} sourceUrls={sourceUrls} siblingsById={siblingsById} badges={badges} />
+      )}
     </div>
   );
 }
