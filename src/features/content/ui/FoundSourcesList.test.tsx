@@ -34,4 +34,13 @@ describe("FoundSourcesList", () => {
     expect(fd.get("angle")).toBe("twist");
     await waitFor(() => expect(screen.getByText("3 ideas added to the Inbox.")).toBeInTheDocument());
   });
+  it("labels an allowed (unmined) source as queued", () => {
+    render(
+      <FoundSourcesList
+        sources={[{ id: "s3", kind: "url", title: "Queued piece", url: "https://example.com/q", status: "allowed", angle: "open", note: "", competitor: "" }]}
+      />
+    );
+    expect(screen.getByText("queued")).toBeInTheDocument();
+    expect(screen.queryByText("allowed")).toBeNull();
+  });
 });

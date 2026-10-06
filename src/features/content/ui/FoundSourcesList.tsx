@@ -44,7 +44,7 @@ function Row({ source }: { source: FoundSourceRow }) {
         <summary className="flex items-center gap-2 cursor-pointer text-sm">
           <span className="flex-1 truncate">{source.title || source.url}</span>
           <span className="text-[10px] uppercase text-purple">{foundBadge(source.kind, { angle: source.angle })}</span>
-          <span className="text-xs text-sub">{source.status}</span>
+          <span className="text-xs text-sub">{source.status === "allowed" ? "queued" : source.status}</span>
         </summary>
         <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-2 mt-2">
           <input type="hidden" name="id" value={source.id} />

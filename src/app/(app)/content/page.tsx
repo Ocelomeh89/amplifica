@@ -74,13 +74,13 @@ export default async function ContentInboxPage({
       <PendingSourcesStrip sources={pending ?? []} />
       <details className="mb-4 bg-card border border-edge rounded-lg p-3">
         <summary className="text-sm cursor-pointer">Add found content</summary>
-        <div className="mt-3"><FoundContentForm /></div>
+        <div className="mt-3"><FoundContentForm canGenerate={Boolean(process.env.ANTHROPIC_API_KEY)} /></div>
       </details>
       <InboxFilter active={active} counts={counts} />
       {active && list.length === 0 ? (
         <p className="text-sm text-sub">No {FORMAT_LABEL[active]} ideas in the Inbox.</p>
       ) : (
-        <InboxList ideas={list} sourceUrls={sourceUrls} siblingsById={siblingsById} badges={badges} />
+        <InboxList key={active ?? "all"} ideas={list} sourceUrls={sourceUrls} siblingsById={siblingsById} badges={badges} />
       )}
     </div>
   );

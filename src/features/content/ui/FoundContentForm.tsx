@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { addFoundContent } from "@/features/content/data/actions";
+import { addFoundContent, queueFoundContent } from "@/features/content/data/actions";
 import { ANGLES, type Angle } from "@/features/content/engine/angle";
 
 export const ANGLE_LABEL: Record<Angle, string> = {
@@ -12,9 +12,11 @@ export const ANGLE_LABEL: Record<Angle, string> = {
 
 const field = "border border-edge rounded px-2 py-1.5 text-sm bg-card w-full";
 
-// A URL or a file in, ideas out. The angle turns a competitor's piece into a
-// counterpoint or a twist instead of a neutral summary.
-export default function FoundContentForm() {
+// A URL or a file in. With an API key the ideas come back now; without one the
+// item joins a queue that Claude Code works through (the weekly run, or
+// /content-found). The angle turns a competitor's piece into a counterpoint or
+// a twist instead of a neutral summary.
+export default function FoundContentForm({ canGenerate }: { canGenerate: boolean }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,10 +29,10 @@ export default function FoundContentForm() {
     setError(null);
     setDone(null);
     try {
-      const result = await addFoundContent(fd);
+      const result = canGenerate ? await addFoundContent(fd) : await queueFoundContent(fd);
       if (result.error) setError(result.error);
       else {
-        setDone(`${result.count} idea${result.count === 1 ? "" : "s"} added to the Inbox.`);
+        setDone(result.message ?? `${result.count} idea${result.count === 1 ? "" : "s"} added to the Inbox.`);
         formRef.current?.reset();
       }
     } catch {
@@ -42,14 +44,29 @@ export default function FoundContentForm() {
 
   return (
     <form ref={formRef} onSubmit={onSubmit} className="grid gap-2">
+      {!canGenerate && (
+        <p className="text-xs text-sub">
+          No API key is set, so this saves to a queue. Claude Code turns the queue into ideas in Monday&apos;s run, or
+          run /content-found to do it now.
+        </p>
+      )}
       <label className="grid gap-1 text-xs text-sub">
         URL
         <input name="url" type="text" placeholder="https://..." className={field} disabled={pending} />
       </label>
       <div className="grid gap-1 text-xs text-sub">
         <label htmlFor="found-file">File</label>
-        <input id="found-file" name="file" type="file" accept=".pdf,.txt,.md,.markdown" className="text-sm" disabled={pending} />
-        <span>PDF, .txt or .md, up to 4 MB. Use a URL or a file, not both.</span>
+        <input
+          id="found-file"
+          name="file"
+          type="file"
+          accept={canGenerate ? ".pdf,.txt,.md,.markdown" : ".txt,.md,.markdown"}
+          className="text-sm"
+          disabled={pending}
+        />
+        <span>
+          {canGenerate ? "PDF, .txt or .md" : ".txt or .md"}, up to 4 MB. Use a URL or a file, not both.
+        </span>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="grid gap-1 text-xs text-sub">
@@ -71,7 +88,9 @@ export default function FoundContentForm() {
       </label>
       <div className="flex items-center gap-3">
         <button type="submit" disabled={pending} className="bg-purple hover:bg-purple/90 disabled:opacity-60 text-white text-sm px-3 py-1.5 rounded">
-          {pending ? "Generating... this can take a couple of minutes" : "Generate ideas"}
+          {canGenerate
+            ? pending ? "Generating... this can take a couple of minutes" : "Generate ideas"
+            : pending ? "Saving..." : "Add to queue"}
         </button>
         {done && <span className="text-xs text-teal-700">{done}</span>}
         {error && <span className="text-xs text-red-600">{error}</span>}

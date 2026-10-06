@@ -15,6 +15,7 @@ export const maxDuration = 300;
 
 export default async function ContentSourcesPage() {
   const { supabase, user } = await requireContentOwner();
+  const canGenerate = Boolean(process.env.ANTHROPIC_API_KEY);
 
   const [{ data: rules }, { data: pending }, { data: recent }, { data: plaud }, { data: found }] = await Promise.all([
     supabase.from("content_source_rules").select("*").eq("user_id", user.id).order("kind").order("pattern"),
@@ -38,10 +39,11 @@ export default async function ContentSourcesPage() {
 
       <Card title="Add found content">
         <p className="text-xs text-sub mb-3">
-          Paste a link or upload a file and get ideas now. For a competitor&apos;s piece, pick Counterpoint to argue the other side or Twist to build on it.
-          For Instagram, paste the caption into the note or upload a screenshot PDF.
+          {canGenerate
+            ? "Paste a link or upload a file and get ideas now. For a competitor's piece, pick Counterpoint to argue the other side or Twist to build on it. For Instagram, paste the caption into the note or upload a screenshot PDF."
+            : "Paste a link or upload a text file and it joins the queue. Claude Code turns the queue into ideas in Monday's run, or run /content-found to do it now. For a competitor's piece, pick Counterpoint to argue the other side or Twist to build on it. For Instagram, paste the caption into the note."}
         </p>
-        <FoundContentForm />
+        <FoundContentForm canGenerate={canGenerate} />
       </Card>
 
       <Card title="Found sources">

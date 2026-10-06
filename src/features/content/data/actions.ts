@@ -6,7 +6,7 @@ import type { Database } from "@/shared/supabase/database.types";
 import { anthropicIdeaGenerator } from "@/features/content/data/claude";
 import { buildContext } from "@/features/content/data/context";
 import { fetchPublicPage } from "@/features/content/data/fetch-page";
-import { mineFound, type FoundDeps, type FoundInput } from "@/features/content/data/found";
+import { mineFound, queueFound, type FoundDeps, type FoundInput, type QueueDeps } from "@/features/content/data/found";
 import { readFoundForm, readOptions } from "@/features/content/data/found-form";
 import { supabaseContextDb, supabaseFoundDb, supabaseIngestDb } from "@/features/content/data/supabase-db";
 import { fetchVideoMeta } from "@/features/content/data/youtube-meta";
@@ -255,7 +255,7 @@ export async function requestMining(formData: FormData) {
   revalidate();
 }
 
-export type FoundActionResult = { error: string | null; count?: number };
+export type FoundActionResult = { error: string | null; count?: number; message?: string };
 
 // Returns the error instead of throwing, like markPosted: a thrown message is
 // replaced with a generic one in production, and "that page is private" must
@@ -298,4 +298,23 @@ export async function regenerateFound(formData: FormData): Promise<FoundActionRe
   const sourceId = str(formData, "id");
   if (!sourceId) return { error: "Missing source." };
   return runFound(supabase, user.id, { kind: "again", sourceId, ...readOptions(formData) });
+}
+
+// Queue mode: used by the form when no ANTHROPIC_API_KEY is set. Saves the
+// link or text file for Claude Code to mine (routines/content-found.md).
+export async function queueFoundContent(formData: FormData): Promise<FoundActionResult> {
+  const { supabase, user } = await requireContentOwner();
+  const parsed = await readFoundForm(formData);
+  if (!parsed.ok) return { error: parsed.error };
+  if (parsed.input.kind === "again") return { error: "Missing source." };
+  const deps: QueueDeps = {
+    fetchPage: (url) => fetchPublicPage(url),
+    videoMeta: (id) => fetchVideoMeta(id, process.env.YOUTUBE_API_KEY),
+    ...supabaseFoundDb(supabase, user.id),
+    ingestDb: supabaseIngestDb(supabase, user.id),
+  };
+  const result = await queueFound(deps, user.id, parsed.input);
+  if (!result.ok) return { error: result.error };
+  revalidate();
+  return { error: null, message: result.message };
 }
