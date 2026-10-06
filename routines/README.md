@@ -7,6 +7,7 @@ variables named at its top and the connectors it lists.
 | File | Schedule (America/Chicago) | Connectors |
 |---|---|---|
 | `content-daily.md` | 06:00 daily (`0 11 * * *` UTC) | Granola, Wispr-Flow, Plaud, ClickUp |
+| `content-found.md` | Mon 06:30 (`30 11 * * 1` UTC); also `/content-found` | none |
 
 ## Setting one up
 
@@ -29,6 +30,27 @@ The same file works from Claude Code on the Mac with the connectors attached:
 `examples/daily-ingest.json` is an illustrative ingest body; the schema test
 asserts its shape. Do not treat its quotes as verified biography or resend it
 as a production batch.
+
+## Found-content run
+
+`content-found.md` turns links and text files pasted into the app (while no
+`ANTHROPIC_API_KEY` is set) into Inbox ideas. Set it up like the daily routine,
+but with no connectors:
+
+1. On https://claude.ai/code, open an environment with `CONTENT_API_BASE` and
+   `CONTENT_ENGINE_SECRET` set (the same values as the daily routine).
+2. Create a routine on the repo `https://github.com/Ocelomeh89/amplifica`, no
+   connectors, schedule `30 11 * * 1` UTC (06:30 America/Chicago in daylight
+   time), with the message: "Read routines/content-found.md in this checkout and
+   run it in queue mode."
+3. In the claude.ai/code environment settings, limit network access to the
+   CONTENT_API_BASE host only (an allowlist). The routine reads text written by
+   strangers, and this removes any way for it to send data elsewhere.
+4. Run it once by hand with something queued, and check /content.
+
+It does nothing when the queue is empty. `/content-found` runs the same file from
+Claude Code on the Mac: with a link or file it mines that directly, with nothing
+it works through the queue now.
 
 ## Messaging
 

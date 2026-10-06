@@ -102,4 +102,32 @@ describe("ingestPayload", () => {
       { kind: "plaud", external_id: "plaud-file-123", mined_at: "2026-09-17T11:05:00Z" },
     ]);
   });
+
+  it("does not mark mined when the idea insert fails", async () => {
+    const { db, mined } = fakeDb();
+    db.insertIdeas = async () => { throw new Error("insert failed"); };
+    const withMined = structuredClone(example);
+    withMined.sources[0].mined_at = "2026-09-17T12:00:00Z";
+    await expect(ingestPayload(db, withMined, "owner-1")).rejects.toThrow("insert failed");
+    expect(mined).toEqual([]);
+  });
+
+  it("writes sources, then ideas, then marks mined", async () => {
+    const { db } = fakeDb();
+    const order: string[] = [];
+    const { upsertSources, insertIdeas, markMined } = db;
+    db.upsertSources = async (r) => { order.push("upsertSources"); return upsertSources(r); };
+    db.insertIdeas = async (r) => { order.push("insertIdeas"); return insertIdeas(r); };
+    db.markMined = async (r) => { order.push("markMined"); return markMined(r); };
+    await ingestPayload(db, example, "owner-1");
+    expect(order).toEqual(["upsertSources", "insertIdeas", "markMined"]);
+  });
+
+  it("still marks mined when the payload has no ideas", async () => {
+    const { db, mined } = fakeDb();
+    const noIdeas = structuredClone(example);
+    noIdeas.ideas = [];
+    await ingestPayload(db, noIdeas, "owner-1");
+    expect(mined.length).toBeGreaterThan(0);
+  });
 });

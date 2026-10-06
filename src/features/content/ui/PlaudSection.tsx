@@ -1,7 +1,7 @@
 import type { ContentSource } from "@/shared/supabase/database.types";
 import { requestMining } from "@/features/content/data/actions";
 import Card from "@/shared/ui/Card";
-import { fmtDate } from "@/shared/format";
+import { fmtDate, fmtDateTime } from "@/shared/format";
 
 type Meta = { has_highlights?: boolean; duration_s?: number };
 
@@ -27,7 +27,7 @@ export default function PlaudSection({ sources, lastSweep }: { sources: ContentS
                 <span className="flex-1 truncate">{s.title || s.external_id}</span>
                 {meta.has_highlights && <span className="text-[10px] uppercase text-purple">highlights</span>}
                 {mins !== null && <span className="text-xs text-sub">{mins} min</span>}
-                <span className="text-xs text-sub">{s.occurred_at ? fmtDate(s.occurred_at) : ""}</span>
+                <span className="text-xs text-sub whitespace-nowrap">{fmtDateTime(s.occurred_at ?? s.created_at)}</span>
                 <span className="text-xs text-sub w-16 text-right">
                   {s.status === "mined" ? "mined" : s.status === "denied" ? "denied" : s.requested_at ? "requested" : s.status}
                 </span>

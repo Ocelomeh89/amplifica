@@ -72,6 +72,10 @@ Skip any recording whose `(kind, external_id)` is already in `known_sources`
 with status `denied`, `mined`, or `pending`; those are decided. A known source
 with status `allowed` and no `mined_at` is still open: include it.
 
+Found content (`kind` `url` or `upload`, pasted into the app) is never part of
+this run. `routines/content-found.md` owns it, and the context endpoint already
+leaves those sources out.
+
 Then add every entry in `requested_sources`, and every `known_sources` entry
 with status `allowed` and no `mined_at`, even if the listing did not return
 it. They already carry the `kind` and `external_id` the read tools take

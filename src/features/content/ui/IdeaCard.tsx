@@ -18,9 +18,11 @@ export type IdeaCardProps = {
    *  can open the reason box from the keyboard. */
   passOpen?: boolean;
   onPassOpenChange?: (open: boolean) => void;
+  badge?: string | null;
+  rank?: number;
 };
 
-export default function IdeaCard({ idea, sourceUrl, siblings, focused, passOpen, onPassOpenChange }: IdeaCardProps) {
+export default function IdeaCard({ idea, sourceUrl, siblings, focused, passOpen, onPassOpenChange, badge, rank }: IdeaCardProps) {
   const [localOpen, setLocalOpen] = useState(false);
   const open = passOpen ?? localOpen;
   const setOpen = onPassOpenChange ?? setLocalOpen;
@@ -35,7 +37,9 @@ export default function IdeaCard({ idea, sourceUrl, siblings, focused, passOpen,
       )}
     >
       <div className="flex items-center gap-2 mb-2">
+        {rank !== undefined && <span className="text-[11px] font-semibold text-sub">#{rank}</span>}
         <FormatBadge format={idea.format} />
+        {badge && <span className="text-[10px] uppercase tracking-wide text-purple">{badge}</span>}
         {idea.pillar && <span className="text-[10px] text-sub uppercase tracking-wide">{idea.pillar}</span>}
         {idea.hook_type && <span className="text-[10px] text-sub">{idea.hook_type}</span>}
         <span className="ml-auto text-[10px] text-sub">score {idea.score.toFixed(2)}</span>

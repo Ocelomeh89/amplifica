@@ -52,7 +52,6 @@ export async function ingestPayload(
   const mined = payload.sources
     .filter((s): s is typeof s & { mined_at: string } => typeof s.mined_at === "string")
     .map((s) => ({ kind: s.kind, external_id: s.external_id, mined_at: s.mined_at }));
-  if (mined.length > 0) await db.markMined(mined);
 
   const chainIds = new Map<string, string>();
   const chainIdFor = (key: string | undefined) => {
@@ -93,5 +92,7 @@ export async function ingestPayload(
   });
 
   const ideas = ideaRows.length > 0 ? await db.insertIdeas(ideaRows) : [];
+  // Last, so a failed idea insert leaves a queued source queued for the next run.
+  if (mined.length > 0) await db.markMined(mined);
   return { sources: written, ideas };
 }

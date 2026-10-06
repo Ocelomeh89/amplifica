@@ -4,20 +4,26 @@ import { addSourceRule, deleteSourceRule } from "@/features/content/data/actions
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import PendingSourcesStrip from "@/features/content/ui/PendingSourcesStrip";
 import PlaudSection from "@/features/content/ui/PlaudSection";
+import FoundContentForm from "@/features/content/ui/FoundContentForm";
+import FoundSourcesList from "@/features/content/ui/FoundSourcesList";
 import { lastRunByKind } from "@/features/content/engine/runs";
 import { SOURCE_KINDS } from "@/features/content/engine/types";
 import Card from "@/shared/ui/Card";
 import { fmtDate } from "@/shared/format";
 
+export const maxDuration = 300;
+
 export default async function ContentSourcesPage() {
   const { supabase, user } = await requireContentOwner();
+  const canGenerate = Boolean(process.env.ANTHROPIC_API_KEY);
 
-  const [{ data: rules }, { data: pending }, { data: recent }, { data: plaud }] = await Promise.all([
+  const [{ data: rules }, { data: pending }, { data: recent }, { data: plaud }, { data: found }] = await Promise.all([
     supabase.from("content_source_rules").select("*").eq("user_id", user.id).order("kind").order("pattern"),
     supabase.from("content_sources").select("*").eq("user_id", user.id).eq("status", "pending").order("occurred_at", { ascending: false }),
     // Comments are read by kind in the weekly review (PR 5), not here.
     supabase.from("content_sources").select("id, kind, title, external_id, status, occurred_at, created_at").eq("user_id", user.id).neq("kind", "comment").order("created_at", { ascending: false }).limit(200),
     supabase.from("content_sources").select("*").eq("user_id", user.id).eq("kind", "plaud").order("occurred_at", { ascending: false }).limit(50),
+    supabase.from("content_sources").select("id, kind, title, url, status, angle:meta->>angle, note:meta->>note, competitor:meta->>competitor").eq("user_id", user.id).in("kind", ["url", "upload"]).order("created_at", { ascending: false }).limit(20),
   ]);
 
   const lastRun = lastRunByKind(recent ?? []);
@@ -30,6 +36,27 @@ export default async function ContentSourcesPage() {
 
       <PendingSourcesStrip sources={pending ?? []} />
       <PlaudSection sources={plaud ?? []} lastSweep={lastRun.plaud ?? null} />
+
+      <Card title="Add found content">
+        <p className="text-xs text-sub mb-3">
+          {canGenerate
+            ? "Paste a link or upload a file and get ideas now. For a competitor's piece, pick Counterpoint to argue the other side or Twist to build on it. For Instagram, paste the caption into the note or upload a screenshot PDF."
+            : "Paste a link or upload a text file and it joins the queue. Claude Code turns the queue into ideas in Monday's run, or run /content-found to do it now. For a competitor's piece, pick Counterpoint to argue the other side or Twist to build on it. For Instagram, paste the caption into the note."}
+        </p>
+        <FoundContentForm canGenerate={canGenerate} />
+      </Card>
+
+      <Card title="Found sources">
+        <FoundSourcesList
+          canGenerate={canGenerate}
+          sources={(found ?? []).map((s) => ({
+            ...s,
+            angle: s.angle ?? "open",
+            note: s.note ?? "",
+            competitor: s.competitor ?? "",
+          }))}
+        />
+      </Card>
 
       <Card title="Who gets read">
         <p className="text-xs text-sub mb-3">

@@ -55,4 +55,16 @@ describe("IdeaCard", () => {
     expect(screen.getByRole("button", { name: /Like/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Pass/ })).toBeInTheDocument();
   });
+  it("shows the found badge when given one, and none otherwise", () => {
+    const { rerender } = render(<IdeaCard idea={idea} sourceUrl={null} siblings={[]} badge="found - twist" />);
+    expect(screen.getByText("found - twist")).toBeInTheDocument();
+    rerender(<IdeaCard idea={idea} sourceUrl={null} siblings={[]} />);
+    expect(screen.queryByText(/found/)).toBeNull();
+  });
+  it("shows the rank when given one, and none otherwise", () => {
+    const { rerender } = render(<IdeaCard idea={idea} sourceUrl={null} siblings={[]} rank={3} />);
+    expect(screen.getByText("#3")).toBeInTheDocument();
+    rerender(<IdeaCard idea={idea} sourceUrl={null} siblings={[]} />);
+    expect(screen.queryByText(/^#\d/)).toBeNull();
+  });
 });

@@ -57,7 +57,7 @@ export async function buildContext(db: ContextDb, now: Date): Promise<ContentCon
     source_rules,
     runs,
     voice_summary,
-    known_sources,
+    allKnownSources,
   ] = await Promise.all([
     db.tasteRules(),
     db.feedbackSince(since(14)),
@@ -69,6 +69,9 @@ export async function buildContext(db: ContextDb, now: Date): Promise<ContentCon
     db.voiceSummary(),
     db.knownSources(since(90)),
   ]);
+  // Found content (pasted links and uploads) is mined by routines/content-found.md,
+  // never by the daily routine, whose read tools exist only for the recording kinds.
+  const known_sources = allKnownSources.filter((s) => s.kind !== "url" && s.kind !== "upload");
   return {
     generated_at: now.toISOString(),
     taste_rules,

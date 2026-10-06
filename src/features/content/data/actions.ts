@@ -1,6 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/shared/supabase/database.types";
+import { anthropicIdeaGenerator } from "@/features/content/data/claude";
+import { buildContext } from "@/features/content/data/context";
+import { fetchPublicPage } from "@/features/content/data/fetch-page";
+import { mineFound, queueFound, type FoundDeps, type FoundInput, type QueueDeps } from "@/features/content/data/found";
+import { readFoundForm, readOptions } from "@/features/content/data/found-form";
+import { supabaseContextDb, supabaseFoundDb, supabaseIngestDb } from "@/features/content/data/supabase-db";
+import { fetchVideoMeta } from "@/features/content/data/youtube-meta";
 import { requireContentOwner } from "@/features/content/data/owner";
 import { syncQueuedIdeasToClickUp } from "@/features/content/data/clickup";
 import { str } from "@/shared/forms";
@@ -244,4 +253,68 @@ export async function requestMining(formData: FormData) {
     .not("status", "in", "(mined,denied)");
   if (error) throw new Error(error.message);
   revalidate();
+}
+
+export type FoundActionResult = { error: string | null; count?: number; message?: string };
+
+// Returns the error instead of throwing, like markPosted: a thrown message is
+// replaced with a generic one in production, and "that page is private" must
+// reach the user.
+async function runFound(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  input: FoundInput
+): Promise<FoundActionResult> {
+  let generator;
+  try {
+    generator = anthropicIdeaGenerator();
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Claude is not configured." };
+  }
+  const deps: FoundDeps = {
+    now: () => new Date(),
+    fetchPage: (url) => fetchPublicPage(url),
+    videoMeta: (id) => fetchVideoMeta(id, process.env.YOUTUBE_API_KEY),
+    ...supabaseFoundDb(supabase, userId),
+    context: () => buildContext(supabaseContextDb(supabase, userId), new Date()),
+    generator,
+    ingestDb: supabaseIngestDb(supabase, userId),
+  };
+  const result = await mineFound(deps, userId, input);
+  if (!result.ok) return { error: result.error };
+  revalidate();
+  return { error: null, count: result.count };
+}
+
+export async function addFoundContent(formData: FormData): Promise<FoundActionResult> {
+  const { supabase, user } = await requireContentOwner();
+  const parsed = await readFoundForm(formData);
+  if (!parsed.ok) return { error: parsed.error };
+  return runFound(supabase, user.id, parsed.input);
+}
+
+export async function regenerateFound(formData: FormData): Promise<FoundActionResult> {
+  const { supabase, user } = await requireContentOwner();
+  const sourceId = str(formData, "id");
+  if (!sourceId) return { error: "Missing source." };
+  return runFound(supabase, user.id, { kind: "again", sourceId, ...readOptions(formData) });
+}
+
+// Queue mode: used by the form when no ANTHROPIC_API_KEY is set. Saves the
+// link or text file for Claude Code to mine (routines/content-found.md).
+export async function queueFoundContent(formData: FormData): Promise<FoundActionResult> {
+  const { supabase, user } = await requireContentOwner();
+  const parsed = await readFoundForm(formData);
+  if (!parsed.ok) return { error: parsed.error };
+  if (parsed.input.kind === "again") return { error: "Missing source." };
+  const deps: QueueDeps = {
+    fetchPage: (url) => fetchPublicPage(url),
+    videoMeta: (id) => fetchVideoMeta(id, process.env.YOUTUBE_API_KEY),
+    ...supabaseFoundDb(supabase, user.id),
+    ingestDb: supabaseIngestDb(supabase, user.id),
+  };
+  const result = await queueFound(deps, user.id, parsed.input);
+  if (!result.ok) return { error: result.error };
+  revalidate();
+  return { error: null, message: result.message };
 }
