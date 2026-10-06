@@ -31,6 +31,12 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
   `engine/found.ts` is server-only (it imports `node:net`): client components import
   `foundBadge` from `engine/angle.ts`, which `found.ts` re-exports. `pnpm build` is
   what catches a violation.
+- `data/found.ts` also holds `queueFound()` (queue mode: resolve, then save an
+  `allowed`, unmined `url`/`upload` source with its text; no Claude). The queue is
+  read by `GET /api/content/found/queued` (`data/found-queue.ts`, bearer-protected)
+  and mined by `routines/content-found.md` (the weekly cloud routine and the
+  `/content-found` skill). `engine/inbox.ts` ranks the Inbox by score and filters
+  by type.
 - `routines/` (repo root) — routine instructions and README; `.claude/skills/`
   holds the local companions `/content-plaud` and `/content-daily`.
 
@@ -67,6 +73,13 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
   paths outside `<user id>/`; `storeFile` upserts.
 - `fetchPublicPage` bounds the response before buffering: it rejects a
   content-length over 20 MiB and reads at most 2 MiB.
+- Queue state is `kind` in (`url`, `upload`), `status` `allowed`, no `mined_at`.
+  `buildContext` leaves those kinds out of `known_sources` and `requested_sources`
+  so the daily routine never tries to open them. Queue mode never calls Claude and
+  never marks anything mined; the found-content routine does, through ingest, one
+  body per source.
+- The form shows queue mode when `ANTHROPIC_API_KEY` is unset; the key itself never
+  reaches the client.
 
 ## Seeding by hand
 
