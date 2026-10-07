@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { MAX_UPLOAD_BYTES } from "@/features/content/engine/found";
 import { readFoundForm, readOptions } from "./found-form";
