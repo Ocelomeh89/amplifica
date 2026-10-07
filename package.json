@@ -17,7 +17,7 @@
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.2",
     "clsx": "^2.1.1",
-    "jsdom": "^29.1.1",
+    "jsdom": "^26.1.0",
     "lucide-react": "^1.16.0",
     "next": "^14.2.35",
     "pdf-lib": "^1.17.1",
