@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
+import { PDFDocument, PDFString, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import { ARCHETYPES, DISCLAIMER, MIGUEL_NOTE, type ArchetypeKey } from "../content";
 
 export interface PdfInput {
@@ -20,13 +20,22 @@ const TINT = rgb(0.97, 0.96, 0.99);
 
 type Measurer = Pick<PDFFont, "widthOfTextAtSize">;
 
+// iOS "smart punctuation" turns a typed O'Brien into O\u2019Brien. Map curly
+// quotes, dashes and the ellipsis to plain characters so a name stays readable.
+const SMART_PUNCTUATION: [RegExp, string][] = [
+  [/[\u2018\u2019]/g, "'"],
+  [/[\u201C\u201D]/g, '"'],
+  [/[\u2013\u2014]/g, "-"],
+  [/\u2026/g, "..."],
+];
+
 /**
  * The standard PDF fonts only encode WinAnsi. Anything else (emoji, CJK,
- * newlines, tabs) would make pdf-lib throw, so flatten whitespace and
- * replace what cannot be drawn.
+ * newlines, tabs) would make pdf-lib throw, so flatten whitespace, normalize
+ * smart punctuation, and replace what cannot be drawn.
  */
 export function toWinAnsi(text: string): string {
-  return text
+  return SMART_PUNCTUATION.reduce((t, [re, to]) => t.replace(re, to), text)
     .replace(/\s+/g, " ")
     .replace(/[^\x20-\x7E -ÿ]/g, "?")
     .trim();
@@ -140,13 +149,23 @@ export async function buildResultPdf(input: PdfInput): Promise<Uint8Array> {
 
   write(`You also have some of: ${runnerUp.name}.`, regular, 12, PLUM, 17);
   y -= 10;
-  write(
-    `Your next step: ${absolute(archetype.primary.href, input.siteUrl)}`,
-    bold,
-    12,
-    PURPLE,
-    17
-  );
+  write("Your next step:", bold, 12, PURPLE, 17);
+
+  // The destination goes on one line, shrunk to fit, and is clickable. A long
+  // URL wrapped mid-word cannot be clicked or copied by hand.
+  const url = toWinAnsi(absolute(archetype.primary.href, input.siteUrl));
+  let urlSize = 10;
+  while (urlSize > 6 && regular.widthOfTextAtSize(url, urlSize) > CONTENT_WIDTH) urlSize -= 0.5;
+  y -= 15;
+  page.drawText(url, { x: MARGIN, y, size: urlSize, font: regular, color: PURPLE });
+  const link = doc.context.obj({
+    Type: "Annot",
+    Subtype: "Link",
+    Rect: [MARGIN, y - 2, MARGIN + regular.widthOfTextAtSize(url, urlSize), y + urlSize],
+    Border: [0, 0, 0],
+    A: { Type: "Action", S: "URI", URI: PDFString.of(url) },
+  });
+  page.node.addAnnot(doc.context.register(link));
   y -= 14;
   write(MIGUEL_NOTE, italic, 11, GRAY, 16);
 

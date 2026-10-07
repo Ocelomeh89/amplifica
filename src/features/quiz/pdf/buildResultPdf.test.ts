@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { PDFDocument } from "pdf-lib";
-import { ARCHETYPE_KEYS, ARCHETYPES } from "../content";
+import { PDFDict, PDFDocument, PDFName, PDFString } from "pdf-lib";
+import { ARCHETYPE_KEYS, ARCHETYPES, DEBT_LETTER_URL } from "../content";
 import { buildResultPdf, toWinAnsi, wrapText } from "./buildResultPdf";
 
 const base = {
@@ -36,9 +36,17 @@ describe("buildResultPdf", () => {
     }
   });
 
-  it("writes the destination link in full for the debt-aholic", async () => {
-    const bytes = await buildResultPdf({ ...base, archetype: "recovering-debt-aholic" });
-    expect(bytes.length).toBeGreaterThan(1000);
+  it.each([
+    ["recovering-debt-aholic", DEBT_LETTER_URL],
+    ["serial-dabbler", "https://amplificawealth.com/calculator"],
+    ["cash-flow-builder", "https://community.amplificawealth.com/join-now"],
+  ] as const)("adds one clickable link to the destination for %s", async (archetype, url) => {
+    const doc = await PDFDocument.load(await buildResultPdf({ ...base, archetype }));
+    const annots = doc.getPage(0).node.Annots();
+    expect(annots?.size()).toBe(1);
+    const annot = doc.context.lookup(annots!.get(0), PDFDict);
+    const action = annot.lookup(PDFName.of("A"), PDFDict);
+    expect(action.lookup(PDFName.of("URI"), PDFString).decodeText()).toBe(url);
   });
 });
 
@@ -47,6 +55,11 @@ describe("toWinAnsi", () => {
     expect(toWinAnsi("José")).toBe("José");
     expect(toWinAnsi("李")).toBe("?");
     expect(toWinAnsi("a\n b\t c")).toBe("a b c");
+  });
+
+  it("turns iOS smart punctuation into plain characters instead of question marks", () => {
+    expect(toWinAnsi("O\u2019Brien")).toBe("O'Brien");
+    expect(toWinAnsi("\u201Chi\u201D \u2018x\u2019 a\u2013b a\u2014b\u2026")).toBe("\"hi\" 'x' a-b a-b...");
   });
 });
 
