@@ -33,10 +33,10 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // /calculator is intentionally public (email-gated lead-gen simulator).
-  // Skip the auth round-trip entirely; session refresh happens on any other
-  // route, so logged-in visitors lose nothing.
-  if (pathname.startsWith("/calculator")) {
+  // /calculator and /quiz are intentionally public (email-gated lead-gen
+  // surfaces). Skip the auth round-trip entirely; session refresh happens on
+  // any other route, so logged-in visitors lose nothing.
+  if (pathname.startsWith("/calculator") || pathname.startsWith("/quiz")) {
     return NextResponse.next({ request });
   }
 
