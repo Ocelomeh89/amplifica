@@ -176,6 +176,40 @@ words, and `built_from`: `[{path, mtime, bytes}]` for every file read.
   (`previous_profile_md`) so a bad rebuild can be reverted by re-posting it.
   Revert is a manual step; there is no UI for it in 4b.
 
+## Never used: stale ideas, kept visible
+
+Added 2026-10-07. Ideas that age out unused are captured in one place so Miguel
+can see what he never posted, instead of the Inbox and queues quietly growing.
+
+**Derived, not stored.** No new status and no sweep. An idea is *never used* when:
+
+- `status = 'inbox'` and `batch_date` is more than **14 days** old (never reviewed), or
+- `status = 'queued'` and `feedback_at` (the Like) is more than **30 days** old
+  (liked but never posted).
+
+Both thresholds are constants in `engine/unused.ts` (pure, tested). Each idea
+carries its reason (`unreviewed` or `unposted`), its age in days, and whether an
+app draft or an `obsidian_path` exists, so a drafted-but-unposted idea is
+distinguishable from one never touched.
+
+**Where it shows.** A "Never used" tab in `ContentTabs` (`/content/unused`), newest
+first, with a count badge. Cards reuse `IdeaCard` and show age, reason, and draft
+state. Stale ideas are removed from the Inbox list and the format queues so those
+stay working lists; their ranks renumber through the existing `ranksAfterMove`.
+Passed (`rejected`) and `archived` ideas are deliberate decisions and are not in
+this view.
+
+**Actions** (Server Actions, `requireUser()`-style owner gate like the rest):
+
+- **Revive**: back to `inbox` with `batch_date = today`, so it gets a fresh 14 days.
+- **Archive**: existing archive action.
+
+**Interaction with the rest of the engine.** `known_titles` already covers every
+idea status, so a never-used idea does not come back from the daily routine as new.
+The unused view is read through `data/queries.ts`; `wiring.test.ts` covers the
+page. No migration. If a Never-used list gets long, that is the signal for the
+routine to generate fewer ideas, which the weekly review (PR 5) can surface.
+
 ## Error handling
 
 - POST validates everything before writing; failure leaves the app and vault
@@ -195,6 +229,9 @@ words, and `built_from`: `[{path, mtime, bytes}]` for every file read.
 - Route tests with the existing fake-DB pattern: queue GET mapping and the 5-idea
   bound; POST all-or-nothing; refusal of non-queued ideas and existing drafts;
   `redo`; voice upsert; `authorizeRoutine()` asserted by `wiring.test.ts`.
+- `unused.test.ts`: boundary days (13/14/15 for inbox, 29/30/31 for queued),
+  reasons, draft-state flags, exclusion of rejected and archived; Revive resets
+  `batch_date`; stale ideas leave the Inbox and queue lists and renumber ranks.
 - `markPosted` test: drafts deleted, `obsidian_path` kept, URL recorded.
 - `prompts` test: every lint rule is named; the banned list is single-sourced.
 - Skills are text; `routines.test.ts` is extended to assert the new routine files
