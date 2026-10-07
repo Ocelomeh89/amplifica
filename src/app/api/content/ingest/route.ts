@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/shared/supabase/admin";
-import { isAuthorized } from "@/features/content/data/api-auth";
+import { authorizeRoutine } from "@/features/content/data/api-auth";
 import { ingestSchema } from "@/features/content/engine/schema";
 import { ingestPayload } from "@/features/content/data/ingest";
 import { supabaseIngestDb } from "@/features/content/data/supabase-db";
@@ -9,13 +9,9 @@ export const dynamic = "force-dynamic";
 
 // The routines' write path. Bearer-protected, validated whole, written whole.
 export async function POST(req: Request) {
-  if (!isAuthorized(req, process.env.CONTENT_ENGINE_SECRET)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-  const owner = process.env.CONTENT_OWNER_USER_ID;
-  if (!owner) {
-    return NextResponse.json({ error: "CONTENT_OWNER_USER_ID is not set" }, { status: 500 });
-  }
+  const auth = authorizeRoutine(req, process.env.CONTENT_ENGINE_SECRET);
+  if ("response" in auth) return auth.response;
+  const { owner } = auth;
 
   let body: unknown;
   try {

@@ -10,7 +10,10 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
 - `data/` — `actions.ts` (Server Actions), `ingest.ts` and `context.ts` (endpoint
   logic behind an interface), `supabase-db.ts` (the adapter), `api-auth.ts`.
 - `ui/` — one file per component. `IdeaCard` is used by the inbox and the idea page.
-- Routes: `src/app/(app)/content/**` and `src/app/api/content/**`.
+- Routes: `src/app/(app)/content/**` and `src/app/api/content/**`. Pages are routing and
+  layout only: every read is in `data/queries.ts` (or `data/performance.ts`), and every
+  `/api/content` route opens with `authorizeRoutine()` from `data/api-auth.ts`.
+  `wiring.test.ts` asserts both.
 - `engine/prompts/ideas.ts` — the generation rules. The daily routine reads it
   from its checkout; PR 4 uses it as a Claude system prompt. `ideas.test.ts`
   asserts it names every ingest field.
@@ -39,6 +42,20 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
   by type.
 - `routines/` (repo root) — routine instructions and README; `.claude/skills/`
   holds the local companions `/content-plaud` and `/content-daily`.
+
+## Touchpoints outside this folder
+
+Nothing in `shared/` or another feature imports content. To move or remove it,
+these are all the places that know it exists:
+
+- `src/app/(app)/content/**`, `src/app/api/content/**` — the routes.
+- `src/app/(app)/layout.tsx` (`showContentNav`) and `Sidebar.tsx` (`contentNavItem`) — the nav entry.
+- `src/app/robots.ts` — `/content` disallow; `src/app/content-route.test.ts` asserts it and the sitemap.
+- `vercel.json` — the daily metrics cron. `next.config.mjs` — `jsdom` external package.
+- `package.json` — `jsdom`, `@mozilla/readability`, `@anthropic-ai/sdk` are used only here.
+- `supabase/migrations/0008`, `0009` and the `content_*` types in `shared/supabase/database.types.ts`.
+- `routines/`, `.claude/skills/content-*`, `docs/superpowers/**` — the routines and their docs.
+- Env: `CONTENT_OWNER_USER_ID`, `CONTENT_ENGINE_SECRET`, `CRON_SECRET`, and the platform keys in `docs/PRODUCT-STATUS.md`.
 
 ## Invariants
 

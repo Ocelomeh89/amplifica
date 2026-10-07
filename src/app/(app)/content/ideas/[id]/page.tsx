@@ -1,52 +1,21 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireContentOwner } from "@/features/content/data/owner";
+import { loadIdea, loadIdeaContext } from "@/features/content/data/queries";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import IdeaCard from "@/features/content/ui/IdeaCard";
 import FormatBadge from "@/features/content/ui/FormatBadge";
 import MetricsPanel from "@/features/content/ui/MetricsPanel";
-import { pickSnapshots } from "@/features/content/engine/snapshots";
 import Card from "@/shared/ui/Card";
 import { fmtDate } from "@/shared/format";
-import type { Format } from "@/features/content/engine/types";
 
 export default async function ContentIdeaPage({ params }: { params: { id: string } }) {
   const { supabase, user } = await requireContentOwner();
 
-  const { data: idea } = await supabase
-    .from("content_ideas")
-    .select("*")
-    .eq("id", params.id)
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const idea = await loadIdea(supabase, user.id, params.id);
   if (!idea) notFound();
 
-  const [{ data: source }, { data: mates }, { data: post }] = await Promise.all([
-    idea.source_id
-      ? supabase.from("content_sources").select("*").eq("id", idea.source_id).eq("user_id", user.id).maybeSingle()
-      : Promise.resolve({ data: null }),
-    idea.chain_id
-      ? supabase
-          .from("content_ideas")
-          .select("id, format, hook, status")
-          .eq("chain_id", idea.chain_id)
-          .eq("user_id", user.id)
-          .neq("id", idea.id)
-      : Promise.resolve({ data: [] as { id: string; format: Format; hook: string; status: string }[] }),
-    supabase
-      .from("content_posts")
-      .select("*")
-      .eq("idea_id", idea.id)
-      .eq("user_id", user.id)
-      .order("posted_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ]);
-
-  const { data: snapshotRows } = post
-    ? await supabase.from("content_metrics").select("post_id, captured_at, metrics").eq("user_id", user.id).eq("post_id", post.id)
-    : { data: [] as { post_id: string; captured_at: string; metrics: unknown }[] };
-  const snapshot = post ? pickSnapshots(snapshotRows ?? []).get(post.id) ?? null : null;
+  const { source, mates, post, snapshot } = await loadIdeaContext(supabase, user.id, idea);
 
   return (
     <div className="max-w-3xl">
@@ -58,7 +27,7 @@ export default async function ContentIdeaPage({ params }: { params: { id: string
         <IdeaCard
           idea={idea}
           sourceUrl={source?.url ?? null}
-          siblings={(mates ?? []).map((m) => ({ id: m.id, format: m.format }))}
+          siblings={mates.map((m) => ({ id: m.id, format: m.format }))}
         />
       </div>
 
@@ -100,10 +69,10 @@ export default async function ContentIdeaPage({ params }: { params: { id: string
         </Card>
       )}
 
-      {(mates ?? []).length > 0 && (
+      {mates.length > 0 && (
         <Card title="Same recording">
           <ul className="text-sm space-y-1">
-            {(mates ?? []).map((m) => (
+            {mates.map((m) => (
               <li key={m.id} className="flex items-center gap-2">
                 <FormatBadge format={m.format} />
                 <Link href={`/content/ideas/${m.id}`} className="hover:underline truncate">{m.hook}</Link>

@@ -1,5 +1,6 @@
 import { requireContentOwner } from "@/features/content/data/owner";
 import { loadPostsForMath } from "@/features/content/data/performance";
+import { loadQueued } from "@/features/content/data/queries";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import Heatmap from "@/features/content/ui/Heatmap";
 import PlanGrid from "@/features/content/ui/PlanGrid";
@@ -11,20 +12,14 @@ import { FORMATS, type Format } from "@/features/content/engine/types";
 
 export default async function ContentWeekPage() {
   const { supabase, user } = await requireContentOwner();
-  const [posts, { data: queued }] = await Promise.all([
+  const [posts, queued] = await Promise.all([
     loadPostsForMath(supabase, user.id),
-    supabase
-      .from("content_ideas")
-      .select("id, format, hook, chain_id")
-      .eq("user_id", user.id)
-      .eq("status", "queued")
-      .order("queue_rank", { ascending: true, nullsFirst: false })
-      .order("created_at", { ascending: true }),
+    loadQueued(supabase, user.id),
   ]);
 
   const cells = bestTimes(normalizePosts(posts, new Date()));
   const queues = Object.fromEntries(FORMATS.map((f) => [f, [] as QueueIdea[]])) as Record<Format, QueueIdea[]>;
-  for (const q of queued ?? []) queues[q.format as Format].push({ id: q.id, format: q.format as Format, hook: q.hook, chain_id: q.chain_id });
+  for (const q of queued) queues[q.format as Format].push({ id: q.id, format: q.format as Format, hook: q.hook, chain_id: q.chain_id });
 
   const now = new Date();
   const thisMonday = mondayOf(new Date(`${chicagoIsoDate(now)}T00:00:00Z`));

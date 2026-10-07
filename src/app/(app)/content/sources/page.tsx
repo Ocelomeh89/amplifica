@@ -1,5 +1,6 @@
 import { Trash2 } from "lucide-react";
 import { requireContentOwner } from "@/features/content/data/owner";
+import { loadSourcesPage } from "@/features/content/data/queries";
 import { addSourceRule, deleteSourceRule } from "@/features/content/data/actions";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import PendingSourcesStrip from "@/features/content/ui/PendingSourcesStrip";
@@ -17,25 +18,18 @@ export default async function ContentSourcesPage() {
   const { supabase, user } = await requireContentOwner();
   const canGenerate = Boolean(process.env.ANTHROPIC_API_KEY);
 
-  const [{ data: rules }, { data: pending }, { data: recent }, { data: plaud }, { data: found }] = await Promise.all([
-    supabase.from("content_source_rules").select("*").eq("user_id", user.id).order("kind").order("pattern"),
-    supabase.from("content_sources").select("*").eq("user_id", user.id).eq("status", "pending").order("occurred_at", { ascending: false }),
-    // Comments are read by kind in the weekly review (PR 5), not here.
-    supabase.from("content_sources").select("id, kind, title, external_id, status, occurred_at, created_at").eq("user_id", user.id).neq("kind", "comment").order("created_at", { ascending: false }).limit(200),
-    supabase.from("content_sources").select("*").eq("user_id", user.id).eq("kind", "plaud").order("occurred_at", { ascending: false }).limit(50),
-    supabase.from("content_sources").select("id, kind, title, url, status, angle:meta->>angle, note:meta->>note, competitor:meta->>competitor").eq("user_id", user.id).in("kind", ["url", "upload"]).order("created_at", { ascending: false }).limit(20),
-  ]);
+  const { rules, pending, recent, plaud, found } = await loadSourcesPage(supabase, user.id);
 
-  const lastRun = lastRunByKind(recent ?? []);
-  const countByKind = Object.fromEntries(SOURCE_KINDS.map((k) => [k, (recent ?? []).filter((s) => s.kind === k).length]));
+  const lastRun = lastRunByKind(recent);
+  const countByKind = Object.fromEntries(SOURCE_KINDS.map((k) => [k, recent.filter((s) => s.kind === k).length]));
 
   return (
     <div className="max-w-3xl">
       <h1 className="text-xl font-semibold mb-2">Content</h1>
       <ContentTabs />
 
-      <PendingSourcesStrip sources={pending ?? []} />
-      <PlaudSection sources={plaud ?? []} lastSweep={lastRun.plaud ?? null} />
+      <PendingSourcesStrip sources={pending} />
+      <PlaudSection sources={plaud} lastSweep={lastRun.plaud ?? null} />
 
       <Card title="Add found content">
         <p className="text-xs text-sub mb-3">
@@ -49,7 +43,7 @@ export default async function ContentSourcesPage() {
       <Card title="Found sources">
         <FoundSourcesList
           canGenerate={canGenerate}
-          sources={(found ?? []).map((s) => ({
+          sources={found.map((s) => ({
             ...s,
             angle: s.angle ?? "open",
             note: s.note ?? "",
@@ -75,12 +69,12 @@ export default async function ContentSourcesPage() {
           <input name="pattern" required placeholder="e.g. Amplifica" className="border border-edge rounded px-2 py-1.5 text-sm bg-card flex-1 min-w-40" />
           <button type="submit" className="bg-purple hover:bg-purple/90 text-white text-sm px-3 py-1.5 rounded">Add rule</button>
         </form>
-        {(rules ?? []).length === 0 ? (
+        {rules.length === 0 ? (
           <p className="text-sm text-sub">No rules yet. Until there are, every recording waits for a decision.</p>
         ) : (
           <table className="w-full text-sm">
             <tbody>
-              {(rules ?? []).map((r) => (
+              {rules.map((r) => (
                 <tr key={r.id} className="border-b border-edge">
                   <td className={r.kind === "allow" ? "text-teal-700 py-1" : "text-red-600 py-1"}>{r.kind}</td>
                   <td className="text-sub">{r.field} contains</td>
@@ -119,7 +113,7 @@ export default async function ContentSourcesPage() {
 
       <Card title="Recent">
         <ul className="text-sm space-y-1">
-          {(recent ?? []).slice(0, 40).map((s) => (
+          {recent.slice(0, 40).map((s) => (
             <li key={s.id} className="flex items-center gap-2">
               <span className="text-[10px] uppercase text-sub w-14">{s.kind}</span>
               <span className="flex-1 truncate">{s.title || s.external_id}</span>

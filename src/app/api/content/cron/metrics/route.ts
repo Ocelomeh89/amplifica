@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/shared/supabase/admin";
-import { isAuthorized } from "@/features/content/data/api-auth";
+import { authorizeRoutine } from "@/features/content/data/api-auth";
 import { runMetricsCron, type CronPlatform } from "@/features/content/data/metrics";
 import { supabaseMetricsDb } from "@/features/content/data/supabase-db";
 import { pullBeehiiv } from "@/features/content/data/pulls/beehiiv";
@@ -15,13 +15,9 @@ const PLATFORMS: CronPlatform[] = ["instagram", "youtube", "beehiiv"];
 // Vercel Cron calls this daily with `Authorization: Bearer <CRON_SECRET>`.
 // `?platform=` narrows to one pull for a manual check.
 export async function GET(req: Request) {
-  if (!isAuthorized(req, process.env.CRON_SECRET)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-  const owner = process.env.CONTENT_OWNER_USER_ID;
-  if (!owner) {
-    return NextResponse.json({ error: "CONTENT_OWNER_USER_ID is not set" }, { status: 500 });
-  }
+  const auth = authorizeRoutine(req, process.env.CRON_SECRET);
+  if ("response" in auth) return auth.response;
+  const { owner } = auth;
   const only = new URL(req.url).searchParams.get("platform");
   const wanted = PLATFORMS.filter((p) => !only || p === only);
   if (wanted.length === 0) {
