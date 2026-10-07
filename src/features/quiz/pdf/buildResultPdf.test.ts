@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { PDFDict, PDFDocument, PDFName, PDFString } from "pdf-lib";
 import { ARCHETYPE_KEYS, ARCHETYPES, DEBT_LETTER_URL } from "../content";
-import { buildResultPdf, toWinAnsi, wrapText } from "./buildResultPdf";
+import { buildResultPdf, formatPdfDate, toWinAnsi, wrapText } from "./buildResultPdf";
 
 const base = {
   name: "Sam Rivera",
@@ -77,5 +77,18 @@ describe("wrapText", () => {
 
   it("returns no lines for empty text", () => {
     expect(wrapText("", font, 1, 10)).toEqual([]);
+  });
+});
+
+describe("formatPdfDate", () => {
+  it("prints the date in Eastern time, so a late-evening submit keeps its local day", () => {
+    // 01:30 UTC on Oct 7 is 9:30 pm EDT on Oct 6.
+    expect(formatPdfDate("2026-10-07T01:30:00Z")).toBe("October 6, 2026");
+    expect(formatPdfDate("2026-10-06T12:00:00Z")).toBe("October 6, 2026");
+  });
+
+  it("follows the switch to standard time in winter", () => {
+    // 04:30 UTC on Jan 15 is 11:30 pm EST on Jan 14.
+    expect(formatPdfDate("2026-01-15T04:30:00Z")).toBe("January 14, 2026");
   });
 });

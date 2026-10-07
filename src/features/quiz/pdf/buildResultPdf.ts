@@ -77,6 +77,16 @@ export function wrapText(text: string, font: Measurer, size: number, maxWidth: n
   return lines;
 }
 
+/** Eastern time: EDT in summer, EST in winter. */
+export function formatPdfDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "America/New_York",
+  });
+}
+
 function absolute(href: string, siteUrl: string): string {
   return href.startsWith("http") ? href : `${siteUrl.replace(/\/$/, "")}${href}`;
 }
@@ -109,17 +119,10 @@ export async function buildResultPdf(input: PdfInput): Promise<Uint8Array> {
     }
   }
 
-  const date = new Date(input.createdAt).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-
   write("Amplifica Wealth", bold, 14, PURPLE);
   y -= 8;
   write("Your investor profile", bold, 24, PLUM, 30);
-  write(`${input.name} | ${date}`, regular, 11, GRAY);
+  write(`${input.name} | ${formatPdfDate(input.createdAt)}`, regular, 11, GRAY);
   y -= 14;
   write(archetype.name, bold, 26, PURPLE, 32);
   y -= 6;
