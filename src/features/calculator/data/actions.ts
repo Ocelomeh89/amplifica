@@ -2,7 +2,7 @@
 
 import { cookies, headers } from "next/headers";
 import { createAdminClient } from "@/shared/supabase/admin";
-import { subscribeToNewsletter } from "@/features/calculator/data/beehiiv";
+import { subscribeToNewsletter } from "@/shared/beehiiv";
 import { str } from "@/shared/forms";
 
 export interface CaptureLeadState {
@@ -61,7 +61,7 @@ export async function captureLead(
 
   // Then Beehiiv, awaited (post-response work can be killed on serverless).
   // Best-effort: the lead is already durable, so failure never blocks unlock.
-  const synced = await subscribeToNewsletter(email);
+  const synced = await subscribeToNewsletter({ email, source: "calculator" });
   if (synced) {
     await supabase
       .from("leads")

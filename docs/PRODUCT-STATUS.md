@@ -61,6 +61,7 @@ src/
       dashboard/ amplicons/ loc/ projections/ settings/ amortization/ compare/
       layout.tsx  Sidebar.tsx
     calculator/         # PUBLIC email-gated simulator
+    quiz/               # PUBLIC temporary lead-gen quiz (/quiz, /quiz/r/[token], PDF route)
     login/ signup/ reset-password/ auth/callback/
     layout.tsx  page.tsx  globals.css  robots.ts  sitemap.ts
 
@@ -73,6 +74,7 @@ src/
     simulator/          # shared simulator UI — used by projections AND calculator
     projections/        # ui/ (EditorForm, NewProjectionButton) + data/actions
     calculator/         # ui/ (CalculatorClient, EmailGate, InfoSections) + data/
+    quiz/               # temporary Instagram quiz: content, scoring, data/, pdf/, ui/ (removable in one delete; see its CLAUDE.md)
     amortization/       # engine/schedule + ui/ + nav.ts  (removable in one delete)
     amplicons/  loc/  dashboard/  settings/  auth/
     content/            # owner-only content engine (inbox, queues, performance, week, sources) — see its CLAUDE.md
@@ -84,9 +86,10 @@ src/
     format.ts           # currency/percent/date formatters
     forms.ts            # FormData coercion for Server Actions
     links.ts
+    beehiiv.ts          # best-effort newsletter subscribe (calculator + quiz)
   boundaries.test.ts    # asserts the three rules below
 
-supabase/migrations/    # 0001-0007 (see §4)
+supabase/migrations/    # 0001-0010 (see §4)
 docs/                   # specs, plans, this status doc
 ```
 
@@ -120,7 +123,7 @@ and open `*.test.ts` only when changing behavior.
 
 ## 4. Data schema (Postgres / Supabase)
 
-Four user-owned tables (all RLS-protected with self policies, all with a `touch_updated_at` trigger) plus the policy-less `leads` table. Reproduce by running migrations `0001`–`0007` in order.
+Four user-owned tables (all RLS-protected with self policies, all with a `touch_updated_at` trigger) plus the policy-less `leads` table. Reproduce by running migrations `0001`–`0010` in order.
 
 ### `profiles` (1:1 with `auth.users`, auto-created on signup) — migration 0001
 | Column | Type | Notes |
@@ -180,7 +183,7 @@ RLS: self CRUD. Index on `user_id`. **Migrations 0004–0006 have been applied t
 |---|---|---|
 | `id` | uuid PK | |
 | `email` | text | not null, format check, stored lowercased |
-| `source` | text | default `'calculator'` (future public surfaces get their own) |
+| `source` | text | default `'calculator'`; the quiz writes `'quiz'` (future public surfaces get their own) |
 | `utm_source` / `utm_medium` / `utm_campaign` | text | nullable, from the visitor's landing URL |
 | `user_agent` | text | nullable |
 | `beehiiv_synced` | boolean | default false; set true after a successful Beehiiv subscribe |
@@ -188,9 +191,26 @@ RLS: self CRUD. Index on `user_id`. **Migrations 0004–0006 have been applied t
 Unique index on `(lower(email), source)` — repeat submits are idempotent (23505 = success).
 **RLS enabled with no policies** (deliberate): the anon key is hard-denied, so the table is not a public spam surface; all writes go through the service-role client server-side.
 
+### `quiz_submissions` (temporary lead-gen quiz) — migration 0010
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `token` | uuid | unique, random; the only handle in the result URL `/quiz/r/[token]` |
+| `name` | text | 1 to 100 chars |
+| `email` | text | format check, stored lowercased |
+| `answers` | jsonb | array of exactly 15 integers, each 0 to 4 |
+| `scores` | jsonb | per-archetype totals, computed server-side |
+| `archetype` / `runner_up` | text | check-constrained to the 8 archetype keys in `features/quiz/content.ts` |
+| `quiz_version` | int | default 1; bump with `QUIZ_VERSION` when questions or weights change |
+| `utm_source` / `utm_medium` / `utm_campaign` | text | nullable |
+| `user_agent` | text | nullable |
+| `beehiiv_synced` | boolean | default false |
+| `created_at` | timestamptz | |
+Email is **not** unique: a retake adds a row (`leads` still dedupes by email). **RLS enabled with no policies**, like `leads`; only the service-role client reads or writes it. Applied by hand in the Supabase SQL editor.
+
 **Triggers/functions (0001):** `touch_updated_at()` (auto `updated_at`), `handle_new_user()` (auto-insert profile on signup, `security definer`).
 
-**TypeScript mirror:** `src/shared/supabase/database.types.ts` mirrors all tables as `Row`/`Insert`/`Update`; exported aliases `Projection`, `Amplicon`, `LoC`, `Profile`, `Lead`.
+**TypeScript mirror:** `src/shared/supabase/database.types.ts` mirrors all tables as `Row`/`Insert`/`Update`; exported aliases `Projection`, `Amplicon`, `LoC`, `Profile`, `Lead`, `QuizSubmission`.
 
 ---
 
@@ -269,6 +289,7 @@ Each feature folder pairs a Server Component `page.tsx` (reads rows) with `actio
 ## 8. Styling & components
 
 - Tailwind with brand tokens (`tailwind.config.ts`): theme-aware `ink/sub/cream/card/edge` (flip via CSS variables in `globals.css`) and fixed brand colors `plum #221338`, `purple #6C4BD3`, `amethyst #A88BE8`, `aqua #3EC9C0`, `mauve #8D8295`. Display serif + body sans font variables.
+- `/quiz` — **temporary public lead-gen quiz** (Instagram traffic). One question per screen (15 questions, 5 answers each), progress kept in `localStorage`, name and email gate after question 15. `submitQuiz(formData)` is called from the client form's `onSubmit` (React 18 has no `useFormState`): honeypot (redirects to `/quiz`) → validate name/email/answers → **rescore on the server** → insert `quiz_submissions` (hard failure shows no result) → mirror to `leads` (`source: 'quiz'`, duplicate ignored) → awaited best-effort Beehiiv subscribe (`first_name`, `utm_source: quiz`) → redirect to `/quiz/r/[token]`. The result page and `/quiz/r/[token]/pdf` (one-page `pdf-lib` PDF) look the row up by token with the service-role client; a malformed or unknown token is a 404. Both are noindex; `robots.ts` disallows `/quiz/r/`; the quiz is not in the sitemap. 8 archetypes; primary button is the calculator except the Debt-aholic (newsletter issue on debt) and the Cash-Flow Builder (community join page). Spec: `docs/superpowers/specs/2026-10-06-lead-gen-quiz-design.md`.
 - **Mobile-friendly throughout**: input/result grids collapse to 1–2 columns below `sm`/`lg`, list tables scroll horizontally in `overflow-x-auto` wrappers, the Sidebar starts collapsed on viewports < 640px (saved preference wins), and the calculator footer/CTA stack vertically on small screens.
 - Shared components: `Card`, `Field`, `InfoBox`, `NumberInput`, `PasswordInput`, `Sidebar` (sticky; keeps Settings + Log out visible while content scrolls).
 - Shared simulator UI in `src/features/simulator/`: `sim-values.ts` (the `SimValues` UI shape, `toSimInput` / `projectionToSimValues` mappers, `PUBLIC_DEFAULT_VALUES`), `useSimulation.ts` (state + 200ms debounce + engine memos), `SimInputsGrid`, `SimResults`, `SimCharts`, `FlywheelExplainer`. Used by both the projection editor and `/calculator`.
@@ -280,7 +301,7 @@ Each feature folder pairs a Server Component `page.tsx` (reads rows) with `actio
 
 1. `pnpm install`. Node 24 LTS.
 2. Create a Supabase project; set `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`, plus `SUPABASE_SERVICE_ROLE_KEY` / `BEEHIIV_API_KEY` / `BEEHIIV_PUBLICATION_ID` for the `/calculator` lead capture (it degrades gracefully without Beehiiv: leads still insert, `beehiiv_synced` stays false).
-3. Apply `supabase/migrations/0001`→`0007` in order (`supabase db push` / `migration up`). This builds all tables, RLS, triggers, and the signup→profile automation.
+3. Apply `supabase/migrations/0001`→`0010` in order (`supabase db push` / `migration up`). This builds all tables, RLS, triggers, and the signup→profile automation.
 4. `pnpm dev` → http://localhost:3000. Sign up (a profile row auto-creates), then add Amplicons/LoCs and build Projections.
 5. `pnpm test` (Vitest, 99 finance tests) and `pnpm typecheck` (`tsc --noEmit`) before shipping. **Do not run `next build` while `next dev` is running** — it corrupts the dev server's `.next` cache.
 

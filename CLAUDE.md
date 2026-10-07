@@ -47,6 +47,7 @@ changing behavior.** In `compare/engine/` 31 of 50 files are tests; in
 | `settings/` | Profile goals + theme toggle. |
 | `projections/` | Thin composition over `features/simulator`; `data/actions.ts` owns the FormData contract that `SimInputsGrid`'s `name=` attributes must match. |
 | `calculator/` | Public email-gated simulator. `data/actions.ts` writes leads via the **service-role** client and subscribes to Beehiiv. |
+| `quiz/` | Temporary Instagram lead-gen quiz at `/quiz`: 15 questions, 8 archetypes, email gate, PDF. **Removable in one delete** (see its CLAUDE.md). Writes `quiz_submissions` and `leads` via the **service-role** client and subscribes to Beehiiv. |
 | `amortization/` | A loan calculator that is **removable in one delete**: nothing outside the folder imports it, apart from `nav.ts` in the Sidebar. |
 | `auth/` | login / signup / reset-password server actions. |
 | `content/` | Owner-only content engine: idea inbox, per-format queues, sources. Routines write through `api/content/ingest`. Spec in `docs/superpowers/specs/2026-09-17-content-engine-design.md`. |

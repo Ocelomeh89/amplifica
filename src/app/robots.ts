@@ -19,6 +19,7 @@ export default function robots(): MetadataRoute.Robots {
           "/compare",
           "/content",
           "/amortization",
+          "/quiz/r/",
           "/auth/",
           "/reset-password",
         ],

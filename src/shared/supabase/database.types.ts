@@ -173,6 +173,43 @@ export type Database = {
         };
         Relationships: [];
       };
+      quiz_submissions: {
+        Row: {
+          id: string;
+          token: string;
+          name: string;
+          email: string;
+          answers: number[];
+          scores: Record<string, number>;
+          archetype: string;
+          runner_up: string;
+          quiz_version: number;
+          utm_source: string | null;
+          utm_medium: string | null;
+          utm_campaign: string | null;
+          user_agent: string | null;
+          beehiiv_synced: boolean;
+          created_at: string;
+        };
+        Insert: {
+          name: string;
+          email: string;
+          answers: number[];
+          scores: Record<string, number>;
+          archetype: string;
+          runner_up: string;
+          quiz_version?: number;
+          utm_source?: string | null;
+          utm_medium?: string | null;
+          utm_campaign?: string | null;
+          user_agent?: string | null;
+          beehiiv_synced?: boolean;
+        };
+        Update: {
+          beehiiv_synced?: boolean;
+        };
+        Relationships: [];
+      };
       content_sources: {
         Row: {
           id: string;
@@ -494,6 +531,7 @@ export type ProjectionInsert = Database["public"]["Tables"]["projections"]["Inse
 export type ProjectionUpdate = Database["public"]["Tables"]["projections"]["Update"];
 export type Lead = Database["public"]["Tables"]["leads"]["Row"];
 export type LeadInsert = Database["public"]["Tables"]["leads"]["Insert"];
+export type QuizSubmission = Database["public"]["Tables"]["quiz_submissions"]["Row"];
 export type ContentSource = Database["public"]["Tables"]["content_sources"]["Row"];
 export type ContentSourceInsert = Database["public"]["Tables"]["content_sources"]["Insert"];
 export type ContentSourceRule = Database["public"]["Tables"]["content_source_rules"]["Row"];
