@@ -401,7 +401,7 @@ describe("quiz content", () => {
 
   it("contains no em dashes in any copy", () => {
     const all = JSON.stringify({ QUESTIONS, ARCHETYPES, MIGUEL_NOTE, DISCLAIMER });
-    expect(all).not.toContain("—");
+    expect(all).not.toContain(String.fromCharCode(0x2014));
   });
 
   it("uses the tie-break order from the spec", () => {
