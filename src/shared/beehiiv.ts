@@ -1,10 +1,22 @@
 import "server-only";
 
-// Best-effort Beehiiv subscribe for calculator leads. Never throws: the lead
-// is already durable in Postgres by the time this runs, so a Beehiiv outage
-// must not block the unlock. Await it in the action — fire-and-forget work
-// can be killed after the response on Vercel serverless.
-export async function subscribeToNewsletter(email: string): Promise<boolean> {
+export interface SubscribeInput {
+  email: string;
+  /** Beehiiv utm_source, for example "calculator" or "quiz". */
+  source: string;
+  /** Sent as the first_name custom field when present. */
+  firstName?: string;
+}
+
+// Best-effort Beehiiv subscribe for public lead surfaces. Never throws: the
+// lead is already durable in Postgres by the time this runs, so a Beehiiv
+// outage must not block the unlock or the result. Await it in the action;
+// fire-and-forget work can be killed after the response on Vercel serverless.
+export async function subscribeToNewsletter({
+  email,
+  source,
+  firstName,
+}: SubscribeInput): Promise<boolean> {
   const apiKey = process.env.BEEHIIV_API_KEY;
   const publicationId = process.env.BEEHIIV_PUBLICATION_ID;
   if (!apiKey || !publicationId) {
@@ -24,8 +36,9 @@ export async function subscribeToNewsletter(email: string): Promise<boolean> {
         body: JSON.stringify({
           email,
           reactivate_existing: true,
-          utm_source: "calculator",
+          utm_source: source,
           utm_medium: "organic",
+          ...(firstName ? { custom_fields: [{ name: "first_name", value: firstName }] } : {}),
         }),
         signal: AbortSignal.timeout(5000),
       }

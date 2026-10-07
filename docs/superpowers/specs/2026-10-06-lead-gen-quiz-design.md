@@ -23,7 +23,7 @@ Success: completions that reach the email gate, emails captured, and clicks from
 
 New folder `src/features/quiz/`, routes under `src/app/quiz/`. It follows the repo's three import rules: `app/` may import `features/quiz`, and `features/quiz` imports only `shared/`.
 
-One refactor comes with it. `features/calculator/data/beehiiv.ts` moves to `src/shared/beehiiv.ts`, since two features now use it. Its signature becomes `subscribeToNewsletter({ email, name?, source })`. The calculator passes `source: "calculator"`, so its behavior does not change. `utm_source` takes the `source` value.
+One refactor comes with it. `features/calculator/data/beehiiv.ts` moves to `src/shared/beehiiv.ts`, since two features now use it. Its signature becomes `subscribeToNewsletter({ email, source, firstName? })`. The calculator passes `source: "calculator"`, so its behavior does not change. `utm_source` takes the `source` value.
 
 ```
 src/shared/beehiiv.ts
@@ -73,9 +73,9 @@ Each submit also inserts into `leads` with `source: "quiz"`. A duplicate there (
 
 ## Submit flow
 
-`submitQuiz(prevState, formData)`:
+`submitQuiz(formData)`, called from the client form's `onSubmit` (React 18 here has no `useFormState`, so the action is called directly, as `FoundContentForm` does):
 
-1. Honeypot field `website`. If filled, return success without storing and send the bot to a dummy result.
+1. Honeypot field `website`. If filled, redirect to `/quiz` without storing anything.
 2. Validate: name 1 to 100 chars, email by regex, exactly 15 answers each an integer from 0 to 4.
 3. Score on the server with `scoreAnswers`. Nothing from the browser is trusted except the raw answers.
 4. Insert into `quiz_submissions`. A hard failure returns "Something went wrong. Please try again." and shows no result.
