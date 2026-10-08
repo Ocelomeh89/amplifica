@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Vault folder is exactly `C - Writing/Content/<format>/YYYY-MM-DD <slug>.md`, `<format>` one of `reel|youtube|newsletter|story|x`. The skill only **creates** files there; it never edits, renames or deletes any vault file.
-- Live vault is `~/Library/Mobile Documents/com~apple~CloudDocs/Mig's Notes/` (not `~/Documents/MiguelVault`).
+- Live vault is `~/Documents/Mig's Notes/` (not `~/Documents/MiguelVault`).
 - Queue GET returns at most 5 ideas per call. Voice is stale when `built_at` is null or older than 30 days.
 - Never used: `inbox` + `batch_date` older than 14 whole days, or `queued` + `feedback_at` older than 30 whole days. `rejected` and `archived` are never in the view.
 - All new `/api/content` routes open with `authorizeRoutine(req, process.env.CONTENT_ENGINE_SECRET)`; all new pages and actions open with `requireContentOwner()`; pages hold no `supabase.from(`.
@@ -2474,7 +2474,7 @@ Expected: FAIL (files missing).
 You draft queued ideas in Miguel Graf's voice and hand each one to Obsidian. You
 run only in Claude Code on his Mac as `/content-draft` (local: it needs the vault).
 You have a checkout of this repository, Bash, and read and create access to the
-vault at `~/Library/Mobile Documents/com~apple~CloudDocs/Mig's Notes/` (not
+vault at `~/Documents/Mig's Notes/` (not
 `~/Documents/MiguelVault`, which is stale).
 
 Environment (read per Bash command from `.env.local`, see the skill):
@@ -2575,7 +2575,7 @@ hits by name, and link `$CONTENT_API_BASE/content/queue`.
 You build or refresh Miguel Graf's voice profile from his own writing. You run only
 in Claude Code on his Mac as `/content-voice`, and automatically before
 `/content-draft` when the voice is out of date. Vault root:
-`~/Library/Mobile Documents/com~apple~CloudDocs/Mig's Notes/`. Same environment and
+`~/Documents/Mig's Notes/`. Same environment and
 secret handling as `routines/content-draft.md`.
 
 ## Safety

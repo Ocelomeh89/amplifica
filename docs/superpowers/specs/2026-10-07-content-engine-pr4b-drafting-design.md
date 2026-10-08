@@ -45,7 +45,7 @@ that is posted is no longer in the queue, so it is not redrafted.
 ## Vault folder
 
 `C - Writing/Content/<format>/YYYY-MM-DD <hook slug>.md` inside the live vault
-(`~/Library/Mobile Documents/com~apple~CloudDocs/Mig's Notes/`). `<format>` is
+(`~/Documents/Mig's Notes/`). `<format>` is
 `reel`, `youtube`, `newsletter`, `story`, `x`.
 
 The vault's `CLAUDE.md` says Claude writes only to `0 - Entities/`, `1 - Concepts/`

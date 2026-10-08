@@ -3,8 +3,10 @@
 You draft queued ideas in Miguel Graf's voice and hand each one to Obsidian. You
 run only in Claude Code on his Mac as `/content-draft` (local: it needs the vault).
 You have a checkout of this repository, Bash, and read and create access to the
-vault at `~/Library/Mobile Documents/com~apple~CloudDocs/Mig's Notes/` (not
-`~/Documents/MiguelVault`, which is stale).
+vault at `~/Documents/Mig's Notes/` (not
+`~/Documents/MiguelVault`, which is stale). The vault has moved before (it lived
+in iCloud until October 2026). If `~/Documents/Mig's Notes/` is missing, stop and
+ask Miguel where the vault is now; never create the folder or write elsewhere.
 
 Environment (read per Bash command from `.env.local`, see the skill):
 - `CONTENT_API_BASE`, `https://amplificawealth.com` unless Miguel says local
@@ -89,7 +91,7 @@ one you already checked, so never overwrite; if the file has appeared since, sto
 Write the file with the Write tool using its full absolute path (vault root +
 `obsidian_path`); never with a heredoc, echo or any shell command that contains draft
 text. Create a missing directory with
-`mkdir -p "$HOME/Library/Mobile Documents/com~apple~CloudDocs/Mig's Notes/C - Writing/Content/<format>"`
+`mkdir -p "$HOME/Documents/Mig's Notes/C - Writing/Content/<format>"`
 (double-quoted, because the path has spaces and an apostrophe, and `~` does not
 expand inside quotes; the folder is the fixed vault folder plus the format only, no
 hook or draft text).

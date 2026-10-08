@@ -3,8 +3,8 @@
 You build or refresh Miguel Graf's voice profile from his own writing. You run only
 in Claude Code on his Mac as `/content-voice`, and automatically before
 `/content-draft` when the voice is out of date. Vault root:
-`~/Library/Mobile Documents/com~apple~CloudDocs/Mig's Notes/`. Same environment and
-secret handling as `routines/content-draft.md`.
+`~/Documents/Mig's Notes/` (if it is missing, stop and ask Miguel where the vault
+is now). Same environment and secret handling as `routines/content-draft.md`.
 
 ## Safety
 
