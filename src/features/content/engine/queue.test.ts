@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextRank, ranksAfterMove } from "./queue";
+import { nextRank, ranksAfterMove, visibleQueue } from "./queue";
 
 describe("nextRank", () => {
   it("is one past the largest rank, ignoring nulls", () => {
@@ -49,5 +49,29 @@ describe("ranksAfterMove", () => {
     expect(ranksAfterMove(q, "a", "up")).toBeNull();
     expect(ranksAfterMove(q, "c", "down")).toBeNull();
     expect(ranksAfterMove(q, "zz", "down")).toBeNull();
+  });
+});
+
+describe("visibleQueue", () => {
+  const NOW = new Date("2026-10-31T12:00:00Z");
+  const daysAgo = (n: number) => new Date(NOW.getTime() - n * 86_400_000).toISOString();
+  const row = (id: string, rank: number | null, likedDaysAgo: number) => ({
+    id,
+    queue_rank: rank,
+    status: "queued",
+    batch_date: daysAgo(60).slice(0, 10),
+    feedback_at: daysAgo(likedDaysAgo),
+    created_at: daysAgo(60),
+  });
+  const rows = [row("stale", null, 40), row("a", 1, 2), row("b", 2, 3)];
+
+  it("drops stale ideas and keeps the DB order of the rest", () => {
+    expect(visibleQueue(rows, NOW).map((r) => r.id)).toEqual(["a", "b"]);
+  });
+  it("moving past a hidden stale neighbour still swaps the visible pair", () => {
+    expect(ranksAfterMove(visibleQueue(rows, NOW), "b", "up")).toEqual([
+      { id: "b", rank: 1 },
+      { id: "a", rank: 2 },
+    ]);
   });
 });

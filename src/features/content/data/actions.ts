@@ -15,7 +15,7 @@ import { requireContentOwner } from "@/features/content/data/owner";
 import { syncQueuedIdeasToClickUp } from "@/features/content/data/clickup";
 import { str } from "@/shared/forms";
 import { reviveFields } from "@/features/content/engine/unused";
-import { nextRank, ranksAfterMove } from "@/features/content/engine/queue";
+import { nextRank, ranksAfterMove, visibleQueue } from "@/features/content/engine/queue";
 import { externalIdFromUrl, platformFromUrl } from "@/features/content/engine/posts";
 import { FORMATS, type Format } from "@/features/content/engine/types";
 
@@ -118,14 +118,14 @@ export async function moveIdea(formData: FormData) {
 
   const { data: ordered } = await supabase
     .from("content_ideas")
-    .select("id, queue_rank")
+    .select("id, queue_rank, status, batch_date, feedback_at, created_at")
     .eq("user_id", user.id)
     .eq("format", format)
     .eq("status", "queued")
     .order("queue_rank", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
 
-  const ranks = ranksAfterMove(ordered ?? [], id, direction);
+  const ranks = ranksAfterMove(visibleQueue(ordered ?? [], new Date()), id, direction);
   if (!ranks) return;
 
   for (const row of ranks) {
