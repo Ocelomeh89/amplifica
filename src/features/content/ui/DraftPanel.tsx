@@ -22,7 +22,7 @@ export default function DraftPanel({ ideaId, draft, obsidianPath }: { ideaId: st
             <ul className="space-y-1">
               {hits.map((h, i) => (
                 <li key={i} className={h.level === "block" ? "text-red-600" : "text-sub"}>
-                  {h.level}: {h.rule} — {h.excerpt}
+                  {h.level}: {h.rule} ({h.excerpt})
                 </li>
               ))}
             </ul>

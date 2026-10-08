@@ -13,7 +13,7 @@ export default async function ContentUnusedPage() {
       <h1 className="text-xl font-semibold mb-2">Content</h1>
       <ContentTabs />
       <p className="text-sm text-sub mb-3">
-        {ideas.length} idea{ideas.length === 1 ? "" : "s"} never used: unreviewed for over {UNREVIEWED_DAYS} days, or liked
+        {ideas.length} idea{ideas.length === 1 ? "" : "s"} never used. Unreviewed for over {UNREVIEWED_DAYS} days, or liked
         and not posted for over {UNPOSTED_DAYS}. Passed and archived ideas are not listed.
       </p>
       {ideas.length === 0 ? (
