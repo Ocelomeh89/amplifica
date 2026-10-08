@@ -70,3 +70,10 @@ review inbox/queued ideas, and update only their copy with owner and
 `updated_at` checks. Preserve source quotes, approval status, queue order,
 feedback, and any drafts; leave rejected, archived, and posted ideas alone.
 Ingest inserts new rows and must not be used to rewrite existing ones.
+
+## Local-only routines
+
+`content-draft.md` and `content-voice.md` run only through the `/content-draft` and
+`/content-voice` skills on Miguel's Mac, because they read and create files in his
+Obsidian vault. They are not scheduled. `/content-draft` checks the voice first and
+runs the voice refresh when it is out of date.
