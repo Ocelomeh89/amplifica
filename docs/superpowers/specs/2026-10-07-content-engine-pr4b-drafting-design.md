@@ -94,8 +94,11 @@ and the repo cannot drift. A test asserts the prompts name every lint rule.
 
 ### `engine/drafts.ts` (pure)
 
-Zod schema for the POST body, `draftFilename(idea, date)` (slug, collision-free
-suffix rule), and `vaultPath(format, filename)`. Path building rejects `..` and
+Zod schema for the POST body, `draftFilename(hook, date)` (slug), and
+`vaultPath(format, filename)`. The server suggests the name (`suggested_obsidian_path`
+on each queue idea); the skill checks existence with the Read tool before POSTing,
+picks `(2)`, `(3)` if needed, and posts the free name. `parseVaultPath` accepts only
+`YYYY-MM-DD slug.md` or `YYYY-MM-DD slug (N).md`. Path building rejects `..` and
 separators in the slug.
 
 ### Routes (bearer + owner, `authorizeRoutine()`)

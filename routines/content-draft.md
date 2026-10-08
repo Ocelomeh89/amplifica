@@ -61,10 +61,17 @@ For each idea, in the session:
    idea's hook, outline, quote and belief. Keep the template's headings exactly.
 2. **Humanize.** Apply `prompts.humanize` to the raw draft with the voice profile in
    view. Minimum effective edit; keep the headings.
-3. Write both to a JSON body file (never inline in a command), then POST it. The
-   shape is in `routines/examples/draft-post.json`. `obsidian_path` is
-   `C - Writing/Content/<format>/<YYYY-MM-DD> <hook slug>.md`: lowercase, words
-   joined by hyphens, at most 60 characters, today's date.
+3. **Pick the file name.** Each idea in the response carries
+   `suggested_obsidian_path`; the server built it (format folder, Chicago date, hook
+   slug), so do not build or edit the name by hand. Before posting, check whether that
+   file exists with the Read tool (never a shell command: the name derives from idea text). If it does, use the same
+   name with ` (2).md`, then ` (3).md`, until you find a free one. That free name is
+   the `obsidian_path` you POST, so the stored path always equals the file you then
+   create (with `--redo` the new name is the stored one). The format is
+   `C - Writing/Content/<format>/<YYYY-MM-DD> <hook slug>.md`: lowercase, words joined
+   by hyphens, at most 60 characters.
+4. Write both drafts to a JSON body file (never inline in a command), then POST it.
+   The shape is in `routines/examples/draft-post.json`.
 
 ```bash
 curl -sS --max-time 60 -o /tmp/draft-result.json -w '%{http_code}' -X POST "$CONTENT_API_BASE/api/content/drafts" -H "Authorization: Bearer $CONTENT_ENGINE_SECRET" -H "Content-Type: application/json" --data @/tmp/draft-body.json
@@ -76,14 +83,16 @@ idea. 409 `draft_exists`: tell Miguel and suggest `--redo`. Continue with the ne
 ## 4. Write the vault file, after the POST succeeds
 
 Only when the POST returned 200, create the file at `obsidian_path` inside the vault
-root. Create `C - Writing/Content/<format>/` if it is missing. If the file already
-exists, write `<name> (2).md` (then `(3)`) instead and say so; never overwrite.
+root. Create `C - Writing/Content/<format>/` if it is missing. The name is the free
+one you already checked, so never overwrite; if the file has appeared since, stop and tell Miguel.
 
 Write the file with the Write tool using its full absolute path (vault root +
 `obsidian_path`); never with a heredoc, echo or any shell command that contains draft
-text. Create a missing directory with `mkdir -p "<path only>"` (double-quoted, because the vault path has spaces and an apostrophe; path only, no draft
-text). Before choosing the name, test whether the file exists with a Read or
-`test -e "<path>"` check.
+text. Create a missing directory with
+`mkdir -p "$HOME/Library/Mobile Documents/com~apple~CloudDocs/Mig's Notes/C - Writing/Content/<format>"`
+(double-quoted, because the path has spaces and an apostrophe, and `~` does not
+expand inside quotes; the folder is the fixed vault folder plus the format only, no
+hook or draft text).
 
 ```markdown
 ---

@@ -25,9 +25,14 @@ describe("routines/content-draft.md", () => {
       "re-fetch",
       "mkdir -p",
       "voice profile is required",
+      "suggested_obsidian_path",
+      "Read tool",
     ]) {
       expect(draftDoc, needle).toContain(needle);
     }
+  });
+  it("no longer builds the filename by hand or checks existence in a shell", () => {
+    expect(draftDoc).not.toContain("test -e");
   });
   it("embeds an example body that passes the real draft schema and path rules", () => {
     const body = JSON.parse(read("routines/examples/draft-post.json"));
