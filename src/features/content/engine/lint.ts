@@ -38,7 +38,7 @@ const PATTERNS: Pattern[] = [
   { id: "guarantee", level: "block", re: /\bguarantee(?:s|d)?\b/gi },
   { id: "low-risk", level: "block", re: /\blow[- ]risk\b/gi },
   { id: "risk-free", level: "block", re: /\brisk[- ]free\b/gi },
-  { id: "return-promise", level: "block", re: /\byou(?:'ll| will) (?:earn|make|get|receive)\b|\bwill return \d/gi },
+  { id: "return-promise", level: "block", re: /\byou(?:'ll| will) (?:earn\b|(?:make|get|receive)\s+(?:\$|\d))|\bwill return \d/gi },
   { id: "episode-numbering", level: "block", re: /\b(?:part \d+ of \d+|episode \d+)\b/gi },
   { id: "leverage", level: "warn", re: /\bleverag(?:e|es|ed|ing)\b/gi, unquoted: true },
   { id: "banned-vocab", level: "warn", re: VOCAB_RE, unquoted: true, distinct: true },

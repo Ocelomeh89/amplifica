@@ -36,6 +36,14 @@ describe("lintDraft: block rules", () => {
     expect(hits.find((h) => h.rule === rule)?.level).toBe("block");
   });
 
+  it("blocks make/get with a money or percent figure as return-promise", () => {
+    expect(lintDraft("x", "## Post\nYou will make $500 a month.").find((h) => h.rule === "return-promise")?.level).toBe("block");
+    expect(lintDraft("x", "## Post\nYou will get 8% back.").find((h) => h.rule === "return-promise")?.level).toBe("block");
+  });
+  it("does not block ordinary make/get phrasing", () => {
+    expect(ids(lintDraft("x", "## Post\nYou'll get a number back and you will make a decision."))).not.toContain("return-promise");
+  });
+
   it("blocks a reel script over 150 words, and not at exactly 150", () => {
     const words = (n: number) => Array.from({ length: n }, () => "word").join(" ");
     expect(ids(lintDraft("reel", `## Script\n${words(151)}`))).toContain("reel-length");
