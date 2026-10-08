@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BANNED_VOCABULARY, HUMANIZE_PROMPT } from "./humanize";
 import { BRAND_GUARDRAILS, DRAFT_PROMPT, FORMAT_TEMPLATES } from "./draft";
 import { FORMATS } from "../types";
+import { LINT_RULES } from "../lint";
 
 describe("humanize prompt", () => {
   it("embeds the whole banned vocabulary", () => {
@@ -27,5 +28,12 @@ describe("draft prompt", () => {
   it("fixes the headings the linter reads", () => {
     expect(FORMAT_TEMPLATES.reel).toContain("## Script");
     expect(FORMAT_TEMPLATES.story).toContain("## Slides");
+  });
+});
+
+describe("prompts and lint agree", () => {
+  it("name every lint rule", () => {
+    const all = `${DRAFT_PROMPT}\n${HUMANIZE_PROMPT}`.toLowerCase();
+    for (const r of LINT_RULES) expect(all, r.id).toContain(r.hint.toLowerCase());
   });
 });
