@@ -27,6 +27,7 @@ describe("content stays owner-only", () => {
       "src/app/api/content/drafts/queue/route.ts",
       "src/app/api/content/drafts/route.ts",
       "src/app/api/content/cron/metrics/route.ts",
+      "src/app/api/content/voice/route.ts",
     ];
     for (const f of routes) expect(read(f), f).toContain("authorizeRoutine(req, process.env.");
   });

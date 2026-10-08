@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/shared/supabase/database.types";
 import { DraftStoreError, type DraftIdea, type DraftsDb } from "./drafts";
 import type { Format } from "@/features/content/engine/types";
+import type { VoiceDb } from "./voice";
 
 type Client = SupabaseClient<Database>;
 
@@ -82,4 +83,32 @@ export function supabaseDraftsDb(client: Client, userId: string): DraftsDb {
 export async function deleteIdeaDrafts(client: Client, userId: string, ideaId: string): Promise<void> {
   const { error } = await client.from("content_drafts").delete().eq("idea_id", ideaId).eq("user_id", userId);
   if (error) throw new Error(`delete drafts: ${error.message}`);
+}
+
+export function supabaseVoiceDb(client: Client, userId: string): VoiceDb {
+  return {
+    async voice() {
+      const { data, error } = await client
+        .from("content_voice")
+        .select("profile_md, exemplars, built_from, built_at")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (error) throw new Error(`voice: ${error.message}`);
+      return data;
+    },
+    async upsertVoice(a) {
+      const { error } = await client.from("content_voice").upsert(
+        {
+          user_id: userId,
+          profile_md: a.profile_md,
+          exemplars: a.exemplars as never,
+          built_from: { files: a.files, previous_profile_md: a.previous_profile_md } as never,
+          built_at: a.built_at,
+          updated_at: a.built_at as never,
+        },
+        { onConflict: "user_id" }
+      );
+      if (error) throw new Error(`upsert voice: ${error.message}`);
+    },
+  };
 }
