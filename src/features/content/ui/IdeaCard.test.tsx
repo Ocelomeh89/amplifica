@@ -32,6 +32,7 @@ const idea: ContentIdea = {
   feedback_reason: null,
   feedback_at: null,
   clickup_task_id: null,
+  obsidian_path: null,
   created_at: "2026-09-17T11:00:00Z",
   updated_at: "2026-09-17T11:00:00Z",
 };
