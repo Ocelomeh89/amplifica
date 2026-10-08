@@ -53,7 +53,8 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
 - `ui/UnusedCard.tsx` renders the Never used page (`/content/unused`), not
   `IdeaCard`; the tab has no count badge.
 - `routines/` (repo root) — routine instructions and README; `.claude/skills/`
-  holds the local companions `/content-plaud` and `/content-daily`.
+  holds the local companions `/content-plaud`, `/content-daily`, `/content-draft` and
+  `/content-voice`.
 
 ## Touchpoints outside this folder
 
@@ -112,12 +113,17 @@ these are all the places that know it exists:
 - A draft is stored atomically through the `content_store_draft` Postgres function:
   raw (v1), humanized (v2) and `obsidian_path` commit together or not at all. It
   locks the idea row; conflicts are `idea_not_queued` and `draft_exists` (409).
-- `obsidian_path` must be `C - Writing/Content/<format>/<name>.md` with the format
-  matching the idea. The skills only create files there, never edit or delete.
+- `obsidian_path` must be `C - Writing/Content/<format>/<YYYY-MM-DD slug>.md` (or
+  `... slug (N).md`) with the format matching the idea: lowercase letters, digits and
+  hyphens only, so nothing in it can reach a shell. The queue response gives each idea
+  a `suggested_obsidian_path` (Chicago date); the skill checks existence with the Read
+  tool and POSTs the free name. The skills only create files there, never edit or delete.
 - Lint runs once, on the humanized first draft. There is no Mark-posted gate.
 - Never used is derived, not stored (inbox over 14 days, queued over 30 since the
   Like); the Inbox, queues and week plan exclude those ideas, and `moveIdea` ranks
-  only the ideas the queue shows. `rejected` and `archived` are never in it.
+  only the ideas the queue shows. `rejected` and `archived` are never in it. The
+  drafts queue (`GET /api/content/drafts/queue`, bare mode) excludes them too, while
+  `?id=` still serves an explicit one.
 - `content_voice.built_from` is `{ files: [{path, mtime, bytes}], previous_profile_md }`.
 
 ## Seeding by hand

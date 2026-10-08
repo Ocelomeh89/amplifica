@@ -18,6 +18,7 @@ create or replace function public.content_store_draft(
   p_redo boolean
 ) returns void
 language plpgsql
+set search_path = public, pg_temp
 as $$
 begin
   perform 1 from public.content_ideas

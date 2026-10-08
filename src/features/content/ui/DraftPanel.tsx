@@ -5,16 +5,17 @@ type Draft = { stage: string; version: number; body: string; lint: unknown };
 
 // Read-only: Miguel edits in Obsidian, which is the final. The app holds the
 // first version until the idea is posted, then only the reference.
-export default function DraftPanel({ ideaId, draft, obsidianPath }: { ideaId: string; draft: Draft | null; obsidianPath: string | null }) {
+export default function DraftPanel({ ideaId, status, draft, obsidianPath }: { ideaId: string; status: string; draft: Draft | null; obsidianPath: string | null }) {
   const hits = draft ? parseLintHits(draft.lint) : [];
   return (
     <div className="text-sm space-y-3">
-      {!draft && !obsidianPath && (
+      {!draft && !obsidianPath && status === "queued" && (
         <div className="flex items-center gap-2">
           <span className="text-sub">No draft yet.</span>
           <CopyCommand command={`/content-draft ${ideaId}`} />
         </div>
       )}
+      {!draft && !obsidianPath && status !== "queued" && <span className="text-sub">No draft.</span>}
       {draft && (
         <>
           <pre className="whitespace-pre-wrap font-sans bg-edge/40 rounded p-3">{draft.body}</pre>

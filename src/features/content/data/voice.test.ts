@@ -8,10 +8,10 @@ const good = {
   files: [{ path: "C - Writing/a.md", mtime: "2026-10-07T01:00:00Z", bytes: 10 }],
 };
 
-function fakeDb(existing: { profile_md: string } | null = null) {
+function fakeDb(existing: { profile_md: string; previous?: string } | null = null) {
   const upserts: unknown[] = [];
   const db: VoiceDb = {
-    voice: async () => (existing ? { profile_md: existing.profile_md, exemplars: [], built_from: { files: [] }, built_at: "2026-09-01T00:00:00Z" } : null),
+    voice: async () => (existing ? { profile_md: existing.profile_md, exemplars: [], built_from: { files: [], previous_profile_md: existing.previous }, built_at: "2026-09-01T00:00:00Z" } : null),
     upsertVoice: async (a) => { upserts.push(a); },
   };
   return { db, upserts };
@@ -37,6 +37,16 @@ describe("postVoice", () => {
     const r = await postVoice(db, good, NOW);
     expect(r.status).toBe(200);
     expect(upserts[0]).toMatchObject({ previous_profile_md: "the old profile", built_at: NOW.toISOString(), profile_md: good.profile_md });
+  });
+  it("re-posting the same profile keeps the earlier previous profile", async () => {
+    const { db, upserts } = fakeDb({ profile_md: good.profile_md, previous: "the one before" });
+    await postVoice(db, good, NOW);
+    expect(upserts[0]).toMatchObject({ previous_profile_md: "the one before" });
+  });
+  it("re-posting the same profile with no stored previous gives an empty one", async () => {
+    const { db, upserts } = fakeDb({ profile_md: good.profile_md });
+    await postVoice(db, good, NOW);
+    expect(upserts[0]).toMatchObject({ previous_profile_md: "" });
   });
   it("has an empty previous profile on the first build", async () => {
     const { db, upserts } = fakeDb(null);

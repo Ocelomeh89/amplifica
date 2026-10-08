@@ -52,7 +52,7 @@ export default async function ContentIdeaPage({ params }: { params: { id: string
       </Card>
 
       <Card title="Draft">
-        <DraftPanel ideaId={idea.id} draft={draft} obsidianPath={idea.obsidian_path} />
+        <DraftPanel ideaId={idea.id} status={idea.status} draft={draft} obsidianPath={idea.obsidian_path} />
       </Card>
 
       {post && (

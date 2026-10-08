@@ -13,6 +13,9 @@ describe("0011_content_drafting.sql", () => {
     expect(sql).toContain("raise exception 'draft_exists'");
     expect(sql).toMatch(/for update/i);
   });
+  it("pins the function search_path", () => {
+    expect(sql).toMatch(/language plpgsql\s+set search_path = public, pg_temp/i);
+  });
   it("writes both versions and the path in the one function", () => {
     expect(sql).toMatch(/values\s*\([^)]*1, 'raw'[^)]*\),\s*\([^)]*2, 'humanized'/is);
     expect(sql).toMatch(/update public\.content_ideas set obsidian_path/i);
