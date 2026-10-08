@@ -14,6 +14,7 @@ import { fetchVideoMeta } from "@/features/content/data/youtube-meta";
 import { requireContentOwner } from "@/features/content/data/owner";
 import { syncQueuedIdeasToClickUp } from "@/features/content/data/clickup";
 import { str } from "@/shared/forms";
+import { reviveFields } from "@/features/content/engine/unused";
 import { nextRank, ranksAfterMove } from "@/features/content/engine/queue";
 import { externalIdFromUrl, platformFromUrl } from "@/features/content/engine/posts";
 import { FORMATS, type Format } from "@/features/content/engine/types";
@@ -90,6 +91,20 @@ export async function archiveIdea(formData: FormData) {
     .update({ status: "archived", queue_rank: null })
     .eq("id", id)
     .eq("user_id", user.id);
+  if (error) throw new Error(error.message);
+  revalidate();
+}
+
+export async function reviveIdea(formData: FormData) {
+  const { supabase, user } = await requireContentOwner();
+  const id = str(formData, "id");
+  if (!id) return;
+  const { error } = await supabase
+    .from("content_ideas")
+    .update(reviveFields(new Date()))
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .in("status", ["inbox", "queued"]);
   if (error) throw new Error(error.message);
   revalidate();
 }

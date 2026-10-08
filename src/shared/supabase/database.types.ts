@@ -331,6 +331,7 @@ export type Database = {
           clickup_task_id?: string | null;
           score?: number;
           obsidian_path?: string | null;
+          batch_date?: string;
         };
         Relationships: [];
       };

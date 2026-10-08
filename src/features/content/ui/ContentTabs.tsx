@@ -7,12 +7,13 @@ import clsx from "clsx";
 const TABS = [
   { href: "/content", label: "Inbox" },
   { href: "/content/queue", label: "Queues" },
+  { href: "/content/unused", label: "Never used" },
   { href: "/content/performance", label: "Performance" },
   { href: "/content/week", label: "Week" },
   { href: "/content/sources", label: "Sources" },
 ];
 
-// The pages under /content share one row of tabs. Taste is added by PR 4.
+// The pages under /content share one row of tabs. Taste is added by 4c.
 export default function ContentTabs() {
   const pathname = usePathname();
   return (
