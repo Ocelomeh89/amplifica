@@ -1,9 +1,10 @@
 import { z } from "zod";
-import { draftPostSchema, parseVaultPath, VAULT_FOLDER } from "@/features/content/engine/drafts";
+import { draftFilename, draftPostSchema, parseVaultPath, VAULT_FOLDER, vaultPath } from "@/features/content/engine/drafts";
 import { lintDraft, type LintHit } from "@/features/content/engine/lint";
 import { DRAFT_PROMPT } from "@/features/content/engine/prompts/draft";
 import { HUMANIZE_PROMPT } from "@/features/content/engine/prompts/humanize";
 import { voiceStale, type VoiceRow } from "@/features/content/engine/voice";
+import { filesOf } from "./voice";
 import type { Format } from "@/features/content/engine/types";
 
 // What /content-draft reads and writes. The endpoints are thin wrappers; the
@@ -48,7 +49,7 @@ export type StoreDraftArgs = {
 
 export interface DraftsDb {
   /** Queued ideas with no draft, in queue order: at most `limit`, plus how many such ideas exist in all. */
-  queuedWithoutDraft(limit: number): Promise<{ ideas: DraftIdea[]; total: number }>;
+  queuedWithoutDraft(limit: number, now: Date): Promise<{ ideas: DraftIdea[]; total: number }>;
   ideaById(id: string): Promise<DraftIdea | null>;
   voice(): Promise<VoiceRow | null>;
   /** Atomic. Throws DraftStoreError for the two expected conflicts. */
@@ -67,17 +68,22 @@ export async function getDraftQueue(db: DraftsDb, rawId: string | null, now: Dat
     if (one.status !== "queued") return { status: 409, body: { error: "idea_not_queued" } };
     ideas = [one];
   } else {
-    const q = await db.queuedWithoutDraft(QUEUE_LIMIT);
+    const q = await db.queuedWithoutDraft(QUEUE_LIMIT, now);
     ideas = q.ideas;
     remaining = Math.max(0, q.total - q.ideas.length);
   }
   const voice = await db.voice();
+  // Calendar date in Chicago, so a late-evening run does not name the file for tomorrow.
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(now);
+  const withPaths = ideas.map((i) => ({ ...i, suggested_obsidian_path: vaultPath(i.format, draftFilename(i.hook, today)) }));
   return {
     status: 200,
     body: {
-      ideas,
+      ideas: withPaths,
       remaining,
-      voice: voice ? { profile_md: voice.profile_md, exemplars: voice.exemplars, built_at: voice.built_at } : null,
+      voice: voice
+        ? { profile_md: voice.profile_md, exemplars: voice.exemplars, files: filesOf(voice.built_from), built_at: voice.built_at }
+        : null,
       voice_stale: voiceStale(voice?.built_at ?? null, now),
       prompts: { draft: DRAFT_PROMPT, humanize: HUMANIZE_PROMPT },
       vault_folder: VAULT_FOLDER,

@@ -13,7 +13,7 @@ function fakeDb(over: Partial<DraftsDb> = {}): DraftsDb & { stored: unknown[] } 
   const stored: unknown[] = [];
   return {
     stored,
-    queuedWithoutDraft: async (limit) => ({ ideas: [idea()].slice(0, limit), total: 1 }),
+    queuedWithoutDraft: async (limit, _now) => ({ ideas: [idea()].slice(0, limit), total: 1 }),
     ideaById: async () => idea(),
     voice: async () => ({ profile_md: "profile", exemplars: [], built_from: { files: [] }, built_at: "2026-10-01T00:00:00Z" }),
     storeDraft: async (args) => { stored.push(args); },
@@ -38,10 +38,31 @@ describe("getDraftQueue", () => {
     expect(Object.keys(b.prompts as object).sort()).toEqual(["draft", "humanize"]);
     expect((b.voice as { profile_md: string }).profile_md).toBe("profile");
   });
+  it("sends voice.files from built_from, [] when legacy or null", async () => {
+    const files = [{ path: "C - Writing/a.md", mtime: "2026-10-07T01:00:00Z", bytes: 10 }];
+    const withFiles = await getDraftQueue(fakeDb({ voice: async () => ({ profile_md: "p", exemplars: [], built_from: { files }, built_at: "2026-10-01T00:00:00Z" }) }), null, NOW);
+    expect((withFiles.body as { voice: { files: unknown[] } }).voice.files).toEqual(files);
+    const legacy = await getDraftQueue(fakeDb({ voice: async () => ({ profile_md: "p", exemplars: [], built_from: null, built_at: "2026-10-01T00:00:00Z" }) }), null, NOW);
+    expect((legacy.body as { voice: { files: unknown[] } }).voice.files).toEqual([]);
+  });
+  it("suggests an obsidian path per idea using the America/Chicago date", async () => {
+    // 2026-10-08T02:00Z is still 2026-10-07 in Chicago (CDT).
+    const late = new Date("2026-10-08T02:00:00Z");
+    const r = await getDraftQueue(fakeDb(), null, late);
+    expect((r.body as { ideas: { suggested_obsidian_path: string }[] }).ideas[0].suggested_obsidian_path).toBe(
+      "C - Writing/Content/reel/2026-10-07 i-took-a-w-2.md"
+    );
+  });
+  it("falls back to the idea slug for a symbol-only hook, also in the by-id path", async () => {
+    const r = await getDraftQueue(fakeDb({ ideaById: async () => idea({ hook: "🔥💸" }) }), ID, NOW);
+    expect((r.body as { ideas: { suggested_obsidian_path: string }[] }).ideas[0].suggested_obsidian_path).toBe(
+      "C - Writing/Content/reel/2026-10-07 idea.md"
+    );
+  });
   it("asks the db for at most QUEUE_LIMIT and reports what remains", async () => {
     const queuedWithoutDraft = vi.fn(async () => ({ ideas: [idea(), idea({ id: "b" })], total: 9 }));
     const r = await getDraftQueue(fakeDb({ queuedWithoutDraft }), null, NOW);
-    expect(queuedWithoutDraft).toHaveBeenCalledWith(QUEUE_LIMIT);
+    expect(queuedWithoutDraft).toHaveBeenCalledWith(QUEUE_LIMIT, NOW);
     expect((r.body as { remaining: number }).remaining).toBe(7);
   });
   it("flags a missing or old voice as stale and still serves ideas", async () => {

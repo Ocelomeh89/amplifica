@@ -28,6 +28,9 @@ export function vaultPath(format: Format, filename: string): string {
   return `${VAULT_FOLDER}/${format}/${filename}`;
 }
 
+/** `YYYY-MM-DD slug.md`, optionally `slug (2).md`: nothing a shell could expand. */
+const VAULT_FILENAME = /^\d{4}-\d{2}-\d{2} [a-z0-9-]+(?: \(\d+\))?\.md$/;
+
 /** `C - Writing/Content/<format>/<name>.md` and nothing else: no traversal, no absolute or Windows paths. */
 export function parseVaultPath(path: string): { format: Format; filename: string } | null {
   const parts = path.split("/");
@@ -37,7 +40,7 @@ export function parseVaultPath(path: string): { format: Format; filename: string
   const format = parts[prefix.length];
   const filename = parts[prefix.length + 1];
   if (!(FORMATS as readonly string[]).includes(format)) return null;
-  if (!/^[^\\/\0]+\.md$/.test(filename) || filename.includes("..")) return null;
+  if (!VAULT_FILENAME.test(filename)) return null;
   return { format: format as Format, filename };
 }
 

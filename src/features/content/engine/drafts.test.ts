@@ -36,7 +36,18 @@ describe("parseVaultPath", () => {
       filename: "2026-10-07 x.md",
     });
   });
+  it("accepts a collision suffix", () => {
+    expect(parseVaultPath("C - Writing/Content/reel/2026-10-07 x (2).md")?.filename).toBe("2026-10-07 x (2).md");
+  });
   it.each([
+    "C - Writing/Content/reel/2026-10-07 a$(id).md",
+    "C - Writing/Content/reel/2026-10-07 a`id`.md",
+    'C - Writing/Content/reel/2026-10-07 a"b.md',
+    "C - Writing/Content/reel/2026-10-07 a'b.md",
+    "C - Writing/Content/reel/2026-10-07 a\nb.md",
+    "C - Writing/Content/reel/2026-10-07 Upper.md",
+    "C - Writing/Content/reel/hello-world.md",
+    "C - Writing/Content/reel/x.md",
     "../C - Writing/Content/reel/x.md",
     "C - Writing/Content/reel/../../x.md",
     "/C - Writing/Content/reel/x.md",

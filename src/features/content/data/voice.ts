@@ -16,9 +16,14 @@ export interface VoiceDb {
   }): Promise<void>;
 }
 
-function filesOf(builtFrom: unknown): unknown[] {
+export function filesOf(builtFrom: unknown): unknown[] {
   const files = (builtFrom as { files?: unknown } | null)?.files;
   return Array.isArray(files) ? files : [];
+}
+
+function previousOf(builtFrom: unknown): string {
+  const prev = (builtFrom as { previous_profile_md?: unknown } | null)?.previous_profile_md;
+  return typeof prev === "string" ? prev : "";
 }
 
 export async function getVoice(db: VoiceDb, now: Date): Promise<Result> {
@@ -42,11 +47,16 @@ export async function postVoice(db: VoiceDb, input: unknown, now: Date): Promise
     };
   }
   const existing = await db.voice();
+  // Re-posting an identical profile must not wipe the revert copy.
+  const previous =
+    existing && existing.profile_md === parsed.data.profile_md
+      ? previousOf(existing.built_from)
+      : (existing?.profile_md ?? "");
   await db.upsertVoice({
     profile_md: parsed.data.profile_md,
     exemplars: parsed.data.exemplars,
     files: parsed.data.files,
-    previous_profile_md: existing?.profile_md ?? "",
+    previous_profile_md: previous,
     built_at: now.toISOString(),
   });
   return { status: 200, body: { ok: true } };

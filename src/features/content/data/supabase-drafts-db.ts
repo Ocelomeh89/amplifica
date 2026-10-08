@@ -3,6 +3,7 @@ import type { Database } from "@/shared/supabase/database.types";
 import { DraftStoreError, type DraftIdea, type DraftsDb } from "./drafts";
 import type { Format } from "@/features/content/engine/types";
 import type { VoiceDb } from "./voice";
+import { UNPOSTED_DAYS } from "@/features/content/engine/unused";
 
 type Client = SupabaseClient<Database>;
 
@@ -17,7 +18,7 @@ export function supabaseDraftsDb(client: Client, userId: string): DraftsDb {
   });
 
   return {
-    async queuedWithoutDraft(limit) {
+    async queuedWithoutDraft(limit, now) {
       // Drafts are deleted at Mark posted, so this list stays small.
       const { data: drafts, error: draftError } = await client.from("content_drafts").select("idea_id").eq("user_id", userId);
       if (draftError) throw new Error(`drafts: ${draftError.message}`);
@@ -27,6 +28,11 @@ export function supabaseDraftsDb(client: Client, userId: string): DraftsDb {
         .select(IDEA_COLUMNS, { count: "exact" })
         .eq("user_id", userId)
         .eq("status", "queued");
+      // Never-used ideas (queued, more than UNPOSTED_DAYS whole days old) are hidden
+      // on the Queues page; keep them out of the bare queue too. 31 days because the
+      // rule is "more than 30": a 30-day-old idea is still fresh.
+      const cutoff = new Date(now.getTime() - (UNPOSTED_DAYS + 1) * 86_400_000).toISOString();
+      query = query.or(`feedback_at.gt.${cutoff},and(feedback_at.is.null,created_at.gt.${cutoff})`);
       if (draftedIds.length > 0) query = query.not("id", "in", `(${draftedIds.join(",")})`);
       const { data, error, count } = await query
         .order("queue_rank", { ascending: true, nullsFirst: false })
