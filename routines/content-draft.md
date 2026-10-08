@@ -39,11 +39,18 @@ Use `?id=<uuid>` for one idea. Anything other than 200: stop and say so (409
 ## 2. Check the voice first
 
 Read `voice_stale` and `voice` from the response. Also compare `voice.files` (path +
-mtime) against the vault files named in `routines/content-voice.md`: any changed
-source file, or any posted final in `C - Writing/Content/` not listed, means the
-voice is out of date. If `voice` is null, `voice_stale` is true, or any file changed,
-show Miguel the changed-file list and run the `/content-voice` routine before
-drafting. If he answers "skip", draft with the current profile and say it may be old.
+mtime) against the vault files named in `routines/content-voice.md`. Record each
+file's mtime with the exact command from "Recording mtime" in that file
+(`TZ=UTC stat -f '%Sm' -t '%Y-%m-%dT%H:%M:%SZ' "<file>"`; quote only the file path,
+never file contents). A file is changed when its mtime differs from the one in
+`voice.files`, or when it is not listed. Any changed source file, or any posted final
+in `C - Writing/Content/` not listed, means the voice is out of date. If `voice` is
+null, `voice_stale` is true, or any file changed, show Miguel the changed-file list
+and run the `/content-voice` routine before drafting. After the refresh, re-fetch the
+queue endpoint (repeat the step 1 curl) and use the new `voice`, exemplars and
+`voice_stale` for drafting. If he answers "skip", draft with the current profile and
+say it may be old; if `voice` is null there is no profile to draft with, so stop and
+tell Miguel a voice profile is required first.
 
 ## 3. Draft each idea
 
@@ -71,6 +78,12 @@ idea. 409 `draft_exists`: tell Miguel and suggest `--redo`. Continue with the ne
 Only when the POST returned 200, create the file at `obsidian_path` inside the vault
 root. Create `C - Writing/Content/<format>/` if it is missing. If the file already
 exists, write `<name> (2).md` (then `(3)`) instead and say so; never overwrite.
+
+Write the file with the Write tool using its full absolute path (vault root +
+`obsidian_path`); never with a heredoc, echo or any shell command that contains draft
+text. Create a missing directory with `mkdir -p <path only>` (path only, no draft
+text). Before choosing the name, test whether the file exists with a Read or
+`test -e` check on the path.
 
 ```markdown
 ---

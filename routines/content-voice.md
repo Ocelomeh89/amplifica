@@ -32,7 +32,13 @@ Candidates, in priority order:
    `C - Writing/Book - *`, LinkedIn posts under `C - Writing/LinkedIn`, and `X-Posts-Log.md`.
 4. `C - Writing/Journal 2026.md` (rhythm and vocabulary only).
 
-Record `{ path, mtime, bytes }` for every file. **Before reading any**, show Miguel
+Record `{ path, mtime, bytes }` for every file.
+
+**Recording mtime.** Each file's `mtime` is recorded in UTC ISO-8601 with seconds,
+via `TZ=UTC stat -f '%Sm' -t '%Y-%m-%dT%H:%M:%SZ' "<file>"` on macOS, and `bytes`
+via `stat -f '%z' "<file>"`. Quote only file paths in these commands, never file
+contents.
+ **Before reading any**, show Miguel
 the list with which files are new or changed since `voice.files`, and wait for a yes
 or edits. This catches a wrong source or a stale copy. Only changed or new files are
 re-read; unchanged files are covered by the existing profile.
@@ -44,6 +50,9 @@ opens, how he handles numbers and his own failures, what he never says. Keep wha
 still holds from the current profile and revise what the new material changes. Pick
 8 to 12 exemplars of 80 to 200 words that best show the voice, each from published or
 draft writing (never the journal), with the vault path.
+The new exemplar set keeps the existing exemplars (from the GET `voice.exemplars`)
+whose source file is unchanged, replaces those whose file changed, and adds new ones,
+ending with 8 to 12 total.
 
 ## 4. Store it
 

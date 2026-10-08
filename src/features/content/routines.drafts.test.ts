@@ -21,6 +21,10 @@ describe("routines/content-draft.md", () => {
       "after the POST succeeds",
       "(2).md",
       "/content-voice",
+      "Write tool",
+      "re-fetch",
+      "mkdir -p",
+      "voice profile is required",
     ]) {
       expect(draftDoc, needle).toContain(needle);
     }
@@ -45,6 +49,9 @@ describe("routines/content-voice.md", () => {
       "show Miguel the list",
       "never quote",
       "mtime",
+      "Recording mtime",
+      "TZ=UTC stat",
+      "unchanged",
     ]) {
       expect(voiceDoc, needle).toContain(needle);
     }
