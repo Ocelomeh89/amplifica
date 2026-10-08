@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireContentOwner } from "@/features/content/data/owner";
-import { loadIdea, loadIdeaContext } from "@/features/content/data/queries";
+import { loadIdea, loadIdeaContext, loadIdeaDraft } from "@/features/content/data/queries";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import IdeaCard from "@/features/content/ui/IdeaCard";
+import DraftPanel from "@/features/content/ui/DraftPanel";
 import FormatBadge from "@/features/content/ui/FormatBadge";
 import MetricsPanel from "@/features/content/ui/MetricsPanel";
 import Card from "@/shared/ui/Card";
@@ -16,6 +17,7 @@ export default async function ContentIdeaPage({ params }: { params: { id: string
   if (!idea) notFound();
 
   const { source, mates, post, snapshot } = await loadIdeaContext(supabase, user.id, idea);
+  const draft = await loadIdeaDraft(supabase, user.id, idea.id);
 
   return (
     <div className="max-w-3xl">
@@ -47,6 +49,10 @@ export default async function ContentIdeaPage({ params }: { params: { id: string
             </>
           )}
         </dl>
+      </Card>
+
+      <Card title="Draft">
+        <DraftPanel ideaId={idea.id} draft={draft} obsidianPath={idea.obsidian_path} />
       </Card>
 
       {post && (
