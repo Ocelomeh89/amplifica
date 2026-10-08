@@ -81,9 +81,9 @@ exists, write `<name> (2).md` (then `(3)`) instead and say so; never overwrite.
 
 Write the file with the Write tool using its full absolute path (vault root +
 `obsidian_path`); never with a heredoc, echo or any shell command that contains draft
-text. Create a missing directory with `mkdir -p <path only>` (path only, no draft
+text. Create a missing directory with `mkdir -p "<path only>"` (double-quoted, because the vault path has spaces and an apostrophe; path only, no draft
 text). Before choosing the name, test whether the file exists with a Read or
-`test -e` check on the path.
+`test -e "<path>"` check.
 
 ```markdown
 ---

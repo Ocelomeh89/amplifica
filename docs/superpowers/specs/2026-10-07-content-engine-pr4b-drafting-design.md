@@ -106,15 +106,16 @@ separators in the slug.
   name, and `voice_stale` (see Voice). Bounded: at most 5 ideas per call.
 - `POST /api/content/drafts`: `{ idea_id, raw, humanized, obsidian_path, model }`.
   Validates the whole body, lints the humanized text, writes both rows and
-  `obsidian_path` in one transaction. Any failure writes nothing. Refuses an idea
+  `obsidian_path` through the `content_store_draft` Postgres function (Supabase's client has no transactions). Any failure writes nothing. Refuses an idea
   that is not `queued` or already has a draft (unless `redo: true`, which deletes
-  the old rows in the same transaction).
+  the old rows in the same function call).
 - `GET`/`POST /api/content/voice`: read for the skill, upsert into `content_voice`.
 
-### Migration `0011_content_obsidian_path.sql`
+### Migration `0011_content_drafting.sql`
 
-`alter table content_ideas add column obsidian_path text;`. Nothing else: the
-`content_drafts` and `content_voice` tables already exist in 0008. Regenerate
+0011 adds `alter table content_ideas add column obsidian_path text;` and the
+`content_store_draft` function. The `content_drafts` and `content_voice` tables
+already exist in 0008. Regenerate
 `shared/supabase/database.types.ts`.
 
 ### UI
@@ -158,7 +159,7 @@ journal.
 
 `profile_md` (sentence length and rhythm, vocabulary used and avoided, how he
 opens, numbers and failures, what he never says), 8 to 12 exemplars of 80 to 200
-words, and `built_from`: `[{path, mtime, bytes}]` for every file read.
+words, and `built_from`: `{ files: [{path, mtime, bytes}], previous_profile_md }`, one entry per file read.
 
 ### Staying current
 
@@ -172,8 +173,7 @@ words, and `built_from`: `[{path, mtime, bytes}]` for every file read.
 - Refresh is incremental in effect, not in cost: it rebuilds the profile from the
   full source set but only re-reads changed files, since unchanged files are
   summarized in the prior profile.
-- Each refresh keeps one prior copy of `profile_md` in `built_from` metadata
-  (`previous_profile_md`) so a bad rebuild can be reverted by re-posting it.
+- `built_from` is stored as `{ files: [{path, mtime, bytes}], previous_profile_md }`; the server fills `previous_profile_md` from the row it replaces. Each refresh keeps one prior copy of `profile_md` there so a bad rebuild can be reverted by re-posting it.
   Revert is a manual step; there is no UI for it in 4b.
 
 ## Never used: stale ideas, kept visible
@@ -193,9 +193,9 @@ app draft or an `obsidian_path` exists, so a drafted-but-unposted idea is
 distinguishable from one never touched.
 
 **Where it shows.** A "Never used" tab in `ContentTabs` (`/content/unused`), newest
-first, with a count badge. Cards reuse `IdeaCard` and show age, reason, and draft
+first, (the count is in the page's first line; `ContentTabs` is a client component shared by every page, so a badge would mean threading a prop through all of them). Cards use a small `UnusedCard` (Revive and Archive only; `IdeaCard`'s Like and Pass do not make sense for an idea that already had its chance) and show age, reason, and draft
 state. Stale ideas are removed from the Inbox list and the format queues so those
-stay working lists; their ranks renumber through the existing `ranksAfterMove`.
+stay working lists; rank gaps heal on the next move through the existing `ranksAfterMove`.
 Passed (`rejected`) and `archived` ideas are deliberate decisions and are not in
 this view.
 

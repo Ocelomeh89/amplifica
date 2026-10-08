@@ -38,7 +38,8 @@ Record `{ path, mtime, bytes }` for every file.
 via `TZ=UTC stat -f '%Sm' -t '%Y-%m-%dT%H:%M:%SZ' "<file>"` on macOS, and `bytes`
 via `stat -f '%z' "<file>"`. Quote only file paths in these commands, never file
 contents.
- **Before reading any**, show Miguel
+
+**Before reading any**, show Miguel
 the list with which files are new or changed since `voice.files`, and wait for a yes
 or edits. This catches a wrong source or a stale copy. Only changed or new files are
 re-read; unchanged files are covered by the existing profile.
