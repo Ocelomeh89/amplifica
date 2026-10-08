@@ -7,8 +7,6 @@ type Client = SupabaseClient<Database>;
 
 const IDEA_COLUMNS =
   "id, format, title, hook, hook_alt, belief_attacked, value_to_listener, why_it_stops, outline, quote, quote_ref, pillar, hook_type, status";
-// The undrafted filter runs in memory over a bounded window of the queue.
-const QUEUE_WINDOW = 50;
 
 export function supabaseDraftsDb(client: Client, userId: string): DraftsDb {
   const toIdea = (r: Record<string, unknown>, hasDraft: boolean): DraftIdea => ({
@@ -19,26 +17,22 @@ export function supabaseDraftsDb(client: Client, userId: string): DraftsDb {
 
   return {
     async queuedWithoutDraft(limit) {
-      const { data, error } = await client
+      // Drafts are deleted at Mark posted, so this list stays small.
+      const { data: drafts, error: draftError } = await client.from("content_drafts").select("idea_id").eq("user_id", userId);
+      if (draftError) throw new Error(`drafts: ${draftError.message}`);
+      const draftedIds = [...new Set((drafts ?? []).map((d) => d.idea_id))];
+      let query = client
         .from("content_ideas")
-        .select(IDEA_COLUMNS)
+        .select(IDEA_COLUMNS, { count: "exact" })
         .eq("user_id", userId)
-        .eq("status", "queued")
+        .eq("status", "queued");
+      if (draftedIds.length > 0) query = query.not("id", "in", `(${draftedIds.join(",")})`);
+      const { data, error, count } = await query
         .order("queue_rank", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: true })
-        .limit(QUEUE_WINDOW);
+        .limit(limit);
       if (error) throw new Error(`queued ideas: ${error.message}`);
-      const rows = data ?? [];
-      if (rows.length === 0) return { ideas: [], total: 0 };
-      const { data: drafts, error: draftError } = await client
-        .from("content_drafts")
-        .select("idea_id")
-        .eq("user_id", userId)
-        .in("idea_id", rows.map((r) => r.id));
-      if (draftError) throw new Error(`drafts: ${draftError.message}`);
-      const drafted = new Set((drafts ?? []).map((d) => d.idea_id));
-      const open = rows.filter((r) => !drafted.has(r.id));
-      return { ideas: open.slice(0, limit).map((r) => toIdea(r, false)), total: open.length };
+      return { ideas: (data ?? []).map((r) => toIdea(r as unknown as Record<string, unknown>, false)), total: count ?? 0 };
     },
 
     async ideaById(id) {
