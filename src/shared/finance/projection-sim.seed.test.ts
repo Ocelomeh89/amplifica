@@ -99,3 +99,42 @@ describe("sanitizeSimInput — seed", () => {
     expect(issues.length).toBeGreaterThanOrEqual(3);
   });
 });
+
+describe("runSimulation — start delay", () => {
+  const delayed = (d: number) => runSimulation({ ...base, seed: seed({ startDelayMonths: d }) });
+
+  it("delay 0 equals an undelayed seeded run", () => {
+    expect(delayed(0)).toEqual(runSimulation({ ...base, seed: seed() }));
+  });
+
+  it("the ledger is idle during the delay: no draw, no cash, no contribution", () => {
+    const r = delayed(3);
+    for (let m = 0; m < 3; m++) {
+      expect(r.series[m].deployedCapital).toBe(0);
+      expect(r.series[m].cash).toBe(0);
+      expect(r.series[m].outstandingAmount).toBe(0);
+      expect(r.series[m].contributedCapital).toBe(0);
+      expect(r.series[m].distributionCashFlow).toBeGreaterThan(0); // tracked payouts still shown
+    }
+    expect(r.series[3].deployedCapital).toBe(10000);
+  });
+
+  it("from month D it matches an undelayed run whose book is D months further along", () => {
+    const D = 4;
+    const r = delayed(D);
+    const shifted = runSimulation({
+      ...base,
+      totalMonths: 360 - D,
+      seed: seed({ book: [tracked(10000, 0.08, 36, -5 - D)] }),
+    });
+    for (let k = 0; k < 120; k++) {
+      const a = r.series[D + k];
+      const b = shifted.series[k];
+      expect(a.outstandingAmount).toBeCloseTo(b.outstandingAmount, 6);
+      expect(a.cash).toBeCloseTo(b.cash, 6);
+      expect(a.expectedFuturePayments).toBeCloseTo(b.expectedFuturePayments, 6);
+      expect(a.distributionCashFlow).toBeCloseTo(b.distributionCashFlow, 6);
+      expect(a.contributedCapital).toBeCloseTo(b.contributedCapital, 6);
+    }
+  });
+});

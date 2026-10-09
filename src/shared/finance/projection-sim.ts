@@ -292,14 +292,22 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
     const withdrawing = config.withdrawalStartMonth != null && m >= config.withdrawalStartMonth;
     const withdrawal = withdrawing ? config.monthlyWithdrawal : 0;
 
-    state.outstandingAmount *= 1 + monthlyLocRate;
+    // Seeded start delay: the projected ledger is idle. Tracked Amplicons
+    // still pay (and are reported), but that money and the MSC are assumed to
+    // be paying down a real LoC balance the dashboard doesn't track, so
+    // nothing accrues, banks, or launches.
+    const idle = seed != null && m < seed.startDelayMonths;
+
+    if (!idle) state.outstandingAmount *= 1 + monthlyLocRate;
 
     const payouts = collectPayouts(state.book, m);
     const cashFlow = effMsc + payouts.total;
     const netInflow = cashFlow - withdrawal;
 
-    applyNetInflow(state, netInflow);
-    manageLaunch(state, config, m, netInflow);
+    if (!idle) {
+      applyNetInflow(state, netInflow);
+      manageLaunch(state, config, m, netInflow);
+    }
 
     if (state.outstandingAmount > state.peakOutstanding) {
       state.peakOutstanding = state.outstandingAmount;
@@ -311,9 +319,11 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
     const value = valueBook(state.book, m + 1);
     const expectedFuturePayments = value.total + state.cash - state.outstandingAmount;
 
-    state.contributed += effMsc;
+    if (!idle) {
+      state.contributed += effMsc;
+      state.marketBalance = state.marketBalance * (1 + monthlyMarketRate) + effMsc;
+    }
     state.distributions += payouts.total;
-    state.marketBalance = state.marketBalance * (1 + monthlyMarketRate) + effMsc;
 
     series.push({
       monthIndex: m,
