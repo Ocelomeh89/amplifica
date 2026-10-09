@@ -57,6 +57,8 @@ describe("routines/content-voice.md", () => {
       "Recording mtime",
       "TZ=UTC stat",
       "unchanged",
+      "beehiiv:",
+      "never list it in `files`",
     ]) {
       expect(voiceDoc, needle).toContain(needle);
     }
