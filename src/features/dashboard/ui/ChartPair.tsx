@@ -44,7 +44,7 @@ export default function ChartPair({
     ? range === "inception" ? inceptionProjected : currentProjected
     : range === "inception" ? inceptionSeries : currentSeries;
   const showOptionality = optionalityInRange(rows, optionalityMonth);
-  const tickInterval = Math.max(2, Math.floor(rows.length / 12));
+  const tickInterval = projecting ? Math.max(2, Math.floor(rows.length / 12)) : 2;
 
   return (
     <div>
