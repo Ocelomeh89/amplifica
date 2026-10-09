@@ -32,7 +32,7 @@ optionality date on both charts.
 | LoC balance today | Assumed **$0**. |
 | Next draw size | A setting. Default (stored as `null`) = face value of the most recent Amplicon by `start_date`. |
 | First projected draw | Exactly the next draw size, no step-up. After that, the existing payoff gate and step-up rules apply unchanged. |
-| Start delay | A setting, **0–5 months**, default 0. No projected draw before that month. Tracked payouts and MSC arriving in the meantime bank as cash and are applied against the first draw. |
+| Start delay | A setting, **0–5 months**, default 0. The projection starts that many months out. In the meantime tracked payouts and MSC are assumed to go to an untracked LoC paydown: they don't bank as cash or reduce the first draw. |
 | Optionality definition | `earliestSustainableWithdrawal(..., { requireGrowth: false })`, the same call Projections makes. Withdrawal amount = **Monthly cash flow goal** from Settings. |
 | Meter percentage | **Cash-flow progress**: current monthly cash flow ÷ projected monthly cash flow (`distributionCashFlow`) in the optionality month, clamped to 0–100%. |
 | Settings storage | New table, one row per user. |
@@ -68,13 +68,17 @@ When `seed` is present:
 - `state.currentInvestmentSize` = `seed.nextDrawSize`.
 - `state.pendingLaunch` starts as `{ steppedEligible: false }`, so the first
   draw is tried at `nextDrawSize` only and is subject to the payoff gate.
-- **Start delay.** `manageLaunch` does nothing while `month < startDelayMonths`.
-  During those months tracked Amplicons keep paying and MSC keeps arriving;
-  with a $0 balance that inflow banks as `cash`. At `startDelayMonths` the
-  first draw is evaluated as usual, and the banked cash is applied against it
-  (the existing `fromCash` step). The payoff gate still applies, so the draw
-  can land later than the delay if it doesn't qualify. With delay 0 and a $0
-  balance the gate usually passes in month 0.
+- **Start delay.** While `month < startDelayMonths` the projected ledger is
+  idle: `applyNetInflow` and `manageLaunch` are skipped. Tracked Amplicons
+  still pay out and appear in `distributionCashFlow`, but that money and the
+  MSC are assumed to be paying down a real LoC balance the dashboard doesn't
+  track, so nothing banks as cash and `contributedCapital` / the market
+  baseline don't accrue. `cash` and `outstandingAmount` stay 0, so EFP during
+  the delay is the tracked book's remaining value. From month
+  `startDelayMonths` on, the simulation runs normally and the first draw is
+  evaluated against a $0 balance. The payoff gate still applies, so the draw
+  can land later than the delay but never earlier. With delay 0 the gate
+  usually passes in month 0.
 - `initialInvestmentSize` in the result = `seed.nextDrawSize`.
 - `msc`, `investmentSizeFactor` and the rest of the config are read as usual.
   `investmentSizeFactor` is unused when seeded.
@@ -111,7 +115,9 @@ export function seedFromTracked(
 ### 1.3 Optionality
 
 `earliestSustainableWithdrawal` spreads `base` into each run, so `seed` carries
-through with no change. Withdrawal may start at month 0. Add a test proving the
+through. `FiOptions` gains `minStartMonth` (default 0, so existing callers are
+unchanged); the dashboard passes `startDelayMonths`, so optionality can't land
+inside the delay, where the ledger is idle and a withdrawal would cost nothing. Add a test proving the
 seeded call finds the same month as a hand-checked seeded scenario.
 
 ### 1.4 Tests (TDD)
@@ -123,9 +129,12 @@ seeded call finds the same month as a hand-checked seeded scenario.
 - Gate: $0 balance + strong existing payouts → first draw in month 0; tiny
   payouts + large draw → flywheel waits and banks cash.
 - First draw is never a step-up.
-- Start delay: with delay D, no draw before month D; cash banked during the
-  delay equals Σ(tracked payouts + MSC) over months 0..D−1 and is netted
-  against the first draw; delay 0 matches the undelayed seeded run.
+- Start delay: with delay D, no draw before month D; `cash`,
+  `outstandingAmount` and `contributedCapital` are 0 through month D−1 while
+  `distributionCashFlow` still shows tracked payouts; the run from month D
+  equals an undelayed seeded run whose book is shifted D months earlier;
+  delay 0 matches the undelayed seeded run.
+- Optionality search with delay D never returns a month before D.
 - Sanitizer clamps `startDelayMonths` to an integer in 0–5.
 - `seedFromTracked`: offsets, matured drop, default and override draw size,
   empty list.
@@ -215,7 +224,9 @@ Replaces the "Expected future payments" cell under Target.
 - Info hover (`InfoBox`): roughly "Your current monthly cash flow as a share of
   the cash flow projected for your optionality date. 100% is the date marked on
   the charts." Final copy goes through the no-ai-slop skill.
-- States: no cash flow goal → "Set a monthly cash flow goal in Settings" (link);
+- States: no tracked Amplicons → "Add an Amplicon to see your progress" (an
+  empty book with a $0 draw is trivially "sustainable", so it must not read as
+  100%); no cash flow goal → "Set a monthly cash flow goal in Settings" (link);
   no sustainable month within the horizon → "Not reached within N years" in grey;
   optionality month 0 → 100%.
 
