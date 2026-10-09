@@ -297,6 +297,7 @@ export type Database = {
           feedback_reason: string | null;
           feedback_at: string | null;
           clickup_task_id: string | null;
+          obsidian_path: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -320,6 +321,7 @@ export type Database = {
           batch_date?: string;
           status?: "inbox" | "queued" | "rejected" | "posted" | "archived";
           queue_rank?: number | null;
+          obsidian_path?: string | null;
         };
         Update: {
           status?: "inbox" | "queued" | "rejected" | "posted" | "archived";
@@ -328,6 +330,8 @@ export type Database = {
           feedback_at?: string | null;
           clickup_task_id?: string | null;
           score?: number;
+          obsidian_path?: string | null;
+          batch_date?: string;
         };
         Relationships: [];
       };
@@ -513,7 +517,21 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      content_store_draft: {
+        Args: {
+          p_user_id: string;
+          p_idea_id: string;
+          p_raw: string;
+          p_humanized: string;
+          p_lint: Json;
+          p_model: string;
+          p_obsidian_path: string;
+          p_redo: boolean;
+        };
+        Returns: undefined;
+      };
+    };
     Enums: Record<string, never>;
   };
 };

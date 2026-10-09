@@ -9,11 +9,13 @@ import { fetchPublicPage } from "@/features/content/data/fetch-page";
 import { mineFound, queueFound, type FoundDeps, type FoundInput, type QueueDeps } from "@/features/content/data/found";
 import { readFoundForm, readOptions } from "@/features/content/data/found-form";
 import { supabaseContextDb, supabaseFoundDb, supabaseIngestDb } from "@/features/content/data/supabase-db";
+import { deleteIdeaDrafts } from "@/features/content/data/supabase-drafts-db";
 import { fetchVideoMeta } from "@/features/content/data/youtube-meta";
 import { requireContentOwner } from "@/features/content/data/owner";
 import { syncQueuedIdeasToClickUp } from "@/features/content/data/clickup";
 import { str } from "@/shared/forms";
-import { nextRank, ranksAfterMove } from "@/features/content/engine/queue";
+import { reviveFields } from "@/features/content/engine/unused";
+import { nextRank, ranksAfterMove, visibleQueue } from "@/features/content/engine/queue";
 import { externalIdFromUrl, platformFromUrl } from "@/features/content/engine/posts";
 import { FORMATS, type Format } from "@/features/content/engine/types";
 
@@ -93,6 +95,20 @@ export async function archiveIdea(formData: FormData) {
   revalidate();
 }
 
+export async function reviveIdea(formData: FormData) {
+  const { supabase, user } = await requireContentOwner();
+  const id = str(formData, "id");
+  if (!id) return;
+  const { error } = await supabase
+    .from("content_ideas")
+    .update(reviveFields(new Date()))
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .in("status", ["inbox", "queued"]);
+  if (error) throw new Error(error.message);
+  revalidate();
+}
+
 export async function moveIdea(formData: FormData) {
   const { supabase, user } = await requireContentOwner();
   const id = str(formData, "id");
@@ -102,14 +118,14 @@ export async function moveIdea(formData: FormData) {
 
   const { data: ordered } = await supabase
     .from("content_ideas")
-    .select("id, queue_rank")
+    .select("id, queue_rank, status, batch_date, feedback_at, created_at")
     .eq("user_id", user.id)
     .eq("format", format)
     .eq("status", "queued")
     .order("queue_rank", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
 
-  const ranks = ranksAfterMove(ordered ?? [], id, direction);
+  const ranks = ranksAfterMove(visibleQueue(ordered ?? [], new Date()), id, direction);
   if (!ranks) return;
 
   for (const row of ranks) {
@@ -186,6 +202,14 @@ export async function markPosted(formData: FormData): Promise<{ error: string | 
     .eq("id", id)
     .eq("user_id", user.id);
   if (error) return { error: error.message };
+
+  // The Obsidian file is the final now; the app keeps only idea.obsidian_path.
+  // The post is already recorded, so a failure here is logged, not returned.
+  try {
+    await deleteIdeaDrafts(supabase, user.id, id);
+  } catch (e) {
+    console.error("markPosted: could not delete drafts", e);
+  }
   revalidate();
   return { error: null };
 }

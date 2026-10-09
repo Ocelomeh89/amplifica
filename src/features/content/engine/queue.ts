@@ -1,3 +1,5 @@
+import { partitionUnused, type UnusedCandidate } from "./unused";
+
 /** The rank a newly queued idea takes: the bottom of its format's queue. */
 export function nextRank(ranks: (number | null)[]): number {
   let max = 0;
@@ -27,4 +29,12 @@ export function ranksAfterMove(
     .map((r, idx) => ({ id: r.id, rank: idx + 1, stored: r.queue_rank }))
     .filter((r) => r.stored !== r.rank)
     .map(({ id, rank }) => ({ id, rank }));
+}
+
+/** The queue as the page shows it: stale ideas (see Never used) are dropped, DB order kept. */
+export function visibleQueue<T extends UnusedCandidate & { id: string; queue_rank: number | null }>(
+  ordered: readonly T[],
+  now: Date
+): T[] {
+  return partitionUnused(ordered, now).fresh;
 }

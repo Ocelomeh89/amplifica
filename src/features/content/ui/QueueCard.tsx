@@ -5,9 +5,12 @@ import Link from "next/link";
 import { ArrowUp, ArrowDown, Archive, CheckCircle2 } from "lucide-react";
 import type { ContentIdea } from "@/shared/supabase/database.types";
 import { archiveIdea, markPosted, moveIdea } from "@/features/content/data/actions";
+import type { DraftState } from "@/features/content/engine/drafts";
+import CopyCommand from "./CopyCommand";
+import DraftBadge from "./DraftBadge";
 import FormatBadge from "./FormatBadge";
 
-export default function QueueCard({ idea, position, total }: { idea: ContentIdea; position: number; total: number }) {
+export default function QueueCard({ idea, position, total, draft = null }: { idea: ContentIdea; position: number; total: number; draft?: DraftState | null }) {
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,14 +47,8 @@ export default function QueueCard({ idea, position, total }: { idea: ContentIdea
         <div className="text-xs text-sub truncate">{idea.title}</div>
 
         <div className="flex items-center gap-2 mt-2">
-          <button
-            type="button"
-            disabled
-            title="Drafting arrives in a later release"
-            className="text-xs px-2 py-1 rounded border border-edge text-sub opacity-60 cursor-not-allowed"
-          >
-            Draft
-          </button>
+          <CopyCommand command={`/content-draft ${idea.id}`} />
+          <DraftBadge draft={draft} obsidianPath={idea.obsidian_path} />
           {!posting ? (
             <button type="button" onClick={() => setPosting(true)} className="text-xs px-2 py-1 rounded border border-edge hover:bg-edge inline-flex items-center gap-1">
               <CheckCircle2 className="w-3 h-3" /> Mark posted

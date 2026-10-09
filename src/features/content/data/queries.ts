@@ -4,6 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/shared/supabase/database.types";
 import { pickSnapshots } from "@/features/content/engine/snapshots";
 import type { Format } from "@/features/content/engine/types";
+import { partitionUnused } from "@/features/content/engine/unused";
+import { summarizeDraft, type DraftState } from "@/features/content/engine/drafts";
 
 // Reads behind the /content pages. Every query is scoped to the user as well
 // as to RLS. The pages stay routing and layout; the Supabase calls live here.
@@ -20,7 +22,8 @@ export async function loadInbox(db: Db, userId: string) {
     db.from("content_ideas").select("*").eq("user_id", userId).eq("status", "inbox").order("created_at", { ascending: false }),
     loadPendingSources(db, userId),
   ]);
-  return { ideas: must(ideas) ?? [], pending };
+  // Stale inbox ideas live in the Never used view, not here.
+  return { ideas: partitionUnused(must(ideas) ?? [], new Date()).fresh, pending };
 }
 
 export async function loadPendingSources(db: Db, userId: string) {
@@ -48,7 +51,7 @@ export async function loadInboxLinks(db: Db, userId: string, sourceIds: string[]
 
 // ---- Queues and the week plan ----------------------------------------------
 
-/** Every queued idea in rank order. */
+/** Every queued idea in rank order, minus the ones that went stale (see Never used). */
 export async function loadQueued(db: Db, userId: string) {
   const res = await db
     .from("content_ideas")
@@ -57,7 +60,7 @@ export async function loadQueued(db: Db, userId: string) {
     .eq("status", "queued")
     .order("queue_rank", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
-  return must(res) ?? [];
+  return partitionUnused(must(res) ?? [], new Date()).fresh;
 }
 
 // ---- One idea ---------------------------------------------------------------
@@ -129,4 +132,41 @@ export async function loadSourcesPage(db: Db, userId: string) {
       .limit(20),
   ]);
   return { rules: must(rules) ?? [], pending, recent: must(recent) ?? [], plaud: must(plaud) ?? [], found: must(found) ?? [] };
+}
+
+// ---- Never used and drafts ---------------------------------------------------
+
+/** Inbox and queued ideas that aged out unused, newest first, with their draft state. */
+export async function loadUnused(db: Db, userId: string) {
+  const res = await db.from("content_ideas").select("*").eq("user_id", userId).in("status", ["inbox", "queued"]);
+  const { unused } = partitionUnused(must(res) ?? [], new Date());
+  const drafts = await loadDraftStates(db, userId, unused.map((i) => i.id));
+  return { ideas: unused, drafts };
+}
+
+/** Newest draft stage and lint counts per idea. Ideas with no app draft are absent. */
+export async function loadDraftStates(db: Db, userId: string, ideaIds: string[]): Promise<Record<string, DraftState>> {
+  if (ideaIds.length === 0) return {};
+  const res = await db.from("content_drafts").select("idea_id, version, stage, lint").eq("user_id", userId).in("idea_id", ideaIds);
+  const byIdea = new Map<string, { version: number; stage: string; lint: unknown }[]>();
+  for (const r of must(res) ?? []) byIdea.set(r.idea_id, [...(byIdea.get(r.idea_id) ?? []), r]);
+  const out: Record<string, DraftState> = {};
+  for (const [id, rows] of byIdea) {
+    const s = summarizeDraft(rows);
+    if (s) out[id] = s;
+  }
+  return out;
+}
+
+/** The newest draft row for the idea page, or null. */
+export async function loadIdeaDraft(db: Db, userId: string, ideaId: string) {
+  const res = await db
+    .from("content_drafts")
+    .select("version, stage, body, lint, created_at")
+    .eq("idea_id", ideaId)
+    .eq("user_id", userId)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return must(res);
 }

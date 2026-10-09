@@ -10,6 +10,7 @@ describe("content stays owner-only", () => {
     const files = [
       "src/app/(app)/content/page.tsx",
       "src/app/(app)/content/queue/page.tsx",
+      "src/app/(app)/content/unused/page.tsx",
       "src/app/(app)/content/performance/page.tsx",
       "src/app/(app)/content/week/page.tsx",
       "src/app/(app)/content/ideas/[id]/page.tsx",
@@ -24,7 +25,10 @@ describe("content stays owner-only", () => {
       "src/app/api/content/context/route.ts",
       "src/app/api/content/ingest/route.ts",
       "src/app/api/content/found/queued/route.ts",
+      "src/app/api/content/drafts/queue/route.ts",
+      "src/app/api/content/drafts/route.ts",
       "src/app/api/content/cron/metrics/route.ts",
+      "src/app/api/content/voice/route.ts",
     ];
     for (const f of routes) expect(read(f), f).toContain("authorizeRoutine(req, process.env.");
   });
@@ -33,6 +37,7 @@ describe("content stays owner-only", () => {
     const pages = [
       "src/app/(app)/content/page.tsx",
       "src/app/(app)/content/queue/page.tsx",
+      "src/app/(app)/content/unused/page.tsx",
       "src/app/(app)/content/week/page.tsx",
       "src/app/(app)/content/ideas/[id]/page.tsx",
       "src/app/(app)/content/sources/page.tsx",

@@ -40,8 +40,21 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
   and mined by `routines/content-found.md` (the weekly cloud routine and the
   `/content-found` skill). `engine/inbox.ts` ranks the Inbox by score and filters
   by type.
+- `engine/lint.ts`, `drafts.ts`, `voice.ts`, `unused.ts`, `prompts/draft.ts`,
+  `prompts/humanize.ts` — pure. Lint runs server-side when a draft is stored.
+  `BANNED_VOCABULARY` (humanize.ts) is the one word list; `LINT_RULES` hints are
+  asserted present in the prompts by `prompts/drafting.test.ts`.
+- `data/drafts.ts` (`getDraftQueue`, `postDraft`) and `data/voice.ts` over
+  `DraftsDb`/`VoiceDb`; `data/supabase-drafts-db.ts` is the adapter. Drafting
+  runs in the local `/content-draft` skill (no API key); the Obsidian file is the
+  final and the app deletes its drafts on Mark posted, keeping `obsidian_path`.
+  Routes: `GET /api/content/drafts/queue`, `POST /api/content/drafts`,
+  `GET|POST /api/content/voice`.
+- `ui/UnusedCard.tsx` renders the Never used page (`/content/unused`), not
+  `IdeaCard`; the tab has no count badge.
 - `routines/` (repo root) — routine instructions and README; `.claude/skills/`
-  holds the local companions `/content-plaud` and `/content-daily`.
+  holds the local companions `/content-plaud`, `/content-daily`, `/content-draft` and
+  `/content-voice`.
 
 ## Touchpoints outside this folder
 
@@ -53,8 +66,8 @@ these are all the places that know it exists:
 - `src/app/robots.ts` — `/content` disallow; `src/app/content-route.test.ts` asserts it and the sitemap.
 - `vercel.json` — the daily metrics cron. `next.config.mjs` — `jsdom` external package.
 - `package.json` — `jsdom`, `@mozilla/readability`, `@anthropic-ai/sdk` are used only here.
-- `supabase/migrations/0008`, `0009` and the `content_*` types in `shared/supabase/database.types.ts`.
-- `routines/`, `.claude/skills/content-*`, `docs/superpowers/**` — the routines and their docs.
+- `supabase/migrations/0008`, `0009`, `0011` and the `content_*` types in `shared/supabase/database.types.ts`.
+- `routines/`, `.claude/skills/content-*` (incl. `content-draft`, `content-voice`), `docs/superpowers/**` — the routines and their docs.
 - Env: `CONTENT_OWNER_USER_ID`, `CONTENT_ENGINE_SECRET`, `CRON_SECRET`, and the platform keys in `docs/PRODUCT-STATUS.md`.
 
 ## Invariants
@@ -97,6 +110,21 @@ these are all the places that know it exists:
   body per source.
 - The form shows queue mode when `ANTHROPIC_API_KEY` is unset; the key itself never
   reaches the client.
+- A draft is stored atomically through the `content_store_draft` Postgres function:
+  raw (v1), humanized (v2) and `obsidian_path` commit together or not at all. It
+  locks the idea row; conflicts are `idea_not_queued` and `draft_exists` (409).
+- `obsidian_path` must be `C - Writing/Content/<format>/<YYYY-MM-DD slug>.md` (or
+  `... slug (N).md`) with the format matching the idea: lowercase letters, digits and
+  hyphens only, so nothing in it can reach a shell. The queue response gives each idea
+  a `suggested_obsidian_path` (Chicago date); the skill checks existence with the Read
+  tool and POSTs the free name. The skills only create files there, never edit or delete.
+- Lint runs once, on the humanized first draft. There is no Mark-posted gate.
+- Never used is derived, not stored (inbox over 14 days, queued over 30 since the
+  Like); the Inbox, queues and week plan exclude those ideas, and `moveIdea` ranks
+  only the ideas the queue shows. `rejected` and `archived` are never in it. The
+  drafts queue (`GET /api/content/drafts/queue`, bare mode) excludes them too, while
+  `?id=` still serves an explicit one.
+- `content_voice.built_from` is `{ files: [{path, mtime, bytes}], previous_profile_md }`.
 
 ## Seeding by hand
 
