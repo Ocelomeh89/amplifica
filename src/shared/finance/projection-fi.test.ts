@@ -25,4 +25,21 @@ describe("earliestSustainableWithdrawal", () => {
   it("returns null when the draw dwarfs the system", () => {
     expect(earliestSustainableWithdrawal(profitable, 1e9).month).toBeNull();
   });
+  it("minStartMonth defaults to 0 (existing callers unchanged)", () => {
+    expect(earliestSustainableWithdrawal(profitable, 4500, { requireGrowth: false, minStartMonth: 0 }))
+      .toEqual(earliestSustainableWithdrawal(profitable, 4500, { requireGrowth: false }));
+  });
+  it("never returns a month before minStartMonth", () => {
+    const u = earliestSustainableWithdrawal(profitable, 4500).month!;
+    // Floor at the unconstrained answer: same month.
+    expect(earliestSustainableWithdrawal(profitable, 4500, { minStartMonth: u }).month).toBe(u);
+    // Floor past it: the answer moves to the floor or later (or none).
+    const later = earliestSustainableWithdrawal(profitable, 4500, { minStartMonth: u + 1 }).month;
+    expect(later === null || later >= u + 1).toBe(true);
+  });
+  it("carries a seed through to every run", () => {
+    const seeded = { ...profitable, seed: { book: [], outstanding: 0, nextDrawSize: 0, startDelayMonths: 0 } };
+    // No book and no draws: nothing pays, so any positive draw erodes from month 0.
+    expect(earliestSustainableWithdrawal(seeded, 4500).month).toBeNull();
+  });
 });
