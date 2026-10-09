@@ -45,7 +45,8 @@ mtime) against the vault files named in `routines/content-voice.md`. Record each
 file's mtime with the exact command from "Recording mtime" in that file
 (`TZ=UTC stat -f '%Sm' -t '%Y-%m-%dT%H:%M:%SZ' "<file>"`; quote only the file path,
 never file contents). A file is changed when its mtime differs from the one in
-`voice.files`, or when it is not listed. Any changed source file, or any posted final
+`voice.files`, or when it is not listed. Skip entries whose path starts with
+`beehiiv:` (newsletter posts, not vault files; never stat them). Any changed source file, or any posted final
 in `C - Writing/Content/` not listed, means the voice is out of date. If `voice` is
 null, `voice_stale` is true, or any file changed, show Miguel the changed-file list
 and run the `/content-voice` routine before drafting. After the refresh, re-fetch the

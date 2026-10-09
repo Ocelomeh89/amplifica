@@ -34,6 +34,12 @@ Candidates, in priority order:
 
 Record `{ path, mtime, bytes }` for every file.
 
+Two exceptions. Newsletter posts come from beehiiv (author Miguel Graf only; skip
+posts by others): record them as `beehiiv:<slug>` with `mtime` the publish time and
+`bytes` 0. They are not vault files, so `/content-draft` never stats them. The
+journal is edited daily, so read it for rhythm but never list it in `files`, or the
+voice would read as stale every day.
+
 **Recording mtime.** Each file's `mtime` is recorded in UTC ISO-8601 with seconds,
 via `TZ=UTC stat -f '%Sm' -t '%Y-%m-%dT%H:%M:%SZ' "<file>"` on macOS, and `bytes`
 via `stat -f '%z' "<file>"`. Quote only file paths in these commands, never file
