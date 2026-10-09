@@ -1,10 +1,10 @@
 import { requireUser } from "@/shared/supabase/auth";
-import { isContentOwner } from "@/features/content/engine/owner";
+import { showContentNav } from "@/features/content/nav";
 import Sidebar from "./Sidebar";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { user } = await requireUser();
-  const showContent = isContentOwner(user.id, process.env.CONTENT_OWNER_USER_ID);
+  const showContent = showContentNav(user.id);
 
   return (
     <div className="flex min-h-screen bg-cream">

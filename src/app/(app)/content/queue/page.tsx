@@ -1,6 +1,7 @@
 import Link from "next/link";
 import clsx from "clsx";
 import { requireContentOwner } from "@/features/content/data/owner";
+import { loadQueued } from "@/features/content/data/queries";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import QueueCard from "@/features/content/ui/QueueCard";
 import { FORMATS, FORMAT_LABEL, type Format } from "@/features/content/engine/types";
@@ -9,15 +10,7 @@ export default async function ContentQueuePage({ searchParams }: { searchParams:
   const { supabase, user } = await requireContentOwner();
   const format: Format = FORMATS.includes(searchParams.format as Format) ? (searchParams.format as Format) : "reel";
 
-  const { data: queued } = await supabase
-    .from("content_ideas")
-    .select("*")
-    .eq("user_id", user.id)
-    .eq("status", "queued")
-    .order("queue_rank", { ascending: true, nullsFirst: false })
-    .order("created_at", { ascending: true });
-
-  const all = queued ?? [];
+  const all = await loadQueued(supabase, user.id);
   const counts = Object.fromEntries(FORMATS.map((f) => [f, all.filter((i) => i.format === f).length])) as Record<Format, number>;
   const list = all.filter((i) => i.format === format);
 
