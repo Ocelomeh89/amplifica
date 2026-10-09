@@ -32,6 +32,7 @@ optionality date on both charts.
 | LoC balance today | Assumed **$0**. |
 | Next draw size | A setting. Default (stored as `null`) = face value of the most recent Amplicon by `start_date`. |
 | First projected draw | Exactly the next draw size, no step-up. After that, the existing payoff gate and step-up rules apply unchanged. |
+| Start delay | A setting, **0–5 months**, default 0. No projected draw before that month. Tracked payouts and MSC arriving in the meantime bank as cash and are applied against the first draw. |
 | Optionality definition | `earliestSustainableWithdrawal(..., { requireGrowth: false })`, the same call Projections makes. Withdrawal amount = **Monthly cash flow goal** from Settings. |
 | Meter percentage | **Cash-flow progress**: current monthly cash flow ÷ projected monthly cash flow (`distributionCashFlow`) in the optionality month, clamped to 0–100%. |
 | Settings storage | New table, one row per user. |
@@ -51,6 +52,7 @@ seed?: {
   book: ActiveInvestment[];   // tracked Amplicons, startMonth relative to month 0
   outstanding: number;        // LoC balance at month 0 (dashboard passes 0)
   nextDrawSize: number;       // size of the first projected draw
+  startDelayMonths: number;   // 0–5: no projected draw before this month
 };
 ```
 
@@ -66,7 +68,13 @@ When `seed` is present:
 - `state.currentInvestmentSize` = `seed.nextDrawSize`.
 - `state.pendingLaunch` starts as `{ steppedEligible: false }`, so the first
   draw is tried at `nextDrawSize` only and is subject to the payoff gate.
-  With a $0 balance the gate usually passes in month 0.
+- **Start delay.** `manageLaunch` does nothing while `month < startDelayMonths`.
+  During those months tracked Amplicons keep paying and MSC keeps arriving;
+  with a $0 balance that inflow banks as `cash`. At `startDelayMonths` the
+  first draw is evaluated as usual, and the banked cash is applied against it
+  (the existing `fromCash` step). The payoff gate still applies, so the draw
+  can land later than the delay if it doesn't qualify. With delay 0 and a $0
+  balance the gate usually passes in month 0.
 - `initialInvestmentSize` in the result = `seed.nextDrawSize`.
 - `msc`, `investmentSizeFactor` and the rest of the config are read as usual.
   `investmentSizeFactor` is unused when seeded.
@@ -74,7 +82,7 @@ When `seed` is present:
   `currentInvestmentSize <= 0` guard); tracked Amplicons still pay out.
 
 Validation: `sanitizeSimInput` clamps `seed.outstanding` and `seed.nextDrawSize`
-to `>= 0` and finite, reporting issues the same way as other fields. Book
+to `>= 0` and finite, and `seed.startDelayMonths` to an integer in 0–5, reporting issues the same way as other fields. Book
 entries are trusted (they come from the seed builder below).
 
 ### 1.2 Seed builder
@@ -115,6 +123,10 @@ seeded call finds the same month as a hand-checked seeded scenario.
 - Gate: $0 balance + strong existing payouts → first draw in month 0; tiny
   payouts + large draw → flywheel waits and banks cash.
 - First draw is never a step-up.
+- Start delay: with delay D, no draw before month D; cash banked during the
+  delay equals Σ(tracked payouts + MSC) over months 0..D−1 and is netted
+  against the first draw; delay 0 matches the undelayed seeded run.
+- Sanitizer clamps `startDelayMonths` to an integer in 0–5.
 - `seedFromTracked`: offsets, matured drop, default and override draw size,
   empty list.
 
@@ -131,6 +143,7 @@ create table public.dashboard_projection_settings (
   loc_interest_pct numeric(5, 4) not null default 0.10 check (loc_interest_pct >= 0 and loc_interest_pct <= 0.30),
   loc_increase numeric(4, 2) not null default 1.50 check (loc_increase >= 1.0 and loc_increase <= 2.0),
   horizon_months integer not null default 360 check (horizon_months >= 60 and horizon_months <= 600),
+  start_delay_months integer not null default 0 check (start_delay_months >= 0 and start_delay_months <= 5),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -175,7 +188,7 @@ In the chart header, next to *Since inception / From current month*:
 
 - **Project forward** toggle (off by default, not persisted).
 - **Gear** button opening `ProjectionSettingsPanel.tsx`: a popover form with the
-  six settings plus MSC shown read-only with a link to Settings. Next draw size
+  seven settings (including *Start delay*, a 0–5 month select) plus MSC shown read-only with a link to Settings. Next draw size
   placeholder shows the latest Amplicon's face value. Save posts
   `saveProjectionSettings`.
 
