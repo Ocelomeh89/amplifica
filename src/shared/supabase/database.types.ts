@@ -147,6 +147,40 @@ export type Database = {
         };
         Relationships: [];
       };
+      dashboard_projection_settings: {
+        Row: {
+          user_id: string;
+          next_draw_size: number | null;
+          investment_interest_pct: number;
+          term_months: number;
+          loc_interest_pct: number;
+          loc_increase: number;
+          horizon_months: number;
+          start_delay_months: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          next_draw_size?: number | null;
+          investment_interest_pct?: number;
+          term_months?: number;
+          loc_interest_pct?: number;
+          loc_increase?: number;
+          horizon_months?: number;
+          start_delay_months?: number;
+        };
+        Update: {
+          next_draw_size?: number | null;
+          investment_interest_pct?: number;
+          term_months?: number;
+          loc_interest_pct?: number;
+          loc_increase?: number;
+          horizon_months?: number;
+          start_delay_months?: number;
+        };
+        Relationships: [];
+      };
       leads: {
         Row: {
           id: string;
@@ -545,3 +579,5 @@ export type ContentPost = Database["public"]["Tables"]["content_posts"]["Row"];
 export type ContentPostInsert = Database["public"]["Tables"]["content_posts"]["Insert"];
 export type ContentMetric = Database["public"]["Tables"]["content_metrics"]["Row"];
 export type ContentReview = Database["public"]["Tables"]["content_reviews"]["Row"];
+export type DashboardProjectionSettingsRow = Database["public"]["Tables"]["dashboard_projection_settings"]["Row"];
+export type DashboardProjectionSettingsInsert = Database["public"]["Tables"]["dashboard_projection_settings"]["Insert"];
