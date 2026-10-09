@@ -31,9 +31,10 @@ export {
   DEFAULT_PERPETUAL_TRIGGER,
   DEFAULT_MONTHLY_WITHDRAWAL,
   DEFAULT_TOTAL_MONTHS,
+  MAX_START_DELAY_MONTHS,
   sanitizeSimInput,
 } from "./sim-input";
-export type { ProjectionSimInput, SimConfig, SimInputIssue } from "./sim-input";
+export type { ProjectionSimInput, SimConfig, SimInputIssue, SimSeed } from "./sim-input";
 export type { ActiveInvestment, InvestmentKind } from "./sim-book";
 
 export interface ProjectionSimPoint {
@@ -242,24 +243,45 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
   const { config } = sanitizeSimInput(input);
   const monthlyLocRate = config.locInterestPct / 12;
   const monthlyMarketRate = config.marketReturnPct / 12;
-  const initialInvestmentSize = config.msc * config.investmentSizeFactor;
+  const seed = config.seed;
+  const initialInvestmentSize = seed ? seed.nextDrawSize : config.msc * config.investmentSizeFactor;
 
-  const state: SimState = {
-    cash: 0,
-    outstandingAmount: initialInvestmentSize,
-    currentInvestmentSize: initialInvestmentSize,
-    lastInvStartMonth: 1,
-    peakOutstanding: initialInvestmentSize,
-    mixAcc: 0,
-    book: [makeInvestment("term", initialInvestmentSize, 1, config)],
-    pendingLaunch: null,
-    investmentsLaunched: 1,
-    perpetualsLaunched: 0,
-    contributed: 0,
-    marketBalance: 0,
-    deployed: initialInvestmentSize,
-    distributions: 0,
-  };
+  // Seeded: no bootstrap draw. The tracked book pays as-is, the first draw is
+  // tried at exactly nextDrawSize (never a step-up), and the payoff gate
+  // decides when it lands.
+  const state: SimState = seed
+    ? {
+        cash: 0,
+        outstandingAmount: seed.outstanding,
+        currentInvestmentSize: seed.nextDrawSize,
+        lastInvStartMonth: 0,
+        peakOutstanding: seed.outstanding,
+        mixAcc: 0,
+        book: seed.book.slice(),
+        pendingLaunch: { steppedEligible: false },
+        investmentsLaunched: 0,
+        perpetualsLaunched: 0,
+        contributed: 0,
+        marketBalance: 0,
+        deployed: 0,
+        distributions: 0,
+      }
+    : {
+        cash: 0,
+        outstandingAmount: initialInvestmentSize,
+        currentInvestmentSize: initialInvestmentSize,
+        lastInvStartMonth: 1,
+        peakOutstanding: initialInvestmentSize,
+        mixAcc: 0,
+        book: [makeInvestment("term", initialInvestmentSize, 1, config)],
+        pendingLaunch: null,
+        investmentsLaunched: 1,
+        perpetualsLaunched: 0,
+        contributed: 0,
+        marketBalance: 0,
+        deployed: initialInvestmentSize,
+        distributions: 0,
+      };
 
   const series: ProjectionSimPoint[] = [];
   const bookByMonth: ActiveInvestment[][] = [];
