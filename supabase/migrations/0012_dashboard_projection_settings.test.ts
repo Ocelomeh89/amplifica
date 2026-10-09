@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import { DEFAULT_PROJECTION_SETTINGS } from "@/features/dashboard/settings";
 
 // Applied by hand in the Supabase SQL editor, like 0008–0010. Assert the parts that matter.
-describe("0011_dashboard_projection_settings.sql", () => {
-  const sql = readFileSync("supabase/migrations/0011_dashboard_projection_settings.sql", "utf8");
+describe("0012_dashboard_projection_settings.sql", () => {
+  const sql = readFileSync("supabase/migrations/0012_dashboard_projection_settings.sql", "utf8");
 
   it("is one row per user and enables RLS with self-only policies", () => {
     expect(sql).toMatch(/user_id uuid primary key references auth\.users\(id\) on delete cascade/i);

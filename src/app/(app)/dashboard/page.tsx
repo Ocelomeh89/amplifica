@@ -23,7 +23,7 @@ export default async function DashboardPage() {
   const [{ data: profile }, { data: amplicons }, { data: projectionRow }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.from("amplicons").select("*"),
-    // Errors (e.g. migration 0011 not yet applied) fall through to defaults.
+    // Errors (e.g. migration 0012 not yet applied) fall through to defaults.
     supabase.from("dashboard_projection_settings").select("*").eq("user_id", user.id).maybeSingle(),
   ]);
   const projectionSettings = settingsFromRow(projectionRow ?? null);

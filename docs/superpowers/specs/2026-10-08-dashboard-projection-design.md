@@ -141,7 +141,7 @@ seeded call finds the same month as a hand-checked seeded scenario.
 
 ## 2. Settings (`dashboard_projection_settings`)
 
-### 2.1 Migration `supabase/migrations/0011_dashboard_projection_settings.sql`
+### 2.1 Migration `supabase/migrations/0012_dashboard_projection_settings.sql`
 
 ```sql
 create table public.dashboard_projection_settings (
