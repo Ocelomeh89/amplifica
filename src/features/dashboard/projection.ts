@@ -81,7 +81,8 @@ export function buildDashboardProjection(args: {
 }
 
 // History up to and including today, then the projection from today. Today's
-// row carries both, so the solid and dashed lines meet.
+// row carries both. Cash flow joins at today; expected future payments can
+// step at today because the projection's month 0 includes that month's first draw.
 export function mergeProjection(
   history: ProjectionPoint[],
   projected: ProjectionSimPoint[],

@@ -142,7 +142,7 @@ export default async function DashboardPage() {
               <div className="text-[10px] text-sub uppercase tracking-wide">Monthly cashflow</div>
               <div className="text-xl font-bold mt-auto pt-3">{fmtUSD0(cashflowGoalUSD)}</div>
             </div>
-            <OptionalityMeter status={projection.optionality} goalUSD={cashflowGoalUSD} />
+            <OptionalityMeter status={projection.optionality} goalUSD={cashflowGoalUSD} currentMonthlyCashflowUSD={currentMonthlyCashflow} />
           </div>
         </div>
       </div>

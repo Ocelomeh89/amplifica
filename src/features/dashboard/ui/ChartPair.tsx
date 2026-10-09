@@ -88,13 +88,14 @@ export default function ChartPair({
               <Line
                 type="monotone"
                 dataKey="cashFlow"
+                name="Cash flow"
                 stroke="#4f7cff"
                 strokeWidth={2}
                 dot={false}
                 isAnimationActive={false}
               />
               {projecting && (
-                <Line type="monotone" dataKey="projectedCashFlow" stroke="#4f7cff" strokeWidth={2}
+                <Line type="monotone" dataKey="projectedCashFlow" name="Projected cash flow" stroke="#4f7cff" strokeWidth={2}
                   strokeDasharray="5 4" dot={false} isAnimationActive={false} />
               )}
               {showOptionality && (
@@ -133,13 +134,14 @@ export default function ChartPair({
               <Line
                 type="monotone"
                 dataKey="expectedFuturePayments"
+                name="Expected future payments"
                 stroke="#2e8a4a"
                 strokeWidth={2}
                 dot={false}
                 isAnimationActive={false}
               />
               {projecting && (
-                <Line type="monotone" dataKey="projectedExpectedFuturePayments" stroke="#2e8a4a" strokeWidth={2}
+                <Line type="monotone" dataKey="projectedExpectedFuturePayments" name="Projected expected future payments" stroke="#2e8a4a" strokeWidth={2}
                   strokeDasharray="5 4" dot={false} isAnimationActive={false} />
               )}
               {showOptionality && (

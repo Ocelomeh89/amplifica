@@ -51,7 +51,7 @@ export function parseProjectionSettings(fd: FormData): ProjectionSettings {
   const draw = readNumber(fd, "next_draw_size");
   const horizonYears = readNumber(fd, "horizon_years");
   return {
-    nextDrawSize: draw == null ? null : Math.max(draw, 0),
+    nextDrawSize: draw == null ? null : Math.min(Math.max(draw, 0), 1e11),
     investmentInterestPct: clamp(pctOr("investment_interest_pct", d.investmentInterestPct), 0, 0.2),
     termMonths: clamp(Math.round(readNumber(fd, "term_months") ?? d.termMonths), 12, 120),
     locInterestPct: clamp(pctOr("loc_interest_pct", d.locInterestPct), 0, 0.3),

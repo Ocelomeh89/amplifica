@@ -40,6 +40,10 @@ describe("parseProjectionSettings", () => {
     expect(parseProjectionSettings(fd({ ...full, next_draw_size: "  " })).nextDrawSize).toBeNull();
   });
 
+  it("caps an absurd next draw size at 1e11", () => {
+    expect(parseProjectionSettings(fd({ ...full, next_draw_size: "1e20" })).nextDrawSize).toBe(1e11);
+  });
+
   it("an empty or non-numeric box falls back to that field's default, not 0", () => {
     const s = parseProjectionSettings(fd({ ...full, term_months: "", loc_increase: "abc", horizon_years: "" }));
     expect(s.termMonths).toBe(DEFAULT_PROJECTION_SETTINGS.termMonths);

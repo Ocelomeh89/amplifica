@@ -18,6 +18,7 @@ export default function ProjectionSettingsPanel({
   msc: number;
 }) {
   const [open, setOpen] = useState(false);
+  const [failed, setFailed] = useState(false);
   const input = "w-full bg-card border border-edge rounded px-2 py-1 text-sm";
   const label = "block text-[11px] text-sub mb-1";
 
@@ -35,8 +36,13 @@ export default function ProjectionSettingsPanel({
       {open && (
         <form
           action={async (fd) => {
-            await saveProjectionSettings(fd);
-            setOpen(false);
+            setFailed(false);
+            try {
+              await saveProjectionSettings(fd);
+              setOpen(false);
+            } catch {
+              setFailed(true);
+            }
           }}
           className="absolute right-0 top-full mt-1 z-20 w-72 bg-card border border-edge rounded-lg shadow-lg p-3 space-y-2"
         >
@@ -54,7 +60,7 @@ export default function ProjectionSettingsPanel({
             <div>
               <label className={label} htmlFor="investment_interest_pct">Amplicon rate (%)</label>
               <input id="investment_interest_pct" name="investment_interest_pct" type="number" min={0} max={20} step={0.25}
-                defaultValue={settings.investmentInterestPct * 100} className={input} />
+                defaultValue={Number((settings.investmentInterestPct * 100).toFixed(2))} className={input} />
             </div>
             <div>
               <label className={label} htmlFor="term_months">Term (months)</label>
@@ -64,7 +70,7 @@ export default function ProjectionSettingsPanel({
             <div>
               <label className={label} htmlFor="loc_interest_pct">LoC rate (%)</label>
               <input id="loc_interest_pct" name="loc_interest_pct" type="number" min={0} max={30} step={0.25}
-                defaultValue={settings.locInterestPct * 100} className={input} />
+                defaultValue={Number((settings.locInterestPct * 100).toFixed(2))} className={input} />
             </div>
             <div>
               <label className={label} htmlFor="loc_increase">Step-up (×)</label>
@@ -92,6 +98,9 @@ export default function ProjectionSettingsPanel({
             <button type="button" onClick={() => setOpen(false)} className="text-xs px-2 py-1 rounded bg-edge text-sub">Cancel</button>
             <button type="submit" className="text-xs px-3 py-1 rounded bg-purple text-white">Save</button>
           </div>
+          {failed && (
+            <p role="alert" className="text-xs text-red-600">Couldn&apos;t save. Try again.</p>
+          )}
         </form>
       )}
     </div>

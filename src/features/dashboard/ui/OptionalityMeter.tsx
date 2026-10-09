@@ -1,11 +1,11 @@
 import Link from "next/link";
 import InfoBox from "@/shared/ui/InfoBox";
-import { fmtMonth, fmtUSD0 } from "@/shared/format";
+import { fmtKUSD, fmtMonth, fmtUSD0 } from "@/shared/format";
 import { meterColor } from "../meter";
 import type { OptionalityStatus } from "../projection";
 
 // The Target box's second cell. Server-renderable: no state, no effects.
-export default function OptionalityMeter({ status, goalUSD }: { status: OptionalityStatus; goalUSD: number }) {
+export default function OptionalityMeter({ status, goalUSD, currentMonthlyCashflowUSD }: { status: OptionalityStatus; goalUSD: number; currentMonthlyCashflowUSD: number }) {
   return (
     <div className="p-4 flex flex-col">
       <div className="text-[10px] text-sub uppercase tracking-wide">
@@ -14,12 +14,12 @@ export default function OptionalityMeter({ status, goalUSD }: { status: Optional
           message={`Optionality is the first month your Amplicons could pay you ${fmtUSD0(goalUSD)}/mo without shrinking your expected future payments. The bar shows today's monthly cash flow as a share of the cash flow projected for that month. You hit 100% on the date marked on the charts.`}
         />
       </div>
-      <MeterBody status={status} />
+      <MeterBody status={status} currentMonthlyCashflowUSD={currentMonthlyCashflowUSD} />
     </div>
   );
 }
 
-function MeterBody({ status }: { status: OptionalityStatus }) {
+function MeterBody({ status, currentMonthlyCashflowUSD }: { status: OptionalityStatus; currentMonthlyCashflowUSD: number }) {
   if (status.kind === "no-amplicons") {
     return (
       <Link href="/amplicons" className="text-xs text-purple mt-auto pt-3">
@@ -53,6 +53,9 @@ function MeterBody({ status }: { status: OptionalityStatus }) {
         className="h-1.5 rounded-full bg-edge mt-2 overflow-hidden"
       >
         <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+      </div>
+      <div className="text-[10px] text-sub mt-1">
+        {fmtKUSD(currentMonthlyCashflowUSD)} of {fmtKUSD(status.cashFlowAtOptionality)}/mo
       </div>
     </div>
   );
