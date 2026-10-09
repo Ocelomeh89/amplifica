@@ -4,6 +4,8 @@
 // feeds it raw Number() conversions mid-edit, so the engine never throws;
 // out-of-domain values are coerced to a defined fallback and reported.
 
+import type { ActiveInvestment } from "./sim-book";
+
 // Fixed payoff threshold, used two ways: a new Amplicon is only ever DRAWN
 // when its payoff is predicted to happen in fewer than this many months (the
 // flywheel waits, banking cash, until a draw qualifies), and the size only
@@ -30,6 +32,20 @@ export const MAX_ANNUAL_RATE = 10;
 // MAX_ANNUAL_RATE above.
 export const MAX_TOTAL_MONTHS = 1200;
 
+// The dashboard can delay the first projected draw by up to this many months.
+export const MAX_START_DELAY_MONTHS = 5;
+
+// Starts the simulation from a real position instead of the bootstrap draw:
+// the user's tracked Amplicons (startMonth relative to month 0 = today), the
+// LoC balance at month 0, and the size of the first projected draw. During
+// the first `startDelayMonths` months the ledger is idle (see projection-sim).
+export interface SimSeed {
+  book: ActiveInvestment[];
+  outstanding: number;
+  nextDrawSize: number;
+  startDelayMonths: number;
+}
+
 export interface ProjectionSimInput {
   msc: number;
   investmentSizeFactor: number;
@@ -51,6 +67,8 @@ export interface ProjectionSimInput {
   // Withdraw monthlyWithdrawal from this month (undefined = never).
   withdrawalStartMonth?: number;
   monthlyWithdrawal?: number;
+  // Seeded start (dashboard). Absent = the bootstrap draw, unchanged.
+  seed?: SimSeed;
 }
 
 // Fully resolved configuration: every optional filled in, every value finite
@@ -73,6 +91,7 @@ export interface SimConfig {
   mscEndMonth: number | null;
   withdrawalStartMonth: number | null;
   monthlyWithdrawal: number;
+  seed: SimSeed | null;
 }
 
 export interface SimInputIssue {
@@ -152,6 +171,20 @@ export function sanitizeSimInput(input: ProjectionSimInput): {
     mscEndMonth: monthSwitch("mscEndMonth", input.mscEndMonth),
     withdrawalStartMonth: monthSwitch("withdrawalStartMonth", input.withdrawalStartMonth),
     monthlyWithdrawal: sanitizeNumber(issues, "monthlyWithdrawal", input.monthlyWithdrawal, { fallback: DEFAULT_MONTHLY_WITHDRAWAL, min: 0 }),
+    seed:
+      input.seed == null
+        ? null
+        : {
+            book: input.seed.book,
+            outstanding: sanitizeNumber(issues, "seed", input.seed.outstanding, { fallback: 0, min: 0 }),
+            nextDrawSize: sanitizeNumber(issues, "seed", input.seed.nextDrawSize, { fallback: 0, min: 0 }),
+            startDelayMonths: sanitizeNumber(issues, "seed", input.seed.startDelayMonths, {
+              fallback: 0,
+              min: 0,
+              max: MAX_START_DELAY_MONTHS,
+              integer: true,
+            }),
+          },
   };
 
   return { config, issues };

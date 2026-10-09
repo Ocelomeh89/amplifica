@@ -12,11 +12,12 @@ detail. Read that before changing behavior.
 
 | File | What |
 |---|---|
-| `projection-sim.ts` | The flywheel simulation. `runSimulation()` is the entry point. |
+| `projection-sim.ts` | The flywheel simulation. `runSimulation()` is the entry point. Optional `seed` (sim-input.ts) starts it from a real position, with an idle 0–5 month start delay. |
 | `sim-input.ts` | Its input shape and validation. |
 | `sim-book.ts` | The book of launches the simulation carries month to month. |
 | `projection.ts` | The simpler net-worth / cash-flow projection used by the dashboard. |
 | `projection-fi.ts` | `earliestSustainableWithdrawal` — the "financial optionality" month. |
+| `dashboard-seed.ts` | `seedFromTracked` — tracked Amplicons → the `seed` that starts `runSimulation` from today instead of the bootstrap draw. |
 | `amortization.ts` | Payment, schedule, remaining principal. Used by the loan calculator and two compare builders. |
 | `dates.ts` | Month-key helpers. |
 

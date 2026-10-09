@@ -10,6 +10,7 @@ export interface FiResult {
 export interface FiOptions {
   requireGrowth?: boolean; // false = income FI (no erosion); true = wealth FI (ends higher)
   minRunwayMonths?: number;
+  minStartMonth?: number; // earliest month the switch may happen (dashboard start delay)
 }
 
 function sustained(efpSeries: number[], from: number, requireGrowth: boolean): boolean {
@@ -31,9 +32,10 @@ export function earliestSustainableWithdrawal(
 ): FiResult {
   const requireGrowth = options.requireGrowth ?? false;
   const minRunwayMonths = options.minRunwayMonths ?? 24;
+  const minStartMonth = options.minStartMonth ?? 0;
   const totalMonths = base.totalMonths ?? 480;
   const maxStart = totalMonths - minRunwayMonths;
-  for (let t = 0; t <= maxStart; t++) {
+  for (let t = minStartMonth; t <= maxStart; t++) {
     const r = runSimulation({ ...base, mscEndMonth: t, withdrawalStartMonth: t, monthlyWithdrawal });
     const nw = r.series.map((s) => s.expectedFuturePayments);
     if (sustained(nw, t, requireGrowth)) {

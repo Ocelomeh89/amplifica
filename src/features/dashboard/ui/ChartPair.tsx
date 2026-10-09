@@ -12,13 +12,20 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { ProjectionPoint } from "@/shared/finance/projection";
-import { fmtCurrency, fmtKUSD, fmtMUSD } from "@/shared/format";
+import { fmtCurrency, fmtKUSD, fmtMUSD, fmtMonth } from "@/shared/format";
+import type { YearMonth } from "@/shared/finance/dates";
+import type { ChartRow } from "../projection";
+import { optionalityInRange } from "../projection";
 
 interface Props {
   inceptionSeries: ProjectionPoint[];
   currentSeries: ProjectionPoint[];
   cashflowTargetUSD: number;
   expectedFuturePaymentsTargetUSD: number;
+  inceptionProjected: ChartRow[];
+  currentProjected: ChartRow[];
+  optionalityMonth: YearMonth | null;
+  controls?: React.ReactNode;
 }
 
 export default function ChartPair({
@@ -26,9 +33,18 @@ export default function ChartPair({
   currentSeries,
   cashflowTargetUSD,
   expectedFuturePaymentsTargetUSD,
+  inceptionProjected,
+  currentProjected,
+  optionalityMonth,
+  controls,
 }: Props) {
   const [range, setRange] = useState<"inception" | "current">("current");
-  const series = range === "inception" ? inceptionSeries : currentSeries;
+  const [projecting, setProjecting] = useState(false);
+  const rows: ChartRow[] = projecting
+    ? range === "inception" ? inceptionProjected : currentProjected
+    : range === "inception" ? inceptionSeries : currentSeries;
+  const showOptionality = optionalityInRange(rows, optionalityMonth);
+  const tickInterval = projecting ? Math.max(2, Math.floor(rows.length / 12)) : 2;
 
   return (
     <div>
@@ -50,15 +66,20 @@ export default function ChartPair({
         >
           From current month
         </button>
+        <label className="ml-auto flex items-center gap-1.5 text-xs text-sub cursor-pointer">
+          <input type="checkbox" checked={projecting} onChange={(e) => setProjecting(e.target.checked)} />
+          Project forward
+        </label>
+        {controls}
       </div>
 
       <div className="bg-card border border-edge rounded-lg p-3 mb-3">
         <div className="text-[11px] text-sub uppercase tracking-wide mb-2">Monthly cash flow</div>
         <div className="h-56">
           <ResponsiveContainer>
-            <LineChart data={series}>
+            <LineChart data={rows}>
               <CartesianGrid strokeDasharray="3 3" stroke="#8d829533" />
-              <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#8D8295" }} interval={2} />
+              <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#8D8295" }} interval={tickInterval} />
               <YAxis tickFormatter={fmtCurrency} tick={{ fontSize: 10, fill: "#8D8295" }} />
               <Tooltip
                 formatter={(v: number) => fmtCurrency(v)}
@@ -67,11 +88,24 @@ export default function ChartPair({
               <Line
                 type="monotone"
                 dataKey="cashFlow"
+                name="Cash flow"
                 stroke="#4f7cff"
                 strokeWidth={2}
                 dot={false}
                 isAnimationActive={false}
               />
+              {projecting && (
+                <Line type="monotone" dataKey="projectedCashFlow" name="Projected cash flow" stroke="#4f7cff" strokeWidth={2}
+                  strokeDasharray="5 4" dot={false} isAnimationActive={false} />
+              )}
+              {showOptionality && (
+                <ReferenceLine
+                  x={optionalityMonth!}
+                  stroke="#6C4BD3"
+                  strokeDasharray="4 4"
+                  label={{ value: `Optionality · ${fmtMonth(optionalityMonth!)}`, fontSize: 10, position: "insideTopRight" }}
+                />
+              )}
               {cashflowTargetUSD > 0 && (
                 <ReferenceLine
                   y={cashflowTargetUSD}
@@ -89,9 +123,9 @@ export default function ChartPair({
         <div className="text-[11px] text-sub uppercase tracking-wide mb-2">Expected future payments</div>
         <div className="h-56">
           <ResponsiveContainer>
-            <LineChart data={series}>
+            <LineChart data={rows}>
               <CartesianGrid strokeDasharray="3 3" stroke="#8d829533" />
-              <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#8D8295" }} interval={2} />
+              <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#8D8295" }} interval={tickInterval} />
               <YAxis tickFormatter={fmtCurrency} tick={{ fontSize: 10, fill: "#8D8295" }} />
               <Tooltip
                 formatter={(v: number) => fmtCurrency(v)}
@@ -100,11 +134,24 @@ export default function ChartPair({
               <Line
                 type="monotone"
                 dataKey="expectedFuturePayments"
+                name="Expected future payments"
                 stroke="#2e8a4a"
                 strokeWidth={2}
                 dot={false}
                 isAnimationActive={false}
               />
+              {projecting && (
+                <Line type="monotone" dataKey="projectedExpectedFuturePayments" name="Projected expected future payments" stroke="#2e8a4a" strokeWidth={2}
+                  strokeDasharray="5 4" dot={false} isAnimationActive={false} />
+              )}
+              {showOptionality && (
+                <ReferenceLine
+                  x={optionalityMonth!}
+                  stroke="#6C4BD3"
+                  strokeDasharray="4 4"
+                  label={{ value: `Optionality · ${fmtMonth(optionalityMonth!)}`, fontSize: 10, position: "insideTopRight" }}
+                />
+              )}
               {expectedFuturePaymentsTargetUSD > 0 && (
                 <ReferenceLine
                   y={expectedFuturePaymentsTargetUSD}

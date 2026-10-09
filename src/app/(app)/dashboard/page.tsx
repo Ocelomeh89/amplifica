@@ -11,14 +11,22 @@ import {
 } from "@/shared/finance/projection";
 import InfoBox from "@/shared/ui/InfoBox";
 import ChartPair from "@/features/dashboard/ui/ChartPair";
+import { settingsFromRow } from "@/features/dashboard/settings";
+import { buildDashboardProjection, mergeProjection } from "@/features/dashboard/projection";
+import { latestAmpliconFaceValue } from "@/shared/finance/dashboard-seed";
+import OptionalityMeter from "@/features/dashboard/ui/OptionalityMeter";
+import ProjectionSettingsPanel from "@/features/dashboard/ui/ProjectionSettingsPanel";
 
 export default async function DashboardPage() {
   const { supabase, user } = await requireUser();
 
-  const [{ data: profile }, { data: amplicons }] = await Promise.all([
+  const [{ data: profile }, { data: amplicons }, { data: projectionRow }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.from("amplicons").select("*"),
+    // Errors (e.g. migration 0012 not yet applied) fall through to defaults.
+    supabase.from("dashboard_projection_settings").select("*").eq("user_id", user.id).maybeSingle(),
   ]);
+  const projectionSettings = settingsFromRow(projectionRow ?? null);
 
   const todayMonth = currentYearMonth();
   const lites: AmpliconLite[] = (amplicons ?? []).map((a) => ({
@@ -65,6 +73,16 @@ export default async function DashboardPage() {
     minMonthsAhead: 36,
     discountRatePct: GLOBAL_DISCOUNT_RATE_PCT,
   });
+
+  const projection = buildDashboardProjection({
+    amplicons: lites,
+    today: todayMonth,
+    settings: projectionSettings,
+    msc: monthlyContribution,
+    cashflowGoalUSD,
+    currentMonthlyCashflow,
+  });
+  const optionalityMonth = projection.optionality.kind === "reached" ? projection.optionality.month : null;
 
   return (
     <div className="max-w-5xl">
@@ -124,10 +142,7 @@ export default async function DashboardPage() {
               <div className="text-[10px] text-sub uppercase tracking-wide">Monthly cashflow</div>
               <div className="text-xl font-bold mt-auto pt-3">{fmtUSD0(cashflowGoalUSD)}</div>
             </div>
-            <div className="p-4 flex flex-col">
-              <div className="text-[10px] text-sub uppercase tracking-wide">Expected future payments</div>
-              <div className="text-xl font-bold mt-auto pt-3">{fmtKUSD(expectedFuturePaymentsGoalUSD)}</div>
-            </div>
+            <OptionalityMeter status={projection.optionality} goalUSD={cashflowGoalUSD} currentMonthlyCashflowUSD={currentMonthlyCashflow} />
           </div>
         </div>
       </div>
@@ -137,6 +152,16 @@ export default async function DashboardPage() {
         currentSeries={currentSeries}
         cashflowTargetUSD={cashflowGoalUSD}
         expectedFuturePaymentsTargetUSD={expectedFuturePaymentsGoalUSD}
+        inceptionProjected={mergeProjection(inceptionSeries, projection.series, todayMonth)}
+        currentProjected={mergeProjection(currentSeries, projection.series, todayMonth)}
+        optionalityMonth={optionalityMonth}
+        controls={
+          <ProjectionSettingsPanel
+            settings={projectionSettings}
+            latestFaceValue={latestAmpliconFaceValue(lites)}
+            msc={monthlyContribution}
+          />
+        }
       />
     </div>
   );

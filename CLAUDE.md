@@ -43,7 +43,7 @@ changing behavior.** In `compare/engine/` 31 of 50 files are tests; in
 |---|---|
 | `amplicons/` | CRUD for amortized investments. `data/actions.ts` + two UI files. |
 | `loc/` | CRUD for lines of credit. `updateUtilization` deliberately has no user check — it leans on RLS. |
-| `dashboard/` | One chart component; the page does the querying. |
+| `dashboard/` | Charts + forward projection: settings table (0012), save action, seeded projection, optionality meter. |
 | `settings/` | Profile goals + theme toggle. |
 | `projections/` | Thin composition over `features/simulator`; `data/actions.ts` owns the FormData contract that `SimInputsGrid`'s `name=` attributes must match. |
 | `calculator/` | Public email-gated simulator. `data/actions.ts` writes leads via the **service-role** client and subscribes to Beehiiv. |
