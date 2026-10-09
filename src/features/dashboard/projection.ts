@@ -73,7 +73,8 @@ export function buildDashboardProjection(args: {
     optionality: {
       kind: "reached",
       month: addMonths(today, fi.month),
-      progress: optionalityProgress(currentMonthlyCashflow, cashFlowAtOptionality),
+      // Optionality today means 100%, whatever the payout reads.
+      progress: fi.month === 0 ? 1 : optionalityProgress(currentMonthlyCashflow, cashFlowAtOptionality),
       cashFlowAtOptionality,
     },
   };
