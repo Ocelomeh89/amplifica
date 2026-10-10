@@ -258,7 +258,7 @@ first payment the month after). So month 0 sees MSC only.
 
 **Two finish lines (`projection-fi.ts`):** *Income FI* (expected future payments never erode while drawing — you live off income) and *Wealth FI* (they also keep growing). The FI surface is **non-monotone** (flywheel saw-tooth) — the solver uses a linear scan, not binary search.
 
-**Validated findings baked into the product's guidance** (from the exploration documented in `docs/projection-continuous-loc-spec.md`): the leverage spread (investment return vs LoC cost) dominates the FI date; a return-above-amortization gap is the cheapest accelerator; perpetuals are a *post-retirement durable-income* layer (deploy late + light), not an FI accelerator.
+**Validated findings baked into the product's guidance** (from the exploration summarized in `docs/parked-ideas.md`): the leverage spread (investment return vs LoC cost) dominates the FI date; a return-above-amortization gap is the cheapest accelerator; perpetuals are a *post-retirement durable-income* layer (deploy late + light), not an FI accelerator.
 
 **Key-scenario benchmark (8% amortized Amplicons, 10% LoC, $2,000 MSC; parameter sweep 2026-07, re-validated under the V1.0 predictive gate + early redeploy trigger):**
 - With product defaults (factor 5, term 36, step-up 1.5, gate 4) the system's own cashflow — Amplicon payouts, excluding the MSC — first crosses **$45k/month at month 179 (~14.9 yr)** (factor 4: month 177). The early redeploy trigger bought ~5 months vs waiting for full payoff; the predictive gate keeps peak debt ≈$1.7M (vs ≈$2.3M under the V0.7 model).
@@ -301,7 +301,7 @@ Each feature folder pairs a Server Component `page.tsx` (reads rows) with `actio
 
 1. `pnpm install`. Node 24 LTS.
 2. Create a Supabase project; set `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`, plus `SUPABASE_SERVICE_ROLE_KEY` / `BEEHIIV_API_KEY` / `BEEHIIV_PUBLICATION_ID` for the `/calculator` lead capture (it degrades gracefully without Beehiiv: leads still insert, `beehiiv_synced` stays false).
-3. Apply `supabase/migrations/0001`→`0010` in order (`supabase db push` / `migration up`). This builds all tables, RLS, triggers, and the signup→profile automation.
+3. Apply `supabase/migrations/0001`→`0012` in order (`supabase db push` / `migration up`). This builds all tables, RLS, triggers, and the signup→profile automation.
 4. `pnpm dev` → http://localhost:3000. Sign up (a profile row auto-creates), then add Amplicons/LoCs and build Projections.
 5. `pnpm test` (Vitest, 99 finance tests) and `pnpm typecheck` (`tsc --noEmit`) before shipping. **Do not run `next build` while `next dev` is running** — it corrupts the dev server's `.next` cache.
 
@@ -314,7 +314,7 @@ Each feature folder pairs a Server Component `page.tsx` (reads rows) with `actio
 - **`V0.6`** — renamed the headline metric **net worth → expected future payments** (engine field `expectedFuturePayments`, all UI copy, the explainer; "External net worth" → "External assets"). Pure reframing — values and FI logic unchanged — to remove the nominal-vs-discounted ambiguity and leave "net worth" free to be defined for real later. No DB change. Rollback: `git reset --hard V0.5`.
 - **`V1.0`** — current release (**launch**). Model: **predictive launch gate** — a new Amplicon is only drawn when its payoff is predicted within `payoffUpgradeMonths` (stepped-up size tried first, current size as fallback, else the flywheel waits and banks cash); continuous mode bypasses the gate. **Early redeploy trigger**: redeploy when the post-payment balance drops below one month's payment, leftover rolls into the new draw (conserved — the source model's "leftover absorption" was rejected as an accounting artifact; see §6 provenance note). **Default `investment_size_factor` 4 → 5** (migration 0006). Engine refactored into `sim-input.ts` (sanitized, total inputs) + `sim-book.ts` + `projection-sim.ts`, with golden characterization tests. Rollback: `git reset --hard V0.7` (and revert migration 0006 if applied).
 - **`V0.7`** — Model: the **first Amplicon payment now lands at month 1** (the bootstrap draw is taken at month 0 but pays the next month, like every re-launch — month 0 is MSC-only), and the **payoff-upgrade gate default moves 3 → 4 months** (migration 0005; engine constant `PAYOFF_UPGRADE_MONTHS`). UI: the **Fixed-mode gate selector and Continuous-LoC-growth toggle are removed** from the projection editor and parked (§11) — engine + DB columns kept, editor uses the gate-4 default. Explainer + this doc updated. Rollback: `git reset --hard V0.6`.
-- Prior milestone tags: `v1` (Projections 2.0 — market benchmark). Parked exploration branch `projection-continuous-loc` (stock sidecar, retained-return pile, spread-ETF, term×factor heatmap) on `origin`, documented in `docs/projection-continuous-loc-spec.md` — not merged.
+- Prior milestone tags: `v1` (Projections 2.0 — market benchmark). Exploration branches `continuous` and `projection-continuous-loc` were deleted 2026-10-10; their unshipped ideas live in `docs/parked-ideas.md`.
 
 ---
 
@@ -326,4 +326,4 @@ explored but not shipped. Re-enabling the first two is a UI-only change.
 - **Fixed-mode gate selector** (`payoff_upgrade_months`, 3 or 4) — let the user choose how fast a payoff must be to trigger a step-up. Removed from the editor in V0.7; engine + DB column retained, default 4.
 - **Continuous LoC growth toggle** (`continuous_growth`) — step the investment up on *every* payoff (`payoffUpgradeMonths = Infinity`) instead of only on fast ones. Removed from the editor in V0.7; engine + DB column retained, default off.
 - **External assets** (`profiles.external_net_worth`) — a user-entered pile of assets held outside amplifica, added to the dashboard's expected-future-payments total. Settings input removed (dashboard no longer adds it; it now shows the flywheel alone). `projection.ts` still accepts an `externalNetWorth` param (the dashboard passes 0); DB column retained, no longer written. Re-enabling is a UI-only change.
-- **Exploration branch `projection-continuous-loc`** — stock sidecar, retained-return pile, spread-ETF, term×factor heatmap (see `docs/projection-continuous-loc-spec.md`). Not merged.
+- **Engine ideas from deleted exploration branches** — cash-flow-leverage sizing, retained-return pile, spread ETF, stock sidecar, term×factor optimizer. Mechanics and findings in `docs/parked-ideas.md`.
