@@ -489,6 +489,12 @@ metric-weighted taste scoring once 20 or more posted ideas carry metrics;
 Trial Reel outcome capture (which hook won); Story metrics from the IG API;
 a "record day" mode that groups a week's Reels by chain into one shot list.
 
+Superseded in part on 2026-10-18 by
+`2026-10-13-content-engine-instagram-intelligence-roadmap.md`: the performance
+window moves to 90 days, `/content-ig-scan` is replaced by the competitor slice,
+cadence analysis folds into PR 5, and Trial Reel outcome capture becomes its own
+slice. That file lists the four changes.
+
 ## Risks
 
 - **Cloud routines and connectors.** The design assumes scheduled Claude
