@@ -466,6 +466,8 @@ export type Database = {
           caption: string;
           pillar: string;
           hook_type: string;
+          media_type: string;
+          thumbnail_url: string;
           created_at: string;
           updated_at: string;
         };
@@ -481,6 +483,8 @@ export type Database = {
           caption?: string;
           pillar?: string;
           hook_type?: string;
+          media_type?: string;
+          thumbnail_url?: string;
         };
         Update: {
           idea_id?: string | null;
@@ -491,6 +495,8 @@ export type Database = {
           caption?: string;
           pillar?: string;
           hook_type?: string;
+          media_type?: string;
+          thumbnail_url?: string;
         };
         Relationships: [];
       };
