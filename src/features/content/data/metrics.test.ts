@@ -39,6 +39,17 @@ function fakeDb() {
 }
 
 describe("storePull", () => {
+  it("never blanks a stored value: a post with only one field gets only that field", async () => {
+    const { db, calls } = fakeDb();
+    const thumbOnly: PulledPost = { ...post, external_id: "t", media_type: "", thumbnail_url: "https://t/9.jpg" };
+    const typeOnly: PulledPost = { ...post, external_id: "m", media_type: "carousel", thumbnail_url: "" };
+    await storePull(db, "user-1", { posts: [thumbOnly, typeOnly], errors: [] }, "2026-09-22T10:00:00.000Z");
+    expect(calls.updatePostMedia[0]).toEqual([
+      { id: "post-0", thumbnail_url: "https://t/9.jpg" },
+      { id: "post-1", media_type: "carousel" },
+    ]);
+  });
+
   it("refreshes media fields only for posts that have them, with only those two columns", async () => {
     const { db, calls } = fakeDb();
     const bare: PulledPost = { ...post, external_id: "bare", media_type: "", thumbnail_url: "" };

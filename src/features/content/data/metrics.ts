@@ -23,7 +23,7 @@ export interface MetricsDb {
   /** Insert-ignore on (user_id, platform, external_id); returns ids for every key, new or existing. */
   upsertPosts(rows: PostRow[]): Promise<PostKey[]>;
   /** Refreshes media_type and thumbnail_url on existing posts, nothing else. Never throws; returns the rows updated. */
-  updatePostMedia(rows: { id: string; media_type: string; thumbnail_url: string }[]): Promise<number>;
+  updatePostMedia(rows: { id: string; media_type?: string; thumbnail_url?: string }[]): Promise<number>;
   insertSnapshots(rows: SnapshotRow[]): Promise<number>;
   /** Insert-ignore on (user_id, kind, external_id). */
   upsertComments(rows: CommentRow[]): Promise<number>;
@@ -48,7 +48,9 @@ export async function storePull(db: MetricsDb, userId: string, pull: Pull, captu
 
   const mediaRows = pull.posts.flatMap((p) => {
     const id = idOf.get(`${p.platform}:${p.external_id}`);
-    return id && (p.media_type !== "" || p.thumbnail_url !== "") ? [{ id, media_type: p.media_type, thumbnail_url: p.thumbnail_url }] : [];
+    if (!id || (p.media_type === "" && p.thumbnail_url === "")) return [];
+    // Only non-empty fields: an unrecognised type or a missing thumbnail must not blank what is stored.
+    return [{ id, ...(p.media_type !== "" ? { media_type: p.media_type } : {}), ...(p.thumbnail_url !== "" ? { thumbnail_url: p.thumbnail_url } : {}) }];
   });
   const media = mediaRows.length ? await db.updatePostMedia(mediaRows) : 0;
 

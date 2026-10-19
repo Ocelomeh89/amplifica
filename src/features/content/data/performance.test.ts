@@ -9,18 +9,22 @@ type Row = { post_id: string; captured_at: string; metrics: unknown };
 
 function fakeClient(rows: Row[]) {
   const ranges: [number, number][] = [];
+  const orders: string[] = [];
   const builder = {
     select: () => builder,
     eq: () => builder,
     in: () => builder,
-    order: () => builder,
+    order: (col: string) => {
+      orders.push(col);
+      return builder;
+    },
     range: async (from: number, to: number) => {
       ranges.push([from, to]);
       return { data: rows.slice(from, to + 1), error: null };
     },
   };
   const client = { from: () => builder };
-  return { client: client as unknown as Parameters<typeof loadSnapshotRows>[0], ranges };
+  return { client: client as unknown as Parameters<typeof loadSnapshotRows>[0], ranges, orders };
 }
 
 describe("loadSnapshotRows", () => {
@@ -40,5 +44,10 @@ describe("loadSnapshotRows", () => {
     const { client, ranges } = fakeClient([{ post_id: "p", captured_at: "2026-10-01T00:00:00Z", metrics: {} }]);
     expect(await loadSnapshotRows(client, "user-1", ["p"])).toHaveLength(1);
     expect(ranges).toEqual([[0, 999]]);
+  });
+  it("breaks ties on id so a page boundary inside one cron run's rows cannot skip or repeat a snapshot", async () => {
+    const { client, orders } = fakeClient([]);
+    await loadSnapshotRows(client, "user-1", ["p"]);
+    expect(orders).toEqual(["captured_at", "id"]);
   });
 });

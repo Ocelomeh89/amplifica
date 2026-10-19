@@ -31,7 +31,9 @@ export async function loadSnapshotRows(
       .select("post_id, captured_at, metrics")
       .eq("user_id", userId)
       .in("post_id", postIds)
+      // Every cron run stamps one captured_at on ~100 rows; without a unique tiebreaker a page boundary can skip or repeat rows.
       .order("captured_at", { ascending: true })
+      .order("id", { ascending: true })
       .range(from, from + SNAPSHOT_PAGE - 1);
     if (error) throw new Error(error.message);
     const page = data ?? [];

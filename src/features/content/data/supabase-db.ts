@@ -199,7 +199,7 @@ export function supabaseMetricsDb(client: Client, userId: string): MetricsDb {
           rows.slice(i, i + 10).map(async (r) => {
             const { error } = await client
               .from("content_posts")
-              .update({ media_type: r.media_type, thumbnail_url: r.thumbnail_url })
+              .update({ ...(r.media_type !== undefined ? { media_type: r.media_type } : {}), ...(r.thumbnail_url !== undefined ? { thumbnail_url: r.thumbnail_url } : {}) })
               .eq("id", r.id)
               .eq("user_id", userId);
             if (error) console.error(`content_posts media update ${r.id}: ${error.message}`);
