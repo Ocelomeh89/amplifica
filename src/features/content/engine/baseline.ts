@@ -79,3 +79,53 @@ export function dayViews(series: SeriesPoint[], postedAt: string, day: number): 
 export function ageHours(postedAt: string, now: Date): number {
   return (now.getTime() - new Date(postedAt).getTime()) / HOUR;
 }
+
+export type Sample = { median: number | null; count: number; thin: boolean };
+export type GroupBaseline = {
+  group: string;
+  /** Settled posts: in the window, at least SETTLED_MIN_AGE_DAYS old, with views. */
+  count: number;
+  thin: boolean;
+  p25: number | null;
+  p50: number | null;
+  p75: number | null;
+  p90: number | null;
+  /** Median views at day N (2 through 7) across posts in the window that have one. */
+  day: Record<number, Sample>;
+};
+
+const DAYS = [2, 3, 4, 5, 6, 7] as const;
+
+export function viewsBaselines(posts: PostForBaseline[], now: Date): Map<string, GroupBaseline> {
+  const since = now.getTime() - WINDOW_DAYS * 24 * HOUR;
+  const byGroup = new Map<string, PostForBaseline[]>();
+  for (const p of posts) {
+    if (new Date(p.posted_at).getTime() < since) continue;
+    const g = baselineGroup(p);
+    byGroup.set(g, [...(byGroup.get(g) ?? []), p]);
+  }
+  const out = new Map<string, GroupBaseline>();
+  for (const [group, members] of byGroup) {
+    const settled: number[] = [];
+    for (const p of members) {
+      const v = latestViews(p.series);
+      if (v !== null && ageHours(p.posted_at, now) / 24 >= SETTLED_MIN_AGE_DAYS) settled.push(v);
+    }
+    const day: Record<number, Sample> = {};
+    for (const n of DAYS) {
+      const vals = members.map((p) => dayViews(p.series, p.posted_at, n)).filter(isNum);
+      day[n] = { median: median(vals), count: vals.length, thin: vals.length < THIN_BASELINE_BELOW };
+    }
+    out.set(group, {
+      group,
+      count: settled.length,
+      thin: settled.length < THIN_BASELINE_BELOW,
+      p25: percentile(settled, 25),
+      p50: percentile(settled, 50),
+      p75: percentile(settled, 75),
+      p90: percentile(settled, 90),
+      day,
+    });
+  }
+  return out;
+}
