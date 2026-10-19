@@ -27,12 +27,8 @@ export type NormalizedPost = PostForMath & {
   n_reach: number | null;
 };
 
-export function median(xs: number[]): number | null {
-  if (xs.length === 0) return null;
-  const s = [...xs].sort((a, b) => a - b);
-  const mid = Math.floor(s.length / 2);
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
-}
+export { median } from "./baseline";
+import { median } from "./baseline";
 
 export function rate(num: number | null | undefined, den: number | null | undefined): number | null {
   if (num == null || den == null || den <= 0) return null;
