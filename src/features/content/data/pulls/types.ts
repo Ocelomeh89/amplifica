@@ -1,4 +1,4 @@
-import type { Format, MetricSnapshot, Platform } from "@/features/content/engine/types";
+import type { Format, MediaType, MetricSnapshot, Platform } from "@/features/content/engine/types";
 
 export type PulledComment = { external_id: string; author: string; text: string; occurred_at: string };
 
@@ -8,6 +8,9 @@ export type PulledPost = {
   external_id: string;
   url: string;
   format: Format | "";
+  /** Instagram media type; "" on other platforms and when Instagram reports one we do not know. */
+  media_type: MediaType | "";
+  thumbnail_url: string;
   posted_at: string;
   caption: string;
   metrics: MetricSnapshot;

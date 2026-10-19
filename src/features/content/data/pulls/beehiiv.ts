@@ -30,6 +30,8 @@ export function mapBeehiivPost(p: BeehiivPost): PulledPost {
     external_id: p.slug,
     url: p.web_url,
     format: "newsletter",
+    media_type: "",
+    thumbnail_url: "",
     posted_at: new Date(p.publish_date * 1000).toISOString(),
     caption: p.title,
     metrics: {

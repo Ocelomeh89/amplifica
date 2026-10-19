@@ -22,6 +22,8 @@ describe("mapBeehiivPost", () => {
       external_id: "net-worth-is-a-vanity-metric",
       url: "https://newsletter.amplificawealth.com/p/net-worth-is-a-vanity-metric",
       format: "newsletter",
+      media_type: "",
+      thumbnail_url: "",
       posted_at: new Date(1789657200 * 1000).toISOString(),
       caption: "Net worth is a vanity metric",
       metrics: { views: 4, opens: 36, open_rate: 0.6316, clicks: 2, click_rate: 0.0556, unsubscribes: 0 },

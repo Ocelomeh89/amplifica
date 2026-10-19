@@ -7,6 +7,8 @@ const post: PulledPost = {
   external_id: "Ddh0MkWxvTI",
   url: "https://www.instagram.com/reel/Ddh0MkWxvTI/",
   format: "reel",
+  media_type: "reel",
+  thumbnail_url: "https://t/1.jpg",
   posted_at: "2026-09-21T00:00:00.000Z",
   caption: "I was offered a new job.",
   metrics: { reach: 384, saves: 2 },

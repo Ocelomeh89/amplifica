@@ -1,5 +1,6 @@
-import type { Format, MetricSnapshot } from "@/features/content/engine/types";
+import type { Format, MediaType, MetricSnapshot } from "@/features/content/engine/types";
 import { externalIdFromUrl } from "@/features/content/engine/posts";
+import { WINDOW_DAYS } from "@/features/content/engine/baseline";
 import type { Pull, PulledComment, PulledPost } from "./types";
 
 // Instagram Graph API through Composio's REST API, using the existing
@@ -20,6 +21,8 @@ export type IgMedia = {
   timestamp: string;
   like_count?: number | null;
   comments_count?: number | null;
+  media_url?: string | null;
+  thumbnail_url?: string | null;
 };
 type MediaPage = { data: IgMedia[]; paging?: { cursors?: { after?: string } } };
 export type InsightRow = { name: string; values?: { value: number }[] };
@@ -48,6 +51,15 @@ export async function composioExecute<T>(
 export function igFormat(m: IgMedia): Format | "" {
   if (m.media_product_type === "REELS") return "reel";
   if (m.media_product_type === "STORY") return "story";
+  return "";
+}
+
+export function igMediaType(m: IgMedia): MediaType | "" {
+  if (m.media_product_type === "REELS") return "reel";
+  if (m.media_product_type === "STORY") return "story";
+  if (m.media_type === "IMAGE") return "image";
+  if (m.media_type === "CAROUSEL_ALBUM") return "carousel";
+  if (m.media_type === "VIDEO") return "video";
   return "";
 }
 
@@ -83,6 +95,8 @@ export function mapIgMedia(m: IgMedia, insights: InsightRow[] | null, comments: 
     external_id: externalIdFromUrl(m.permalink, "instagram"),
     url: m.permalink,
     format: igFormat(m),
+    media_type: igMediaType(m),
+    thumbnail_url: m.thumbnail_url ?? m.media_url ?? "",
     posted_at: new Date(m.timestamp).toISOString(),
     caption: m.caption ?? "",
     metrics,
@@ -97,11 +111,12 @@ export function mapIgMedia(m: IgMedia, insights: InsightRow[] | null, comments: 
   };
 }
 
-const MEDIA_FIELDS = "id,caption,media_type,media_product_type,permalink,timestamp,like_count,comments_count";
-const MAX_MEDIA = 100;
+const MEDIA_FIELDS = "id,caption,media_type,media_product_type,permalink,timestamp,like_count,comments_count,media_url,thumbnail_url";
+/** Safety cap on one run; the 90-day window normally stops paging first. */
+export const MAX_ITEMS = 400;
 const CONCURRENCY = 4;
 
-export async function pullInstagram(env: ComposioEnv, fetchImpl: typeof fetch = fetch): Promise<Pull> {
+export async function pullInstagram(env: ComposioEnv, fetchImpl: typeof fetch = fetch, now: Date = new Date()): Promise<Pull> {
   if (!env.apiKey || !env.connectionId) {
     console.warn("instagram: COMPOSIO_API_KEY / COMPOSIO_IG_CONNECTION_ID not set; skipping pull");
     return { posts: [], errors: ["instagram: COMPOSIO_API_KEY / COMPOSIO_IG_CONNECTION_ID not set"] };
@@ -111,14 +126,17 @@ export async function pullInstagram(env: ComposioEnv, fetchImpl: typeof fetch = 
   const media: IgMedia[] = [];
   try {
     let after: string | undefined;
-    while (media.length < MAX_MEDIA) {
+    const cutoff = now.getTime() - WINDOW_DAYS * 86_400_000;
+    while (media.length < MAX_ITEMS) {
       const page = await composioExecute<MediaPage>(
         "INSTAGRAM_GET_IG_USER_MEDIA",
         { ig_user_id: "me", limit: 50, fields: MEDIA_FIELDS, ...(after ? { after } : {}) },
         full,
         fetchImpl
       );
-      media.push(...page.data);
+      media.push(...page.data.filter((m) => new Date(m.timestamp).getTime() >= cutoff));
+      const oldest = page.data.length ? Math.min(...page.data.map((m) => new Date(m.timestamp).getTime())) : Infinity;
+      if (oldest < cutoff) break;
       after = page.paging?.cursors?.after;
       if (!after || page.data.length === 0) break;
     }
