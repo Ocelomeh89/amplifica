@@ -129,3 +129,65 @@ export function viewsBaselines(posts: PostForBaseline[], now: Date): Map<string,
   }
   return out;
 }
+
+export type MultiplierMode = "pending" | "matched" | "settled" | "none";
+export type Multiplier = { n_views: number | null; mode: MultiplierMode; day: number | null; thin: boolean };
+
+/** Views against the typical post at the same age; the settled median only for posts with no matched value. */
+export function viewsMultiplier(post: PostForBaseline, baseline: GroupBaseline | undefined, now: Date): Multiplier {
+  const hours = ageHours(post.posted_at, now);
+  if (hours < PENDING_HOURS) return { n_views: null, mode: "pending", day: null, thin: false };
+  const ageDays = Math.floor(hours / 24);
+  const none: Multiplier = { n_views: null, mode: "none", day: null, thin: false };
+  if (!baseline) return none;
+  const n = Math.min(ageDays, CANONICAL_DAY);
+  const sample = baseline.day[n];
+  const atDay = dayViews(post.series, post.posted_at, n);
+  if (atDay !== null && sample?.median != null && sample.median > 0) {
+    return { n_views: atDay / sample.median, mode: "matched", day: n, thin: sample.thin };
+  }
+  const latest = latestViews(post.series);
+  if (ageDays >= SETTLED_MIN_AGE_DAYS && latest !== null && baseline.p50 != null && baseline.p50 > 0) {
+    return { n_views: latest / baseline.p50, mode: "settled", day: null, thin: baseline.thin };
+  }
+  return none;
+}
+
+export type Status = "Pending" | "Lagging" | "Normal" | "Promising" | "Viral";
+
+export function statusOf(m: Multiplier): Status | null {
+  if (m.mode === "pending") return "Pending";
+  if (m.mode === "none" || m.n_views === null) return null;
+  if (m.n_views < LAGGING_BELOW) return "Lagging";
+  if (m.n_views < PROMISING_FROM) return "Normal";
+  if (m.n_views < VIRAL_FROM) return "Promising";
+  return "Viral";
+}
+
+/** A fifth or more of the views arrived after day 14, on a post at least 28 days old. */
+export function isEvergreen(post: PostForBaseline, now: Date): boolean {
+  if (ageHours(post.posted_at, now) / 24 < EVERGREEN_MIN_AGE_DAYS) return false;
+  const latest = latestViews(post.series);
+  const early = dayViews(post.series, post.posted_at, EVERGREEN_DAY);
+  if (latest === null || early === null || latest <= 0) return false;
+  return (latest - early) / latest >= EVERGREEN_LATE_SHARE;
+}
+
+export type PostScore = {
+  id: string;
+  group: string;
+  views: number | null;
+  multiplier: Multiplier;
+  status: Status | null;
+  evergreen: boolean;
+};
+
+export function scorePosts(posts: PostForBaseline[], now: Date): { baselines: Map<string, GroupBaseline>; scores: PostScore[] } {
+  const baselines = viewsBaselines(posts, now);
+  const scores = posts.map((p): PostScore => {
+    const group = baselineGroup(p);
+    const multiplier = viewsMultiplier(p, baselines.get(group), now);
+    return { id: p.id, group, views: latestViews(p.series), multiplier, status: statusOf(multiplier), evergreen: isEvergreen(p, now) };
+  });
+  return { baselines, scores };
+}

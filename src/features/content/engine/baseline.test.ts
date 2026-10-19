@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { baselineGroup, dayViews, latestViews, percentile, viewsBaselines, DAY_TOLERANCE_HOURS, type PostForBaseline, type SeriesPoint } from "./baseline";
+import { baselineGroup, dayViews, latestViews, percentile, viewsBaselines, viewsMultiplier, statusOf, isEvergreen, scorePosts, DAY_TOLERANCE_HOURS, type GroupBaseline, type PostForBaseline, type SeriesPoint } from "./baseline";
 
 const pt = (at: string, views: number | null): SeriesPoint => ({ at, views });
 const reel = (id: string, posted_at: string, series: SeriesPoint[]): PostForBaseline => ({
@@ -98,5 +98,72 @@ describe("viewsBaselines", () => {
     const m = viewsBaselines(posts, now);
     expect(m.get("instagram:reel")!.p50).toBe(100);
     expect(m.get("instagram:carousel")!.p50).toBe(10);
+  });
+});
+
+describe("viewsMultiplier and statusOf", () => {
+  const now = new Date("2026-10-18T12:00:00Z");
+  const b: GroupBaseline = {
+    group: "instagram:reel", count: 10, thin: false, p25: 200, p50: 400, p75: 600, p90: 900,
+    day: {
+      2: { median: 100, count: 10, thin: false }, 3: { median: 150, count: 10, thin: false }, 4: { median: 200, count: 10, thin: false },
+      5: { median: 250, count: 10, thin: false }, 6: { median: 300, count: 10, thin: false }, 7: { median: 350, count: 7, thin: true },
+    },
+  };
+  it("is pending under 48 hours", () => {
+    const m = viewsMultiplier(reel("p", "2026-10-17T00:00:00Z", [{ at: "2026-10-18T10:00:00Z", views: 1000 }]), b, now);
+    expect(m).toEqual({ n_views: null, mode: "pending", day: null, thin: false });
+    expect(statusOf(m)).toBe("Pending");
+  });
+  it("matches at min(age days, 7) and carries that day's thin flag", () => {
+    const m3 = viewsMultiplier(reel("a", "2026-10-15T12:00:00Z", daily("2026-10-15T12:00:00Z", [50, 100, 300])), b, now);
+    expect(m3).toEqual({ n_views: 2, mode: "matched", day: 3, thin: false }); // 300 / 150
+    const m7 = viewsMultiplier(reel("w", "2026-09-20T12:00:00Z", daily("2026-09-20T12:00:00Z", [1, 1, 1, 1, 1, 1, 1050])), b, now);
+    expect(m7).toEqual({ n_views: 3, mode: "matched", day: 7, thin: true }); // 1050 / 350
+  });
+  it("settles when there is no day-N value and the post is at least 14 days old", () => {
+    const m = viewsMultiplier(reel("s", "2026-09-01T12:00:00Z", [{ at: "2026-10-17T10:00:00Z", views: 200 }]), b, now);
+    expect(m).toEqual({ n_views: 0.5, mode: "settled", day: null, thin: false }); // 200 / p50 400
+  });
+  it("is none between 2 and 14 days without a day value, with no baseline, and with an empty settled set", () => {
+    expect(viewsMultiplier(reel("n", "2026-10-10T12:00:00Z", []), b, now).mode).toBe("none");
+    expect(viewsMultiplier(reel("n2", "2026-09-01T12:00:00Z", [{ at: "2026-10-17T10:00:00Z", views: 200 }]), undefined, now).mode).toBe("none");
+    expect(statusOf({ n_views: null, mode: "none", day: null, thin: false })).toBeNull();
+    const youngGroup: GroupBaseline = { ...b, count: 0, thin: true, p25: null, p50: null, p75: null, p90: null };
+    expect(viewsMultiplier(reel("nod7", "2026-09-28T12:00:00Z", [{ at: "2026-10-17T10:00:00Z", views: 500 }]), youngGroup, now).mode).toBe("none");
+  });
+  it("maps the status bands at 0.5, 1.5 and 3.0", () => {
+    const at = (n: number) => statusOf({ n_views: n, mode: "settled", day: null, thin: false });
+    expect(at(0.49)).toBe("Lagging");
+    expect(at(0.5)).toBe("Normal");
+    expect(at(1.49)).toBe("Normal");
+    expect(at(1.5)).toBe("Promising");
+    expect(at(2.99)).toBe("Promising");
+    expect(at(3)).toBe("Viral");
+  });
+});
+
+describe("isEvergreen", () => {
+  const now = new Date("2026-10-18T12:00:00Z");
+  it("needs 28 days, a day-14 snapshot and a fifth of views after day 14", () => {
+    const grows = [...daily("2026-09-10T12:00:00Z", Array.from({ length: 14 }, (_, i) => 100 + i)), { at: "2026-10-17T10:00:00Z", views: 160 }];
+    expect(isEvergreen(reel("e", "2026-09-10T12:00:00Z", grows), now)).toBe(true); // (160 - 113) / 160 >= 0.2
+    const flat = [...daily("2026-09-10T12:00:00Z", Array.from({ length: 14 }, () => 150)), { at: "2026-10-17T10:00:00Z", views: 160 }];
+    expect(isEvergreen(reel("f", "2026-09-10T12:00:00Z", flat), now)).toBe(false);
+    expect(isEvergreen(reel("y", "2026-10-02T12:00:00Z", daily("2026-10-02T12:00:00Z", Array.from({ length: 15 }, (_, i) => 10 * i))), now)).toBe(false); // 16 days old
+    expect(isEvergreen(reel("nod14", "2026-09-10T12:00:00Z", [{ at: "2026-10-17T10:00:00Z", views: 1000 }]), now)).toBe(false);
+  });
+});
+
+describe("scorePosts", () => {
+  it("keeps a 16-day-old viral post Viral and not Evergreen, and returns one score per post", () => {
+    const now = new Date("2026-10-18T12:00:00Z");
+    const base = Array.from({ length: 8 }, (_, i) => reel(`b${i}`, "2026-09-01T12:00:00Z", daily("2026-09-01T12:00:00Z", [10, 20, 30, 40, 50, 60, 70 + i])));
+    const viral = reel("v", "2026-10-02T12:00:00Z", daily("2026-10-02T12:00:00Z", [100, 200, 300, 400, 500, 600, 700]));
+    const { scores } = scorePosts([...base, viral], now);
+    const v = scores.find((s) => s.id === "v")!;
+    expect(v.status).toBe("Viral");
+    expect(v.evergreen).toBe(false);
+    expect(scores).toHaveLength(9);
   });
 });
