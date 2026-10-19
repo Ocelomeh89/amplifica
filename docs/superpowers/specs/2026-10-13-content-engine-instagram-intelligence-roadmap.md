@@ -189,6 +189,6 @@ Checked against Meta's docs on 2026-10-13. Revisit only when a slice above is bl
 ## Next step
 
 Slice 1 is specced in `2026-10-18-content-engine-baselines-and-status-design.md`
-(draft, awaiting approval). Start the spike in the same week so its answer is in hand before slice 6
+(approved, built; migration 0013 and production acceptance pending). Start the spike in the same week so its answer is in hand before slice 6
 is specced. Slice 6 gets its own spec after the spike, reusing slice 1's functions
 for the per-creator baseline.

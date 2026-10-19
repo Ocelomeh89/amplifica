@@ -6,7 +6,7 @@
 
 Roadmap: `2026-10-13-content-engine-instagram-intelligence-roadmap.md`, slice 1.
 Parent design: `2026-09-17-content-engine-design.md` ("Performance math"). Status:
-draft, 2026-10-18, revised once after a builder check, not yet approved.
+approved 2026-10-18, built on branch `feat/content-baselines-status`; migration 0013 and production acceptance pending.
 
 ## Intent
 
