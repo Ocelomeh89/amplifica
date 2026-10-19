@@ -66,7 +66,7 @@ describe("buildPlan", () => {
 
 function post(posted_at: string, n_reach: number) {
   return {
-    id: posted_at, platform: "instagram" as const, format: "reel", pillar: "", hook_type: "", hook_used: "",
+    id: posted_at, platform: "instagram" as const, format: "reel", media_type: "reel", pillar: "", hook_type: "", hook_used: "",
     posted_at, metrics: {}, first: null, reach: null, saves_rate: null, shares_rate: null, watch_s: null,
     n_saves: null, n_shares: null, n_watch: null, n_reach,
   };

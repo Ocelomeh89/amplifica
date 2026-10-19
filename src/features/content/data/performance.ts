@@ -11,7 +11,7 @@ export type PostRowForView = PostForMath & { url: string; caption: string; idea_
 export async function loadPostsForMath(supabase: SupabaseClient<Database>, userId: string): Promise<PostRowForView[]> {
   const { data: posts, error } = await supabase
     .from("content_posts")
-    .select("id, platform, format, pillar, hook_type, hook_used, caption, url, idea_id, posted_at")
+    .select("id, platform, format, media_type, pillar, hook_type, hook_used, caption, url, idea_id, posted_at")
     .eq("user_id", userId)
     .order("posted_at", { ascending: false });
   if (error) throw new Error(error.message);
@@ -32,6 +32,7 @@ export async function loadPostsForMath(supabase: SupabaseClient<Database>, userI
       id: p.id,
       platform: p.platform,
       format: p.format,
+      media_type: p.media_type,
       pillar: p.pillar,
       hook_type: p.hook_type,
       hook_used: p.hook_used,
