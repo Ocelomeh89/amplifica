@@ -22,15 +22,17 @@ export type CommentRow = {
 export interface MetricsDb {
   /** Insert-ignore on (user_id, platform, external_id); returns ids for every key, new or existing. */
   upsertPosts(rows: PostRow[]): Promise<PostKey[]>;
+  /** Refreshes media_type and thumbnail_url on existing posts, nothing else. Never throws; returns the rows updated. */
+  updatePostMedia(rows: { id: string; media_type: string; thumbnail_url: string }[]): Promise<number>;
   insertSnapshots(rows: SnapshotRow[]): Promise<number>;
   /** Insert-ignore on (user_id, kind, external_id). */
   upsertComments(rows: CommentRow[]): Promise<number>;
 }
 
-export type StoreCounts = { posts: number; snapshots: number; comments: number };
+export type StoreCounts = { posts: number; snapshots: number; comments: number; media: number };
 
 export async function storePull(db: MetricsDb, userId: string, pull: Pull, capturedAt: string): Promise<StoreCounts> {
-  if (pull.posts.length === 0) return { posts: 0, snapshots: 0, comments: 0 };
+  if (pull.posts.length === 0) return { posts: 0, snapshots: 0, comments: 0, media: 0 };
   const keys = await db.upsertPosts(
     pull.posts.map((p) => ({
       user_id: userId,
@@ -43,6 +45,12 @@ export async function storePull(db: MetricsDb, userId: string, pull: Pull, captu
     }))
   );
   const idOf = new Map(keys.map((k) => [`${k.platform}:${k.external_id}`, k.id]));
+
+  const mediaRows = pull.posts.flatMap((p) => {
+    const id = idOf.get(`${p.platform}:${p.external_id}`);
+    return id && (p.media_type !== "" || p.thumbnail_url !== "") ? [{ id, media_type: p.media_type, thumbnail_url: p.thumbnail_url }] : [];
+  });
+  const media = mediaRows.length ? await db.updatePostMedia(mediaRows) : 0;
 
   const snapshots: SnapshotRow[] = [];
   const comments: CommentRow[] = [];
@@ -65,7 +73,7 @@ export async function storePull(db: MetricsDb, userId: string, pull: Pull, captu
   }
   const snapshotCount = snapshots.length ? await db.insertSnapshots(snapshots) : 0;
   const commentCount = comments.length ? await db.upsertComments(comments) : 0;
-  return { posts: snapshots.length, snapshots: snapshotCount, comments: commentCount };
+  return { posts: snapshots.length, snapshots: snapshotCount, comments: commentCount, media };
 }
 
 export type CronPlatform = "instagram" | "youtube" | "beehiiv";
@@ -96,7 +104,7 @@ export async function runMetricsCron(input: {
       if (counts.posts === 0 && result.errors.length > 0) failures += 1;
     } catch (e) {
       console.error(`content metrics: ${platform} failed`, e);
-      platforms[platform] = { posts: 0, snapshots: 0, comments: 0, errors: [`${platform}: ${(e as Error).message}`] };
+      platforms[platform] = { posts: 0, snapshots: 0, comments: 0, media: 0, errors: [`${platform}: ${(e as Error).message}`] };
       failures += 1;
     }
   }
