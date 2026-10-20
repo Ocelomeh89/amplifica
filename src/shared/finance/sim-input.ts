@@ -62,6 +62,10 @@ export interface ProjectionSimInput {
   perpetualTriggerSize?: number;
   perpetualYieldPct?: number;
   perpetualTermMonths?: number;
+  // First month the MSC is contributed. Default 1 for the bootstrap draw (month
+  // 0 is the draw alone) and 0 when seeded; compare passes 0 so the flywheel
+  // takes the same month-0 capital as every other option.
+  mscStartMonth?: number;
   // Stop MSC at this month (undefined = never). Independent of withdrawal.
   mscEndMonth?: number;
   // Withdraw monthlyWithdrawal from this month (undefined = never).
@@ -88,6 +92,7 @@ export interface SimConfig {
   perpetualTriggerSize: number;
   perpetualYieldPct: number;
   perpetualTermMonths: number;
+  mscStartMonth: number;
   mscEndMonth: number | null;
   withdrawalStartMonth: number | null;
   monthlyWithdrawal: number;
@@ -168,6 +173,7 @@ export function sanitizeSimInput(input: ProjectionSimInput): {
     perpetualTriggerSize: sanitizeNumber(issues, "perpetualTriggerSize", input.perpetualTriggerSize, { fallback: DEFAULT_PERPETUAL_TRIGGER, min: 0 }),
     perpetualYieldPct: sanitizeNumber(issues, "perpetualYieldPct", input.perpetualYieldPct, { fallback: DEFAULT_PERPETUAL_YIELD_PCT, min: 0, max: MAX_ANNUAL_RATE }),
     perpetualTermMonths: sanitizeNumber(issues, "perpetualTermMonths", input.perpetualTermMonths, { fallback: DEFAULT_PERPETUAL_TERM_MONTHS, min: 1, integer: true }),
+    mscStartMonth: sanitizeNumber(issues, "mscStartMonth", input.mscStartMonth, { fallback: input.seed == null ? 1 : 0, min: 0, integer: true }),
     mscEndMonth: monthSwitch("mscEndMonth", input.mscEndMonth),
     withdrawalStartMonth: monthSwitch("withdrawalStartMonth", input.withdrawalStartMonth),
     monthlyWithdrawal: sanitizeNumber(issues, "monthlyWithdrawal", input.monthlyWithdrawal, { fallback: DEFAULT_MONTHLY_WITHDRAWAL, min: 0 }),

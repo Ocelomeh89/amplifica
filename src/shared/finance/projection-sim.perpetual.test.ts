@@ -48,18 +48,19 @@ describe("perpetual Amplicons", () => {
 describe("MSC-end and withdrawal are independent", () => {
   it("contributions stop at mscEndMonth and never resume", () => {
     const r = runSimulation({ ...base, mscEndMonth: 100 });
-    expect(r.series[99].contributedCapital).toBeCloseTo(2000 * 100, 6);
-    expect(r.series[200].contributedCapital).toBeCloseTo(2000 * 100, 6);
+    // Months 1–99: the MSC starts at month 1.
+    expect(r.series[99].contributedCapital).toBeCloseTo(2000 * 99, 6);
+    expect(r.series[200].contributedCapital).toBeCloseTo(2000 * 99, 6);
   });
   it("zero-interest conservation: MSC in until cutoff, then withdrawal out", () => {
-    // 0% everywhere, MSC stops at 100, draw 4500 from 100. Expected future payments = MSC*100 - 4500*(m-100+1).
+    // 0% everywhere, MSC in months 1–99, draw 4500 from 100. Book + cash − LoC = MSC*99 - 4500*(m-100+1).
     const r = runSimulation({
       ...base, investmentInterestPct: 0, locInterestPct: 0, marketReturnPct: 0,
       totalMonths: 200, mscEndMonth: 100, withdrawalStartMonth: 100, monthlyWithdrawal: 4500,
     });
     for (const s of r.series) {
       const m = s.monthIndex;
-      const exp = m < 100 ? 2000 * (m + 1) : 2000 * 100 - 4500 * (m - 100 + 1);
+      const exp = m < 100 ? 2000 * m : 2000 * 99 - 4500 * (m - 100 + 1);
       expect(Math.abs(s.expectedFuturePayments + s.cash - exp)).toBeLessThan(1e-4 * Math.max(1, Math.abs(exp)));
     }
   });

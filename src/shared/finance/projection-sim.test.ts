@@ -21,8 +21,8 @@ describe("runSimulation — bootstrap", () => {
     expect(runSimulation(baseInput).initialInvestmentSize).toBe(20000);
   });
 
-  it("month 0 cashFlow = MSC only (the first Amplicon's first payment lands at month 1)", () => {
-    expect(runSimulation(baseInput).series[0].cashFlow).toBeCloseTo(5000, 2);
+  it("month 0 cashFlow = 0 (the draw alone: the MSC and the first payment both start at month 1)", () => {
+    expect(runSimulation(baseInput).series[0].cashFlow).toBeCloseTo(0, 2);
   });
 
   it("month 1 cashFlow = MSC + first payout of investment 0", () => {
@@ -30,9 +30,9 @@ describe("runSimulation — bootstrap", () => {
     expect(runSimulation(baseInput).series[1].cashFlow).toBeCloseTo(5000 + pmt, 2);
   });
 
-  it("month 0 outstanding = accrued initial minus month-0 inflow (MSC only)", () => {
-    // 20000 × (1 + 0.10/12) − 5000 = 15166.67 (no Amplicon payment until month 1)
-    expect(runSimulation(baseInput).series[0].outstandingAmount).toBeCloseTo(15166.67, 1);
+  it("month 0 outstanding = the accrued initial draw (no inflow until month 1)", () => {
+    // 20000 × (1 + 0.10/12) = 20166.67
+    expect(runSimulation(baseInput).series[0].outstandingAmount).toBeCloseTo(20166.67, 1);
   });
 
   it("active investment count is 0 at month 0 (drawn, not yet paying) and 1 from month 1", () => {
@@ -82,12 +82,12 @@ describe("runSimulation — cash bucket accelerates growth (no plateau)", () => 
 
 describe("runSimulation — predictive launch gate (only draw when payoff is predicted < gate)", () => {
   // Hand-reconcilable at 0% everywhere: msc=1000, factor=3 → 3000 bootstrap
-  // (payout 83.33). The redeploy trigger fires at m1 (916.67 left < the
-  // 1083.33 payment). The ×3 step-up (9000 + 916.67 leftover) cannot reach its
-  // trigger in < 4 months on a 1333.33 inflow, but relaunching the current
-  // 3000 can (916.67 + 3000 on a 1166.67 inflow triggers at its 3rd payment),
-  // so the flywheel falls back to the current size instead of stalling or
-  // over-drawing.
+  // (payout 83.33). Month 0 has no inflow; the redeploy trigger fires at m2
+  // (833.33 left < the 1083.33 payment). The ×3 step-up (9000 + 833.33
+  // leftover) cannot reach its trigger in < 4 months on a 1333.33 inflow, but
+  // relaunching the current 3000 can (833.33 + 3000 on a 1166.67 inflow
+  // triggers at its 3rd payment), so the flywheel falls back to the current
+  // size instead of stalling or over-drawing.
   const steep: ProjectionSimInput = {
     msc: 1000, investmentSizeFactor: 3, termMonths: 36,
     investmentInterestPct: 0, locIncrease: 3.0, locInterestPct: 0,
@@ -95,11 +95,11 @@ describe("runSimulation — predictive launch gate (only draw when payoff is pre
 
   it("falls back to the current size when the stepped-up draw cannot clear within the gate", () => {
     const r = runSimulation(steep);
-    expect(r.series[1].currentInvestmentSize).toBe(3000); // not 9000
-    // The relaunch really happened at m1: 916.67 leftover + 3000 drawn…
-    expect(r.series[1].outstandingAmount).toBeCloseTo(3916.67, 1);
+    expect(r.series[2].currentInvestmentSize).toBe(3000); // not 9000
+    // The relaunch really happened at m2: 833.33 leftover + 3000 drawn…
+    expect(r.series[2].outstandingAmount).toBeCloseTo(3833.33, 1);
     // …and one 1166.67 payment later:
-    expect(r.series[2].outstandingAmount).toBeCloseTo(2750, 1);
+    expect(r.series[3].outstandingAmount).toBeCloseTo(2666.67, 1);
   });
 
   it("growth resumes once the book's payouts make the stepped-up size affordable", () => {
@@ -181,7 +181,7 @@ describe("runSimulation — deployed capital & distribution cash flow", () => {
     const r = runSimulation(baseInput);
     expect(r.series[0].distributionCashFlow).toBeCloseTo(0, 6);
     for (const p of r.series) {
-      expect(p.cashFlow - p.distributionCashFlow).toBeCloseTo(5000, 6);
+      expect(p.cashFlow - p.distributionCashFlow).toBeCloseTo(p.monthIndex === 0 ? 0 : 5000, 6);
     }
   });
 

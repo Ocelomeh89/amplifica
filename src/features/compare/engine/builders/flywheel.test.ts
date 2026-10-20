@@ -40,6 +40,7 @@ describe("buildFlywheel — shape", () => {
       locIncrease: 1.5,
       locInterestPct: 0.1,
       totalMonths: HORIZON_MONTHS,
+      mscStartMonth: 0,
     });
     expect(s.exit.debtPayoff).toBeCloseTo(sim.series[LAST_INCOME_MONTH].outstandingAmount, 6);
     // The default run never fully delevers by the horizon, so this is a real
@@ -124,6 +125,7 @@ describe("buildFlywheel — interest income and LoC interest expense", () => {
     locIncrease: 1.5,
     locInterestPct: 0.1,
     totalMonths: HORIZON_MONTHS,
+    mscStartMonth: 0,
   });
 
   it("taxes the interest earned, not the whole payment — and taxes it whether or not it is withdrawn", () => {
@@ -298,6 +300,7 @@ describe("buildFlywheel — cost basis is per position", () => {
       perpetualMix: s.perpetualMix,
       perpetualTriggerSize: s.perpetualTriggerSize,
       totalMonths: HORIZON_MONTHS,
+      mscStartMonth: 0,
     });
     let face = 0;
     for (const inv of sim.finalBook) face += inv.faceValue;

@@ -53,7 +53,7 @@ export default function FlywheelExplainer() {
                 {`The engine accrues interest on the line of credit, collects cash (your savings plus the monthly payout of every active investment), and uses it to pay the balance down. Any surplus beyond what's needed to clear the balance is banked in a cash bucket — never discarded. When the remaining balance drops below one month's payment, the line is effectively clear: the engine redeploys, rolling the small leftover into the new draw (it stays owed — nothing is written off) — but only if that new draw is itself predicted to clear within 4 months. It tries the stepped-up size first, then the current size; if neither qualifies, it waits and banks cash until one does.`}
               </p>
               <p className="text-sm text-sub leading-relaxed mt-2">
-                {`Each investment — the first one included — is drawn one month before it starts paying: the opening draw is taken in month 0, and its first payment lands in month 1. So month 0 sees your savings only.`}
+                {`Each investment — the first one included — is drawn one month before it starts paying: the opening draw is taken in month 0, and its first payment lands in month 1. Your monthly savings also start in month 1, so month 0 is the draw alone.`}
               </p>
             </Section>
 
@@ -69,9 +69,9 @@ Otherwise the investment size stays the same.`}</Formula>
               </p>
             </Section>
 
-            <Section title="Outstanding cashflow">
+            <Section title="Net outstanding cashflow">
               <p className="text-sm text-sub leading-relaxed">
-                {`Outstanding cashflow = the nominal sum of all remaining investment payments, minus the outstanding line-of-credit balance. It is future cash measured at face value — not a discounted present value — so there is no discount-rate assumption to argue about.`}
+                {`Net outstanding cashflow = the nominal sum of all remaining investment payments, minus the outstanding line-of-credit balance. It is future cash measured at face value — not a discounted present value — so there is no discount-rate assumption to argue about.`}
               </p>
             </Section>
           </div>

@@ -46,25 +46,25 @@ describe("golden — key scenario, product defaults (gate 4, no perpetuals)", ()
   it("summary", () => {
     expectClose(r.initialInvestmentSize, 8000);
     expectClose(r.finalInvestmentSize, 1556956.0546875);
-    expect(r.investmentsLaunched).toBe(125);
+    expect(r.investmentsLaunched).toBe(126);
     expect(r.perpetualsLaunched).toBe(0);
-    expectClose(r.peakOutstanding, 1819139.976346727);
-    expectClose(r.finalContributedCapital, 960000);
-    expectClose(r.finalMarketBaseline, 12648159.161839038);
+    expectClose(r.peakOutstanding, 1779094.6696101623);
+    expectClose(r.finalContributedCapital, 958000);
+    expectClose(r.finalMarketBaseline, 12541645.449757725);
   });
 
   it("series waypoints", () => {
     checkPoints(r.series, [
-      { monthIndex: 0, cashFlow: 2000, outstandingAmount: 6066.666666666666, expectedFuturePayments: 2958.2065862254985, activeInvestmentCount: 0 },
-      { monthIndex: 1, cashFlow: 2250.690923691449, outstandingAmount: 3866.531298530773, expectedFuturePayments: 4907.651030669943, activeInvestmentCount: 1 },
-      { monthIndex: 12, cashFlow: 3128.1091566115206, outstandingAmount: 14071.058823960213, expectedFuturePayments: 31303.998364192048, currentInvestmentSize: 12000, activeInvestmentCount: 4 },
-      { monthIndex: 60, cashFlow: 11024.873252892165, outstandingAmount: 45690.290146311585, expectedFuturePayments: 165830.17671834852, currentInvestmentSize: 40500 },
-      { monthIndex: 120, cashFlow: 26747.894623165233, outstandingAmount: 52840.487696077136, expectedFuturePayments: 396428.98392446083, currentInvestmentSize: 91125 },
+      { monthIndex: 0, cashFlow: 0, outstandingAmount: 8066.666666666666, expectedFuturePayments: 958.2065862254985, activeInvestmentCount: 0 },
+      { monthIndex: 1, cashFlow: 2250.690923691449, outstandingAmount: 5883.197965197439, expectedFuturePayments: 2890.984364003277, activeInvestmentCount: 1 },
+      { monthIndex: 12, cashFlow: 3128.1091566115206, outstandingAmount: 4955.194421744323, expectedFuturePayments: 27759.971119989772, currentInvestmentSize: 12000, activeInvestmentCount: 4 },
+      { monthIndex: 60, cashFlow: 11165.886897468605, outstandingAmount: 22383.190255886475, expectedFuturePayments: 159806.43853687408, currentInvestmentSize: 40500 },
+      { monthIndex: 120, cashFlow: 24844.21042138329, outstandingAmount: 99351.18396539411, expectedFuturePayments: 398462.23480058345, currentInvestmentSize: 91125 },
       // System cashflow (minus the $2k MSC) first crosses $45k at month 177;
       // month 184 is pinned as a nearby waypoint.
-      { monthIndex: 184, cashFlow: 46974.53926709836, outstandingAmount: 39918.57698041503, expectedFuturePayments: 758914.9061923319, currentInvestmentSize: 205031.25 },
-      { monthIndex: 360, cashFlow: 175473.22288737935, outstandingAmount: 726109.6380806855, expectedFuturePayments: 3090301.2654416603, currentInvestmentSize: 691980.46875 },
-      { monthIndex: 479, cashFlow: 392314.7514966036, outstandingAmount: 21460.44060355483, expectedFuturePayments: 6760258.366649931, currentInvestmentSize: 1556956.0546875 },
+      { monthIndex: 184, cashFlow: 49116.183994103034, outstandingAmount: 125429.87589082766, expectedFuturePayments: 763352.6858161159, currentInvestmentSize: 205031.25 },
+      { monthIndex: 360, cashFlow: 175473.22288737935, outstandingAmount: 191484.1129302528, expectedFuturePayments: 2996086.357625343, currentInvestmentSize: 691980.46875 },
+      { monthIndex: 479, cashFlow: 408577.86614229536, outstandingAmount: 484328.74610065174, expectedFuturePayments: 6752757.271232205, currentInvestmentSize: 1556956.0546875 },
     ]);
   });
 });
@@ -73,17 +73,17 @@ describe("golden — key scenario + perpetuals (mix 0.25, trigger 50k)", () => {
   const r = runSimulation({ ...KEY, perpetualMix: 0.25, perpetualTriggerSize: 50000 });
 
   it("summary", () => {
-    expectClose(r.finalInvestmentSize, 1037970.703125);
-    expect(r.investmentsLaunched).toBe(128);
+    expectClose(r.finalInvestmentSize, 691980.46875);
+    expect(r.investmentsLaunched).toBe(131);
     expect(r.perpetualsLaunched).toBe(27);
-    expectClose(r.peakOutstanding, 1073321.5960843146);
+    expectClose(r.peakOutstanding, 907304.8113102979);
   });
 
   it("series waypoints", () => {
     checkPoints(r.series, [
-      { monthIndex: 120, cashFlow: 18748.223614255523, expectedFuturePayments: 720034.3663582284, perpetualIncome: 1518.75, perpetualBookValue: 510300 },
-      { monthIndex: 240, cashFlow: 35293.48672405621, expectedFuturePayments: 2642986.8572686943, perpetualIncome: 7593.75, perpetualBookValue: 2199403.125 },
-      { monthIndex: 479, cashFlow: 224242.08395691816, outstandingAmount: 858023.8587614323, expectedFuturePayments: 17807834.362399444, perpetualIncome: 59610.9375 },
+      { monthIndex: 120, cashFlow: 16844.539412473583, expectedFuturePayments: 715804.7874605242, perpetualIncome: 1518.75, perpetualBookValue: 514856.25 },
+      { monthIndex: 240, cashFlow: 36341.56237539266, expectedFuturePayments: 2551178.410275814, perpetualIncome: 7214.0625, perpetualBookValue: 2071575 },
+      { monthIndex: 479, cashFlow: 231287.28538737935, outstandingAmount: 436122.74648961576, expectedFuturePayments: 16902944.650595535, perpetualIncome: 55814.0625 },
     ]);
   });
 });
@@ -97,16 +97,16 @@ describe("golden — key scenario, continuous growth (gate = Infinity)", () => {
   it("summary", () => {
     expectClose(r.finalInvestmentSize, 39903080.76095581);
     expect(r.investmentsLaunched).toBe(22);
-    expectClose(r.peakOutstanding, 40397585.81748239);
+    expectClose(r.peakOutstanding, 40397649.944703385);
   });
 
   it("series waypoints (including the late-horizon stall)", () => {
     checkPoints(r.series, [
-      { monthIndex: 120, cashFlow: 38140.25476820403, outstandingAmount: 80885.0167306133, activeInvestmentCount: 2 },
-      { monthIndex: 240, cashFlow: 166664.0357876296, outstandingAmount: 2348068.517430432, activeInvestmentCount: 1 },
+      { monthIndex: 120, cashFlow: 38140.25476820403, outstandingAmount: 118048.24608539327, activeInvestmentCount: 2 },
+      { monthIndex: 240, cashFlow: 166664.0357876296, outstandingAmount: 2493967.653606882, activeInvestmentCount: 1 },
       // The aggressive continuous mode eventually stalls: debt outruns payouts,
       // the last loan never retires, and all Amplicons expire.
-      { monthIndex: 479, cashFlow: 2000, outstandingAmount: 3133484.247635554, expectedFuturePayments: -3133484.247635554, activeInvestmentCount: 0 },
+      { monthIndex: 479, cashFlow: 2000, outstandingAmount: 3109702.072000084, expectedFuturePayments: -3109702.072000084, activeInvestmentCount: 0 },
     ]);
   });
 });
@@ -116,17 +116,17 @@ describe("golden — key scenario, stop MSC at 184 + withdraw 10k from 200", () 
 
   it("summary", () => {
     expectClose(r.finalInvestmentSize, 205031.25);
-    expect(r.investmentsLaunched).toBe(61);
-    expectClose(r.peakOutstanding, 4038814.5620020363);
-    expectClose(r.finalContributedCapital, 368000);
-    expectClose(r.finalMarketBaseline, 10088971.435077382);
+    expect(r.investmentsLaunched).toBe(62);
+    expectClose(r.peakOutstanding, 4017577.277415103);
+    expectClose(r.finalContributedCapital, 366000);
+    expectClose(r.finalMarketBaseline, 9982457.72299605);
   });
 
   it("series waypoints", () => {
     checkPoints(r.series, [
-      { monthIndex: 199, cashFlow: 53541.11817511707, outstandingAmount: 146861.29246630034, expectedFuturePayments: 844720.216136868 },
-      { monthIndex: 200, cashFlow: 53541.11817511707, outstandingAmount: 104544.01839506911, expectedFuturePayments: 833496.3720329821 },
-      { monthIndex: 479, cashFlow: 0, outstandingAmount: 4038814.5620020363, expectedFuturePayments: -4038814.5620020363, activeInvestmentCount: 0 },
+      { monthIndex: 199, cashFlow: 49257.82872110771, outstandingAmount: 35347.91158424066, expectedFuturePayments: 823451.6239446374 },
+      { monthIndex: 200, cashFlow: 49257.82872110771, outstandingAmount: 201415.89879300163, expectedFuturePayments: 839423.4385312744 },
+      { monthIndex: 479, cashFlow: 0, outstandingAmount: 4017577.277415103, expectedFuturePayments: -4017577.277415103, activeInvestmentCount: 0 },
     ]);
   });
 });

@@ -60,7 +60,7 @@ export default function SimCharts({ series, incomeMarkerMonth }: Props) {
 
       <div className="bg-card border border-edge rounded-lg p-3 mb-3">
         <div className="text-[11px] text-sub uppercase tracking-wide mb-2">
-          Outstanding cashflow &amp; capital deployed
+          Net outstanding cashflow &amp; capital deployed
         </div>
         <div className="h-56">
           <ResponsiveContainer>
@@ -71,7 +71,7 @@ export default function SimCharts({ series, incomeMarkerMonth }: Props) {
               <Tooltip formatter={(v: number) => fmtCurrency(v)} labelFormatter={(l) => `Month ${l}`} />
               {incomeMarkerMonth != null && <ReferenceLine x={incomeMarkerMonth} {...incomeMarkerProps} />}
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Line type="monotone" dataKey="expectedFuturePayments" name="Outstanding cashflow" stroke="#6C4BD3" strokeWidth={2} dot={false} isAnimationActive={false} />
+              <Line type="monotone" dataKey="expectedFuturePayments" name="Net outstanding cashflow" stroke="#6C4BD3" strokeWidth={2} dot={false} isAnimationActive={false} />
               <Line type="monotone" dataKey="deployedCapital" name="Total deployed" stroke="#8D8295" strokeWidth={2} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
             </LineChart>
           </ResponsiveContainer>

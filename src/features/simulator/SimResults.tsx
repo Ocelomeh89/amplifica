@@ -53,7 +53,7 @@ export default function SimResults({ sim, incomeMarkerMonth, variant = "editor" 
           </div>
           <div>
             <div className="text-[10px] text-sub uppercase tracking-wide">
-              {horizonYears}-Year Outstanding Cashflow
+              {horizonYears}-Year Net Outstanding Cashflow
               <InfoBox message={INVESTMENT_SIZE_INFO} />
             </div>
             <div className="text-base font-bold">{fmtCurrency(finalExpectedFuturePayments)}</div>
@@ -81,7 +81,7 @@ export default function SimResults({ sim, incomeMarkerMonth, variant = "editor" 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
           <div>
             <div className="text-[10px] text-sub uppercase tracking-wide">&nbsp;</div>
-            {["Cash flow/mo", "Outstanding cashflow", ...(variant === "editor" ? ["Perpetual income/mo"] : [])].map(
+            {["Cash flow/mo", "Net outstanding cashflow", ...(variant === "editor" ? ["Perpetual income/mo"] : [])].map(
               (label) => (
                 <div key={label} className="text-xs text-sub py-0.5">{label}</div>
               )

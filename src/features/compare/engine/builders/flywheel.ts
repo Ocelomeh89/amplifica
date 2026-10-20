@@ -119,6 +119,7 @@ export function buildFlywheel(spec: FlywheelSpec, capital: CapitalSchedule): Opt
     perpetualYieldPct: spec.perpetualYieldPct,
     perpetualTriggerSize: spec.perpetualTriggerSize,
     totalMonths: HORIZON_MONTHS,
+    mscStartMonth: 0,
     mscEndMonth: capital.monthlyEndMonth ?? undefined,
     withdrawalStartMonth: spec.withdrawalStartMonth,
     monthlyWithdrawal: spec.monthlyWithdrawal,

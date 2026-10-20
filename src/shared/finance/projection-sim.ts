@@ -5,7 +5,8 @@
 //
 // Payment timing convention: every Amplicon — the bootstrap one included — is
 // *drawn* one month before its *first payment*. The initial draw is taken at
-// month 0 and first pays at month 1, exactly like every re-launch.
+// month 0 and first pays at month 1, exactly like every re-launch. The MSC
+// also starts at month 1, so month 0 holds the draw and nothing else.
 
 import {
   sanitizeSimInput,
@@ -164,7 +165,8 @@ function payoffPredictedWithinGate(
   for (let j = 0; j < horizon; j++) {
     const future = month + 1 + j;
     balance *= 1 + monthlyLocRate;
-    const effMsc = config.mscEndMonth == null || future < config.mscEndMonth ? config.msc : 0;
+    const effMsc =
+      future >= config.mscStartMonth && (config.mscEndMonth == null || future < config.mscEndMonth) ? config.msc : 0;
     const withdrawal =
       config.withdrawalStartMonth != null && future >= config.withdrawalStartMonth ? config.monthlyWithdrawal : 0;
     let inflow = effMsc - withdrawal;
@@ -287,7 +289,7 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
   const bookByMonth: ActiveInvestment[][] = [];
 
   for (let m = 0; m < config.totalMonths; m++) {
-    const mscActive = config.mscEndMonth == null || m < config.mscEndMonth;
+    const mscActive = m >= config.mscStartMonth && (config.mscEndMonth == null || m < config.mscEndMonth);
     const effMsc = mscActive ? config.msc : 0;
     const withdrawing = config.withdrawalStartMonth != null && m >= config.withdrawalStartMonth;
     const withdrawal = withdrawing ? config.monthlyWithdrawal : 0;

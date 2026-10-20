@@ -56,6 +56,7 @@ describe("flywheel — conservation when there is no interest anywhere", () => {
   // With 0% investment interest each loan repays exactly its face value, and with
   // 0% LoC interest nothing accrues. So MSC is the ONLY net inflow and expected future payments
   // must equal MSC × elapsed months EXACTLY — no matter how many upgrades fire.
+  // The MSC starts at month 1, so month m has seen m contributions.
   const noInterestCases: ProjectionSimInput[] = [
     { msc: 1000, investmentSizeFactor: 3, termMonths: 36, investmentInterestPct: 0, locIncrease: 1.5, locInterestPct: 0 },
     { msc: 5000, investmentSizeFactor: 6, termMonths: 24, investmentInterestPct: 0, locIncrease: 2.0, locInterestPct: 0, totalMonths: 480 },
@@ -63,10 +64,10 @@ describe("flywheel — conservation when there is no interest anywhere", () => {
   ];
 
   for (const input of noInterestCases) {
-    it(`expectedFuturePayments[m] === MSC × (m+1) for msc=${input.msc}, factor=${input.investmentSizeFactor}, locInc=${input.locIncrease}`, () => {
+    it(`expectedFuturePayments[m] + cash[m] === MSC × m for msc=${input.msc}, factor=${input.investmentSizeFactor}, locInc=${input.locIncrease}`, () => {
       const r = runSimulation(input);
       for (const s of r.series) {
-        const expected = input.msc * (s.monthIndex + 1);
+        const expected = input.msc * s.monthIndex;
         expect(Math.abs(s.expectedFuturePayments + s.cash - expected)).toBeLessThan(1e-6 * Math.max(1, expected));
       }
     });
@@ -95,16 +96,16 @@ describe("flywheel — expected future payments never falls when the LoC charges
 
 describe("flywheel — single cycle reconciles by hand", () => {
   // msc=1000, factor=3 → initial draw 3000 at month 0; 0% everywhere so payout =
-  // 3000/36 = 83.33/mo. The first Amplicon payment lands at month 1, so month 0
-  // sees MSC only. The LoC is paid down:
-  //   m0 out = 3000 − 1000 (MSC only) = 2000
-  //   m1 out = 2000 − 1083.33 (MSC + first payout) = 916.67 — BELOW one month's
-  //      payment, so the redeploy trigger fires. The cycle cleared 0 (< 4)
-  //      months after its first payment, so the next size steps up ×1.5 → 4500,
-  //      which the gate predicts affordable (trigger reached at its 4th
-  //      payment). The 916.67 leftover stays owed and rolls into the draw:
-  //      out = 916.67 + 4500 = 5416.67.
-  //   m2 inflow is now 1000 + 83.33 + 125 = 1208.33 → out = 4208.33.
+  // 3000/36 = 83.33/mo. The MSC and the first Amplicon payment both start at
+  // month 1, so month 0 sees no inflow. The LoC is paid down:
+  //   m0 out = 3000 (the draw alone)
+  //   m1 out = 3000 − 1083.33 (MSC + first payout) = 1916.67
+  //   m2 out = 1916.67 − 1083.33 = 833.33 — BELOW one month's payment, so the
+  //      redeploy trigger fires. The cycle cleared 1 (< 4) month after its
+  //      first payment, so the next size steps up ×1.5 → 4500, which the gate
+  //      predicts affordable (trigger reached at its 4th payment). The 833.33
+  //      leftover stays owed and rolls into the draw: out = 833.33 + 4500 = 5333.33.
+  //   m3 inflow is now 1000 + 83.33 + 125 = 1208.33 → out = 4125.
   const input: ProjectionSimInput = {
     msc: 1000, investmentSizeFactor: 3, termMonths: 36,
     investmentInterestPct: 0, locIncrease: 1.5, locInterestPct: 0, totalMonths: 6,
@@ -115,9 +116,10 @@ describe("flywheel — single cycle reconciles by hand", () => {
     expect(r.initialInvestmentSize).toBe(3000);
     expect(monthlyPayment(3000, 0, 36)).toBeCloseTo(83.33, 2);
 
-    expect(r.series[0].outstandingAmount).toBeCloseTo(2000, 2);
-    expect(r.series[1].outstandingAmount).toBeCloseTo(5416.67, 2);
-    expect(r.series[2].outstandingAmount).toBeCloseTo(4208.33, 2);
+    expect(r.series[0].outstandingAmount).toBeCloseTo(3000, 2);
+    expect(r.series[1].outstandingAmount).toBeCloseTo(1916.67, 2);
+    expect(r.series[2].outstandingAmount).toBeCloseTo(5333.33, 2);
+    expect(r.series[3].outstandingAmount).toBeCloseTo(4125, 2);
 
     // One upgrade fired (cleared < 4 months): 3000 × 1.5 = 4500.
     expect(r.investmentsLaunched).toBe(2);
@@ -127,7 +129,7 @@ describe("flywheel — single cycle reconciles by hand", () => {
   it("expected future payments grows by exactly MSC each month through the cycle", () => {
     const r = runSimulation(input);
     for (const s of r.series) {
-      expect(s.expectedFuturePayments).toBeCloseTo(1000 * (s.monthIndex + 1), 6);
+      expect(s.expectedFuturePayments).toBeCloseTo(1000 * s.monthIndex, 6);
     }
   });
 });
@@ -138,17 +140,17 @@ describe("benchmarks — contributed capital", () => {
     investmentInterestPct: 0.08, locIncrease: 1.5, locInterestPct: 0.1,
   };
 
-  it("contributedCapital[m] === MSC × (m+1) and equals the final summary", () => {
+  it("contributedCapital[m] === MSC × m (the MSC starts at month 1) and equals the final summary", () => {
     const r = runSimulation(input);
     for (const s of r.series) {
-      expect(s.contributedCapital).toBeCloseTo(input.msc * (s.monthIndex + 1), 6);
+      expect(s.contributedCapital).toBeCloseTo(input.msc * s.monthIndex, 6);
     }
-    expect(r.finalContributedCapital).toBeCloseTo(input.msc * r.series.length, 6);
+    expect(r.finalContributedCapital).toBeCloseTo(input.msc * (r.series.length - 1), 6);
   });
 });
 
 describe("benchmarks — market DCA baseline", () => {
-  it("matches the closed-form annuity future value MSC × ((1+r)^(m+1) − 1)/r", () => {
+  it("matches the closed-form annuity future value MSC × ((1+r)^m − 1)/r", () => {
     const input: ProjectionSimInput = {
       msc: 5000, investmentSizeFactor: 4, termMonths: 36,
       investmentInterestPct: 0.08, locIncrease: 1.5, locInterestPct: 0.1,
@@ -157,7 +159,7 @@ describe("benchmarks — market DCA baseline", () => {
     const r = runSimulation(input);
     const monthly = 0.1 / 12;
     for (const s of r.series) {
-      const n = s.monthIndex + 1;
+      const n = s.monthIndex; // contributions in months 1..m
       const expected = (input.msc * (Math.pow(1 + monthly, n) - 1)) / monthly;
       expect(s.marketBaseline).toBeCloseTo(expected, 4);
     }
@@ -174,14 +176,16 @@ describe("benchmarks — market DCA baseline", () => {
     }
   });
 
-  it("with a positive return the baseline outgrows contributions after month 0", () => {
+  it("with a positive return the baseline outgrows contributions after month 1", () => {
     const r = runSimulation({
       msc: 5000, investmentSizeFactor: 4, termMonths: 36,
       investmentInterestPct: 0.08, locIncrease: 1.5, locInterestPct: 0.1,
       marketReturnPct: 0.1,
     });
+    // Month 0 has no contribution; month 1's lands at month end, unearning.
     expect(r.series[0].marketBaseline).toBeCloseTo(r.series[0].contributedCapital, 6);
-    for (let i = 1; i < r.series.length; i++) {
+    expect(r.series[1].marketBaseline).toBeCloseTo(r.series[1].contributedCapital, 6);
+    for (let i = 2; i < r.series.length; i++) {
       expect(r.series[i].marketBaseline).toBeGreaterThan(r.series[i].contributedCapital);
     }
   });

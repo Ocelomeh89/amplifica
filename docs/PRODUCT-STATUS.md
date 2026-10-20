@@ -238,14 +238,16 @@ Email is **not** unique: a retake adds a row (`leads` still dedupes by email). *
 **Payment timing:** every Amplicon — the bootstrap one included — is *drawn* one
 month before its *first payment*. The initial draw is taken at month 0 and its first
 payment lands at month 1, exactly like every re-launch (drawn the month a loan retires,
-first payment the month after). So month 0 sees MSC only.
+first payment the month after). The MSC also starts at month 1 (`mscStartMonth`, default 1;
+0 when seeded, and compare passes 0 so the flywheel shares every option's month-0 capital),
+so month 0 is the draw alone.
 
 **Monthly loop:**
 1. Accrue LoC interest on the outstanding balance (`locInterestPct/12`).
 2. Collect inflow = MSC share + payouts of all active Amplicons (term = amortizing payment; perpetual = flat coupon `face × yield/12`).
 3. Apply `inflow − withdrawal` to the LoC: surplus banks as cash; a shortfall is covered from cash, then re-borrowed.
 4. **Redeploy trigger (V1.0):** when the post-payment balance drops **below one month's payment** (this month's net inflow), the line is effectively clear and the engine redeploys — the **leftover balance stays owed and rolls into the fresh draw** (capital is conserved: nothing is written off, no "leftover absorption"). The launch itself happens **only when its payoff — reaching that same trigger — is predicted in fewer than `payoffUpgradeMonths` months** (V1.0 predictive gate). The forecast uses the actual book's payout schedule (expiries included), the candidate's own payout, the MSC/withdrawal schedule, LoC accrual, and banked cash applied against the draw. The **stepped-up size (×`locIncrease`) is tried first** (allowed only when the retired loan itself cleared within the gate), then the **current size** as fallback; if neither qualifies the flywheel **waits, banking surplus as cash**, re-evaluating monthly. Once size ≥ `perpetualTriggerSize`, a `perpetualMix` fraction of launches become **perpetual** (chosen by a leaky-bucket accumulator → a clean cadence, e.g. 0.25 ⇒ ~1 in 4). Deploy banked cash against the fresh draw. Continuous mode (`payoffUpgradeMonths = Infinity`) bypasses the prediction (always launch, always step up) but keeps the early-redeploy trigger.
-5. Expected future payments = Σ remaining nominal payouts (all Amplicons) + cash − outstanding (nominal future cash, not a discounted present value).
+5. Net outstanding cashflow (engine field `expectedFuturePayments`) = Σ remaining nominal payouts (all Amplicons) − outstanding (nominal future cash, not a discounted present value). Cash is excluded since 2026-10-20; the optionality search still judges sustainability on this plus cash.
 6. Roll the no-leverage benchmarks (`contributedCapital`, `marketBaseline`).
 
 **Key inputs** (defaults in parens): `msc`, `investmentSizeFactor`, `termMonths`,
@@ -261,8 +263,8 @@ first payment the month after). So month 0 sees MSC only.
 **Validated findings baked into the product's guidance** (from the exploration summarized in `docs/parked-ideas.md`): the leverage spread (investment return vs LoC cost) dominates the FI date; a return-above-amortization gap is the cheapest accelerator; perpetuals are a *post-retirement durable-income* layer (deploy late + light), not an FI accelerator.
 
 **Key-scenario benchmark (8% amortized Amplicons, 10% LoC, $2,000 MSC; parameter sweep 2026-07, re-validated under the V1.0 predictive gate + early redeploy trigger):**
-- With product defaults (factor 5, term 36, step-up 1.5, gate 4) the system's own cashflow — Amplicon payouts, excluding the MSC — first crosses **$45k/month at month 179 (~14.9 yr)** (factor 4: month 177). The early redeploy trigger bought ~5 months vs waiting for full payoff; the predictive gate keeps peak debt ≈$1.7M (vs ≈$2.3M under the V0.7 model).
-- **Term is the dominant accelerator**: factor 5 + term 24 reaches $45k at **month 128 (~10.7 yr)**; term 48 pushes it past 17 yr. Step-up size barely moves the date.
+- With product defaults (factor 5, term 36, step-up 1.5, gate 4) the system's own cashflow — Amplicon payouts, excluding the MSC — first crosses **$45k/month at month 180 (~15.0 yr)** (factor 4: month 183; both were 179/177 before the MSC moved to month 1 on 2026-10-20). The early redeploy trigger bought ~5 months vs waiting for full payoff; the predictive gate keeps peak debt ≈$1.7M (vs ≈$2.3M under the V0.7 model).
+- **Term is the dominant accelerator**: factor 5 + term 24 reaches $45k at **month 129 (~10.8 yr)**; term 48 pushes it past 17 yr. Step-up size barely moves the date.
 - **Self-sustaining at year 10 with term 24**: stopping the MSC at month 120 (system cashflow ≈$36k/mo), expected future payments never erode and cashflow keeps compounding on its own — crossing $45k/mo at month 135 (~11.3 yr) and reaching ≈$350k/mo by year 40.
 - **Continuous growth (gate ∞, prediction bypassed) is a trap at this spread**: it looks years faster early, but aggressive configs concentrate into one ever-larger loan whose 10% LoC accrual outruns payouts — the loan never retires, all Amplicons expire, and system cashflow collapses to $0 with multi-million peak debt (pinned in the golden tests).
 - **Perpetual mix delays the cashflow date** but remains the only way a large *sustained withdrawal* (income FI at $45k/mo) becomes reachable — pure term configs never sustain it within 40 yr. Consistent with the perpetuals-as-post-retirement-layer finding above.
