@@ -132,6 +132,33 @@ slice 6 ships manual-only and Business Discovery moves to the top of the backlog
 Creators for the spike (Miguel, 2026-10-19): `ericsfinancials`, `micro.investing`. Add
 Miguel's own account for step 5.
 
+### Spike result (2026-10-20): PASS on competitor data, own-account step pending
+
+Ran `ericsfinancials` and `micro.investing`, 10 posts each, 90 days, `maxTotalChargeUsd: 2`.
+
+| Run | Items | Cost | Reel views | Duration |
+|---|---|---|---|---|
+| `basicData` | 20 | $0.034 (about $0.0017 per item) | absent | absent |
+| `detailedData` | 20 | $0.022 as billed | `videoPlayCount` on 13 of 13 Reels | `videoDuration` on 13 of 13 Reels |
+
+Total spend about $0.06. Caption and date came back on all 20 items in both runs.
+
+- **Use `detailedData`.** `basicData` has no views and no duration, so it fails the pass
+  test. Detailed was not dearer in this run.
+- **Two view fields.** `videoPlayCount` is the larger number and `videoViewCount` the
+  smaller (16,424 against 6,907 on one Reel). Which one matches Instagram's displayed
+  "views" is unverified. Settle it against one of Miguel's own Reels before slice 6
+  stores either.
+- **Carousels carry no views.** Only likes and comments, as expected.
+- **Composio's parsed response fails on detailed data** (`latestComments.replies` is
+  null, 148 validation errors) even though Apify ran and billed. Slice 6 must read the
+  run's dataset (`APIFY_GET_DATASET_ITEMS`) instead of trusting the tool's response.
+- **Filters leak.** A pinned post from 2024 got through the 90-day filter, and a collab
+  Reel owned by another account came back under `micro.investing`. Slice 6 filters by
+  `ownerUsername` and date after the pull.
+- **Step 5 not done:** Miguel's own account is not yet scraped, so share-of-duration for
+  slice 3 is open. `videoDuration` came back for competitors, which is a good sign.
+
 **YouTube may need the same.** Slice 6 competitor tracking is Instagram-only. YouTube
 competitors are where the direct niche competition sits (see the competitive-landscape
 memory), and the YouTube Data API reads public channels and videos with the key we
