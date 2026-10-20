@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { composioExecute, igFormat, insightMetricsFor, mapIgMedia, mapInsights, pullInstagram, type IgMedia } from "./instagram";
+import { composioExecute, igFormat, igMediaType, insightMetricsFor, mapIgMedia, mapInsights, pullInstagram, type IgMedia } from "./instagram";
 
 const reel: IgMedia = {
   id: "17958519123208964",
@@ -21,6 +21,7 @@ const carousel: IgMedia = {
   like_count: 5,
   comments_count: 0,
 };
+const NOW = new Date("2026-10-18T12:00:00Z"); // fixtures are dated September 2026; a real clock would age them out of the 90-day window
 const insightRows = [
   { name: "views", values: [{ value: 591 }] },
   { name: "reach", values: [{ value: 384 }] },
@@ -102,7 +103,7 @@ describe("pullInstagram", () => {
       INSTAGRAM_GET_IG_MEDIA_INSIGHTS: (a) => ({ data: a.ig_media_id === reel.id ? insightRows : [{ name: "reach", values: [{ value: 43 }] }] }),
       INSTAGRAM_GET_IG_MEDIA_COMMENTS: (a) => ({ data: a.ig_media_id === reel.id ? commentRows : [] }),
     });
-    const out = await pullInstagram(env, fetchImpl as unknown as typeof fetch);
+    const out = await pullInstagram(env, fetchImpl as unknown as typeof fetch, NOW);
     expect(out.errors).toEqual([]);
     expect(out.posts.map((p) => p.external_id)).toEqual(["Ddh0MkWxvTI", "DdepM2dEdAU"]);
     expect(out.posts[0].metrics.avg_watch_time_s).toBe(9.826);
@@ -118,14 +119,14 @@ describe("pullInstagram", () => {
       INSTAGRAM_GET_IG_MEDIA_INSIGHTS: () => ({ data: [] }),
       INSTAGRAM_GET_IG_MEDIA_COMMENTS: () => ({ data: [] }),
     });
-    const out = await pullInstagram(env, fetchImpl as unknown as typeof fetch);
+    const out = await pullInstagram(env, fetchImpl as unknown as typeof fetch, NOW);
     expect(out.posts).toHaveLength(2);
   });
 
   it("keeps the post and records an error when insights or comments fail", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const fetchImpl = fake({ INSTAGRAM_GET_IG_USER_MEDIA: () => ({ data: [reel], paging: {} }) });
-    const out = await pullInstagram(env, fetchImpl as unknown as typeof fetch);
+    const out = await pullInstagram(env, fetchImpl as unknown as typeof fetch, NOW);
     expect(out.posts).toHaveLength(1);
     expect(out.posts[0].metrics).toEqual({ likes: 32, comments: 4 });
     expect(out.errors).toHaveLength(2);
@@ -134,5 +135,48 @@ describe("pullInstagram", () => {
   it("reports a missing env as an error, never throws", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(await pullInstagram({}, vi.fn() as unknown as typeof fetch)).toEqual({ posts: [], errors: ["instagram: COMPOSIO_API_KEY / COMPOSIO_IG_CONNECTION_ID not set"] });
+  });
+});
+
+describe("igMediaType", () => {
+  it("maps product type first, then media type, else empty", () => {
+    expect(igMediaType(reel)).toBe("reel");
+    expect(igMediaType({ ...reel, media_product_type: "STORY" })).toBe("story");
+    expect(igMediaType(carousel)).toBe("carousel");
+    expect(igMediaType({ ...carousel, media_type: "IMAGE" })).toBe("image");
+    expect(igMediaType({ ...carousel, media_type: "VIDEO" })).toBe("video");
+    expect(igMediaType({ ...carousel, media_type: "SOMETHING_NEW" })).toBe("");
+  });
+});
+
+describe("media fields and the 90-day window", () => {
+  const env = { apiKey: "k", connectionId: "c" };
+  it("mapIgMedia carries media_type and falls back from thumbnail_url to media_url to empty", () => {
+    expect(mapIgMedia({ ...reel, thumbnail_url: "https://t/1.jpg", media_url: "https://m/1.mp4" }, insightRows, []).thumbnail_url).toBe("https://t/1.jpg");
+    expect(mapIgMedia({ ...carousel, media_url: "https://m/2.jpg" }, null, []).thumbnail_url).toBe("https://m/2.jpg");
+    expect(mapIgMedia(carousel, null, []).thumbnail_url).toBe("");
+    expect(mapIgMedia(carousel, null, []).media_type).toBe("carousel");
+  });
+
+  it("stops paging once a page's oldest item is past the window and requests insights only inside it", async () => {
+    const fresh = { ...reel, id: "fresh", timestamp: "2026-10-01T00:00:00+0000" };
+    const stale = { ...reel, id: "stale", timestamp: "2026-06-01T00:00:00+0000" };
+    const insightCalls: string[] = [];
+    const fetchImpl = vi.fn(async (url: string, init: RequestInit) => {
+      const slug = url.split("/").pop()!;
+      const args = JSON.parse(init.body as string).arguments as Record<string, unknown>;
+      let data: unknown = { data: [] };
+      if (slug === "INSTAGRAM_GET_IG_USER_MEDIA") {
+        data = args.after ? { data: [{ ...reel, id: "never" }], paging: {} } : { data: [fresh, stale], paging: { cursors: { after: "CUR" } } };
+      } else if (slug === "INSTAGRAM_GET_IG_MEDIA_INSIGHTS") {
+        insightCalls.push(String(args.ig_media_id));
+        data = { data: insightRows };
+      }
+      return new Response(JSON.stringify({ successful: true, data, error: null }), { status: 200 });
+    });
+    const out = await pullInstagram(env, fetchImpl as unknown as typeof fetch, NOW);
+    expect(out.posts).toHaveLength(1);
+    expect(insightCalls).toEqual(["fresh"]);
+    expect(fetchImpl.mock.calls.filter(([u]) => String(u).endsWith("INSTAGRAM_GET_IG_USER_MEDIA"))).toHaveLength(1);
   });
 });

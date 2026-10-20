@@ -36,7 +36,7 @@ export default function AttributionPanels({ groups, doubleDown, stop }: { groups
         </Card>
       </div>
       <Card title="All groups">
-        <p className="text-xs text-sub mb-3">Score is the mean of the group&apos;s median normalized saves and shares. 1.00× is the 60-day typical post for that platform and format.</p>
+        <p className="text-xs text-sub mb-3">Score is the mean of the group&apos;s median normalized saves and shares. 1.00× is the 90-day typical post for that group.</p>
         <ul className="space-y-2">
           {[...groups].sort((a, b) => (b.score ?? -1) - (a.score ?? -1)).map((g) => <GroupLine key={`${g.dimension}:${g.key}`} g={g} />)}
         </ul>

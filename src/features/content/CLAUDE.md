@@ -26,7 +26,10 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
   three: Vercel Hobby allows two crons).
 - `engine/snapshots.ts`, `normalize.ts`, `attribution.ts`, `best-times.ts`,
   `plan.ts` — the performance math, pure. `data/performance.ts` loads posts
-  with first and latest snapshots for the Performance and Week pages.
+  with every snapshot (paged) for the Performance and Week pages.
+- `engine/baseline.ts` — 90-day window, baseline group, views baselines, matched-age
+  multiplier, status and Evergreen flag. `engine/overview.ts` — Overview cards and the
+  `?window=` filter. Both pure; slices 2, 3 and 6 reuse them.
 - `data/found.ts` — `mineFound()`, the one flow for pasted URLs and uploads, over a
   `FoundDeps` interface. `claude.ts` is the single Claude call (forced `record_ideas`
   tool); `fetch-page.ts` is the SSRF-guarded fetch; `found-form.ts` reads the form.
@@ -66,7 +69,7 @@ these are all the places that know it exists:
 - `src/app/robots.ts` — `/content` disallow; `src/app/content-route.test.ts` asserts it and the sitemap.
 - `vercel.json` — the daily metrics cron. `next.config.mjs` — `jsdom` external package.
 - `package.json` — `jsdom`, `@mozilla/readability`, `@anthropic-ai/sdk` are used only here.
-- `supabase/migrations/0008`, `0009`, `0011` and the `content_*` types in `shared/supabase/database.types.ts`.
+- `supabase/migrations/0008`, `0009`, `0011`, `0013` and the `content_*` types in `shared/supabase/database.types.ts`.
 - `routines/`, `.claude/skills/content-*` (incl. `content-draft`, `content-voice`), `docs/superpowers/**` — the routines and their docs.
 - Env: `CONTENT_OWNER_USER_ID`, `CONTENT_ENGINE_SECRET`, `CRON_SECRET`, and the platform keys in `docs/PRODUCT-STATUS.md`.
 
@@ -124,6 +127,9 @@ these are all the places that know it exists:
   only the ideas the queue shows. `rejected` and `archived` are never in it. The
   drafts queue (`GET /api/content/drafts/queue`, bare mode) excludes them too, while
   `?id=` still serves an explicit one.
+- The cron refreshes `media_type` and `thumbnail_url` on existing posts and nothing else; `upsertPosts` stays insert-ignore.
+- Every baseline uses `WINDOW_DAYS` (90) and `baselineGroup`; there is no second window.
+- `loadPostsForMath` pages the snapshot read in 1,000s; PostgREST caps a single response at 1,000 rows.
 - `content_voice.built_from` is `{ files: [{path, mtime, bytes}], previous_profile_md }`.
 
 ## Seeding by hand

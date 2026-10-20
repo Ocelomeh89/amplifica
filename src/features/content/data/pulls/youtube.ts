@@ -42,6 +42,8 @@ export function mapVideo(v: YtVideo, threads: Thread[]): PulledPost {
     external_id: v.id,
     url: `https://www.youtube.com/watch?v=${v.id}`,
     format: ytFormat(parseIsoDuration(v.contentDetails?.duration ?? "")),
+    media_type: "",
+    thumbnail_url: "",
     posted_at: v.snippet.publishedAt,
     caption: v.snippet.title,
     metrics: { views: int(v.statistics?.viewCount), likes: int(v.statistics?.likeCount), comments: int(v.statistics?.commentCount) },

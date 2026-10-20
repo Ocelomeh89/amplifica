@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { median, normalizePosts, rate, type PostForMath } from "./normalize";
 
 const now = new Date("2026-09-21T12:00:00Z");
-const base = { platform: "instagram" as const, format: "reel", pillar: "cycle", hook_type: "belief", hook_used: "h", first: null };
+const base = { platform: "instagram" as const, format: "reel", media_type: "reel", pillar: "cycle", hook_type: "belief", hook_used: "h", first: null };
 const post = (id: string, posted_at: string, metrics: PostForMath["metrics"]): PostForMath => ({ ...base, id, posted_at, metrics });
 
 describe("median and rate", () => {
@@ -20,7 +20,7 @@ describe("median and rate", () => {
 });
 
 describe("normalizePosts", () => {
-  it("divides each rate by the 60-day median of the same platform and format", () => {
+  it("divides each rate by the 90-day median of the same baseline group", () => {
     const posts = [
       post("a", "2026-09-10T00:00:00Z", { reach: 100, saves: 1, shares: 2, avg_watch_time_s: 10 }),
       post("b", "2026-09-12T00:00:00Z", { reach: 100, saves: 2, shares: 2, avg_watch_time_s: 20 }),
@@ -51,6 +51,16 @@ describe("normalizePosts", () => {
     expect(out.find((p) => p.id === "fresh")!.n_saves).toBe(1);
   });
 
+  it("uses a 90-day window by default", () => {
+    const posts = [
+      post("recent", "2026-09-01T00:00:00Z", { reach: 100, saves: 1 }),
+      post("day80", "2026-07-03T00:00:00Z", { reach: 100, saves: 3 }), // inside 90 days of now
+      post("day100", "2026-06-13T00:00:00Z", { reach: 100, saves: 100 }), // outside
+    ];
+    const out = normalizePosts(posts, now);
+    expect(out.find((p) => p.id === "recent")!.n_saves).toBe(0.5); // 0.01 / median(0.01, 0.03)
+  });
+
   it("uses the first snapshot's reach for n_reach when present", () => {
     const a = { ...post("a", "2026-09-10T00:00:00Z", { reach: 400 }), first: { reach: 100 } };
     const b = { ...post("b", "2026-09-11T00:00:00Z", { reach: 400 }), first: { reach: 300 } };
@@ -58,9 +68,9 @@ describe("normalizePosts", () => {
     expect(out.find((p) => p.id === "a")!.n_reach).toBe(0.5); // 100 / median(100, 300)
   });
 
-  it("keeps a different format on its own baseline", () => {
+  it("puts an Instagram carousel and a Reel on different baselines", () => {
     const reel = post("r", "2026-09-10T00:00:00Z", { reach: 100, saves: 1 });
-    const carousel = { ...post("c", "2026-09-10T00:00:00Z", { reach: 100, saves: 4 }), format: "" };
+    const carousel = { ...post("c", "2026-09-10T00:00:00Z", { reach: 100, saves: 4 }), format: "", media_type: "carousel" };
     const out = normalizePosts([reel, carousel], now);
     expect(out.find((p) => p.id === "r")!.n_saves).toBe(1);
     expect(out.find((p) => p.id === "c")!.n_saves).toBe(1);

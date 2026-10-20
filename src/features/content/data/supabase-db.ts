@@ -191,6 +191,25 @@ export function supabaseMetricsDb(client: Client, userId: string): MetricsDb {
       const wanted = new Set(rows.map((r) => `${r.platform}:${r.external_id}`));
       return (data ?? []).filter((d) => wanted.has(`${d.platform}:${d.external_id}`));
     },
+    async updatePostMedia(rows) {
+      // One update per row: a partial upsert on id trips the NOT NULL checks on user_id, platform and external_id.
+      let updated = 0;
+      for (let i = 0; i < rows.length; i += 10) {
+        const results = await Promise.all(
+          rows.slice(i, i + 10).map(async (r) => {
+            const { error } = await client
+              .from("content_posts")
+              .update({ ...(r.media_type !== undefined ? { media_type: r.media_type } : {}), ...(r.thumbnail_url !== undefined ? { thumbnail_url: r.thumbnail_url } : {}) })
+              .eq("id", r.id)
+              .eq("user_id", userId);
+            if (error) console.error(`content_posts media update ${r.id}: ${error.message}`);
+            return !error;
+          })
+        );
+        updated += results.filter(Boolean).length;
+      }
+      return updated;
+    },
     async insertSnapshots(rows) {
       const { error } = await client
         .from("content_metrics")

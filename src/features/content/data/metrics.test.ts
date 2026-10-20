@@ -7,6 +7,8 @@ const post: PulledPost = {
   external_id: "Ddh0MkWxvTI",
   url: "https://www.instagram.com/reel/Ddh0MkWxvTI/",
   format: "reel",
+  media_type: "reel",
+  thumbnail_url: "https://t/1.jpg",
   posted_at: "2026-09-21T00:00:00.000Z",
   caption: "I was offered a new job.",
   metrics: { reach: 384, saves: 2 },
@@ -14,11 +16,15 @@ const post: PulledPost = {
 };
 
 function fakeDb() {
-  const calls: Record<string, unknown[]> = { upsertPosts: [], insertSnapshots: [], upsertComments: [] };
+  const calls: Record<string, unknown[]> = { upsertPosts: [], insertSnapshots: [], upsertComments: [], updatePostMedia: [] };
   const db: MetricsDb = {
     async upsertPosts(rows) {
       calls.upsertPosts.push(rows);
       return rows.map((r, i) => ({ id: `post-${i}`, platform: r.platform, external_id: r.external_id }));
+    },
+    async updatePostMedia(rows) {
+      calls.updatePostMedia.push(rows);
+      return rows.length;
     },
     async insertSnapshots(rows) {
       calls.insertSnapshots.push(rows);
@@ -33,10 +39,28 @@ function fakeDb() {
 }
 
 describe("storePull", () => {
+  it("never blanks a stored value: a post with only one field gets only that field", async () => {
+    const { db, calls } = fakeDb();
+    const thumbOnly: PulledPost = { ...post, external_id: "t", media_type: "", thumbnail_url: "https://t/9.jpg" };
+    const typeOnly: PulledPost = { ...post, external_id: "m", media_type: "carousel", thumbnail_url: "" };
+    await storePull(db, "user-1", { posts: [thumbOnly, typeOnly], errors: [] }, "2026-09-22T10:00:00.000Z");
+    expect(calls.updatePostMedia[0]).toEqual([
+      { id: "post-0", thumbnail_url: "https://t/9.jpg" },
+      { id: "post-1", media_type: "carousel" },
+    ]);
+  });
+
+  it("refreshes media fields only for posts that have them, with only those two columns", async () => {
+    const { db, calls } = fakeDb();
+    const bare: PulledPost = { ...post, external_id: "bare", media_type: "", thumbnail_url: "" };
+    await storePull(db, "user-1", { posts: [post, bare], errors: [] }, "2026-09-22T10:00:00.000Z");
+    expect(calls.updatePostMedia[0]).toEqual([{ id: "post-0", media_type: "reel", thumbnail_url: "https://t/1.jpg" }]);
+  });
+
   it("writes posts, one snapshot per post, and comments as sources keyed to the post", async () => {
     const { db, calls } = fakeDb();
     const out = await storePull(db, "user-1", { posts: [post], errors: [] }, "2026-09-22T10:00:00.000Z");
-    expect(out).toEqual({ posts: 1, snapshots: 1, comments: 1 });
+    expect(out).toEqual({ posts: 1, snapshots: 1, comments: 1, media: 1 });
     expect(calls.upsertPosts[0]).toEqual([
       { user_id: "user-1", platform: "instagram", external_id: "Ddh0MkWxvTI", url: post.url, format: "reel", posted_at: post.posted_at, caption: post.caption },
     ]);
@@ -59,7 +83,7 @@ describe("storePull", () => {
     const { db } = fakeDb();
     db.upsertPosts = async () => [];
     const out = await storePull(db, "u", { posts: [post], errors: [] }, "2026-09-22T10:00:00.000Z");
-    expect(out).toEqual({ posts: 0, snapshots: 0, comments: 0 });
+    expect(out).toEqual({ posts: 0, snapshots: 0, comments: 0, media: 0 });
   });
 
   it("does nothing on an empty pull", async () => {
@@ -85,9 +109,9 @@ describe("runMetricsCron", () => {
       },
     });
     expect(report.ok).toBe(true);
-    expect(report.platforms.instagram).toEqual({ posts: 1, snapshots: 1, comments: 1, errors: ["instagram: insights x: boom"] });
-    expect(report.platforms.youtube).toEqual({ posts: 0, snapshots: 0, comments: 0, errors: ["youtube: quota"] });
-    expect(report.platforms.beehiiv).toEqual({ posts: 0, snapshots: 0, comments: 0, errors: [] });
+    expect(report.platforms.instagram).toEqual({ posts: 1, snapshots: 1, comments: 1, media: 1, errors: ["instagram: insights x: boom"] });
+    expect(report.platforms.youtube).toEqual({ posts: 0, snapshots: 0, comments: 0, media: 0, errors: ["youtube: quota"] });
+    expect(report.platforms.beehiiv).toEqual({ posts: 0, snapshots: 0, comments: 0, media: 0, errors: [] });
   });
 
   it("is not ok when every pull failed", async () => {
@@ -107,7 +131,7 @@ describe("runMetricsCron", () => {
       pulls: { youtube: async () => ({ posts: [], errors: ["youtube: YOUTUBE_API_KEY not set"] }) },
     });
     expect(report.ok).toBe(false);
-    expect(report.platforms.youtube).toEqual({ posts: 0, snapshots: 0, comments: 0, errors: ["youtube: YOUTUBE_API_KEY not set"] });
+    expect(report.platforms.youtube).toEqual({ posts: 0, snapshots: 0, comments: 0, media: 0, errors: ["youtube: YOUTUBE_API_KEY not set"] });
   });
 
   it("is ok when a pull returns a post alongside a per-item error", async () => {

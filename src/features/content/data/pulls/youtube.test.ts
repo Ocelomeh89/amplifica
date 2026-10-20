@@ -38,6 +38,8 @@ describe("mapVideo", () => {
       external_id: "abc123XYZ",
       url: "https://www.youtube.com/watch?v=abc123XYZ",
       format: "youtube",
+      media_type: "",
+      thumbnail_url: "",
       posted_at: "2026-09-10T15:00:00Z",
       caption: "The CYCLE explained",
       metrics: { views: 1200, likes: 40, comments: 3 },

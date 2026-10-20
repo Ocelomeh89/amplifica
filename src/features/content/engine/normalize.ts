@@ -5,6 +5,7 @@ export type PostForMath = {
   id: string;
   platform: Platform;
   format: string;
+  media_type: string;
   pillar: string;
   hook_type: string;
   hook_used: string;
@@ -20,19 +21,16 @@ export type NormalizedPost = PostForMath & {
   saves_rate: number | null;
   shares_rate: number | null;
   watch_s: number | null;
-  /** Each rate divided by the 60-day median of the same platform and format; null without a baseline. */
+  /** Each rate divided by the 90-day median of the same baseline group; null without a baseline. */
   n_saves: number | null;
   n_shares: number | null;
   n_watch: number | null;
   n_reach: number | null;
 };
 
-export function median(xs: number[]): number | null {
-  if (xs.length === 0) return null;
-  const s = [...xs].sort((a, b) => a - b);
-  const mid = Math.floor(s.length / 2);
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
-}
+import { WINDOW_DAYS, baselineGroup, median } from "./baseline";
+
+export { median };
 
 export function rate(num: number | null | undefined, den: number | null | undefined): number | null {
   if (num == null || den == null || den <= 0) return null;
@@ -52,10 +50,10 @@ function reachOf(m: MetricSnapshot): number | null {
 
 /**
  * Rates per post, then each rate divided by the rolling median of the same
- * platform and format over the last `windowDays`. Every post is normalized,
+ * baseline group (see `baselineGroup`) over the last `windowDays`. Every post is normalized,
  * even old ones, against the current baseline, so the table can show history.
  */
-export function normalizePosts(posts: PostForMath[], now: Date, windowDays = 60): NormalizedPost[] {
+export function normalizePosts(posts: PostForMath[], now: Date, windowDays = WINDOW_DAYS): NormalizedPost[] {
   const since = now.getTime() - windowDays * 86_400_000;
   const withRates = posts.map((p) => {
     const reach = reachOf(p.metrics);
@@ -70,7 +68,7 @@ export function normalizePosts(posts: PostForMath[], now: Date, windowDays = 60)
     };
   });
 
-  const groupKey = (p: PostForMath) => `${p.platform}:${p.format}`;
+  const groupKey = baselineGroup;
   const baselines = new Map<string, { saves: number | null; shares: number | null; watch: number | null; reach: number | null }>();
   for (const p of withRates) {
     const key = groupKey(p);

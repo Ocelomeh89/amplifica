@@ -7,6 +7,7 @@ function np(over: Partial<NormalizedPost>): NormalizedPost {
     id: "x",
     platform: "instagram",
     format: "reel",
+    media_type: "reel",
     pillar: "cycle",
     hook_type: "belief",
     hook_used: "short hook",
