@@ -317,7 +317,7 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
     // taken here so it and that valuation see the identical book.
     bookByMonth.push(state.book.slice());
     const value = valueBook(state.book, m + 1);
-    const expectedFuturePayments = value.total + state.cash - state.outstandingAmount;
+    const expectedFuturePayments = value.total - state.outstandingAmount;
 
     if (!idle) {
       state.contributed += effMsc;

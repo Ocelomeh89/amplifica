@@ -37,7 +37,9 @@ export function earliestSustainableWithdrawal(
   const maxStart = totalMonths - minRunwayMonths;
   for (let t = minStartMonth; t <= maxStart; t++) {
     const r = runSimulation({ ...base, mscEndMonth: t, withdrawalStartMonth: t, monthlyWithdrawal });
-    const nw = r.series.map((s) => s.expectedFuturePayments);
+    // Withdrawals leave through the cash bucket, so sustainability is judged on
+    // the book plus cash, net of the LoC — not on expectedFuturePayments alone.
+    const nw = r.series.map((s) => s.expectedFuturePayments + s.cash);
     if (sustained(nw, t, requireGrowth)) {
       return { month: t, monthlyWithdrawal, expectedFuturePaymentsAtSwitch: nw[t], expectedFuturePaymentsAtEnd: nw[nw.length - 1] };
     }

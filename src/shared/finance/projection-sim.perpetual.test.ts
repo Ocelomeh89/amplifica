@@ -60,7 +60,7 @@ describe("MSC-end and withdrawal are independent", () => {
     for (const s of r.series) {
       const m = s.monthIndex;
       const exp = m < 100 ? 2000 * (m + 1) : 2000 * 100 - 4500 * (m - 100 + 1);
-      expect(Math.abs(s.expectedFuturePayments - exp)).toBeLessThan(1e-4 * Math.max(1, Math.abs(exp)));
+      expect(Math.abs(s.expectedFuturePayments + s.cash - exp)).toBeLessThan(1e-4 * Math.max(1, Math.abs(exp)));
     }
   });
 });

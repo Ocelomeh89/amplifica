@@ -69,9 +69,9 @@ Otherwise the investment size stays the same.`}</Formula>
               </p>
             </Section>
 
-            <Section title="Investment size (expected future payments)">
+            <Section title="Outstanding cashflow">
               <p className="text-sm text-sub leading-relaxed">
-                {`Investment size = the nominal sum of all remaining investment payments, PLUS the cash bucket, minus the outstanding line-of-credit balance. It is future cash measured at face value — not a discounted present value — so there is no discount-rate assumption to argue about. Banking surplus cash (rather than discarding it) is what lets your monthly savings keep adding to the total over time.`}
+                {`Outstanding cashflow = the nominal sum of all remaining investment payments, minus the outstanding line-of-credit balance. It is future cash measured at face value — not a discounted present value — so there is no discount-rate assumption to argue about.`}
               </p>
             </Section>
           </div>

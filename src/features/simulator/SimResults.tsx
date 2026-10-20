@@ -9,7 +9,7 @@ import type { Simulation } from "./useSimulation";
 const SNAPSHOTS = [60, 120, 180]; // 5 / 10 / 15 years
 
 const INVESTMENT_SIZE_INFO =
-  "Projected portfolio value at the end of the 30-year illustration.";
+  "Remaining Amplicon payments, minus the line-of-credit balance, at the end of the 30-year illustration.";
 const DEPLOYED_INFO =
   "Total capital deployed across all Amplicons over the illustration. The same dollar redeployed into a later Amplicon counts each time it is put to work.";
 const CASH_FLOW_INFO =
@@ -53,7 +53,7 @@ export default function SimResults({ sim, incomeMarkerMonth, variant = "editor" 
           </div>
           <div>
             <div className="text-[10px] text-sub uppercase tracking-wide">
-              {horizonYears}-Year Investment Size
+              {horizonYears}-Year Outstanding Cashflow
               <InfoBox message={INVESTMENT_SIZE_INFO} />
             </div>
             <div className="text-base font-bold">{fmtCurrency(finalExpectedFuturePayments)}</div>
@@ -81,7 +81,7 @@ export default function SimResults({ sim, incomeMarkerMonth, variant = "editor" 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
           <div>
             <div className="text-[10px] text-sub uppercase tracking-wide">&nbsp;</div>
-            {["Cash flow/mo", "Investment size", ...(variant === "editor" ? ["Perpetual income/mo"] : [])].map(
+            {["Cash flow/mo", "Outstanding cashflow", ...(variant === "editor" ? ["Perpetual income/mo"] : [])].map(
               (label) => (
                 <div key={label} className="text-xs text-sub py-0.5">{label}</div>
               )

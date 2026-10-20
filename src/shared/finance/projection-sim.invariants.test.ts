@@ -67,7 +67,7 @@ describe("flywheel — conservation when there is no interest anywhere", () => {
       const r = runSimulation(input);
       for (const s of r.series) {
         const expected = input.msc * (s.monthIndex + 1);
-        expect(Math.abs(s.expectedFuturePayments - expected)).toBeLessThan(1e-6 * Math.max(1, expected));
+        expect(Math.abs(s.expectedFuturePayments + s.cash - expected)).toBeLessThan(1e-6 * Math.max(1, expected));
       }
     });
   }
