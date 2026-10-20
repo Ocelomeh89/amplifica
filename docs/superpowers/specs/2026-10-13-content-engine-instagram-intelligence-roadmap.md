@@ -129,6 +129,16 @@ The spike spends a few dollars to avoid designing slice 6's data model on a gues
 Pass means Reel views, caption and date for every item under the cap. Fail means
 slice 6 ships manual-only and Business Discovery moves to the top of the backlog.
 
+Creators for the spike (Miguel, 2026-10-19): `ericsfinancials`, `micro.investing`. Add
+Miguel's own account for step 5.
+
+**YouTube may need the same.** Slice 6 competitor tracking is Instagram-only. YouTube
+competitors are where the direct niche competition sits (see the competitive-landscape
+memory), and the YouTube Data API reads public channels and videos with the key we
+already hold, so a competitor pull may not need Apify at all. Decide after the Instagram
+result. The channel has zero videos today, so there is no own-channel baseline to compare
+against yet.
+
 ## Relation to the content-engine design (2026-09-17)
 
 This roadmap supersedes the design in four places and leaves the rest alone.
