@@ -55,6 +55,14 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
   `GET|POST /api/content/voice`.
 - `ui/UnusedCard.tsx` renders the Never used page (`/content/unused`), not
   `IdeaCard`; the tab has no count badge.
+- `engine/tags.ts` — the six tags' value lists (`HOOK_TYPES` is shared with ideas), caption
+  length, cover summary, `parseTagFilters`/`filterByTags` and the tag endpoint's zod schema.
+  `engine/performance-view.ts` — Overview cards for the filtered posts, baselines from all.
+  `data/tags.ts` (`getTagQueue`, `storeTags`, `correctTags`) over `TagsDb`;
+  `supabase-tags-db.ts` is the adapter plus `igMediaUrlLookup`. Routes
+  `GET /api/content/tags/queue` and `POST /api/content/tags`; `tag-actions.ts` is the
+  correction Server Action. Tagging runs in `routines/content-tag.md` (weekly, and
+  `/content-tag`), not in the cron.
 - `routines/` (repo root) — routine instructions and README; `.claude/skills/`
   holds the local companions `/content-plaud`, `/content-daily`, `/content-draft` and
   `/content-voice`.
@@ -69,7 +77,7 @@ these are all the places that know it exists:
 - `src/app/robots.ts` — `/content` disallow; `src/app/content-route.test.ts` asserts it and the sitemap.
 - `vercel.json` — the daily metrics cron. `next.config.mjs` — `jsdom` external package.
 - `package.json` — `jsdom`, `@mozilla/readability`, `@anthropic-ai/sdk` are used only here.
-- `supabase/migrations/0008`, `0009`, `0011`, `0013` and the `content_*` types in `shared/supabase/database.types.ts`.
+- `supabase/migrations/0008`, `0009`, `0011`, `0013`, `0014` and the `content_*` types in `shared/supabase/database.types.ts`.
 - `routines/`, `.claude/skills/content-*` (incl. `content-draft`, `content-voice`), `docs/superpowers/**` — the routines and their docs.
 - Env: `CONTENT_OWNER_USER_ID`, `CONTENT_ENGINE_SECRET`, `CRON_SECRET`, and the platform keys in `docs/PRODUCT-STATUS.md`.
 
@@ -130,6 +138,15 @@ these are all the places that know it exists:
 - The cron refreshes `media_type` and `thumbnail_url` on existing posts and nothing else; `upsertPosts` stays insert-ignore.
 - Every baseline uses `WINDOW_DAYS` (90) and `baselineGroup`; there is no second window.
 - `loadPostsForMath` pages the snapshot read in 1,000s; PostgREST caps a single response at 1,000 rows.
+- Tagging never writes `pillar` (the idea routine's content pillar). `message` is the canon
+  argument. A hook type copied onto a post by `markPosted` is not locked: the routine
+  replaces it with what the post did.
+- `storeTags` skips any field named in `tag_locks`; `correctTags` locks each tag it writes at
+  confidence 1 and leaves `tagged_at` alone, so a corrected post is still queued for its
+  other tags. To re-queue unlocked posts after a list change:
+  `update content_posts set tagged_at = null where platform = 'instagram' and cardinality(tag_locks) = 0;`
+- The tag queue excludes stories and takes a fresh `media_url` from Composio at request time;
+  Instagram's CDN links expire, so none is stored.
 - `content_voice.built_from` is `{ files: [{path, mtime, bytes}], previous_profile_md }`.
 
 ## Seeding by hand

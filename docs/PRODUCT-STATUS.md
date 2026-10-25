@@ -303,7 +303,7 @@ Each feature folder pairs a Server Component `page.tsx` (reads rows) with `actio
 
 1. `pnpm install`. Node 24 LTS.
 2. Create a Supabase project; set `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`, plus `SUPABASE_SERVICE_ROLE_KEY` / `BEEHIIV_API_KEY` / `BEEHIIV_PUBLICATION_ID` for the `/calculator` lead capture (it degrades gracefully without Beehiiv: leads still insert, `beehiiv_synced` stays false).
-3. Apply `supabase/migrations/0001`→`0013` in order (`supabase db push` / `migration up`). This builds all tables, RLS, triggers, and the signup→profile automation.
+3. Apply `supabase/migrations/0001`→`0014` in order (`supabase db push` / `migration up`). This builds all tables, RLS, triggers, and the signup→profile automation.
 4. `pnpm dev` → http://localhost:3000. Sign up (a profile row auto-creates), then add Amplicons/LoCs and build Projections.
 5. `pnpm test` (Vitest, 99 finance tests) and `pnpm typecheck` (`tsc --noEmit`) before shipping. **Do not run `next build` while `next dev` is running** — it corrupts the dev server's `.next` cache.
 
