@@ -116,7 +116,7 @@ Produce a JSON array of ideas. Each idea has exactly these fields:
 - \`quote_ref\`: where it was said: source title, date, and a timestamp or speaker.
 - \`pillar\`: one of "method", "funding", "income-assets", "optionality", "real-numbers".
 - \`hook_type\`: one of "belief-attacking", "paradox", "failure-lesson", "ranking",
-  "identity", "question", "real-numbers".
+  "identity", "question", "real-numbers", "story-moment", "promise", "warning".
 - \`chain_key\`: a short string shared by ideas from the same source and thesis
   (a reel, its story sequence, a newsletter section) so they appear as one
   recording; omit when the idea stands alone.

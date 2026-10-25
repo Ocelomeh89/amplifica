@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { ingestSchema } from "./schema";
+import { HOOK_TYPES } from "./tags";
 
 const example = JSON.parse(readFileSync("routines/examples/daily-ingest.json", "utf8"));
 
@@ -63,6 +64,17 @@ describe("ingestSchema", () => {
       bad.ideas.push({ ...bad.ideas[0], title: `${bad.ideas[0].title} ${i}` });
     }
     expect(bad.ideas.length).toBe(11);
+    expect(ingestSchema.safeParse(bad).success).toBe(false);
+  });
+
+  it("accepts an empty hook_type and every shared one, and rejects others", () => {
+    for (const hook_type of ["", ...HOOK_TYPES]) {
+      const ok = structuredClone(example);
+      ok.ideas[0].hook_type = hook_type;
+      expect(ingestSchema.safeParse(ok).success, hook_type).toBe(true);
+    }
+    const bad = structuredClone(example);
+    bad.ideas[0].hook_type = "nope";
     expect(ingestSchema.safeParse(bad).success).toBe(false);
   });
 });

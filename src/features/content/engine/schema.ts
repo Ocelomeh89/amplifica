@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { FORMATS, SOURCE_KINDS, SOURCE_STATUSES } from "./types";
+import { HOOK_TYPES } from "./tags";
 
 // The contract between the routines and the app. A routine builds this body,
 // the ingest endpoint validates it whole and writes it whole. Anything that
@@ -40,7 +41,7 @@ export const ingestIdeaSchema = z.object({
   quote: z.string().default(""),
   quote_ref: z.string().default(""),
   pillar: z.string().default(""),
-  hook_type: z.string().default(""),
+  hook_type: z.union([z.literal(""), z.enum(HOOK_TYPES)]).default(""),
   chain_key: z.string().optional(),
   score: z.number().min(0).max(1).default(0),
   batch_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
