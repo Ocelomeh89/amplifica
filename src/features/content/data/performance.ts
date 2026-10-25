@@ -5,8 +5,9 @@ import type { Database } from "@/shared/supabase/database.types";
 import { pickSnapshots } from "@/features/content/engine/snapshots";
 import type { PostForMath } from "@/features/content/engine/normalize";
 import type { SeriesPoint } from "@/features/content/engine/baseline";
+import type { PostTags } from "@/features/content/engine/tags";
 
-export type PostRowForView = PostForMath & {
+export type PostRowForView = PostForMath & PostTags & {
   url: string;
   caption: string;
   idea_id: string | null;
@@ -46,7 +47,9 @@ export async function loadSnapshotRows(
 export async function loadPostsForMath(supabase: SupabaseClient<Database>, userId: string): Promise<PostRowForView[]> {
   const { data: posts, error } = await supabase
     .from("content_posts")
-    .select("id, platform, format, media_type, thumbnail_url, pillar, hook_type, hook_used, caption, url, idea_id, posted_at")
+    .select(
+      "id, platform, format, media_type, thumbnail_url, pillar, hook_type, hook_used, caption, url, idea_id, posted_at, onscreen_text, message, cta_type, post_style, cover_face, cover_text, cover_number, hook_spoken, hook_onscreen, tag_confidence, tag_locks, tagged_at"
+    )
     .eq("user_id", userId)
     .order("posted_at", { ascending: false });
   if (error) throw new Error(error.message);
@@ -75,6 +78,18 @@ export async function loadPostsForMath(supabase: SupabaseClient<Database>, userI
       pillar: p.pillar,
       hook_type: p.hook_type,
       hook_used: p.hook_used,
+      onscreen_text: p.onscreen_text,
+      message: p.message,
+      cta_type: p.cta_type,
+      post_style: p.post_style,
+      cover_face: p.cover_face,
+      cover_text: p.cover_text,
+      cover_number: p.cover_number,
+      hook_spoken: p.hook_spoken,
+      hook_onscreen: p.hook_onscreen,
+      tag_confidence: (p.tag_confidence ?? {}) as Record<string, number>,
+      tag_locks: p.tag_locks ?? [],
+      tagged_at: p.tagged_at,
       caption: p.caption,
       url: p.url,
       idea_id: p.idea_id,
