@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { CONTENT_POSITIONING, IDEAS_PROMPT } from "./ideas";
 import { ingestIdeaSchema } from "../schema";
 import { FORMATS } from "../types";
+import { HOOK_TYPES } from "../tags";
 
 // The prompt and the schema must not drift: every field a routine has to
 // produce is named in the rules it reads.
@@ -11,6 +12,9 @@ describe("IDEAS_PROMPT", () => {
     for (const key of Object.keys(ingestIdeaSchema.shape)) {
       expect(IDEAS_PROMPT, key).toContain(`\`${key}\``);
     }
+  });
+  it("names every hook type the shared list allows", () => {
+    for (const h of HOOK_TYPES) expect(IDEAS_PROMPT).toContain(`"${h}"`);
   });
   it("names every format and the brand guardrails", () => {
     for (const f of FORMATS) expect(IDEAS_PROMPT).toContain(`\`${f}\``);

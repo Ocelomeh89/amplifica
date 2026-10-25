@@ -16,6 +16,7 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/ideas/[id]/page.tsx",
       "src/app/(app)/content/sources/page.tsx",
       "src/features/content/data/actions.ts",
+      "src/features/content/data/tag-actions.ts",
     ];
     for (const f of files) expect(read(f), f).toContain("requireContentOwner()");
   });
@@ -27,6 +28,8 @@ describe("content stays owner-only", () => {
       "src/app/api/content/found/queued/route.ts",
       "src/app/api/content/drafts/queue/route.ts",
       "src/app/api/content/drafts/route.ts",
+      "src/app/api/content/tags/queue/route.ts",
+      "src/app/api/content/tags/route.ts",
       "src/app/api/content/cron/metrics/route.ts",
       "src/app/api/content/voice/route.ts",
     ];

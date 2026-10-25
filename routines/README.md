@@ -8,6 +8,7 @@ variables named at its top and the connectors it lists.
 |---|---|---|
 | `content-daily.md` | 06:00 daily (`0 11 * * *` UTC) | Granola, Wispr-Flow, Plaud, ClickUp |
 | `content-found.md` | Mon 06:30 (`30 11 * * 1` UTC); also `/content-found` | none |
+| `content-tag.md` | Mon 07:00 (`0 12 * * 1` UTC); also `/content-tag` | none |
 
 ## Setting one up
 
@@ -51,6 +52,34 @@ but with no connectors:
 It does nothing when the queue is empty. `/content-found` runs the same file from
 Claude Code on the Mac: with a link or file it mines that directly, with nothing
 it works through the queue now.
+
+## Post-tagging run
+
+`content-tag.md` tags Instagram posts with the choices behind them (hook, on-screen
+text, cover, message, call to action, post style) and writes them through
+`/api/content/tags`. Set it up like the found-content routine, with no connectors,
+but the environment needs more network than the app host, because it downloads each
+Reel and installs a speech model:
+
+1. On https://claude.ai/code, open an environment with `CONTENT_API_BASE` and
+   `CONTENT_ENGINE_SECRET` set (the same values as the other routines).
+2. Create a routine on the repo `https://github.com/Ocelomeh89/amplifica`, no
+   connectors, schedule `0 12 * * 1` UTC (07:00 America/Chicago in daylight time),
+   with the message: "Read routines/content-tag.md in this checkout and run it."
+3. Set the environment's network to an allowlist of exactly these hosts, not full
+   access (the routine reads text and video made by strangers and holds the secret):
+   - the `CONTENT_API_BASE` host (amplificawealth.com);
+   - `*.cdninstagram.com` and `*.fbcdn.net`, Instagram's media servers;
+   - `pypi.org` and `files.pythonhosted.org`, to install `faster-whisper` and
+     `imageio-ffmpeg`;
+   - `huggingface.co` and its file hosts, for the `base.en` speech model.
+4. Run it once by hand. The first run is the transcription proof: its final report
+   says whether the tools installed and ran under this allowlist. Add any host the
+   run turned out to need to the list above, and write the outcome in the roadmap.
+5. Spot-check ten posts on /content/performance against the tags.
+
+`/content-tag` runs the same file from Claude Code on the Mac, where there is no
+allowlist. The first backfill tags up to 100 posts per run.
 
 ## Messaging
 

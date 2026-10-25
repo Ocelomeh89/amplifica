@@ -32,13 +32,14 @@ These are settled; a slice that needs to reopen one says so in its own spec.
   it, so Reel view counts stay unverified, and Apify is not yet connected. The spike
   below settles both. Manual entry (single form plus bulk paste) is the fallback.
 - **Anthropic API.** Miguel is adding `ANTHROPIC_API_KEY` to Vercel and `.env.local`
-  (2026-10-18). Needed from slice 2 on; slice 1 and the spike do not need it. Haiku
-  5.5 classifies, Opus generates. `data/claude.ts` forces the found-ideas tool and
-  hardcodes Opus today; slice 2 generalizes it (model and tool as parameters) instead
-  of copying it.
-- **Hooks without transcripts.** A post linked to an idea carries the planned hook in
-  `hook_used`; classify from that. Otherwise classify from the caption's first line
-  and store a confidence. Transcription stays a separate decision.
+  (2026-10-18). Slice 2 does not use it: tagging runs as a weekly Claude Code routine
+  (2026-10-25), so there is no per-post API call and `data/claude.ts` stays as it is.
+  Slices 3 and 5 generate with it, so generalizing `data/claude.ts` (model and tool as
+  parameters) moves to slice 3.
+- **Hooks and transcripts.** Superseded by slice 2 (2026-10-25): the tagging routine
+  transcribes the first 10 seconds of each Reel itself, and a post linked to an idea
+  still carries the planned hook in `hook_used` as one input. If the cloud proof fails,
+  slice 2 ships without the spoken hook.
 - **Why slice 6 matters.** A competitor post that beats that creator's median becomes
   a linked idea in the Reels queue. That is the point of the competitor feature.
 
@@ -76,7 +77,7 @@ settled comparison described below.
 |---|---|---|---|---|
 | 1 | Baselines and status | Pull: `media_type` and `thumbnail_url` stored, insights scoped to the last 90 days instead of the first 100 items. Engine: 90-day window, views percentiles (P25, P50, P75, P90) per baseline group, `n_views` multiplier at matched age, status (Pending, Lagging, Normal, Promising, Viral, Evergreen), thin baseline under 8. UI: Overview cards with 7/14/30/90-day filter, status badge on the Performance table. | no | `media_type`, `thumbnail_url` on `content_posts` |
 | spike | Apify through Composio | Answers whether competitor Reel views, captions, dates, video URLs and durations come back under a cost cap. Runs while slices 1 and 2 are built. | no | none |
-| 2 | Automatic classification | Hook type, visual format (media type plus caption), content format, CTA type per post. The cron fills only untagged posts; a correction in the UI sets `tagged_by = owner` and the cron never overwrites it. Confidence stored. Tables reuse `attribute()` with `cta_type` and `content_format` as two more dimensions, plus median views and saves per 1k views per group. `data/claude.ts` generalized. | yes | tag columns, `tagged_by`, `tag_confidence` on `content_posts` |
+| 2 | Post tagging | **Built 2026-10-26** (migration 0014 and the cloud proof pending). Six choices per post: hook type (one list shared with ideas), on-screen text, cover, message (canon argument), CTA, post style; plus spoken and on-screen hook text. A weekly Claude Code routine tags from the video, frames and caption; a correction on the Performance page locks a tag. Chips filter the table and the Overview cards. Spec `2026-10-25-content-engine-post-tagging-design.md`. | no | tag columns, `tag_confidence`, `tag_locks`, `tagged_at` on `content_posts` |
 | 6 | Competitors and Viral Watch | Creators and their posts with a per-creator baseline from the same functions (viral = 3x that creator's median, thin under 8). Apify pull once a week inside the existing daily cron (Monday branch), cost-capped; manual form and bulk paste as fallback. Auto-classified. **Adapt** on a viral post creates a linked idea in the Inbox through `ingestPayload` with the competitor post as the source. | yes | 2 tables, plus a new `competitor` source kind: the kind check constraint in migration 0008, `SOURCE_KINDS` and the ingest schema all change |
 | 3 | Post detail and Recreate | Page per post: thumbnail, metrics against the median at matched age, link out, retention line as watch time against the median (share of duration only if the spike returns durations). Recreate generates a brief and a linked idea (original hook, format, pillar). | yes | `source_post_id` on `content_ideas` |
 | 5 | Post Today | Top-10 cards with an evidence line. Opportunity score 0-100, computed on read and never stored: own evidence 50, competitor evidence 30, freshness 20 (not covered in the last 60 days). Trend momentum is left out until a trend source exists. The idea `score` (0-1, the routine's confidence) is untouched. 3x3 hook variants, each with a first line and a short caption. | yes | variants jsonb on `content_ideas` |
