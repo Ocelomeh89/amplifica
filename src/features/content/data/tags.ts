@@ -31,6 +31,8 @@ export type StoredTags = {
   tag_locks: string[];
   tag_confidence: Record<string, number>;
   values: Partial<PostTags>;
+  /** Changes whenever the row does (updated_at). Writes that depend on the locks pass it back. */
+  version: string;
 };
 
 export interface TagsDb {
@@ -38,7 +40,8 @@ export interface TagsDb {
   untagged(limit: number, since: Date): Promise<{ posts: QueueRow[]; total: number }>;
   /** Only the owner's Instagram posts appear in the map. */
   locksFor(ids: string[]): Promise<Map<string, StoredTags>>;
-  writeTags(id: string, patch: Partial<PostTags>): Promise<void>;
+  /** With ifVersion, writes only if the row is still at that version and returns whether it did. */
+  writeTags(id: string, patch: Partial<PostTags>, ifVersion?: string): Promise<boolean>;
 }
 
 /** Shortcode to a fresh video or image URL. Instagram's CDN links expire, so this is asked at request time. */
@@ -80,43 +83,52 @@ export async function storeTags(db: TagsDb, input: unknown, now: Date): Promise<
   const stored = await db.locksFor(parsed.data.posts.map((p) => p.id));
   const results: { id: string; written?: string[]; skipped_locked?: string[]; error?: string }[] = [];
   for (const post of parsed.data.posts) {
-    const existing = stored.get(post.id);
+    let existing = stored.get(post.id);
     if (!existing) {
       results.push({ id: post.id, error: "not_found" });
       continue;
     }
     const { id, tag_confidence, ...fields } = post;
-    const patch: Record<string, unknown> = {};
-    const written: string[] = [];
-    const skipped_locked: string[] = [];
-    for (const [k, v] of Object.entries(fields)) {
-      if (v === undefined) continue;
-      if (existing.tag_locks.includes(k)) skipped_locked.push(k);
-      else {
-        patch[k] = v;
-        written.push(k);
+    let outcome: { written: string[]; skipped_locked: string[] } | null = null;
+    // The lock list can change under us (Miguel corrects a tag while the routine runs),
+    // so the write is conditional on the version read; one re-read and retry on a miss.
+    for (let attempt = 0; attempt < 2 && existing && !outcome; attempt++) {
+      const patch: Record<string, unknown> = {};
+      const written: string[] = [];
+      const skipped_locked: string[] = [];
+      for (const [k, v] of Object.entries(fields)) {
+        if (v === undefined) continue;
+        if (existing.tag_locks.includes(k)) skipped_locked.push(k);
+        else {
+          patch[k] = v;
+          written.push(k);
+        }
       }
+      const confidence = Object.fromEntries(
+        Object.entries(tag_confidence ?? {}).filter(([k, v]) => v !== undefined && !existing!.tag_locks.includes(k))
+      );
+      const ok = await db.writeTags(
+        id,
+        { ...patch, tag_confidence: { ...existing.tag_confidence, ...confidence }, tagged_at: now.toISOString() } as Partial<PostTags>,
+        existing.version
+      );
+      if (ok) outcome = { written, skipped_locked };
+      else existing = (await db.locksFor([id])).get(id);
     }
-    const confidence = Object.fromEntries(
-      Object.entries(tag_confidence ?? {}).filter(([k, v]) => v !== undefined && !existing.tag_locks.includes(k))
-    );
-    await db.writeTags(id, {
-      ...patch,
-      tag_confidence: { ...existing.tag_confidence, ...confidence },
-      tagged_at: now.toISOString(),
-    } as Partial<PostTags>);
-    results.push({ id, written, skipped_locked });
+    results.push(outcome ? { id, ...outcome } : { id, error: existing ? "conflict" : "not_found" });
   }
   return { status: 200, body: { results } };
 }
 
 /** Miguel's correction: write the fields, lock each tag at confidence 1. Hook text is written but not locked. */
 export async function correctTags(db: TagsDb, id: string, patch: Partial<PostTags>): Promise<{ error: string | null }> {
-  const existing = (await db.locksFor([id])).get(id);
-  if (!existing) return { error: "Post not found." };
+  let existing = (await db.locksFor([id])).get(id);
   const names = Object.keys(patch).filter(isTagName);
-  const tag_locks = [...new Set([...existing.tag_locks, ...names])];
-  const tag_confidence = { ...existing.tag_confidence, ...Object.fromEntries(names.map((n) => [n, 1])) };
-  await db.writeTags(id, { ...patch, tag_locks, tag_confidence });
-  return { error: null };
+  for (let attempt = 0; attempt < 2 && existing; attempt++) {
+    const tag_locks = [...new Set([...existing.tag_locks, ...names])];
+    const tag_confidence = { ...existing.tag_confidence, ...Object.fromEntries(names.map((n) => [n, 1])) };
+    if (await db.writeTags(id, { ...patch, tag_locks, tag_confidence }, existing.version)) return { error: null };
+    existing = (await db.locksFor([id])).get(id);
+  }
+  return { error: existing ? "The post changed while saving. Try again." : "Post not found." };
 }

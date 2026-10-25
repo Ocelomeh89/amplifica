@@ -19,12 +19,15 @@ const NAME_LABEL: Record<string, string> = {
 export default function TagFilters({ filters }: { filters: TagFilter[] }) {
   const params = useSearchParams();
   if (filters.length === 0) return null;
+  // `drop` is one filter to remove; null removes them all.
   const without = (drop: string | null) => {
     const next = new URLSearchParams(params.toString());
     next.delete("tag");
-    for (const f of filters) {
-      const item = `${f.name}:${f.value}`;
-      if (item !== drop) next.append("tag", item);
+    if (drop !== null) {
+      for (const f of filters) {
+        const item = `${f.name}:${f.value}`;
+        if (item !== drop) next.append("tag", item);
+      }
     }
     const q = next.toString();
     return q ? `?${q}` : "?";
@@ -47,7 +50,7 @@ export default function TagFilters({ filters }: { filters: TagFilter[] }) {
           </Link>
         );
       })}
-      <Link href={without("*")} scroll={false} className="text-sub hover:text-ink underline">
+      <Link href={without(null)} scroll={false} className="text-sub hover:text-ink underline">
         clear all
       </Link>
     </div>

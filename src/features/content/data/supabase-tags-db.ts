@@ -47,7 +47,7 @@ export function supabaseTagsDb(client: Client, userId: string): TagsDb {
       if (ids.length === 0) return out;
       const { data, error } = await client
         .from("content_posts")
-        .select(`id, tag_locks, tag_confidence, ${TAG_COLUMNS}`)
+        .select(`id, updated_at, tag_locks, tag_confidence, ${TAG_COLUMNS}`)
         .eq("user_id", userId)
         .eq("platform", "instagram")
         .in("id", ids);
@@ -55,6 +55,7 @@ export function supabaseTagsDb(client: Client, userId: string): TagsDb {
       for (const r of data ?? []) {
         const row = r as unknown as Record<string, unknown>;
         out.set(row.id as string, {
+          version: row.updated_at as string,
           tag_locks: row.tag_locks as string[],
           tag_confidence: (row.tag_confidence ?? {}) as Record<string, number>,
           values: pickLocked(row as Partial<PostTags>, row.tag_locks as string[]),
@@ -63,13 +64,22 @@ export function supabaseTagsDb(client: Client, userId: string): TagsDb {
       return out;
     },
 
-    async writeTags(id, patch) {
-      const { error } = await client
+    async writeTags(id, patch, ifVersion) {
+      let query = client
         .from("content_posts")
         .update(patch as Database["public"]["Tables"]["content_posts"]["Update"])
         .eq("id", id)
         .eq("user_id", userId);
+      if (ifVersion === undefined) {
+        const { error } = await query;
+        if (error) throw new Error(`tag write: ${error.message}`);
+        return true;
+      }
+      // The touch_updated_at trigger moves updated_at on every write, so a changed row misses this match.
+      query = query.eq("updated_at", ifVersion);
+      const { data, error } = await query.select("id");
       if (error) throw new Error(`tag write: ${error.message}`);
+      return (data ?? []).length > 0;
     },
   };
 }

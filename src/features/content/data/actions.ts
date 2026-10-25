@@ -163,7 +163,7 @@ export async function markPosted(formData: FormData): Promise<{ error: string | 
   // only links the idea, so an existing row keeps its posted_at.
   const { data: existing, error: findError } = await supabase
     .from("content_posts")
-    .select("id, posted_at")
+    .select("id, posted_at, hook_type, tagged_at, tag_locks")
     .eq("user_id", user.id)
     .eq("platform", platform)
     .eq("external_id", externalId)
@@ -171,9 +171,12 @@ export async function markPosted(formData: FormData): Promise<{ error: string | 
   if (findError) return { error: findError.message };
 
   if (existing) {
+    // A hook type the tagging routine set, or Miguel corrected, is what the post did;
+    // the idea's is only what it planned. The plan stays readable through idea_id.
+    const keepHookType = existing.tagged_at !== null || (existing.tag_locks ?? []).includes("hook_type");
     const { error: updateError } = await supabase
       .from("content_posts")
-      .update({ idea_id: idea.id, hook_used: idea.hook, pillar: idea.pillar, hook_type: idea.hook_type })
+      .update({ idea_id: idea.id, hook_used: idea.hook, pillar: idea.pillar, ...(keepHookType ? {} : { hook_type: idea.hook_type }) })
       .eq("id", existing.id)
       .eq("user_id", user.id);
     if (updateError) return { error: updateError.message };

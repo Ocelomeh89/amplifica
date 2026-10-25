@@ -63,6 +63,16 @@ describe("supabaseTagsDb.writeTags", () => {
   });
 });
 
+describe("supabaseTagsDb.writeTags with a version", () => {
+  it("matches on updated_at and reports whether a row was written", async () => {
+    const hit = fakeClient([{ id: "p1" }], 1);
+    expect(await supabaseTagsDb(hit.client, "u1").writeTags("p1", { post_style: "image" }, "2026-10-26T12:00:00.123456+00:00")).toBe(true);
+    expect(hit.log).toContainEqual(["content_posts.eq", "updated_at", "2026-10-26T12:00:00.123456+00:00"]);
+    const miss = fakeClient([], 0);
+    expect(await supabaseTagsDb(miss.client, "u1").writeTags("p1", { post_style: "image" }, "stale")).toBe(false);
+  });
+});
+
 describe("igMediaUrlLookup", () => {
   const NOW = new Date("2026-10-26T12:00:00Z");
   const media = [

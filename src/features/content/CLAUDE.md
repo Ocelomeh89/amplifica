@@ -145,6 +145,9 @@ these are all the places that know it exists:
   confidence 1 and leaves `tagged_at` alone, so a corrected post is still queued for its
   other tags. To re-queue unlocked posts after a list change:
   `update content_posts set tagged_at = null where platform = 'instagram' and cardinality(tag_locks) = 0;`
+- Tag writes are conditional on the row's `updated_at` (read with the locks): if Miguel corrects a tag
+  while the routine runs, the write misses, re-reads once, and either lands with the new locks or
+  reports `conflict`. `markPosted` leaves a hook type the routine set or Miguel corrected alone.
 - The tag queue excludes stories and takes a fresh `media_url` from Composio at request time;
   Instagram's CDN links expire, so none is stored.
 - `content_voice.built_from` is `{ files: [{path, mtime, bytes}], previous_profile_md }`.
