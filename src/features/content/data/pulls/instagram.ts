@@ -116,6 +116,27 @@ const MEDIA_FIELDS = "id,caption,media_type,media_product_type,permalink,timesta
 export const MAX_ITEMS = 400;
 const CONCURRENCY = 4;
 
+/** The account's media from the last WINDOW_DAYS days, newest first, as far as MAX_ITEMS allows. Throws on a Composio failure. */
+export async function listIgMedia(env: Required<ComposioEnv>, fetchImpl: typeof fetch = fetch, now: Date = new Date()): Promise<IgMedia[]> {
+  const media: IgMedia[] = [];
+  let after: string | undefined;
+  const cutoff = now.getTime() - WINDOW_DAYS * 86_400_000;
+  while (media.length < MAX_ITEMS) {
+    const page = await composioExecute<MediaPage>(
+      "INSTAGRAM_GET_IG_USER_MEDIA",
+      { ig_user_id: "me", limit: 50, fields: MEDIA_FIELDS, ...(after ? { after } : {}) },
+      env,
+      fetchImpl
+    );
+    media.push(...page.data.filter((m) => new Date(m.timestamp).getTime() >= cutoff));
+    const oldest = page.data.length ? Math.min(...page.data.map((m) => new Date(m.timestamp).getTime())) : Infinity;
+    if (oldest < cutoff) break;
+    after = page.paging?.cursors?.after;
+    if (!after || page.data.length === 0) break;
+  }
+  return media;
+}
+
 export async function pullInstagram(env: ComposioEnv, fetchImpl: typeof fetch = fetch, now: Date = new Date()): Promise<Pull> {
   if (!env.apiKey || !env.connectionId) {
     console.warn("instagram: COMPOSIO_API_KEY / COMPOSIO_IG_CONNECTION_ID not set; skipping pull");
@@ -123,23 +144,9 @@ export async function pullInstagram(env: ComposioEnv, fetchImpl: typeof fetch = 
   }
   const full: Required<ComposioEnv> = { apiKey: env.apiKey, connectionId: env.connectionId, userId: env.userId ?? DEFAULT_COMPOSIO_USER_ID };
   const errors: string[] = [];
-  const media: IgMedia[] = [];
+  let media: IgMedia[];
   try {
-    let after: string | undefined;
-    const cutoff = now.getTime() - WINDOW_DAYS * 86_400_000;
-    while (media.length < MAX_ITEMS) {
-      const page = await composioExecute<MediaPage>(
-        "INSTAGRAM_GET_IG_USER_MEDIA",
-        { ig_user_id: "me", limit: 50, fields: MEDIA_FIELDS, ...(after ? { after } : {}) },
-        full,
-        fetchImpl
-      );
-      media.push(...page.data.filter((m) => new Date(m.timestamp).getTime() >= cutoff));
-      const oldest = page.data.length ? Math.min(...page.data.map((m) => new Date(m.timestamp).getTime())) : Infinity;
-      if (oldest < cutoff) break;
-      after = page.paging?.cursors?.after;
-      if (!after || page.data.length === 0) break;
-    }
+    media = await listIgMedia(full, fetchImpl, now);
   } catch (e) {
     return { posts: [], errors: [`instagram: media list failed: ${(e as Error).message}`] };
   }
