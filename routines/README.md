@@ -78,6 +78,13 @@ Reel and installs a speech model:
    run turned out to need to the list above, and write the outcome in the roadmap.
 5. Spot-check ten posts on /content/performance against the tags.
 
+First cloud run, 2026-10-26: the app host was missing from the allowlist (403 from
+the egress proxy), then the `base.en` download failed on Hugging Face's Xet hosts
+(`cas-server.xethub.hf.co`), so the run tagged 20 posts from covers and captions only.
+Locally the same download fails until `HF_HUB_DISABLE_XET=1` is set. Add `*.hf.co` to
+the allowlist or set that variable on the environment. Whether
+`*.cdninstagram.com` and `*.fbcdn.net` serve video from the cloud is still untested.
+
 `/content-tag` runs the same file from Claude Code on the Mac, where there is no
 allowlist. The first backfill tags up to 100 posts per run.
 
