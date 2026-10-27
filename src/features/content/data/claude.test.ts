@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CLAUDE_CLIENT_OPTIONS, CLAUDE_MODEL, MissingApiKeyError, anthropicIdeaGenerator, claudeIdeaGenerator } from "./claude";
+import {
+  CLAUDE_CLIENT_OPTIONS,
+  CLAUDE_MODEL,
+  MissingApiKeyError,
+  anthropicIdeaGenerator,
+  claudeIdeaGenerator,
+  claudeToolCaller,
+} from "./claude";
 
 function fakeClient(content: { type: string; input?: unknown }[]) {
   const create = vi.fn(async (_args: Record<string, unknown>) => ({ content }));
@@ -61,5 +68,39 @@ describe("anthropicIdeaGenerator", () => {
     delete process.env.ANTHROPIC_API_KEY;
     expect(() => anthropicIdeaGenerator()).toThrow(MissingApiKeyError);
     expect(() => anthropicIdeaGenerator()).toThrow(/ANTHROPIC_API_KEY/);
+  });
+});
+
+describe("claudeToolCaller", () => {
+  const tool = { name: "record_options", description: "Record options.", schema: { type: "object" } };
+  it("forces the given tool and defaults to the idea model", async () => {
+    const { client, create } = fakeClient([{ type: "tool_use", input: { options: [] } }]);
+    const out = await claudeToolCaller(client).call({ system: "SYS", text: "USER", tool });
+    expect(out).toEqual({ options: [] });
+    const args = create.mock.calls[0][0] as Record<string, any>;
+    expect(args.model).toBe(CLAUDE_MODEL);
+    expect(args.tool_choice).toEqual({ type: "tool", name: "record_options" });
+    expect(args.tools).toEqual([{ name: "record_options", description: "Record options.", input_schema: { type: "object" } }]);
+    expect(args.system).toBe("SYS");
+  });
+  it("maxTokens defaults to 8000 and can be set", async () => {
+    const { client, create } = fakeClient([{ type: "tool_use", input: {} }]);
+    await claudeToolCaller(client).call({ system: "S", text: "U", tool });
+    await claudeToolCaller(client).call({ system: "S", text: "U", tool, maxTokens: 2000 });
+    expect((create.mock.calls[0][0] as Record<string, any>).max_tokens).toBe(8000);
+    expect((create.mock.calls[1][0] as Record<string, any>).max_tokens).toBe(2000);
+  });
+  it("a model override is passed through", async () => {
+    const { client, create } = fakeClient([{ type: "tool_use", input: {} }]);
+    await claudeToolCaller(client).call({ system: "S", text: "U", tool, model: "other-model" });
+    expect((create.mock.calls[0][0] as Record<string, any>).model).toBe("other-model");
+  });
+  it("a truncated answer rejects with a readable message", async () => {
+    const create = vi.fn(async () => ({ stop_reason: "max_tokens", content: [{ type: "tool_use", input: {} }] }));
+    await expect(claudeToolCaller({ messages: { create } }).call({ system: "S", text: "U", tool })).rejects.toThrow(/ran out of room/i);
+  });
+  it("an answer with no tool call rejects", async () => {
+    const { client } = fakeClient([{ type: "text" }]);
+    await expect(claudeToolCaller(client).call({ system: "S", text: "U", tool })).rejects.toThrow(/no result/i);
   });
 });
