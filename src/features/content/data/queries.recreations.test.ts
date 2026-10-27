@@ -14,7 +14,7 @@ function fakeClient(tables: Record<string, unknown[]>) {
       const b: Record<string, unknown> = {
         then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: tables[table] ?? [], error: null }).then(ok),
       };
-      for (const m of ["select", "eq", "in", "gte", "order", "limit"]) {
+      for (const m of ["select", "eq", "in", "or", "order", "limit"]) {
         b[m] = (...args: unknown[]) => {
           log.push([`${table}.${m}`, ...args]);
           return b;
@@ -32,12 +32,13 @@ const row = (id: string, status: string, created_at: string) => ({
 });
 
 describe("loadOpenRecreations", () => {
-  it("reads the owner's pending, ready and failed cards from the last 7 days, newest first", async () => {
+  it("reads the owner's pending, ready and failed cards, keeping live ones past 7 days, newest first", async () => {
     const { client, log } = fakeClient({ content_recreations: [], content_posts: [] });
     await loadOpenRecreations(client, "u1", NOW);
     expect(log).toContainEqual(["content_recreations.eq", "user_id", "u1"]);
     expect(log).toContainEqual(["content_recreations.in", "status", ["pending", "ready", "failed"]]);
-    expect(log).toContainEqual(["content_recreations.gte", "created_at", "2026-10-19T15:00:00.000Z"]);
+    // Live cards (pending, ready) stay however old; only failed ones age out after 7 days.
+    expect(log).toContainEqual(["content_recreations.or", "status.in.(pending,ready),created_at.gte.2026-10-19T15:00:00.000Z"]);
     expect(log).toContainEqual(["content_recreations.order", "created_at", { ascending: false }]);
   });
 

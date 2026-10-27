@@ -191,7 +191,8 @@ export async function loadOpenRecreations(db: Db, userId: string, now: Date): Pr
       .select("id, source_post_id, mode, status, options, error, idea_id, created_at")
       .eq("user_id", userId)
       .in("status", ["pending", "ready", "failed"])
-      .gte("created_at", since)
+      // Live cards stay however old, or an old ready card becomes unreachable; only failed ones age out.
+      .or(`status.in.(pending,ready),created_at.gte.${since}`)
       .order("created_at", { ascending: false })
   ) ?? [];
   if (rows.length === 0) return [];

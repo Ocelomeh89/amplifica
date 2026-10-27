@@ -5,7 +5,7 @@ import type { Database } from "@/shared/supabase/database.types";
 import { WINDOW_DAYS, scorePosts } from "@/features/content/engine/baseline";
 import { normalizePosts } from "@/features/content/engine/normalize";
 import { postFigures, type Figure } from "@/features/content/engine/post-figures";
-import { RECREATE_MODES, type RecreateMode } from "@/features/content/engine/recreate";
+import { RECREATE_MODES, STALE_PENDING_MINUTES, type RecreateMode } from "@/features/content/engine/recreate";
 import { winnerInsights, type WinnerInsights, type WinnerPost } from "@/features/content/engine/winners";
 import { loadPostsForMath, type PostRowForView } from "./performance";
 import { supabaseRecreateDb } from "./supabase-recreate-db";
@@ -42,7 +42,9 @@ export async function loadPostDetail(
   const live = { "same-recipe": null, adjacent: null } as PostDetail["live"];
   for (const mode of RECREATE_MODES) {
     const row = await recreateDb.live(postId, mode);
-    if (row && (row.status === "pending" || row.status === "ready")) live[mode] = { id: row.id, status: row.status };
+    // A pending card past the stale limit is a dead job: show the button again. The next start expires it.
+    const stale = row?.status === "pending" && new Date(row.created_at).getTime() < now.getTime() - STALE_PENDING_MINUTES * 60_000;
+    if (row && !stale && (row.status === "pending" || row.status === "ready")) live[mode] = { id: row.id, status: row.status };
   }
 
   const { data: ideas, error } = await supabase

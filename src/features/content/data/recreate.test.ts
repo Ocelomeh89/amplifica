@@ -105,7 +105,9 @@ const caller = (raw: unknown): ToolCaller => ({ call: async () => raw });
 const readyRow = async (db: ReturnType<typeof fakeDb>, mode: RecreateMode = "same-recipe") => {
   const s = await startRecreation(db, POST, mode, NOW);
   if (!s.ok) throw new Error("start failed");
-  await runRecreation(db, caller({ options: OPTIONS }), s.id, NOW);
+  // Adjacent options must leave the source message (velocity), or the row would end failed instead of ready.
+  const options = mode === "adjacent" ? [opt("a", "scoreboard"), opt("b", "forced-sale"), opt("c", "credit-ladder")] : OPTIONS;
+  await runRecreation(db, caller({ options }), s.id, NOW);
   return s.id;
 };
 
@@ -247,6 +249,34 @@ describe("regenerate", () => {
     expect(db.rows.find((x) => x.id === id)!.status).toBe("discarded");
     expect(db.rows.filter((x) => x.status === "pending" && x.mode === "adjacent")).toHaveLength(1);
     expect(await db.countSince("2026-10-26T05:00:00Z")).toBe(2);
+  });
+
+  it("retrying a stale pending card starts a new run", async () => {
+    const db = fakeDb();
+    db.rows.push({ id: "stale", source_post_id: POST, mode: "same-recipe", status: "pending", options: [], error: "", idea_id: null, created_at: "2026-10-26T14:40:00Z" });
+    const r = await regenerate(db, "stale", NOW);
+    expect(r.ok).toBe(true);
+    expect(db.rows.find((x) => x.id === "stale")!.status).toBe("discarded");
+    expect(db.rows.filter((x) => x.status === "pending")).toHaveLength(1);
+  });
+
+  it("keeps the card when the daily cap would refuse the new run", async () => {
+    const db = fakeDb();
+    const id = await readyRow(db, "adjacent");
+    for (let i = 0; i < 9; i++) {
+      db.rows.push({ id: `t${i}`, source_post_id: "other", mode: "adjacent", status: "failed", options: [], error: "", idea_id: null, created_at: "2026-10-26T05:30:00Z" });
+    }
+    expect(await regenerate(db, id, NOW)).toMatchObject({ ok: false });
+    expect(db.rows.find((x) => x.id === id)!.status).toBe("ready");
+  });
+
+  it("keeps the card when the post was untagged since", async () => {
+    const db = fakeDb();
+    const id = await readyRow(db);
+    const untagged = fakeDb({ tagged: false });
+    untagged.rows.push({ ...db.rows[0] });
+    expect(await regenerate(untagged, id, NOW)).toMatchObject({ ok: false });
+    expect(untagged.rows.find((x) => x.id === id)!.status).toBe("ready");
   });
 
   it("refuses a card that cannot be replaced", async () => {

@@ -82,19 +82,29 @@ export function chicagoDayStart(now: Date): Date {
   return new Date(Date.parse(`${iso}T00:00:00Z`) + 6 * 3_600_000);
 }
 
-export async function startRecreation(db: RecreateDb, postId: string, mode: RecreateMode, now: Date): Promise<StartResult> {
+/** The post exists and is tagged; any dead pending run of it is cleared so it cannot block a new one. */
+async function checkPost(db: RecreateDb, postId: string, now: Date): Promise<string | null> {
   const post = await db.sourceBasics(postId);
-  if (!post) return { ok: false, error: "That post was not found." };
-  if (post.tagged_at === null) return { ok: false, error: "Tag this post first." };
-
+  if (!post) return "That post was not found.";
+  if (post.tagged_at === null) return "Tag this post first.";
   await db.expireStale(postId, new Date(now.getTime() - STALE_PENDING_MINUTES * MINUTE).toISOString());
+  return null;
+}
+
+async function checkCap(db: RecreateDb, now: Date): Promise<string | null> {
+  const used = await db.countSince(chicagoDayStart(now).toISOString());
+  return used >= RECREATE_DAILY_CAP ? `That's ${RECREATE_DAILY_CAP} recreations today. Try again tomorrow.` : null;
+}
+
+export async function startRecreation(db: RecreateDb, postId: string, mode: RecreateMode, now: Date): Promise<StartResult> {
+  const postError = await checkPost(db, postId, now);
+  if (postError) return { ok: false, error: postError };
 
   const live = await db.live(postId, mode);
   if (live) return { ok: false, error: LIVE_EXISTS, liveId: live.id };
 
-  if ((await db.countSince(chicagoDayStart(now).toISOString())) >= RECREATE_DAILY_CAP) {
-    return { ok: false, error: `That's ${RECREATE_DAILY_CAP} recreations today. Try again tomorrow.` };
-  }
+  const capError = await checkCap(db, now);
+  if (capError) return { ok: false, error: capError };
 
   const id = await db.insertPending(postId, mode);
   if (id === null) return { ok: false, error: LIVE_EXISTS };
@@ -153,6 +163,10 @@ export async function pickOption(db: RecreateDb, id: string, index: number, now:
 export async function regenerate(db: RecreateDb, id: string, now: Date): Promise<StartResult> {
   const row = await db.get(id);
   if (!row) return { ok: false, error: GONE };
+  // Check before discarding: a refused start must not cost Miguel the card he has. A dead pending run is
+  // expired here first, so it can be discarded below.
+  const refused = (await checkPost(db, row.source_post_id, now)) ?? (await checkCap(db, now));
+  if (refused) return { ok: false, error: refused };
   if (!(await db.discard(id))) return { ok: false, error: "That card can't be replaced right now." };
   return startRecreation(db, row.source_post_id, row.mode, now);
 }

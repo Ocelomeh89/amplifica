@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { CONTENT_POSITIONING, IDEAS_PROMPT } from "./prompts/ideas";
 import { ingestIdeaSchema } from "./schema";
-import { HOOK_TYPES, MESSAGES, type PostTags } from "./tags";
+import { HOOK_TYPES, MESSAGES, type Message, type PostTags } from "./tags";
 import type { WinnerInsights } from "./winners";
 
 // Slice 3: Recreate. A source post becomes 3 hook-and-angle options; the picked
@@ -114,9 +114,30 @@ export function recreateSystemPrompt(): string {
     "You help Miguel Graf repeat what works. Given one of his Instagram posts and what is known about why it did well, you write 3 options for a new Reel.",
     CONTENT_POSITIONING.trim(),
     rules,
+    CANON_MESSAGES,
     OPTION_RULES,
   ].join("\n\n");
 }
+
+/** The canon arguments, one line each, so the model knows what a message slug means. Same wording as routines/content-tag.md. */
+const MESSAGE_MEANING: Record<Exclude<Message, "none">, string> = {
+  scoreboard: "cash flow is the scoreboard, not net worth; 25x is a withdrawal rate.",
+  velocity: "velocity beats rate; same return, more turns; short cycles.",
+  "dollars-not-yourself": "keep the paycheck, move the dollars; quitting to get rich is wrong.",
+  "debt-efficiency": "rank debt by what it takes (payment over balance), not by rate.",
+  "credit-ladder": "the source you can access and repay beats the cheapest rate; the five-source ladder.",
+  "system-over-willpower": "a plan that runs itself beats one that needs discipline.",
+  "forced-sale": "people lose money on a forced sale, not a bad asset; size, reserves, horizon.",
+};
+
+const CANON_MESSAGES = `
+## The canon messages
+
+Each option's message is one of these arguments:
+
+${(Object.keys(MESSAGE_MEANING) as (keyof typeof MESSAGE_MEANING)[]).map((m) => `- ${m}: ${MESSAGE_MEANING[m]}`).join("\n")}
+- none: the option argues none of them.
+`.trim();
 
 const CAPTION_CHARS = 600;
 

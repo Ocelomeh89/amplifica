@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ingestIdeaSchema } from "./schema";
+import { MESSAGES } from "./tags";
 import {
   RECREATE_TOOL_NAME,
   canRecreate,
@@ -117,6 +118,10 @@ describe("recreateSystemPrompt", () => {
     expect(p).toContain("What makes an idea good here");
     expect(p).toContain("Brand guardrails, non-negotiable");
     expect(p).not.toContain("Ranking and dedupe");
+  });
+  it("lists every canon message with a one-line meaning", () => {
+    const p = recreateSystemPrompt();
+    for (const m of MESSAGES.filter((x) => x !== "none")) expect(p).toContain(`- ${m}: `);
   });
 });
 

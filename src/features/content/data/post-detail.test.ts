@@ -45,6 +45,14 @@ describe("loadPostDetail", () => {
     expect(d?.post).not.toHaveProperty("series");
   });
 
+  it("ignores a pending card past the stale limit, so the button comes back", async () => {
+    const card = (status: string, created_at: string) => ({ id: "r1", source_post_id: "p1", mode: "same-recipe", status, options: [], error: "", idea_id: null, created_at });
+    const stale = await loadPostDetail(fakeClient({ content_posts: [post()], content_metrics: [], content_recreations: [card("pending", "2026-10-26T14:40:00Z")] }), "u1", "p1", NOW);
+    expect(stale?.live["same-recipe"]).toBeNull();
+    const fresh = await loadPostDetail(fakeClient({ content_posts: [post()], content_metrics: [], content_recreations: [card("pending", "2026-10-26T14:55:00Z")] }), "u1", "p1", NOW);
+    expect(fresh?.live["same-recipe"]).toEqual({ id: "r1", status: "pending" });
+  });
+
   it("lists ideas made from the post", async () => {
     const d = await loadPostDetail(
       fakeClient({ content_posts: [post()], content_metrics: [], content_ideas: [{ id: "i1", hook: "New hook", status: "inbox", created_at: "2026-10-26T00:00:00Z" }] }),
