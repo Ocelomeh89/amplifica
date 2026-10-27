@@ -21,6 +21,13 @@ describe("TagChips", () => {
     expect(q.getAll("tag")).toEqual(["hook_type:paradox", "post_style:animation"]);
   });
 
+  it("with a basePath, a chip links to that page filtered by its own tag only", () => {
+    render(<TagChips row={row({ post_style: "animation" })} basePath="/content/performance" />);
+    const href = screen.getByRole("link", { name: /Animation/ }).getAttribute("href")!;
+    expect(href.startsWith("/content/performance?")).toBe(true);
+    expect(new URLSearchParams(href.split("?")[1]).getAll("tag")).toEqual(["post_style:animation"]);
+  });
+
   it("fades a low-confidence chip with a question mark and marks a locked one", () => {
     render(
       <TagChips row={row({ message: "velocity", hook_type: "question", tag_confidence: { message: 0.3 }, tag_locks: ["hook_type"] })} />

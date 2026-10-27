@@ -35,6 +35,7 @@ function idea(id: string): ContentIdea {
     feedback_at: null,
     clickup_task_id: null,
     obsidian_path: null,
+    source_post_id: null,
     created_at: "2026-09-17T11:00:00Z",
     updated_at: "2026-09-17T11:00:00Z",
   };

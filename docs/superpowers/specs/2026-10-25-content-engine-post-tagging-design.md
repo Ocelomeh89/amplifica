@@ -2,7 +2,7 @@
 
 Roadmap: `2026-10-13-content-engine-instagram-intelligence-roadmap.md`, slice 2.
 Builds on slice 1: `2026-10-18-content-engine-baselines-and-status-design.md`.
-Status: approved 2026-10-25, built on branch `feat/content-post-tagging`; migration 0014 and the cloud proof pending. Decided with Miguel in conversation the same day; builder
+Status: approved 2026-10-25, built, merged and live 2026-10-26; migration 0014 applied, 60 posts tagged, 10-post spot check passed. The cloud transcription proof is still open. Decided with Miguel in conversation the same day; builder
 check done, its two open questions answered by Miguel (hook-type list merged, routine
 environment gets named hosts).
 
