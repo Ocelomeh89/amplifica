@@ -31,6 +31,9 @@ export type RecreationRow = {
   created_at: string;
 };
 
+/** A card on the Inbox: the recreation with its source post's thumbnail and caption. */
+export type OpenRecreation = RecreationRow & { source: { id: string; thumbnail_url: string; caption: string } };
+
 export type SourceBasics = { id: string; hook_type: string; pillar: string; tagged_at: string | null };
 
 export type RecreateContext = {

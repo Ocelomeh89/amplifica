@@ -6,6 +6,9 @@ import { pickSnapshots } from "@/features/content/engine/snapshots";
 import type { Format } from "@/features/content/engine/types";
 import { partitionUnused } from "@/features/content/engine/unused";
 import { summarizeDraft, type DraftState } from "@/features/content/engine/drafts";
+import type { RecreateOption } from "@/features/content/engine/recreate";
+import { STALE_PENDING_MINUTES } from "@/features/content/engine/recreate";
+import type { OpenRecreation } from "./recreate";
 
 // Reads behind the /content pages. Every query is scoped to the user as well
 // as to RLS. The pages stay routing and layout; the Supabase calls live here.
@@ -169,4 +172,49 @@ export async function loadIdeaDraft(db: Db, userId: string, ideaId: string) {
     .limit(1)
     .maybeSingle();
   return must(res);
+}
+
+// ---- Recreate cards ---------------------------------------------------------
+
+const OPEN_DAYS = 7;
+
+/**
+ * Pending, ready and failed cards from the last week, newest first. A pending card
+ * past the stale limit is shown as failed here; the database row is fixed by the
+ * next start, which expires it before inserting.
+ */
+export async function loadOpenRecreations(db: Db, userId: string, now: Date): Promise<OpenRecreation[]> {
+  const since = new Date(now.getTime() - OPEN_DAYS * 86_400_000).toISOString();
+  const rows = must(
+    await db
+      .from("content_recreations")
+      .select("id, source_post_id, mode, status, options, error, idea_id, created_at")
+      .eq("user_id", userId)
+      .in("status", ["pending", "ready", "failed"])
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+  ) ?? [];
+  if (rows.length === 0) return [];
+
+  const postIds = Array.from(new Set(rows.map((r) => r.source_post_id)));
+  const posts =
+    must(await db.from("content_posts").select("id, thumbnail_url, caption").eq("user_id", userId).in("id", postIds)) ?? [];
+  const byId = new Map(posts.map((p) => [p.id, p]));
+  const staleBefore = now.getTime() - STALE_PENDING_MINUTES * 60_000;
+
+  return rows.map((r) => {
+    const stale = r.status === "pending" && new Date(r.created_at).getTime() < staleBefore;
+    const post = byId.get(r.source_post_id);
+    return {
+      id: r.id,
+      source_post_id: r.source_post_id,
+      mode: r.mode,
+      status: stale ? "failed" : r.status,
+      options: (r.options ?? []) as unknown as RecreateOption[],
+      error: stale ? "Timed out" : r.error,
+      idea_id: r.idea_id,
+      created_at: r.created_at,
+      source: { id: r.source_post_id, thumbnail_url: post?.thumbnail_url ?? "", caption: post?.caption ?? "" },
+    };
+  });
 }

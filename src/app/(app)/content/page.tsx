@@ -1,9 +1,10 @@
 import { requireContentOwner } from "@/features/content/data/owner";
-import { loadInbox, loadInboxLinks } from "@/features/content/data/queries";
+import { loadInbox, loadInboxLinks, loadOpenRecreations } from "@/features/content/data/queries";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import InboxList from "@/features/content/ui/InboxList";
 import InboxFilter from "@/features/content/ui/InboxFilter";
 import PendingSourcesStrip from "@/features/content/ui/PendingSourcesStrip";
+import RecreateCard from "@/features/content/ui/RecreateCard";
 import { FORMAT_LABEL, type Format } from "@/features/content/engine/types";
 import FoundContentForm from "@/features/content/ui/FoundContentForm";
 import { foundBadge } from "@/features/content/engine/angle";
@@ -19,6 +20,7 @@ export default async function ContentInboxPage({
   const { supabase, user } = await requireContentOwner();
 
   const { ideas, pending } = await loadInbox(supabase, user.id);
+  const recreations = await loadOpenRecreations(supabase, user.id, new Date());
 
   // Rank the whole Inbox by score, count per type from the full list, then
   // filter. The Inbox holds tens of ideas, so this stays in memory.
@@ -57,6 +59,9 @@ export default async function ContentInboxPage({
         <summary className="text-sm cursor-pointer">Add found content</summary>
         <div className="mt-3"><FoundContentForm canGenerate={Boolean(process.env.ANTHROPIC_API_KEY)} /></div>
       </details>
+      {recreations.map((r) => (
+        <RecreateCard key={r.id} item={r} />
+      ))}
       <InboxFilter active={active} counts={counts} />
       {active && list.length === 0 ? (
         <p className="text-sm text-sub">No {FORMAT_LABEL[active]} ideas in the Inbox.</p>
