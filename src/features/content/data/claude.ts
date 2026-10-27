@@ -1,9 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { FOUND_TOOL_NAME, foundToolSchema } from "@/features/content/engine/found-ideas";
 
-// The Claude calls the app makes. One forced tool call per request. A forced tool call returns
-// structured JSON; forced tool choice cannot be combined with extended
-// thinking, so none is requested. Only imported from Server Actions, so the
+// The Claude calls the app makes. One tool call per request, for structured JSON.
+// The current model rejects a forced tool_choice ("tool" and "any"), so the call
+// uses "auto" and the system prompt tells the model to answer through the tool.
+// No extended thinking is requested. Only imported from Server Actions, so the
 // key never reaches the client bundle.
 
 export const CLAUDE_MODEL = "claude-opus-5-5";
@@ -49,9 +50,9 @@ export function claudeToolCaller(client: MessagesClient): ToolCaller {
       const res = await client.messages.create({
         model,
         max_tokens: maxTokens,
-        system,
+        system: `${system}\n\nAnswer only by calling the ${tool.name} tool.`,
         tools: [{ name: tool.name, description: tool.description, input_schema: tool.schema }],
-        tool_choice: { type: "tool", name: tool.name },
+        tool_choice: { type: "auto" },
         messages: [{ role: "user", content }],
       });
       if (res.stop_reason === "max_tokens") {

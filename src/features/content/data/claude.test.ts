@@ -20,8 +20,8 @@ describe("claudeIdeaGenerator", () => {
     expect(out).toEqual({ ideas: [] });
     const args = create.mock.calls[0][0] as Record<string, any>;
     expect(args.model).toBe(CLAUDE_MODEL);
-    expect(args.system).toBe("SYS");
-    expect(args.tool_choice).toEqual({ type: "tool", name: "record_ideas" });
+    expect(args.system).toBe("SYS\n\nAnswer only by calling the " + args.tools[0].name + " tool.");
+    expect(args.tool_choice).toEqual({ type: "auto" });
     expect(args.tools[0].name).toBe("record_ideas");
     expect(args.thinking).toBeUndefined();
     expect(args.messages[0].content).toEqual([{ type: "text", text: "USER" }]);
@@ -79,9 +79,9 @@ describe("claudeToolCaller", () => {
     expect(out).toEqual({ options: [] });
     const args = create.mock.calls[0][0] as Record<string, any>;
     expect(args.model).toBe(CLAUDE_MODEL);
-    expect(args.tool_choice).toEqual({ type: "tool", name: "record_options" });
+    expect(args.tool_choice).toEqual({ type: "auto" });
     expect(args.tools).toEqual([{ name: "record_options", description: "Record options.", input_schema: { type: "object" } }]);
-    expect(args.system).toBe("SYS");
+    expect(args.system).toBe("SYS\n\nAnswer only by calling the " + args.tools[0].name + " tool.");
   });
   it("maxTokens defaults to 8000 and can be set", async () => {
     const { client, create } = fakeClient([{ type: "tool_use", input: {} }]);
