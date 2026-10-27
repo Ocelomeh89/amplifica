@@ -1,6 +1,6 @@
 # Content engine slice 3: post page and Recreate
 
-Status: draft 2026-10-26, builder check and Opus review done, UX check done. Decided with
+Status: approved and built 2026-10-26 on branch feat/content-recreate; migration 0015 pending. Builder check, Opus review and UX check done. Decided with
 Miguel in conversation the same day. Slice 3 of
 `2026-10-13-content-engine-instagram-intelligence-roadmap.md`. Slices 1 (baselines, status)
 and 2 (post tagging) are live.

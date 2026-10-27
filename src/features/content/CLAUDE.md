@@ -63,6 +63,11 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
   `GET /api/content/tags/queue` and `POST /api/content/tags`; `tag-actions.ts` is the
   correction Server Action. Tagging runs in `routines/content-tag.md` (weekly, and
   `/content-tag`), not in the cron.
+- `engine/winners.ts` (top-third counts per tag value), `post-figures.ts`, `recreate.ts` (schema,
+  prompt, idea mapping) — pure, slice 3. `data/recreate.ts` is the flow over `RecreateDb`
+  (start, run, pick, regenerate); `supabase-recreate-db.ts` is the adapter and builds the prompt's
+  context; `recreate-actions.ts` holds the Server Actions; `post-detail.ts` loads the post page
+  (`/content/performance/[postId]`); `loadOpenRecreations` in `queries.ts` feeds the Inbox card.
 - `routines/` (repo root) — routine instructions and README; `.claude/skills/`
   holds the local companions `/content-plaud`, `/content-daily`, `/content-draft` and
   `/content-voice`.
@@ -77,7 +82,7 @@ these are all the places that know it exists:
 - `src/app/robots.ts` — `/content` disallow; `src/app/content-route.test.ts` asserts it and the sitemap.
 - `vercel.json` — the daily metrics cron. `next.config.mjs` — `jsdom` external package.
 - `package.json` — `jsdom`, `@mozilla/readability`, `@anthropic-ai/sdk` are used only here.
-- `supabase/migrations/0008`, `0009`, `0011`, `0013`, `0014` and the `content_*` types in `shared/supabase/database.types.ts`.
+- `supabase/migrations/0008`, `0009`, `0011`, `0013`, `0014`, `0015` and the `content_*` types in `shared/supabase/database.types.ts`.
 - `routines/`, `.claude/skills/content-*` (incl. `content-draft`, `content-voice`), `docs/superpowers/**` — the routines and their docs.
 - Env: `CONTENT_OWNER_USER_ID`, `CONTENT_ENGINE_SECRET`, `CRON_SECRET`, and the platform keys in `docs/PRODUCT-STATUS.md`.
 
@@ -150,6 +155,16 @@ these are all the places that know it exists:
   reports `conflict`. `markPosted` leaves a hook type the routine set or Miguel corrected alone.
 - The tag queue excludes stories and takes a fresh `media_url` from Composio at request time;
   Instagram's CDN links expire, so none is stored.
+- One live recreation per post and mode (partial unique index on `content_recreations`). A start first
+  marks that post's pending rows older than 10 minutes failed, so a crashed job never blocks a retry.
+  The daily cap (10, America/Chicago day) counts every status.
+- A pick claims the row (`ready` to `picked`) before it inserts the idea, and puts it back to `ready` if
+  the insert fails, so a double click makes one idea. Recreated ideas are Reels at score 1 with
+  `source_post_id`; they go through an app-only schema, so the shared ingest contract and the daily
+  routine's prompt never carry `source_post_id`.
+- The Recreate job runs after the response with `waitUntil`, through the admin client; every query in
+  `supabase-recreate-db.ts` filters by the owner's id, because the admin client bypasses RLS. A missing
+  `ANTHROPIC_API_KEY` is checked before any row is inserted.
 - `content_voice.built_from` is `{ files: [{path, mtime, bytes}], previous_profile_md }`.
 
 ## Seeding by hand
