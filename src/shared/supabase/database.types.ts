@@ -332,12 +332,14 @@ export type Database = {
           feedback_at: string | null;
           clickup_task_id: string | null;
           obsidian_path: string | null;
+          source_post_id: string | null;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           user_id: string;
           source_id?: string | null;
+          source_post_id?: string | null;
           format: "reel" | "youtube" | "newsletter" | "story" | "x";
           title: string;
           hook: string;
@@ -366,6 +368,7 @@ export type Database = {
           score?: number;
           obsidian_path?: string | null;
           batch_date?: string;
+          source_post_id?: string | null;
         };
         Relationships: [];
       };
@@ -554,6 +557,39 @@ export type Database = {
         };
         Update: {
           metrics?: Json;
+        };
+        Relationships: [];
+      };
+      content_recreations: {
+        Row: {
+          id: string;
+          user_id: string;
+          source_post_id: string;
+          mode: "same-recipe" | "adjacent";
+          status: "pending" | "ready" | "failed" | "picked" | "discarded";
+          options: Json;
+          error: string;
+          picked_index: number | null;
+          idea_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          source_post_id: string;
+          mode: "same-recipe" | "adjacent";
+          status?: "pending" | "ready" | "failed" | "picked" | "discarded";
+          options?: Json;
+          error?: string;
+          picked_index?: number | null;
+          idea_id?: string | null;
+        };
+        Update: {
+          status?: "pending" | "ready" | "failed" | "picked" | "discarded";
+          options?: Json;
+          error?: string;
+          picked_index?: number | null;
+          idea_id?: string | null;
         };
         Relationships: [];
       };
