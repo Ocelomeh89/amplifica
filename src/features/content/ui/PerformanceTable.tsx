@@ -2,6 +2,7 @@
 
 import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import clsx from "clsx";
 import type { NormalizedPost } from "@/features/content/engine/normalize";
 import type { MultiplierMode, Status } from "@/features/content/engine/baseline";
@@ -43,6 +44,9 @@ const COLS: Col[] = [
 const x = (v: number | null) => (v == null ? "–" : `${v.toFixed(2)}×`);
 
 export default function PerformanceTable({ rows }: { rows: TableRow[] }) {
+  // The page keeps the current filters in `back`, so its Back link returns to the same view.
+  const qs = useSearchParams().toString();
+  const back = qs ? `?${qs}` : "";
   const [sort, setSort] = useState<{ key: keyof TableRow; dir: 1 | -1 }>({ key: "posted_at", dir: -1 });
   const sorted = useMemo(() => {
     const copy = [...rows];
@@ -128,6 +132,9 @@ export default function PerformanceTable({ rows }: { rows: TableRow[] }) {
                 )}
                 {r.platform === "instagram" && (
                   <>
+                    <Link href={`/content/performance/${r.id}${back ? `?back=${encodeURIComponent(back)}` : ""}`} className="ml-2 text-purple hover:underline">
+                      details
+                    </Link>
                     <button
                       type="button"
                       onClick={() => togglePanel(r.id, "detail")}

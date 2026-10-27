@@ -43,11 +43,13 @@ function LockMark() {
   );
 }
 
-export default function TagChips({ row }: { row: PostTags & { caption: string } }) {
+/** `basePath` makes each chip a fresh filter on that page, for use off the Performance page. */
+export default function TagChips({ row, basePath }: { row: PostTags & { caption: string }; basePath?: string }) {
   const params = useSearchParams();
   const chips = chipsFor(row);
   const tagged = chips.some((c) => c.key !== "caption_length");
   const hrefFor = (filter: string) => {
+    if (basePath) return `${basePath}?${new URLSearchParams({ tag: filter }).toString()}`;
     const next = new URLSearchParams(params.toString());
     if (!next.getAll("tag").includes(filter)) next.append("tag", filter);
     return `?${next.toString()}`;

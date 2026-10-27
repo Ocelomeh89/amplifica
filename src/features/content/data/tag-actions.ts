@@ -19,5 +19,6 @@ export async function saveTagCorrection(formData: FormData): Promise<{ error: st
     return { error: (e as Error).message };
   }
   revalidatePath("/content/performance");
+  revalidatePath("/content/performance/[postId]", "page");
   return { error: null };
 }
