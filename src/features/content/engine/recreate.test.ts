@@ -76,7 +76,7 @@ const source: RecreateSource = {
   media_type: "reel",
   figures: ["Views: 41,200 vs posts at the same age"],
 };
-const ok: WinnerInsights = { state: "ok", winners: 10, rest: 20, shared: ["Question hooks: 6 of your top 10, 4 of the other 20."], message: null, lacks: null, caveat: "Small sample." };
+const ok: WinnerInsights = { state: "ok", winners: 10, winnerIds: [], rest: 20, shared: ["Question hooks: 6 of your top 10, 4 of the other 20."], message: null, lacks: null, caveat: "Small sample." };
 
 describe("renderRecreateTurn", () => {
   const base = { source, insights: ok, winnerHooks: ["Winner hook one"], recentHooks: ["A hook already in the Inbox"] };

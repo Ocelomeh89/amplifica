@@ -180,6 +180,12 @@ describe("winnerInsights", () => {
     expect(r.lacks).toBeNull();
   });
 
+  it("lists the winners' ids, best first", () => {
+    const r = run(subject, field(() => ({})));
+    if (r.state !== "ok") throw new Error("expected ok");
+    expect(r.winnerIds).toEqual(Array.from({ length: 10 }, (_, i) => `w${i + 1}`));
+  });
+
   it("carries the small-sample caveat", () => {
     const r = run(subject, field(() => ({})));
     if (r.state !== "ok") throw new Error("expected ok");

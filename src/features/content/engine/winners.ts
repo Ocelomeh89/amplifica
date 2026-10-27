@@ -10,7 +10,7 @@ export type WinnerPost = PostTags & { id: string; media_type: string; posted_at:
 export type WinnerInsights =
   | { state: "untagged" }
   | { state: "thin"; have: number; need: number }
-  | { state: "ok"; winners: number; rest: number; shared: string[]; message: string | null; lacks: string | null; caveat: string };
+  | { state: "ok"; winners: number; winnerIds: string[]; rest: number; shared: string[]; message: string | null; lacks: string | null; caveat: string };
 
 export const WINNERS_MAX = 10;
 export const MIN_ELIGIBLE = 15;
@@ -117,5 +117,5 @@ export function winnerInsights(
     if (best) lacks = `Not in this post: ${best.c.phrase}. ${best.w} of your top ${winners.length} have ${best.c.pronoun}.`;
   }
 
-  return { state: "ok", winners: winners.length, rest: rest.length, shared, message, lacks, caveat: SMALL_SAMPLE };
+  return { state: "ok", winners: winners.length, winnerIds: winners.map((w) => w.id), rest: rest.length, shared, message, lacks, caveat: SMALL_SAMPLE };
 }
