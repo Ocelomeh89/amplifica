@@ -31,7 +31,7 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
   multiplier, status and Evergreen flag. `engine/overview.ts` — Overview cards and the
   `?window=` filter. Both pure; slices 2, 3 and 6 reuse them.
 - `data/found.ts` — `mineFound()`, the one flow for pasted URLs and uploads, over a
-  `FoundDeps` interface. `claude.ts` is the single Claude call (forced `record_ideas`
+  `FoundDeps` interface. `claude.ts` is the single Claude call (`record_ideas`, tool_choice auto
   tool); `fetch-page.ts` is the SSRF-guarded fetch; `found-form.ts` reads the form.
   `engine/angle.ts`, `found.ts`, `found-ideas.ts`, `readable.ts` are the pure parts.
   `engine/found.ts` is server-only (it imports `node:net`): client components import
