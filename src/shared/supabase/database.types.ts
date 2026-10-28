@@ -560,6 +560,89 @@ export type Database = {
         };
         Relationships: [];
       };
+      content_experiments: {
+        Row: {
+          id: string;
+          user_id: string;
+          idea_id: string;
+          day: string;
+          slot: number;
+          kind: "proposed" | "moment";
+          moment: string;
+          variable: "hook_type" | "onscreen_text" | "cta_type" | "post_style" | "cover" | "message" | "topic";
+          value: string;
+          recipe: Json;
+          reason: string;
+          status: "open" | "posted" | "judged" | "unjudged" | "skipped" | "discarded";
+          post_id: string | null;
+          judge_at: string | null;
+          verdict: "won" | "lost" | "flat" | null;
+          judge_metrics: Json;
+          judged_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          idea_id: string;
+          day: string;
+          slot: number;
+          kind: "proposed" | "moment";
+          moment?: string;
+          variable: "hook_type" | "onscreen_text" | "cta_type" | "post_style" | "cover" | "message" | "topic";
+          value: string;
+          recipe?: Json;
+          reason?: string;
+          status?: "open" | "posted" | "judged" | "unjudged" | "skipped" | "discarded";
+          post_id?: string | null;
+          judge_at?: string | null;
+          verdict?: "won" | "lost" | "flat" | null;
+          judge_metrics?: Json;
+          judged_at?: string | null;
+        };
+        Update: {
+          slot?: number;
+          moment?: string;
+          variable?: "hook_type" | "onscreen_text" | "cta_type" | "post_style" | "cover" | "message" | "topic";
+          value?: string;
+          recipe?: Json;
+          reason?: string;
+          status?: "open" | "posted" | "judged" | "unjudged" | "skipped" | "discarded";
+          post_id?: string | null;
+          judge_at?: string | null;
+          verdict?: "won" | "lost" | "flat" | null;
+          judge_metrics?: Json;
+          judged_at?: string | null;
+        };
+        Relationships: [];
+      };
+      content_today_runs: {
+        Row: {
+          id: string;
+          user_id: string;
+          day: string;
+          kind: "cron" | "swap" | "moment";
+          status: "pending" | "ready" | "failed";
+          experiment_id: string | null;
+          error: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          day: string;
+          kind: "cron" | "swap" | "moment";
+          status?: "pending" | "ready" | "failed";
+          experiment_id?: string | null;
+          error?: string;
+        };
+        Update: {
+          status?: "pending" | "ready" | "failed";
+          experiment_id?: string | null;
+          error?: string;
+        };
+        Relationships: [];
+      };
       content_recreations: {
         Row: {
           id: string;
