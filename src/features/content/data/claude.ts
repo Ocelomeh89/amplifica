@@ -17,7 +17,11 @@ export class MissingApiKeyError extends Error {
 }
 
 /** Opus with a large answer can run long; fail inside the page's 300 s budget. */
-export const CLAUDE_CLIENT_OPTIONS = (apiKey: string) => ({ apiKey, timeout: 240_000, maxRetries: 1 });
+export const CLAUDE_CLIENT_OPTIONS = (apiKey: string, opts: { timeoutMs?: number; maxRetries?: number } = {}) => ({
+  apiKey,
+  timeout: opts.timeoutMs ?? 240_000,
+  maxRetries: opts.maxRetries ?? 1,
+});
 
 export type GenerateInput = { system: string; text: string; pdf?: { base64: string } };
 
@@ -88,6 +92,7 @@ export function anthropicIdeaGenerator(): IdeaGenerator {
   return claudeIdeaGenerator(new Anthropic(CLAUDE_CLIENT_OPTIONS(requireKey())) as unknown as MessagesClient);
 }
 
-export function anthropicToolCaller(): ToolCaller {
-  return claudeToolCaller(new Anthropic(CLAUDE_CLIENT_OPTIONS(requireKey())) as unknown as MessagesClient);
+/** A call with a time budget passes a shorter timeout and no retry; Recreate keeps the defaults. */
+export function anthropicToolCaller(opts?: { timeoutMs?: number; maxRetries?: number }): ToolCaller {
+  return claudeToolCaller(new Anthropic(CLAUDE_CLIENT_OPTIONS(requireKey(), opts)) as unknown as MessagesClient);
 }
