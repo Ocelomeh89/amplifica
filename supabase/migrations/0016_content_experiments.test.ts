@@ -18,8 +18,9 @@ describe("0016_content_experiments.sql", () => {
     expect(listFor(exp, "verdict")).toEqual([...VERDICTS].sort());
   });
 
-  it("idea_id is unique and cascades; post_id sets null", () => {
-    expect(exp).toMatch(/idea_id uuid not null unique references public\.content_ideas\(id\) on delete cascade/i);
+  it("idea_id cascades and is unique among live rows; post_id sets null", () => {
+    expect(exp).toMatch(/idea_id uuid not null references public\.content_ideas\(id\) on delete cascade/i);
+    expect(sql).toMatch(/create unique index \w+ on public\.content_experiments\s*\(idea_id\)\s*where status in \('open', 'posted', 'judged', 'unjudged'\)/i);
     expect(exp).toMatch(/post_id uuid references public\.content_posts\(id\) on delete set null/i);
   });
 

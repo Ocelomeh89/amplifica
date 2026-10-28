@@ -360,6 +360,11 @@ export type Database = {
           obsidian_path?: string | null;
         };
         Update: {
+          hook?: string;
+          hook_alt?: string | null;
+          hook_type?: string;
+          title?: string;
+          outline?: Json;
           status?: "inbox" | "queued" | "rejected" | "posted" | "archived";
           queue_rank?: number | null;
           feedback_reason?: string | null;

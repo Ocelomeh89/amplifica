@@ -6,7 +6,7 @@
 create table public.content_experiments (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
-  idea_id uuid not null unique references public.content_ideas(id) on delete cascade,
+  idea_id uuid not null references public.content_ideas(id) on delete cascade,
   day date not null,
   slot smallint not null check (slot between 1 and 3),
   kind text not null check (kind in ('proposed', 'moment')),
@@ -30,6 +30,11 @@ create index content_experiments_user_day_idx on public.content_experiments(user
 
 -- One live brief per slot per day; a skipped or discarded slot can be refilled.
 create unique index content_experiments_live_slot_idx on public.content_experiments (user_id, day, slot)
+  where status in ('open', 'posted', 'judged', 'unjudged');
+
+-- One live experiment per idea. A skipped or discarded row stays as history and the idea
+-- can be briefed again.
+create unique index content_experiments_live_idea_idx on public.content_experiments (idea_id)
   where status in ('open', 'posted', 'judged', 'unjudged');
 
 create trigger content_experiments_touch_updated_at
