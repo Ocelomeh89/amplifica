@@ -626,7 +626,7 @@ export type Database = {
           id: string;
           user_id: string;
           day: string;
-          kind: "cron" | "swap" | "moment";
+          kind: "cron" | "swap" | "moment" | "makenow";
           status: "pending" | "ready" | "failed";
           experiment_id: string | null;
           error: string;
@@ -636,7 +636,7 @@ export type Database = {
         Insert: {
           user_id: string;
           day: string;
-          kind: "cron" | "swap" | "moment";
+          kind: "cron" | "swap" | "moment" | "makenow";
           status?: "pending" | "ready" | "failed";
           experiment_id?: string | null;
           error?: string;

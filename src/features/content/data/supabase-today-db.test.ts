@@ -52,7 +52,7 @@ describe("supabaseTodayDb", () => {
   it("countRunsSince counts only swap and moment runs", async () => {
     const { client, log } = fakeClient({ content_today_runs: { count: 3 } });
     expect(await supabaseTodayDb(client, "u1").countRunsSince("2026-10-27T05:00:00Z")).toBe(3);
-    expect(log).toContainEqual(["content_today_runs.in", "kind", ["swap", "moment"]]);
+    expect(log).toContainEqual(["content_today_runs.in", "kind", ["swap", "moment", "makenow"]]);
   });
 
   it("patchIdea touches only an Inbox or queued idea and returns null when none matched", async () => {
@@ -61,6 +61,21 @@ describe("supabaseTodayDb", () => {
     expect(out).toBeNull();
     expect(log).toContainEqual(["content_ideas.in", "status", ["inbox", "queued"]]);
     expect(log).toContainEqual(["content_ideas.eq", "user_id", "u1"]);
+  });
+
+  it("unclaimedInboxIdeas excludes every idea that ever had an experiment, not only live ones", async () => {
+    const { client, log } = fakeClient({ content_experiments: { data: [{ idea_id: "i1" }] }, content_ideas: { data: [{ id: "i1", title: "t", hook: "h", pillar: "", hook_alt: null, status: "inbox" }, { id: "i2", title: "t", hook: "h", pillar: "", hook_alt: null, status: "inbox" }] } });
+    const out = await supabaseTodayDb(client, "u1").unclaimedInboxIdeas(5);
+    expect(out.map((i) => i.id)).toEqual(["i2"]);
+    expect(log.some((c) => c[0] === "content_experiments.in" && c[1] === "status")).toBe(false);
+  });
+
+  it("page reports today's failed swap and moment runs, newest first, and not the make-now counters", async () => {
+    const run = (id: string, kind: string, status: string) => ({ id, day: "2026-10-27", kind, status, experiment_id: null, error: "boom", created_at: "2026-10-27T15:00:00Z" });
+    const { client } = fakeClient({ content_today_runs: { data: [run("a", "moment", "failed"), run("b", "makenow", "failed"), run("c", "cron", "failed"), run("d", "swap", "ready")] } });
+    const page = await supabaseTodayDb(client, "u1").page("2026-10-27", new Date("2026-10-27T15:05:00Z"));
+    expect(page.failedRuns.map((r) => r.id)).toEqual(["a"]);
+    expect(page.cronRun?.id).toBe("c");
   });
 
   it("returnToInbox only moves a queued idea", async () => {

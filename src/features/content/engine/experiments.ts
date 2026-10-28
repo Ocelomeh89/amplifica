@@ -14,7 +14,7 @@ export const HELD_STILL = ["hook_type", "onscreen_text", "cta_type", "post_style
 export const EXPERIMENT_KINDS = ["proposed", "moment"] as const;
 export const EXPERIMENT_STATUSES = ["open", "posted", "judged", "unjudged", "skipped", "discarded"] as const;
 export const VERDICTS = ["won", "lost", "flat"] as const;
-export const RUN_KINDS = ["cron", "swap", "moment"] as const;
+export const RUN_KINDS = ["cron", "swap", "moment", "makenow"] as const;
 export const RUN_STATUSES = ["pending", "ready", "failed"] as const;
 
 export type Variable = (typeof VARIABLES)[number];
@@ -133,7 +133,7 @@ export function controlRecipe(ev: Evidence): Control {
 export type Test = { variable: Variable; value: string; control: string };
 export type LiveTest = { variable: string; value: string };
 
-/** Promising leads with thin evidence first; then untried values; topic only when nothing else is left. */
+/** One ranked list: promising leads with thin evidence first, then untried values; topic only when nothing else is left. */
 export function candidateTests(ev: Evidence, control: Control, live: LiveTest[]): Test[] {
   const held = new Set(live.map((l) => `${l.variable}:${l.value}`));
   const controls: Record<Counted, string> = { ...control, message: bestValue(ev.message) };
@@ -145,18 +145,18 @@ export function candidateTests(ev: Evidence, control: Control, live: LiveTest[])
   const leads = all
     .filter((c) => c.row.won >= 1 && c.row.total < EXPLORE_BELOW)
     .sort((a, b) => b.row.share - a.row.share || a.row.total - b.row.total || COUNTED.indexOf(a.test.variable as Counted) - COUNTED.indexOf(b.test.variable as Counted));
-  if (leads.length > 0) return leads.map((c) => c.test);
   const untried = all.filter((c) => c.row.total === 0);
-  if (untried.length > 0) return untried.map((c) => c.test);
+  const ranked = [...leads, ...untried].map((c) => c.test);
+  if (ranked.length > 0) return ranked;
   return held.has("topic:new") ? [] : [{ variable: "topic", value: "new", control: "" }];
 }
 
 export type PlannedSlot = { slot: 1 | 2; test: Test; ideaId: string };
 
-/** The day's control recipe and up to two tests on different variables, one per idea. */
-export function pickDay(ev: Evidence, live: LiveTest[], ideaIds: string[]): { control: Control; slots: PlannedSlot[] } {
+/** The day's control recipe and up to two tests on different variables, one per idea. `heldVariables` are the variables live slots already test today. */
+export function pickDay(ev: Evidence, live: LiveTest[], ideaIds: string[], heldVariables: string[] = []): { control: Control; slots: PlannedSlot[] } {
   const control = controlRecipe(ev);
-  const candidates = candidateTests(ev, control, live);
+  const candidates = candidateTests(ev, control, live).filter((c) => !heldVariables.includes(c.variable));
   const slots: PlannedSlot[] = [];
   const first = candidates[0];
   if (first && ideaIds[0] !== undefined) {
@@ -167,9 +167,9 @@ export function pickDay(ev: Evidence, live: LiveTest[], ideaIds: string[]): { co
   return { control, slots };
 }
 
-export function pickMoment(ev: Evidence, live: LiveTest[]): { control: Control; test: Test } | null {
+export function pickMoment(ev: Evidence, live: LiveTest[], heldVariables: string[] = []): { control: Control; test: Test } | null {
   const control = controlRecipe(ev);
-  const test = candidateTests(ev, control, live)[0];
+  const test = candidateTests(ev, control, live).find((c) => !heldVariables.includes(c.variable));
   return test ? { control, test } : null;
 }
 

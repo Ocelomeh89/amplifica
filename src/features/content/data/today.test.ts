@@ -152,6 +152,7 @@ describe("startMoment and runMoment", () => {
     const made = f.experiments.find((e) => e.kind === "moment")!;
     expect(made).toMatchObject({ slot: 3, moment: "flying out at 6am", status: "open" });
     expect(`${made.variable}:${made.value}`).not.toBe("hook_type:paradox");
+    expect(made.variable).not.toBe("hook_type");
     expect(f.runs.find((r) => r.kind === "moment")).toMatchObject({ status: "ready", experiment_id: made.id });
   });
 
@@ -164,16 +165,26 @@ describe("startMoment and runMoment", () => {
 });
 
 describe("swapTest and skipBrief", () => {
-  it("swap replaces the test on the same idea with a different variable; the old row is discarded", async () => {
+  it("swap rewrites the same brief in place with a test on a different variable", async () => {
     const f = fakeDb({ ideas: [idea("i1")], experiments: [exp({ id: "e1", idea_id: "i1", variable: "hook_type", value: "paradox" })] });
     f.ideas.get("i1")!.status = "queued";
     const start = await swapTest(f.db, "e1", NOW);
     expect(start.ok).toBe(true);
     await runSwap(f.db, caller({ briefs: [brief(1)] }), (start as { runId: string }).runId, "e1", NOW);
-    expect(f.experiments.find((e) => e.id === "e1")!.status).toBe("discarded");
-    const fresh = f.experiments.find((e) => e.id !== "e1")!;
-    expect(fresh).toMatchObject({ idea_id: "i1", slot: 1, status: "open" });
-    expect(fresh.variable).not.toBe("hook_type");
+    expect(f.experiments).toHaveLength(1);
+    expect(f.experiments[0]).toMatchObject({ id: "e1", idea_id: "i1", slot: 1, status: "open" });
+    expect(f.experiments[0].variable).not.toBe("hook_type");
+    expect(f.runs[0]).toMatchObject({ kind: "swap", status: "ready", experiment_id: "e1" });
+  });
+
+  it("a swap whose write fails leaves the old brief as it was and restores the idea", async () => {
+    const f = fakeDb({ ideas: [idea("i1")], updateFails: true, experiments: [exp({ id: "e1", idea_id: "i1", variable: "hook_type", value: "paradox" })] });
+    f.ideas.get("i1")!.status = "queued";
+    const start = await swapTest(f.db, "e1", NOW);
+    await runSwap(f.db, caller({ briefs: [brief(1)] }), (start as { runId: string }).runId, "e1", NOW);
+    expect(f.experiments[0]).toMatchObject({ id: "e1", variable: "hook_type", value: "paradox", status: "open" });
+    expect(f.calls.restore).toEqual(["i1"]);
+    expect(f.runs.find((r) => r.kind === "swap")!.status).toBe("failed");
   });
 
   it("skip sets skipped and returns the idea to the Inbox", async () => {
@@ -186,5 +197,43 @@ describe("swapTest and skipBrief", () => {
   it("skip refuses a brief that is already posted", async () => {
     const f = fakeDb({ experiments: [exp({ id: "e1", status: "posted" })] });
     expect((await skipBrief(f.db, "e1")).error).not.toBeNull();
+  });
+});
+
+describe("review fixes", () => {
+  it("day 2 after expiry claims new ideas, not yesterday's expired briefs", async () => {
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2"), idea("i3")] });
+    await generateDaily(f.db, caller({ briefs: [brief(1), brief(2)] }), NOW);
+    expect(f.experiments.map((e) => e.idea_id)).toEqual(["i1", "i2"]);
+    const DAY2 = new Date("2026-10-28T15:00:00Z");
+    expect(await expireUnposted(f.db, DAY2)).toBe(2);
+    const r = await generateDaily(f.db, caller({ briefs: [brief(1)] }), DAY2);
+    expect(r.made).toBe(1);
+    expect(f.experiments.filter((e) => e.day === "2026-10-28").map((e) => e.idea_id)).toEqual(["i3"]);
+  });
+
+  it("a refill does not test a variable another live slot holds", async () => {
+    const f = fakeDb({ ideas: [idea("i1")], experiments: [exp({ id: "e2", idea_id: "i9", slot: 2, variable: "hook_type", value: "paradox" })] });
+    const r = await generateDaily(f.db, caller({ briefs: [brief(1)] }), NOW);
+    expect(r.made).toBe(1);
+    expect(f.experiments.find((e) => e.slot === 1)!.variable).not.toBe("hook_type");
+  });
+
+  it("Make now counts toward the daily cap", async () => {
+    const f = fakeDb({ runs: [{ id: "r0", day: DAY, kind: "cron", status: "failed", experiment_id: null, error: "x", created_at: NOW.toISOString() }] });
+    for (let i = 0; i < TODAY_DAILY_CAP; i++) {
+      const r = await makeNow(f.db, NOW);
+      expect(r.ok).toBe(true);
+      f.runs.find((x) => x.kind === "cron")!.status = "failed";
+    }
+    const over = await makeNow(f.db, NOW);
+    expect(over).toMatchObject({ ok: false });
+    expect((over as { error: string }).error).toContain(String(TODAY_DAILY_CAP));
+  });
+
+  it("Make now works again after an empty-Inbox run once the Inbox has ideas", async () => {
+    const f = fakeDb({ ideas: [idea("i1")], runs: [{ id: "r0", day: DAY, kind: "cron", status: "ready", experiment_id: null, error: "Inbox is empty", created_at: NOW.toISOString() }] });
+    expect(await makeNow(f.db, NOW)).toMatchObject({ ok: true, runId: "r0" });
+    expect(f.runs.find((r) => r.id === "r0")).toMatchObject({ status: "pending", error: "" });
   });
 });

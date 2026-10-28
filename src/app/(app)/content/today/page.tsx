@@ -1,11 +1,13 @@
 import { chicagoIsoDate } from "@/features/content/engine/best-times";
 import { requireContentOwner } from "@/features/content/data/owner";
 import { supabaseTodayDb } from "@/features/content/data/supabase-today-db";
+import { EMPTY_INBOX } from "@/features/content/data/today";
 import AutoRefresh from "@/features/content/ui/AutoRefresh";
 import BriefCard from "@/features/content/ui/BriefCard";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import MakeNowButton from "@/features/content/ui/MakeNowButton";
 import MomentForm from "@/features/content/ui/MomentForm";
+import RunErrors from "@/features/content/ui/RunErrors";
 import TallyTable from "@/features/content/ui/TallyTable";
 import VerdictsList from "@/features/content/ui/VerdictsList";
 import YouTubeSlots from "@/features/content/ui/YouTubeSlots";
@@ -30,8 +32,13 @@ export default async function TodayPage() {
 
   const empty = (slot: 1 | 2) => {
     if (cron?.status === "pending") return <p className="text-sm text-sub">Making your briefs… This takes a few minutes.</p>;
-    if (cron?.status === "ready" && cron.error === "Inbox is empty") {
-      return <p className="text-sm text-sub">Inbox is empty. Recreate a winner, or wait for tomorrow&apos;s ideas.</p>;
+    if (cron?.status === "ready" && cron.error === EMPTY_INBOX) {
+      return (
+        <div>
+          <p className="text-sm text-sub mb-2">Inbox is empty. Recreate a winner or add an idea, then make your briefs.</p>
+          {slot === 1 && <MakeNowButton />}
+        </div>
+      );
     }
     if (cron?.status === "ready") return <p className="text-sm text-sub">No brief here. Ideas in your Inbox fill it tomorrow.</p>;
     return (
@@ -60,6 +67,7 @@ export default async function TodayPage() {
           </Card>
         );
       })}
+      <RunErrors runs={page.failedRuns.slice(0, 2).map((r) => ({ kind: r.kind as "moment" | "swap", error: r.error }))} />
       {bySlot.get(3) ? (
         <BriefCard brief={bySlot.get(3)!} />
       ) : momentPending ? (

@@ -24,7 +24,7 @@ function evidence(): Evidence {
 
 type Snapshot = { hook: string; hook_alt: string | null; hook_type: string; title: string; outline: unknown; status: string; score: number };
 
-export function fakeDb(opts: { ideas?: IdeaLite[]; patchFails?: string[]; experiments?: ExperimentRow[]; runs?: RunRow[]; posted?: { exp: ExperimentRow; posted_at: string }[]; math?: Map<string, { multiplier: Multiplier; normalized: null }> } = {}) {
+export function fakeDb(opts: { updateFails?: boolean; ideas?: IdeaLite[]; patchFails?: string[]; experiments?: ExperimentRow[]; runs?: RunRow[]; posted?: { exp: ExperimentRow; posted_at: string }[]; math?: Map<string, { multiplier: Multiplier; normalized: null }> } = {}) {
   const ideas = new Map<string, IdeaLite & { hook_alt: string | null; status: string }>();
   for (const i of opts.ideas ?? []) ideas.set(i.id, { ...i, hook_alt: null, status: "inbox" });
   const experiments: ExperimentRow[] = [...(opts.experiments ?? [])];
@@ -42,7 +42,8 @@ export function fakeDb(opts: { ideas?: IdeaLite[]; patchFails?: string[]; experi
       return experiments.filter((e) => e.day === day && ["open", "posted", "judged", "unjudged"].includes(e.status));
     },
     async unclaimedInboxIdeas(limit) {
-      return [...ideas.values()].filter((i) => i.status === "inbox").slice(0, limit);
+      const briefed = new Set(experiments.map((e) => e.idea_id));
+      return [...ideas.values()].filter((i) => i.status === "inbox" && !briefed.has(i.id)).slice(0, limit);
     },
     async idea(id) {
       return ideas.get(id) ?? null;
@@ -56,6 +57,7 @@ export function fakeDb(opts: { ideas?: IdeaLite[]; patchFails?: string[]; experi
       return id;
     },
     async updateExperiment(id, patch) {
+      if (opts.updateFails) throw new Error("update failed");
       Object.assign(experiments.find((e) => e.id === id)!, patch);
     },
     async patchIdea(id, patch) {

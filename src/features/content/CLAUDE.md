@@ -174,12 +174,13 @@ these are all the places that know it exists:
   `ANTHROPIC_API_KEY` is checked before any row is inserted.
 - Today (slice 5): a brief is a Reel idea plus a `content_experiments` row. The evidence is eligible
   Reels only (`isEligible`), so the tally and the winners block agree. A (variable, value) pair held by
-  an open or posted experiment is never proposed again; two slots on a day never share a variable or an
-  idea. A proposed brief rewrites the claimed Inbox idea in place (old hook kept in `hook_alt`); unposted
+  an open or posted experiment is never proposed again; slots on one day never share a variable (the
+  moment slot and refills included); an idea that ever had an experiment is not picked again, so expired
+  and skipped briefs wait in the Inbox for Miguel. Swap rewrites the open experiment in place. A proposed brief rewrites the claimed Inbox idea in place (old hook kept in `hook_alt`); unposted
   briefs are skipped by the next cron and their ideas return to the Inbox. Mark posted tags an untagged
   Instagram post from the brief's recipe and never overwrites existing tags. Briefs are generated at the
   end of the metrics cron (Hobby does not order two crons), skipped with a failed run when under 90
-  seconds remain; on-demand briefs are capped at 5 per Chicago day. `idea_id` is unique only among live
+  seconds remain; on-demand briefs (swap, moment, make now) are capped at 5 per Chicago day. `idea_id` is unique only among live
   experiments, so a skipped idea can be briefed again. YouTube slots are the top two of the YouTube queue,
   with no evidence; the planned link to Instagram winners is a comment in `YouTubeSlots.tsx`.
 - `content_voice.built_from` is `{ files: [{path, mtime, bytes}], previous_profile_md }`.

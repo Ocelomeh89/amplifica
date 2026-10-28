@@ -53,7 +53,7 @@ create table public.content_today_runs (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   day date not null,
-  kind text not null check (kind in ('cron', 'swap', 'moment')),
+  kind text not null check (kind in ('cron', 'swap', 'moment', 'makenow')),
   status text not null default 'pending' check (status in ('pending', 'ready', 'failed')),
   experiment_id uuid references public.content_experiments(id) on delete set null,
   error text not null default '',

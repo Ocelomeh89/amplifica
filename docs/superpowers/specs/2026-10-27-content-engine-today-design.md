@@ -126,8 +126,10 @@ tomorrow's ideas." Claude does not invent a topic.
 invariant (provenance is mandatory) holds.
 
 Skip sets the experiment to `skipped` and returns the idea to `inbox` with `queue_rank` null
-(my call: the hook is still a usable idea). Swap the test discards the experiment and makes
-a new one on the same idea with the next candidate on a variable no live slot holds that day.
+(my call: the hook is still a usable idea). Swap the test rewrites the open experiment in
+place (final review: one write, so a failure leaves the old brief intact) with the next candidate on
+a variable no live slot holds that day. An idea that ever had an experiment is not picked again, so
+expired and skipped briefs wait in the Inbox for Miguel.
 **Briefs not posted by the next morning's cron are skipped automatically** (my call): the
 page is fresh every day, and yesterday's hooks live on in the Inbox.
 

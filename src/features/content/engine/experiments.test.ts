@@ -166,7 +166,7 @@ describe("candidateTests", () => {
     const control = controlRecipe(ev);
     expect(control.hook_type).toBe("question");
     const c = candidateTests(ev, control, []).filter((t) => t.variable === "hook_type");
-    expect(c.map((t) => t.value)).toEqual(["warning", "paradox"]);
+    expect(c.slice(0, 2).map((t) => t.value)).toEqual(["warning", "paradox"]);
     expect(c[0].control).toBe("question");
   });
 
@@ -324,5 +324,31 @@ describe("tagsFromRecipe", () => {
   it("reads none as all three flags false", () => {
     const t = tagsFromRecipe({ ...recipe, cover: "none" }, "h", NOW);
     expect([t.cover_face, t.cover_text, t.cover_number]).toEqual([false, false, false]);
+  });
+});
+
+describe("one ranked list and held variables", () => {
+  it("fills two slots on different variables when thin leads exist on only one variable", () => {
+    const ev = evidenceOf(
+      batch({ hook_type: "question" }, EXPLORE_BELOW, 4),
+      batch({ hook_type: "paradox" }, 3, 2),
+      batch({ hook_type: "warning" }, 2, 1)
+    );
+    const { slots } = pickDay(ev, [], ["i1", "i2"]);
+    expect(slots).toHaveLength(2);
+    expect(slots[0].test.variable).toBe("hook_type");
+    expect(slots[1].test.variable).not.toBe("hook_type");
+  });
+
+  it("pickDay never tests a variable a live slot already holds", () => {
+    const ev = evidenceOf(batch({ hook_type: "question" }, EXPLORE_BELOW, 4), batch({ hook_type: "paradox" }, 3, 2));
+    const { slots } = pickDay(ev, [], ["i1", "i2"], ["hook_type"]);
+    expect(slots.every((s) => s.test.variable !== "hook_type")).toBe(true);
+  });
+
+  it("pickMoment never tests a variable a live slot already holds", () => {
+    const ev = evidenceOf(batch({ hook_type: "question" }, EXPLORE_BELOW, 4), batch({ hook_type: "paradox" }, 3, 2));
+    const pick = pickMoment(ev, [], ["hook_type"]);
+    expect(pick!.test.variable).not.toBe("hook_type");
   });
 });

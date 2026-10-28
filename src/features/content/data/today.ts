@@ -89,6 +89,8 @@ export type TodayPage = {
   briefs: BriefView[];
   cronRun: RunRow | null;
   pendingRuns: RunRow[];
+  /** Today's failed swap and moment runs, newest first, so the page can say why nothing appeared. */
+  failedRuns: RunRow[];
   verdicts: BriefView[];
   tally: TallyRow[];
   youtube: { id: string; title: string }[];
@@ -97,7 +99,7 @@ export type TodayPage = {
 export type PostMath = { multiplier: Multiplier; normalized: Pick<NormalizedPost, "n_saves" | "n_watch"> | null };
 
 export type NewExperiment = Omit<ExperimentRow, "id" | "created_at">;
-export type ExperimentPatch = Partial<Pick<NewExperiment, "status" | "verdict" | "judge_metrics" | "judged_at" | "post_id" | "judge_at">>;
+export type ExperimentPatch = Partial<Pick<NewExperiment, "status" | "verdict" | "judge_metrics" | "judged_at" | "post_id" | "judge_at" | "variable" | "value" | "recipe" | "reason">>;
 
 export interface TodayDb {
   evidence(now: Date): Promise<{ ev: Evidence; winnerHooks: string[]; recentHooks: string[] }>;
@@ -131,6 +133,8 @@ export interface TodayDb {
   page(day: string, now: Date): Promise<TodayPage>;
 }
 
+/** The cron run's error text when there was nothing in the Inbox to brief. Make now may run again after it. */
+export const EMPTY_INBOX = "Inbox is empty";
 const MINUTE = 60_000;
 const message = (e: unknown) => (e instanceof Error && e.message ? e.message : "Something went wrong.");
 const capMessage = `That's ${TODAY_DAILY_CAP} briefs today. Try again tomorrow.`;
@@ -183,7 +187,7 @@ export async function beginCron(db: TodayDb, now: Date): Promise<Started> {
     const id = await db.insertRun({ day, kind: "cron" });
     return id === null ? { ok: false, error: "Today's briefs are already being made." } : { ok: true, runId: id };
   }
-  if (existing.status === "ready") return { ok: false, error: "Today's briefs are already made." };
+  if (existing.status === "ready" && existing.error !== EMPTY_INBOX) return { ok: false, error: "Today's briefs are already made." };
   if (existing.status === "pending" && !isStale(existing, now)) return { ok: false, error: "Today's briefs are already being made." };
   await db.updateRun(existing.id, { status: "pending", error: "" });
   return { ok: true, runId: existing.id };
@@ -193,7 +197,13 @@ export async function beginCron(db: TodayDb, now: Date): Promise<Started> {
 export async function makeNow(db: TodayDb, now: Date): Promise<Started> {
   const used = await db.countRunsSince(chicagoDayStart(now).toISOString());
   if (used >= TODAY_DAILY_CAP) return { ok: false, error: capMessage };
-  return beginCron(db, now);
+  const started = await beginCron(db, now);
+  if (started.ok) {
+    // The cron row is reused, so a counter row records this attempt against the cap.
+    const counter = await db.insertRun({ day: chicagoIsoDate(now), kind: "makenow" });
+    if (counter !== null) await db.updateRun(counter, { status: "ready" });
+  }
+  return started;
 }
 
 const idsOf = (slots: BriefSlotInput[]) => slots.map((s) => s.slot);
@@ -241,11 +251,11 @@ export async function runDaily(db: TodayDb, caller: ToolCaller, runId: string, n
     }
     const ideas = await db.unclaimedInboxIdeas(missing.length);
     if (ideas.length === 0) {
-      await db.updateRun(runId, { status: "ready", error: "Inbox is empty" });
+      await db.updateRun(runId, { status: "ready", error: EMPTY_INBOX });
       return { made: 0, error: null };
     }
     const { ev, winnerHooks, recentHooks } = await db.evidence(now);
-    const { control, slots } = pickDay(ev, await db.liveTests(), ideas.map((i) => i.id));
+    const { control, slots } = pickDay(ev, await db.liveTests(), ideas.map((i) => i.id), live.map((e) => e.variable));
     if (slots.length === 0) return await fail("No test is left to run today.");
     const planned = slots.map((s, i) => ({ ...s, slot: missing[i] }));
     const inputs: BriefSlotInput[] = planned.map((p) => {
@@ -323,7 +333,7 @@ export async function runMoment(db: TodayDb, caller: ToolCaller, runId: string, 
   };
   try {
     const { ev, winnerHooks, recentHooks } = await db.evidence(now);
-    const pick = pickMoment(ev, await db.liveTests());
+    const pick = pickMoment(ev, await db.liveTests(), (await db.liveSlots(day)).map((e) => e.variable));
     if (!pick) return await fail("No test is left to run today.");
     const text = moment.trim();
     const [b] = await askClaude(
@@ -367,7 +377,7 @@ export async function swapTest(db: TodayDb, experimentId: string, now: Date): Pr
   return id === null ? { ok: false, error: "Something went wrong." } : { ok: true, runId: id };
 }
 
-/** A new test on the same idea, on a variable no live slot holds. The old row is discarded only once the new brief is written. */
+/** A new test on the same idea, on a variable no live slot holds. The brief is rewritten in place. */
 export async function runSwap(db: TodayDb, caller: ToolCaller, runId: string, experimentId: string, now: Date): Promise<void> {
   const day = chicagoIsoDate(now);
   let snapshot: { id: string; snapshot: IdeaSnapshot } | null = null;
@@ -404,25 +414,14 @@ export async function runSwap(db: TodayDb, caller: ToolCaller, runId: string, ex
     const before = await db.patchIdea(idea.id, briefIdeaPatch(b, test, control, idea.hook_alt ?? idea.hook));
     if (before === null) return await fail("The idea changed while the brief was made. Try again.");
     snapshot = { id: idea.id, snapshot: before };
-    await db.updateExperiment(old.id, { status: "discarded" });
-    const id = await db.insertExperiment({
-      idea_id: idea.id,
-      day,
-      slot: old.slot,
-      kind: old.kind,
-      moment: old.moment,
+    // Rewritten in place: one write, so a failure leaves the old brief exactly as it was.
+    await db.updateExperiment(old.id, {
       variable: test.variable,
       value: test.value,
       recipe: recipeFor(test, control, b.message, idea.title),
       reason: renderReason(test, ev),
-      status: "open",
-      post_id: null,
-      judge_at: null,
-      verdict: null,
-      judge_metrics: {},
-      judged_at: null,
     });
-    await db.updateRun(runId, { status: "ready", experiment_id: id });
+    await db.updateRun(runId, { status: "ready", experiment_id: old.id });
   } catch (e) {
     await fail(message(e));
   }

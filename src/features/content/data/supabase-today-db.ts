@@ -87,7 +87,8 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
     },
 
     async unclaimedInboxIdeas(limit) {
-      const { data: claimed, error: claimedError } = await experiments().select("idea_id").eq("user_id", userId).in("status", [...LIVE]);
+      // Any experiment, live or not: an expired or skipped brief stays in the Inbox but is not picked again.
+      const { data: claimed, error: claimedError } = await experiments().select("idea_id").eq("user_id", userId);
       if (claimedError) throw new Error(`today claimed: ${claimedError.message}`);
       const taken = new Set((claimed ?? []).map((c) => (c as { idea_id: string }).idea_id));
       const { data, error } = await ideas()
@@ -234,7 +235,7 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
     },
 
     async countRunsSince(since) {
-      const { count, error } = await runs().select("id", { count: "exact", head: true }).eq("user_id", userId).in("kind", ["swap", "moment"]).gte("created_at", since);
+      const { count, error } = await runs().select("id", { count: "exact", head: true }).eq("user_id", userId).in("kind", ["swap", "moment", "makenow"]).gte("created_at", since);
       if (error) throw new Error(`today count: ${error.message}`);
       return count ?? 0;
     },
@@ -308,7 +309,8 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
         day,
         briefs: (todays ?? []).map((r) => view(toExp(r as unknown as Record<string, unknown>))),
         cronRun: cron ? aged(cron) : null,
-        pendingRuns: runList.filter((r) => r.kind !== "cron").map(aged).filter((r) => r.status === "pending"),
+        pendingRuns: runList.filter((r) => r.kind === "swap" || r.kind === "moment").map(aged).filter((r) => r.status === "pending"),
+        failedRuns: runList.filter((r) => r.kind === "swap" || r.kind === "moment").map(aged).filter((r) => r.status === "failed"),
         verdicts: (judged ?? []).map((r) => view(toExp(r as unknown as Record<string, unknown>))),
         tally: tallyRows(ev),
         youtube,
