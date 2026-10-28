@@ -1,6 +1,6 @@
 # Content engine slice 5: Today, three briefs a day as one-variable tests
 
-Status: draft 2026-10-27, decided with Miguel in conversation the same day. Builder check
+Status: approved and built 2026-10-27 on branch feat/content-today; migration 0016 pending. Decided with Miguel in conversation the same day. Builder check
 done; its seven questions are settled below as my calls, marked. Replaces the roadmap's "Post Today" row (slice 5) and absorbs the experiment half of
 slice 7. Slices 1 (baselines), 2 (tagging) and 3 (post page, Recreate) are live. It also
 closes the slice 2 leftover: proving the cloud tagging routine can fetch videos and the

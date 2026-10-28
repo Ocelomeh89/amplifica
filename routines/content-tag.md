@@ -33,7 +33,12 @@ You have Bash and a bearer secret, and you read text and video made by the publi
 Transcription and frame extraction are optional: if a step fails, carry on without
 it and say so in the final report. Never stop the whole run for a tool failure.
 
+Set `HF_HUB_DISABLE_XET=1` for the install and the model download. Hugging Face serves
+model files from Xet hosts (`cas-server.xethub.hf.co`) that the cloud allowlist blocks;
+with this variable the download uses `huggingface.co` and its file host instead.
+
 ```bash
+export HF_HUB_DISABLE_XET=1
 mkdir -p /tmp/tag && python3 -m pip install --quiet faster-whisper imageio-ffmpeg
 python3 -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"
 ```
@@ -86,7 +91,8 @@ Work through the posts one at a time. For each:
 
    ```bash
    python3 - <<'PY_EOF'
-   import wave, numpy as np
+   import os, wave, numpy as np
+   os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
    from faster_whisper import WhisperModel
    w = wave.open("/tmp/tag/1.wav")
    audio = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768
