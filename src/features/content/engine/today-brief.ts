@@ -162,9 +162,9 @@ export function momentIdea(b: BriefOut, test: Test, held: Control, sourceId: str
   });
 }
 
-/** The recipe a card shows as "held still": the control with the tested value swapped in, plus the idea's message and topic. */
+/** The recipe the post is made with: the control with the tested value swapped in, plus the idea's message and topic. `control` remembers what the test replaced, for the card. */
 export function recipeFor(test: Test, held: Control, message: string, topic: string): Record<string, string> {
   const recipe: Record<string, string> = { ...held };
   if ((HELD_STILL as readonly string[]).includes(test.variable)) recipe[test.variable] = test.value;
-  return { ...recipe, message, topic };
+  return { ...recipe, message, topic, control: test.control };
 }

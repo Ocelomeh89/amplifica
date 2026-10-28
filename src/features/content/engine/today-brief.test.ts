@@ -98,6 +98,7 @@ describe("briefIdeaPatch and recipeFor", () => {
       post_style: "text-broll",
       message: "velocity",
       topic: "401k fees",
+      control: "talking-head",
     });
   });
 });
