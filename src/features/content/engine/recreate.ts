@@ -91,7 +91,7 @@ export const canRecreate = (p: Pick<PostTags, "tagged_at">): boolean => p.tagged
 
 export type RecreateSource = PostTags & { caption: string; media_type: string; figures: string[] };
 
-const between = (text: string, from: string, to: string): string => {
+export const between = (text: string, from: string, to: string): string => {
   const a = text.indexOf(from);
   const b = text.indexOf(to);
   if (a < 0 || b < 0 || b < a) throw new Error(`ideas prompt headings moved: ${from} / ${to}`);
@@ -130,7 +130,7 @@ const MESSAGE_MEANING: Record<Exclude<Message, "none">, string> = {
   "forced-sale": "people lose money on a forced sale, not a bad asset; size, reserves, horizon.",
 };
 
-const CANON_MESSAGES = `
+export const CANON_MESSAGES = `
 ## The canon messages
 
 Each option's message is one of these arguments:
