@@ -225,3 +225,26 @@ export function judgeExperiment(a: {
   if (days >= UNJUDGED_AFTER_DAYS) return { status: "unjudged", reason: `No day-${JUDGE_DAY} figure after ${UNJUDGED_AFTER_DAYS} days.` };
   return null;
 }
+
+/** What a brief's recipe says about the post it produced. Confidence 0.8: above the low line, below a correction. */
+export const BRIEF_TAG_CONFIDENCE = 0.8;
+
+export function tagsFromRecipe(recipe: Record<string, string>, hook: string, now: Date) {
+  const parts = (recipe.cover ?? "none").split("+");
+  const flags = { cover_face: parts.includes("face"), cover_text: parts.includes("text"), cover_number: parts.includes("number") };
+  const tags = {
+    hook_type: recipe.hook_type ?? "",
+    onscreen_text: recipe.onscreen_text ?? "",
+    message: recipe.message ?? "",
+    cta_type: recipe.cta_type ?? "",
+    post_style: recipe.post_style ?? "",
+    ...flags,
+  };
+  return {
+    ...tags,
+    hook_spoken: hook,
+    hook_onscreen: "",
+    tag_confidence: Object.fromEntries(Object.keys(tags).map((k) => [k, BRIEF_TAG_CONFIDENCE])) as Record<string, number>,
+    tagged_at: now.toISOString(),
+  };
+}

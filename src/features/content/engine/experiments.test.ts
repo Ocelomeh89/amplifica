@@ -10,6 +10,7 @@ import {
   coverValue,
   evidenceCounts,
   judgeExperiment,
+  tagsFromRecipe,
   UNJUDGED_AFTER_DAYS,
   outcomeOf,
   pickDay,
@@ -294,5 +295,34 @@ describe("judgeExperiment", () => {
 
   it("keeps waiting before the limit when there is no figure yet", () => {
     expect(judgeExperiment({ postedAt: posted(10), multiplier: { n_views: null, mode: "none", day: null, thin: false }, normalized: null, now: NOW })).toBeNull();
+  });
+});
+
+describe("tagsFromRecipe", () => {
+  const recipe = { hook_type: "paradox", onscreen_text: "adds-to-hook", cta_type: "save", post_style: "text-broll", cover: "face+number", message: "velocity", topic: "x" };
+  it("writes the six tags, explicit cover flags and the hook as the spoken hook", () => {
+    const t = tagsFromRecipe(recipe, "Your 401k is slow.", NOW);
+    expect(t).toMatchObject({
+      hook_type: "paradox",
+      onscreen_text: "adds-to-hook",
+      cta_type: "save",
+      post_style: "text-broll",
+      message: "velocity",
+      cover_face: true,
+      cover_text: false,
+      cover_number: true,
+      hook_spoken: "Your 401k is slow.",
+      hook_onscreen: "",
+      tagged_at: NOW.toISOString(),
+    });
+  });
+  it("gives 0.8 confidence to each tag it set, above the low-confidence line", () => {
+    const t = tagsFromRecipe(recipe, "h", NOW);
+    expect(Object.keys(t.tag_confidence).sort()).toEqual(["cover_face", "cover_number", "cover_text", "cta_type", "hook_type", "message", "onscreen_text", "post_style"]);
+    expect(Object.values(t.tag_confidence).every((v) => v === 0.8)).toBe(true);
+  });
+  it("reads none as all three flags false", () => {
+    const t = tagsFromRecipe({ ...recipe, cover: "none" }, "h", NOW);
+    expect([t.cover_face, t.cover_text, t.cover_number]).toEqual([false, false, false]);
   });
 });

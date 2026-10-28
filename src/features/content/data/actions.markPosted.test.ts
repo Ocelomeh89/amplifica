@@ -25,7 +25,7 @@ function fakeClient() {
         },
         upsert: () => ((op = "upsert"), Promise.resolve(done())),
         single: () => Promise.resolve({ data: { id: "i1", format: "reel", hook: "h", pillar: "p", hook_type: "t" }, error: null }),
-        maybeSingle: () => Promise.resolve({ data: existingRow, error: null }),
+        maybeSingle: () => Promise.resolve({ data: table === "content_posts" ? existingRow : null, error: null }),
         then: (res: (v: unknown) => unknown) => Promise.resolve(done()).then(res),
       };
       return b;
