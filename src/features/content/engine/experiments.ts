@@ -1,4 +1,5 @@
-import type { PostScore, Status } from "./baseline";
+import { statusOf, type Multiplier, type PostScore, type Status } from "./baseline";
+import type { NormalizedPost } from "./normalize";
 import { CTA_TYPES, HOOK_TYPES, MESSAGES, ONSCREEN_TEXT, POST_STYLES, TAG_LABELS, type PostTags } from "./tags";
 import { isEligible, type WinnerPost } from "./winners";
 
@@ -188,4 +189,39 @@ export function tallyRows(ev: Evidence): TallyRow[] {
     label: VARIABLE_LABEL[variable],
     values: ev[variable].filter((r) => r.total > 0).map((r) => ({ ...r, thin: r.total < TALLY_THIN_BELOW })),
   }));
+}
+
+/** A brief is judged at the first figure matched at day 7 or later. */
+export const JUDGE_DAY = 7;
+/** With no day-7 figure this long after posting, the experiment is closed as unjudged. */
+export const UNJUDGED_AFTER_DAYS = 14;
+
+export type JudgeMetrics = { multiplier: number; day: number | null; mode: string; n_saves: number | null; n_watch: number | null };
+
+/** Null means wait. The verdict is slice 1's status at day 7; saves and watch time ride along as figures. */
+export function judgeExperiment(a: {
+  postedAt: string;
+  multiplier: Multiplier;
+  normalized: Pick<NormalizedPost, "n_saves" | "n_watch"> | null;
+  now: Date;
+}): { status: "judged"; verdict: Verdict; judge_metrics: JudgeMetrics } | { status: "unjudged"; reason: string } | null {
+  if (isEligible(a.multiplier)) {
+    const outcome = outcomeOf(statusOf(a.multiplier));
+    if (outcome) {
+      return {
+        status: "judged",
+        verdict: outcome,
+        judge_metrics: {
+          multiplier: a.multiplier.n_views as number,
+          day: a.multiplier.day,
+          mode: a.multiplier.mode,
+          n_saves: a.normalized?.n_saves ?? null,
+          n_watch: a.normalized?.n_watch ?? null,
+        },
+      };
+    }
+  }
+  const days = (a.now.getTime() - new Date(a.postedAt).getTime()) / 86_400_000;
+  if (days >= UNJUDGED_AFTER_DAYS) return { status: "unjudged", reason: `No day-${JUDGE_DAY} figure after ${UNJUDGED_AFTER_DAYS} days.` };
+  return null;
 }

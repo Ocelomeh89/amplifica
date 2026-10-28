@@ -9,6 +9,8 @@ import {
   controlRecipe,
   coverValue,
   evidenceCounts,
+  judgeExperiment,
+  UNJUDGED_AFTER_DAYS,
   outcomeOf,
   pickDay,
   pickMoment,
@@ -254,5 +256,43 @@ describe("tallyRows", () => {
     expect(row.values.find((v) => v.value === "paradox")!.thin).toBe(true);
     expect(row.values.find((v) => v.value === "question")!.thin).toBe(false);
     expect(row.label).toBe("Hook type");
+  });
+});
+
+describe("judgeExperiment", () => {
+  const posted = (daysAgo: number) => new Date(NOW.getTime() - daysAgo * 86_400_000).toISOString();
+  const norm = { n_saves: 1.2, n_watch: 0.9 };
+
+  it("judges a matched day-7 figure at 1.6 as won and stores the figures", () => {
+    const r = judgeExperiment({ postedAt: posted(8), multiplier: { n_views: 1.6, mode: "matched", day: 7, thin: false }, normalized: norm, now: NOW });
+    expect(r).toEqual({
+      status: "judged",
+      verdict: "won",
+      judge_metrics: { multiplier: 1.6, day: 7, mode: "matched", n_saves: 1.2, n_watch: 0.9 },
+    });
+  });
+
+  it("judges a settled 0.4 as lost", () => {
+    const r = judgeExperiment({ postedAt: posted(20), multiplier: { n_views: 0.4, mode: "settled", day: null, thin: false }, normalized: null, now: NOW });
+    expect(r).toMatchObject({ status: "judged", verdict: "lost" });
+  });
+
+  it("judges matched day 9 at 1.0 as flat", () => {
+    const r = judgeExperiment({ postedAt: posted(10), multiplier: { n_views: 1.0, mode: "matched", day: 9, thin: false }, normalized: norm, now: NOW });
+    expect(r).toMatchObject({ status: "judged", verdict: "flat" });
+  });
+
+  it("waits at matched day 5", () => {
+    expect(judgeExperiment({ postedAt: posted(6), multiplier: { n_views: 2, mode: "matched", day: 5, thin: false }, normalized: null, now: NOW })).toBeNull();
+  });
+
+  it("marks an experiment unjudged once it has no day-7 figure after the limit", () => {
+    expect(UNJUDGED_AFTER_DAYS).toBe(14);
+    const r = judgeExperiment({ postedAt: posted(16), multiplier: { n_views: null, mode: "none", day: null, thin: false }, normalized: null, now: NOW });
+    expect(r).toEqual({ status: "unjudged", reason: "No day-7 figure after 14 days." });
+  });
+
+  it("keeps waiting before the limit when there is no figure yet", () => {
+    expect(judgeExperiment({ postedAt: posted(10), multiplier: { n_views: null, mode: "none", day: null, thin: false }, normalized: null, now: NOW })).toBeNull();
   });
 });
