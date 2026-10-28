@@ -176,7 +176,7 @@ export async function judgeDue(db: TodayDb, now: Date): Promise<{ judged: number
 type Started = { ok: true; runId: string } | { ok: false; error: string };
 
 /** Takes the day's cron run: new, or a failed or timed-out one reused. Never a ready or live one. */
-async function beginCron(db: TodayDb, now: Date): Promise<Started> {
+export async function beginCron(db: TodayDb, now: Date): Promise<Started> {
   const day = chicagoIsoDate(now);
   const existing = await db.runFor(day, "cron");
   if (!existing) {
