@@ -56,6 +56,10 @@ describe("CLAUDE_CLIENT_OPTIONS", () => {
   it("bounds the call below the page budget with one retry", () => {
     expect(CLAUDE_CLIENT_OPTIONS("k")).toEqual({ apiKey: "k", timeout: 240_000, maxRetries: 1 });
   });
+
+  it("takes a shorter timeout and no retry for a call with a time budget", () => {
+    expect(CLAUDE_CLIENT_OPTIONS("k", { timeoutMs: 180_000, maxRetries: 0 })).toEqual({ apiKey: "k", timeout: 180_000, maxRetries: 0 });
+  });
 });
 
 describe("anthropicIdeaGenerator", () => {

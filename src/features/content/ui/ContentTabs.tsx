@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import clsx from "clsx";
 
 const TABS = [
+  { href: "/content/today", label: "Today" },
   { href: "/content", label: "Inbox" },
   { href: "/content/queue", label: "Queues" },
   { href: "/content/unused", label: "Never used" },

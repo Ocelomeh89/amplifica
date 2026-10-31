@@ -72,7 +72,8 @@ Reel and installs a speech model:
    - `*.cdninstagram.com` and `*.fbcdn.net`, Instagram's media servers;
    - `pypi.org` and `files.pythonhosted.org`, to install `faster-whisper` and
      `imageio-ffmpeg`;
-   - `huggingface.co` and its file hosts, for the `base.en` speech model.
+   - `huggingface.co` and `cdn-lfs.huggingface.co`, for the `base.en` speech model. The
+     routine sets `HF_HUB_DISABLE_XET=1` so the download does not need the Xet hosts.
 4. Run it once by hand. The first run is the transcription proof: its final report
    says whether the tools installed and ran under this allowlist. Add any host the
    run turned out to need to the list above, and write the outcome in the roadmap.
@@ -81,9 +82,11 @@ Reel and installs a speech model:
 First cloud run, 2026-10-26: the app host was missing from the allowlist (403 from
 the egress proxy), then the `base.en` download failed on Hugging Face's Xet hosts
 (`cas-server.xethub.hf.co`), so the run tagged 20 posts from covers and captions only.
-Locally the same download fails until `HF_HUB_DISABLE_XET=1` is set. Add `*.hf.co` to
-the allowlist or set that variable on the environment. Whether
-`*.cdninstagram.com` and `*.fbcdn.net` serve video from the cloud is still untested.
+Locally the same download fails until `HF_HUB_DISABLE_XET=1` is set; the routine now sets it.
+Whether `*.cdninstagram.com` and `*.fbcdn.net` serve video from the cloud is still untested.
+
+**Proof (fill in after the next cloud run with untagged posts):** date, the report's tools
+line, how many `hook_spoken` values were written, and any host the run still needed.
 
 `/content-tag` runs the same file from Claude Code on the Mac, where there is no
 allowlist. The first backfill tags up to 100 posts per run.

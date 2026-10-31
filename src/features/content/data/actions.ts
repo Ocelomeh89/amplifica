@@ -10,6 +10,7 @@ import { mineFound, queueFound, type FoundDeps, type FoundInput, type QueueDeps 
 import { readFoundForm, readOptions } from "@/features/content/data/found-form";
 import { supabaseContextDb, supabaseFoundDb, supabaseIngestDb } from "@/features/content/data/supabase-db";
 import { deleteIdeaDrafts } from "@/features/content/data/supabase-drafts-db";
+import { linkBriefExperiment } from "@/features/content/data/mark-posted-brief";
 import { fetchVideoMeta } from "@/features/content/data/youtube-meta";
 import { requireContentOwner } from "@/features/content/data/owner";
 import { syncQueuedIdeasToClickUp } from "@/features/content/data/clickup";
@@ -212,6 +213,13 @@ export async function markPosted(formData: FormData): Promise<{ error: string | 
     await deleteIdeaDrafts(supabase, user.id, id);
   } catch (e) {
     console.error("markPosted: could not delete drafts", e);
+  }
+  // A brief's idea also links its experiment and tags the post. The post is already
+  // recorded, so a failure is logged, not returned.
+  try {
+    await linkBriefExperiment(supabase, user.id, { ideaId: id, platform, externalId, now: new Date() });
+  } catch (e) {
+    console.error("markPosted: could not link the experiment", e);
   }
   revalidate();
   return { error: null };

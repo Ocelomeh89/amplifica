@@ -68,6 +68,13 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
   (start, run, pick, regenerate); `supabase-recreate-db.ts` is the adapter and builds the prompt's
   context; `recreate-actions.ts` holds the Server Actions; `post-detail.ts` loads the post page
   (`/content/performance/[postId]`); `loadOpenRecreations` in `queries.ts` feeds the Inbox card.
+- `engine/experiments.ts` (evidence counts over eligible Reels, control recipe, picker, reason, verdict,
+  tally, `tagsFromRecipe`) and `today-brief.ts` (prompt, tool schema, idea patch, recipe) — pure, slice 5.
+  `data/today.ts` is the flow over `TodayDb` (daily briefs, moment, swap, skip, expire, judge, make now);
+  `supabase-today-db.ts` is the adapter and builds `/content/today`; `today-cron.ts` is the tail of the
+  metrics cron; `today-actions.ts` holds the Server Actions; `mark-posted-brief.ts` links an experiment
+  at Mark posted. UI: `BriefCard`, `MomentForm`, `MakeNowButton`, `VerdictsList`, `TallyTable`,
+  `YouTubeSlots`, `AutoRefresh`. `today.fake.ts` is the in-memory `TodayDb` for tests.
 - `routines/` (repo root) — routine instructions and README; `.claude/skills/`
   holds the local companions `/content-plaud`, `/content-daily`, `/content-draft` and
   `/content-voice`.
@@ -165,6 +172,17 @@ these are all the places that know it exists:
 - The Recreate job runs after the response with `waitUntil`, through the admin client; every query in
   `supabase-recreate-db.ts` filters by the owner's id, because the admin client bypasses RLS. A missing
   `ANTHROPIC_API_KEY` is checked before any row is inserted.
+- Today (slice 5): a brief is a Reel idea plus a `content_experiments` row. The evidence is eligible
+  Reels only (`isEligible`), so the tally and the winners block agree. A (variable, value) pair held by
+  an open or posted experiment is never proposed again; slots on one day never share a variable (the
+  moment slot and refills included); an idea that ever had an experiment is not picked again, so expired
+  and skipped briefs wait in the Inbox for Miguel. Swap rewrites the open experiment in place. A proposed brief rewrites the claimed Inbox idea in place (old hook kept in `hook_alt`); unposted
+  briefs are skipped by the next cron and their ideas return to the Inbox. Mark posted tags an untagged
+  Instagram post from the brief's recipe and never overwrites existing tags. Briefs are generated at the
+  end of the metrics cron (Hobby does not order two crons), skipped with a failed run when under 90
+  seconds remain; on-demand briefs (swap, moment, make now) are capped at 5 per Chicago day. `idea_id` is unique only among live
+  experiments, so a skipped idea can be briefed again. YouTube slots are the top two of the YouTube queue,
+  with no evidence; the planned link to Instagram winners is a comment in `YouTubeSlots.tsx`.
 - `content_voice.built_from` is `{ files: [{path, mtime, bytes}], previous_profile_md }`.
 
 ## Seeding by hand

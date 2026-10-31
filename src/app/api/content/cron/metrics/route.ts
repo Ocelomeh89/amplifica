@@ -3,6 +3,9 @@ import { createAdminClient } from "@/shared/supabase/admin";
 import { authorizeRoutine } from "@/features/content/data/api-auth";
 import { runMetricsCron, type CronPlatform } from "@/features/content/data/metrics";
 import { supabaseMetricsDb } from "@/features/content/data/supabase-db";
+import { anthropicToolCaller } from "@/features/content/data/claude";
+import { supabaseTodayDb } from "@/features/content/data/supabase-today-db";
+import { runTodayCron } from "@/features/content/data/today-cron";
 import { pullBeehiiv } from "@/features/content/data/pulls/beehiiv";
 import { pullInstagram } from "@/features/content/data/pulls/instagram";
 import { CHANNEL_HANDLE, pullYouTube } from "@/features/content/data/pulls/youtube";
@@ -15,6 +18,7 @@ const PLATFORMS: CronPlatform[] = ["instagram", "youtube", "beehiiv"];
 // Vercel Cron calls this daily with `Authorization: Bearer <CRON_SECRET>`.
 // `?platform=` narrows to one pull for a manual check.
 export async function GET(req: Request) {
+  const startedAt = new Date();
   const auth = authorizeRoutine(req, process.env.CRON_SECRET);
   if ("response" in auth) return auth.response;
   const { owner } = auth;
@@ -33,7 +37,21 @@ export async function GET(req: Request) {
 
   try {
     const report = await runMetricsCron({ db: supabaseMetricsDb(createAdminClient(), owner), userId: owner, now: new Date(), pulls });
-    return NextResponse.json(report, { status: report.ok ? 200 : 500 });
+    // Today's briefs come after the pulls so judging sees fresh snapshots. A failure here
+    // never fails the metrics run: it is reported and the page offers Make now.
+    let today: Awaited<ReturnType<typeof runTodayCron>> | { error: string };
+    try {
+      today = await runTodayCron({
+        db: supabaseTodayDb(createAdminClient(), owner),
+        callerFor: (timeoutMs) => anthropicToolCaller({ timeoutMs, maxRetries: 0 }),
+        startedAt,
+        now: new Date(),
+      });
+    } catch (e) {
+      console.error("content today cron failed", e);
+      today = { error: (e as Error).message };
+    }
+    return NextResponse.json({ ...report, today }, { status: report.ok ? 200 : 500 });
   } catch (e) {
     console.error("content metrics cron failed", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
