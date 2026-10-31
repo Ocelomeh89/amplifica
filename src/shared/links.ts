@@ -7,3 +7,8 @@
  */
 export const SIGN_IN_URL =
   "https://login.circle.so/sign_in?request_host=community.amplificawealth.com#email";
+
+export const NEWSLETTER_URL = "https://newsletter.amplificawealth.com";
+export const COMMUNITY_URL = "https://community.amplificawealth.com";
+export const INSTAGRAM_URL = "https://www.instagram.com/amplificawealth/";
+export const YOUTUBE_URL = "https://www.youtube.com/@amplificawealth";
