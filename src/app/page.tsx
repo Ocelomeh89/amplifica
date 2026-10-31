@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/shared/supabase/server";
 import { redirect } from "next/navigation";
-import { SIGN_IN_URL } from "@/shared/links";
+import { COMMUNITY_URL } from "@/shared/links";
+import PublicHeader from "@/shared/ui/public/PublicHeader";
+import PublicFooter from "@/shared/ui/public/PublicFooter";
 
 export const metadata: Metadata = {
   title: { absolute: "Amplifica Wealth — savings into monthly investment income" },
@@ -17,29 +19,6 @@ export const metadata: Metadata = {
     url: "/",
   },
 };
-
-const NEWSLETTER_URL = "https://newsletter.amplificawealth.com";
-const COMMUNITY_URL = "https://community.amplificawealth.com";
-
-function AmplitudeMark({ id }: { id: string }) {
-  return (
-    <svg width="26" height="22" viewBox="0 0 30 26" fill="none" aria-hidden="true">
-      <defs>
-        <linearGradient id={id} x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0%" stopColor="#A88BE8" />
-          <stop offset="100%" stopColor="#6C4BD3" />
-        </linearGradient>
-      </defs>
-      <g fill={`url(#${id})`}>
-        <rect x="0" y="23" width="4" height="3" rx="1" />
-        <rect x="6.5" y="21" width="4" height="5" rx="1" />
-        <rect x="13" y="18" width="4" height="8" rx="1" />
-        <rect x="19.5" y="12" width="4" height="14" rx="1" />
-        <rect x="26" y="2" width="4" height="24" rx="1" />
-      </g>
-    </svg>
-  );
-}
 
 // The brand's five-bar mark expanded into a nine-bar amplification: each bar
 // ~1.45x the last, the final one aqua — the cycle compounding. Purely
@@ -142,27 +121,7 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen bg-cream text-ink">
-      {/* ——— Header ——— */}
-      <header className="max-w-6xl mx-auto px-6 pt-6 flex items-baseline justify-between">
-        <div className="flex items-center gap-2.5">
-          <AmplitudeMark id="amp-mark-home" />
-          <span className="font-display text-xl leading-none">Amplifica Wealth</span>
-        </div>
-        <nav className="flex items-baseline gap-6 text-sm">
-          <Link href="/calculator" className="hover:text-purple transition-colors hidden sm:inline">
-            Calculator
-          </Link>
-          <a href={NEWSLETTER_URL} className="hover:text-purple transition-colors hidden sm:inline">
-            Newsletter
-          </a>
-          <a href={COMMUNITY_URL} className="hover:text-purple transition-colors hidden md:inline">
-            Community
-          </a>
-          <a href={SIGN_IN_URL} className="text-purple hover:underline">
-            Sign in
-          </a>
-        </nav>
-      </header>
+      <PublicHeader />
 
       {/* ——— Hero ——— */}
       <section className="max-w-6xl mx-auto px-6 pt-20 pb-24 sm:pt-28 sm:pb-32 grid grid-cols-1 lg:grid-cols-12 gap-12 items-end">
@@ -364,28 +323,7 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* ——— Footer ——— */}
-      <footer className="border-t border-edge">
-        <div className="max-w-6xl mx-auto px-6 py-10 flex flex-col gap-6">
-          <div className="flex flex-wrap items-baseline justify-between gap-4">
-            <span className="text-sm">
-              Engineer your future. Amplify your wealth. Live your way.
-            </span>
-            <nav className="flex gap-6 text-sm text-sub">
-              <Link href="/calculator" className="hover:text-purple">Calculator</Link>
-              <a href={NEWSLETTER_URL} className="hover:text-purple">Newsletter</a>
-              <a href={COMMUNITY_URL} className="hover:text-purple">Community</a>
-              <a href={SIGN_IN_URL} className="hover:text-purple">Sign in</a>
-            </nav>
-          </div>
-          <p className="text-xs text-sub max-w-3xl">
-            © 2026 Amplifica Wealth. Educational publisher, not a registered
-            investment adviser. Nothing here is financial, legal, or tax advice, and
-            no return is promised or implied. Borrowing to invest involves real risk,
-            including the loss of borrowed principal.
-          </p>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }
