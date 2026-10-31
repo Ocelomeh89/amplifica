@@ -52,6 +52,18 @@ changing behavior.** In `compare/engine/` 31 of 50 files are tests; in
 | `auth/` | login / signup / reset-password server actions. |
 | `content/` | Owner-only content engine: idea inbox, per-format queues, sources. Routines write through `api/content/ingest`. Spec in `docs/superpowers/specs/2026-09-17-content-engine-design.md`. |
 
+## Math guard
+
+The model's numbers must not change unless Miguel asks for that change.
+Before suggesting or making any change that could move a number the engine
+produces, open with **⚠️ MATH WARNING** and say which outputs move and by
+how much (a golden diff or a before/after probe). The math lives in
+`shared/finance/`, `features/compare/engine/`, `features/dashboard/projection.ts`
+and `features/simulator/{useSimulation,sim-values}.ts`; anything that changes
+their inputs (defaults, FormData parsing, a renamed field) counts too. A
+`PreToolUse` hook (`.claude/hooks/math-guard.sh`) stops for approval on any
+edit to those files. A label-only or copy-only change says so explicitly.
+
 ## Conventions
 
 - **Mutations are Server Actions.** No client-side DB calls, ever.

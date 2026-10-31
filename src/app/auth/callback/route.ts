@@ -1,4 +1,5 @@
 import { createClient } from "@/shared/supabase/server";
+import { safeNextPath } from "@/shared/supabase/safe-next";
 import { NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 
@@ -8,8 +9,7 @@ export async function GET(request: Request) {
   const tokenHash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type") as EmailOtpType | null;
   // Only allow relative in-app redirects (e.g. /reset-password); default to dashboard.
-  const nextParam = url.searchParams.get("next");
-  const next = nextParam && nextParam.startsWith("/") ? nextParam : "/dashboard";
+  const next = safeNextPath(url.searchParams.get("next")) ?? "/dashboard";
 
   // GoTrue can redirect here with an error instead of a token.
   const providerError =

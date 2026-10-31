@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { safeNextPath } from "./safe-next";
 
 export async function updateSession(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
@@ -21,8 +22,8 @@ export async function updateSession(request: NextRequest) {
         const type = searchParams.get("type");
         if (type) callbackUrl.searchParams.set("type", type);
       }
-      const next = searchParams.get("next");
-      if (next && next.startsWith("/")) callbackUrl.searchParams.set("next", next);
+      const next = safeNextPath(searchParams.get("next"));
+      if (next) callbackUrl.searchParams.set("next", next);
       return NextResponse.redirect(callbackUrl);
     }
     const authError = searchParams.get("error_description") ?? searchParams.get("error");
