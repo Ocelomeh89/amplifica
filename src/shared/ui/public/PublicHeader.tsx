@@ -9,16 +9,18 @@ const NAV_LINK = "text-white/80 hover:text-white transition-colors";
 export default function PublicHeader() {
   return (
     <header className="bg-plum text-white">
-      <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between gap-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4 sm:gap-6">
         <Link
           href="/"
           aria-label="Amplifica Wealth home"
           className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
         >
           <AmplitudeMark id="amp-mark-header" size={26} />
-          <span className="font-display text-lg leading-none">Amplifica Wealth</span>
+          <span className="font-display text-lg leading-none whitespace-nowrap">
+            Amplifica<span className="hidden sm:inline"> Wealth</span>
+          </span>
         </Link>
-        <nav aria-label="Primary" className="flex items-center gap-5 text-sm">
+        <nav aria-label="Primary" className="flex items-center gap-3 sm:gap-5 text-sm">
           <Link href="/calculator" className={`${NAV_LINK} hidden sm:inline`}>
             Calculator
           </Link>
@@ -29,7 +31,7 @@ export default function PublicHeader() {
             Community
           </a>
           <SocialLinks tone="onPlum" />
-          <a href={SIGN_IN_URL} className="text-amethyst hover:text-white transition-colors">
+          <a href={SIGN_IN_URL} className="text-amethyst hover:text-white transition-colors whitespace-nowrap">
             Sign in
           </a>
         </nav>

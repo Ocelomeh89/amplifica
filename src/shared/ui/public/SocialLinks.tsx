@@ -68,7 +68,7 @@ const LINKS = [
 
 export default function SocialLinks({ tone }: { tone: keyof typeof TONES }) {
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-0.5 sm:gap-1">
       {LINKS.map((l) => (
         <a
           key={l.href}
@@ -76,7 +76,7 @@ export default function SocialLinks({ tone }: { tone: keyof typeof TONES }) {
           target="_blank"
           rel="noopener noreferrer"
           aria-label={l.label}
-          className={`min-h-[44px] min-w-[44px] grid place-items-center transition-colors ${TONES[tone]}`}
+          className={`min-h-10 min-w-10 sm:min-h-11 sm:min-w-11 grid place-items-center transition-colors ${TONES[tone]}`}
         >
           {l.icon}
         </a>

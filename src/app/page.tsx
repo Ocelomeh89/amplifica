@@ -299,8 +299,14 @@ export default async function Home() {
           </h2>
           <div className="mt-8 max-w-2xl space-y-4 text-[#F6F1EA]/80 text-base leading-relaxed">
             <p>
-              Miguel has lost over a million dollars, twice: once to a custodian
-              bankruptcy, once to a business he bought and had to close. Jackie, a
+              <a
+                href="https://miguelgraf.com"
+                className="underline underline-offset-4 decoration-[#F6F1EA]/40 hover:text-[#F6F1EA] hover:decoration-[#F6F1EA] transition-colors"
+              >
+                Miguel has lost over a million dollars, twice
+              </a>
+              : once to a custodian bankruptcy, once to a business he bought and
+              had to close. Jackie, a
               trained scientist, was laid off three months into his first industry
               role. We built this system from those lessons, taking control of our
               finances and lives.
