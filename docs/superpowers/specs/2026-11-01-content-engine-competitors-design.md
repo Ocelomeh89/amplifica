@@ -1,6 +1,7 @@
 # Content engine slice 6: competitor posts as Today briefs
 
-Status: draft 2026-11-01, decided with Miguel in conversation the same day. Builder check pending.
+Status: draft 2026-11-01, decided with Miguel in conversation the same day. Builder check done; its
+five questions are settled below as my calls, marked.
 Replaces the roadmap's "Competitors and Viral Watch" row (slice 6). Slices 1, 2, 3 and 5 are live.
 The Apify spike passed on 2026-10-20 (roadmap, "Spike result").
 
@@ -81,13 +82,16 @@ not seeded by the migration, which does not know the owner's id).
 
 ### Decision 2: The weekly pull
 
-The Monday metrics cron starts one Apify run for every `watching` creator: Reels from the last 90
-days for a creator never pulled before, the last 21 days otherwise; `resultsLimit` 30 per creator;
+The Monday metrics cron starts one Apify run covering every `watching` creator (one run, so the
+cap is per week): `onlyPostsNewerThan` 90 days if any creator has never been pulled, 21 days
+otherwise, with the narrower window applied per creator after the pull; `resultsLimit` 30 per
+creator;
 `detailedData`; `maxTotalChargeUsd` 1.00 (constant `COMPETITOR_WEEKLY_CAP_USD`). The run is
 started and recorded, not awaited: any later cron (the same day's tail at the earliest, Tuesday at
 the latest) finds the run finished, reads its dataset with `APIFY_GET_DATASET_ITEMS`, keeps items
 whose `ownerUsername` matches a watched creator, whose type is a Reel and whose date falls inside
-the requested window, and upserts them. A re-pulled post updates its views, likes, comments and
+the requested window, and upserts them, then sets `last_pulled_at` and `last_pull_status` on each creator in the run (my
+call: per-creator outcome lives on the creator, so the runs table needs no creator id). A re-pulled post updates its views, likes, comments and
 `pulled_at` (unlike own posts, whose snapshots are append-only). A run still pending after 48
 hours is marked failed. A failed run shows on the Creators page with its reason; it never blocks
 the rest of the cron or Today.
@@ -127,7 +131,9 @@ call.)
 ### Decision 5: Topic brief or format brief
 
 On a day with at least one fresh, popular, tagged, unbriefed competitor post, the best one (highest
-multiple) takes slot 2. Slot 1 stays a normal proposed brief; slot 3 stays the moment. One
+multiple) takes slot 2. Slot 1 stays a normal proposed brief; slot 3 stays the moment. The
+competitor brief is picked first, and slot 1 and the moment then avoid its variable: the slice 5
+rule that slots on one day never share a variable still holds (my call). One
 competitor brief per day at most. With no such post, Today works exactly as in slice 5.
 
 The engine decides which brief the post seeds, in this order:
@@ -135,19 +141,35 @@ The engine decides which brief the post seeds, in this order:
 1. **Format brief** if one of the post's format choices (post style, hook type, on-screen text,
    cover, CTA) is a value Miguel has fewer than `EXPLORE_BELOW` (5) eligible posts with, the tag's
    confidence is at least `LOW_CONFIDENCE`, and the (variable, value) pair is not held by a live
-   experiment or by another slot that day. The brief's variable is that choice and its value is
+   experiment. The brief's variable is that choice and its value is
    the competitor's; everything else holds at the control recipe; the topic is an Inbox idea
    claimed as in slice 5. When several choices qualify, take them in the picker's existing
    variable order. A post with a `format_note` qualifies as a post-style test with value
    `new-format`; the note travels in the recipe and on the card. `new-format` is a recipe value
-   only; it is not added to `POST_STYLES`.
+   only; it is not added to `POST_STYLES` (the 0014 check on `content_posts.post_style` stays). At
+   Mark posted, `tagsFromRecipe` leaves `post_style` blank for a `new-format` recipe, so the
+   tagging routine fills in the nearest style later. A `new-format` brief is exempt from the
+   held-pair rule, because each note is a different format. Its verdict shows in Verdicts in with
+   the note; the tally does not count `new-format` (my call: a tally row per note would be one post
+   each; revisit if new formats start winning).
 2. **Topic brief** otherwise. A new variable, `source`, with values `competitor-rebuttal` (the
    post has a `pushes_belief`) and `competitor-take` (it does not); the control is `own`. Every
    format choice holds at the control recipe. The idea is new: the post's subject, Miguel's
    rebuttal or take.
 
-Swap on a competitor brief rewrites it in place as a normal proposed brief, as Swap does in slice
-5; the competitor post counts as used.
+Swap on a competitor brief turns it into a normal proposed brief (my call):
+- It clears `kind` back to `proposed` and `competitor_post_id`, so the card loses the "Inspired by"
+  line. The competitor post still counts as used.
+- A topic brief claims a fresh Inbox idea, as a proposed brief does, and its competitor idea goes
+  back to the Inbox at score 1. Swap never keeps the competitor topic under a new test, which would
+  change two things at once.
+- A format brief keeps its idea (already Miguel's own) and is rewritten as in slice 5.
+
+Skip on a topic brief sends its idea back to the Inbox, as in slice 5. If Miguel posts it later
+without a brief, it counts as competitor-inspired in the tally, which is true of its topic.
+
+If both attempts at a competitor brief fail the copy check (Decision 7), the post is marked used
+all the same, so it does not cost two Claude calls a day for two weeks (my call).
 
 ### Decision 6: The source variable and the tally
 
@@ -193,7 +215,8 @@ posts (multiple, date, link, and whether it has seeded a brief).
 Migration 0017:
 
 - `content_creators`: `id`, `user_id`, `platform` (check `instagram`), `username` (lowercase),
-  `status` (check `watching`, `removed`), `last_pulled_at`, timestamps; unique (`user_id`,
+  `status` (check `watching`, `removed`), `last_pulled_at`, `last_pull_status` (check `ready`,
+  `failed`, null), timestamps; unique (`user_id`,
   `platform`, `username`).
 - `content_competitor_posts`: `id`, `user_id`, `creator_id`, `shortcode` (unique per user),
   `url`, `posted_at`, `caption`, `views`, `likes`, `comments`, `duration_seconds`,
@@ -203,8 +226,8 @@ Migration 0017:
   seeds a brief; never cleared).
 - `content_competitor_runs`: `id`, `user_id`, `apify_run_id`, `status` (check `pending`, `ready`,
   `failed`), `error`, `started_at`, `finished_at`, `cost_usd`, `items`.
-- `content_experiments`: `kind` check gains `competitor`; new nullable `competitor_post_id`
-  referencing `content_competitor_posts`.
+- `content_experiments`: `kind` check gains `competitor`; `variable` check gains `source`; new
+  nullable `competitor_post_id` referencing `content_competitor_posts`.
 - `content_sources.kind` check gains `competitor`.
 - RLS and touch triggers as on the slice 5 tables. Every admin-client query filters by user id.
 
