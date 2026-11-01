@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { ContentIdea } from "@/shared/supabase/database.types";
 import type { Format } from "@/features/content/engine/types";
 import { likeIdea } from "@/features/content/data/actions";
@@ -11,6 +11,8 @@ type Props = {
   sourceUrls: Record<string, string | null>;
   siblingsById: Record<string, { id: string; format: Format }[]>;
   badges?: Record<string, string | null>;
+  /** Each idea's Sharpen panel, built by the page. */
+  sharpenSlots?: Record<string, ReactNode>;
 };
 
 // J/K move focus, L likes the focused idea, X opens its Pass box. Keys are
@@ -18,7 +20,7 @@ type Props = {
 // by idea id, not index: the array shrinks by one every time a keyboard
 // like/pass goes through the Server Action + revalidation round trip, so an
 // index would drift onto the wrong idea mid-sequence.
-export default function InboxList({ ideas, sourceUrls, siblingsById, badges }: Props) {
+export default function InboxList({ ideas, sourceUrls, siblingsById, badges, sharpenSlots }: Props) {
   const [focusId, setFocusId] = useState<string | null>(ideas[0]?.id ?? null);
   const [passOpenId, setPassOpenId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -82,6 +84,7 @@ export default function InboxList({ ideas, sourceUrls, siblingsById, badges }: P
           focused={i === focusIndex}
           passOpen={passOpenId === idea.id}
           onPassOpenChange={(open) => setPassOpenId(open ? idea.id : null)}
+          sharpenSlot={sharpenSlots?.[idea.id]}
         />
       ))}
     </div>

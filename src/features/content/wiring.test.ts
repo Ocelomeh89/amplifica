@@ -16,6 +16,7 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/week/page.tsx",
       "src/app/(app)/content/today/page.tsx",
       "src/app/(app)/content/creators/page.tsx",
+      "src/app/(app)/content/taste/page.tsx",
       "src/app/(app)/content/ideas/[id]/page.tsx",
       "src/app/(app)/content/sources/page.tsx",
       "src/features/content/data/actions.ts",
@@ -54,6 +55,7 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/sources/page.tsx",
       "src/app/(app)/content/today/page.tsx",
       "src/app/(app)/content/creators/page.tsx",
+      "src/app/(app)/content/taste/page.tsx",
     ];
     for (const f of pages) expect(read(f), f).not.toMatch(/supabase\s*\.from\(/);
   });

@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireContentOwner } from "@/features/content/data/owner";
-import { loadIdea, loadIdeaContext, loadIdeaDraft } from "@/features/content/data/queries";
+import { loadIdea, loadIdeaContext, loadIdeaDraft, loadSharpenStates } from "@/features/content/data/queries";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import IdeaCard from "@/features/content/ui/IdeaCard";
+import SharpenPanel from "@/features/content/ui/SharpenPanel";
 import DraftPanel from "@/features/content/ui/DraftPanel";
 import FormatBadge from "@/features/content/ui/FormatBadge";
 import MetricsPanel from "@/features/content/ui/MetricsPanel";
@@ -18,6 +19,9 @@ export default async function ContentIdeaPage({ params }: { params: { id: string
 
   const { source, mates, post, snapshot } = await loadIdeaContext(supabase, user.id, idea);
   const draft = await loadIdeaDraft(supabase, user.id, idea.id);
+  const sharp = await loadSharpenStates(supabase, user.id, [idea], new Date());
+  // Only an Inbox or queued idea can be sharpened; posted and passed ideas show no button.
+  const canSharpen = idea.status === "inbox" || idea.status === "queued";
 
   return (
     <div className="max-w-3xl">
@@ -30,6 +34,9 @@ export default async function ContentIdeaPage({ params }: { params: { id: string
           idea={idea}
           sourceUrl={source?.url ?? null}
           siblings={mates.map((m) => ({ id: m.id, format: m.format }))}
+          sharpenSlot={
+            canSharpen ? <SharpenPanel ideaId={idea.id} sharpen={sharp.sharpens[idea.id] ?? null} blocked={sharp.blocked[idea.id] ?? null} /> : null
+          }
         />
       </div>
 

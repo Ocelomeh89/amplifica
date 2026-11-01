@@ -1,10 +1,11 @@
 import { requireContentOwner } from "@/features/content/data/owner";
-import { loadInbox, loadInboxLinks, loadOpenRecreations } from "@/features/content/data/queries";
+import { loadInbox, loadInboxLinks, loadOpenRecreations, loadSharpenStates } from "@/features/content/data/queries";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import InboxList from "@/features/content/ui/InboxList";
 import InboxFilter from "@/features/content/ui/InboxFilter";
 import PendingSourcesStrip from "@/features/content/ui/PendingSourcesStrip";
 import RecreateCard from "@/features/content/ui/RecreateCard";
+import SharpenPanel from "@/features/content/ui/SharpenPanel";
 import { FORMAT_LABEL, type Format } from "@/features/content/engine/types";
 import FoundContentForm from "@/features/content/ui/FoundContentForm";
 import { foundBadge } from "@/features/content/engine/angle";
@@ -50,6 +51,11 @@ export default async function ContentInboxPage({
       .map((m) => ({ id: m.id, format: m.format }));
   }
 
+  const sharp = await loadSharpenStates(supabase, user.id, list, new Date());
+  const sharpenSlots = Object.fromEntries(
+    list.map((i) => [i.id, <SharpenPanel key={i.id} ideaId={i.id} sharpen={sharp.sharpens[i.id] ?? null} blocked={sharp.blocked[i.id] ?? null} />])
+  );
+
   return (
     <div className="max-w-3xl">
       <h1 className="text-xl font-semibold mb-2">Content</h1>
@@ -66,7 +72,7 @@ export default async function ContentInboxPage({
       {active && list.length === 0 ? (
         <p className="text-sm text-sub">No {FORMAT_LABEL[active]} ideas in the Inbox.</p>
       ) : (
-        <InboxList key={active ?? "all"} ideas={list} sourceUrls={sourceUrls} siblingsById={siblingsById} badges={badges} />
+        <InboxList key={active ?? "all"} ideas={list} sourceUrls={sourceUrls} siblingsById={siblingsById} badges={badges} sharpenSlots={sharpenSlots} />
       )}
     </div>
   );
