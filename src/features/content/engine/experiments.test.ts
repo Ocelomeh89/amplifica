@@ -5,6 +5,10 @@ import type { WinnerPost } from "./winners";
 import {
   COVER_VALUES,
   EXPLORE_BELOW,
+  NEW_FORMAT,
+  SOURCE_VALUES,
+  competitorTest,
+  type CompetitorTags,
   candidateTests,
   controlRecipe,
   coverValue,
@@ -350,5 +354,87 @@ describe("one ranked list and held variables", () => {
     const ev = evidenceOf(batch({ hook_type: "question" }, EXPLORE_BELOW, 4), batch({ hook_type: "paradox" }, 3, 2));
     const pick = pickMoment(ev, [], ["hook_type"]);
     expect(pick!.test.variable).not.toBe("hook_type");
+  });
+});
+
+describe("slice 6: the source variable and the competitor test", () => {
+  // Control: question hook, talking head, save CTA, no on-screen text, face cover (5 posts each).
+  const base = () => batch({}, 5, 3);
+  const tags = (over: Partial<CompetitorTags> = {}): CompetitorTags => ({
+    hook_type: "question",
+    onscreen_text: "none",
+    cta_type: "save",
+    post_style: "talking-head",
+    cover_face: true,
+    cover_text: false,
+    cover_number: false,
+    tag_confidence: { hook_type: 0.9, onscreen_text: 0.9, cta_type: 0.9, post_style: 0.9, cover_face: 0.9, cover_text: 0.9, cover_number: 0.9 },
+    pushes_belief: null,
+    format_note: null,
+    ...over,
+  });
+
+  it("a barely-tried, confidently tagged post style seeds a format test", () => {
+    const ev = evidenceOf(base(), batch({ post_style: "text-broll" }, 1, 1));
+    expect(competitorTest(tags({ post_style: "text-broll" }), ev, controlRecipe(ev), [])).toEqual({
+      variable: "post_style",
+      value: "text-broll",
+      control: "talking-head",
+    });
+  });
+
+  it("takes the first qualifying choice in held-still order", () => {
+    const ev = evidenceOf(base());
+    expect(competitorTest(tags({ hook_type: "paradox", post_style: "text-broll" }), ev, controlRecipe(ev), []).variable).toBe("hook_type");
+  });
+
+  it("format tags all below LOW_CONFIDENCE seed a topic test: a rebuttal when it pushes a belief", () => {
+    const ev = evidenceOf(base());
+    const low = { hook_type: 0.4, onscreen_text: 0.4, cta_type: 0.4, post_style: 0.5, cover_face: 0.3, cover_text: 0.9, cover_number: 0.9 };
+    const t = competitorTest(tags({ hook_type: "paradox", post_style: "text-broll", cover_face: false, tag_confidence: low, pushes_belief: "max out your 401k" }), ev, controlRecipe(ev), []);
+    expect(t).toEqual({ variable: "source", value: "competitor-rebuttal", control: "own" });
+  });
+
+  it("a value with 5 or more posts, or held live, does not qualify; no pushed belief makes a take", () => {
+    const ev = evidenceOf(base(), batch({ post_style: "text-broll" }, EXPLORE_BELOW, 1));
+    expect(competitorTest(tags({ post_style: "text-broll" }), ev, controlRecipe(ev), [])).toEqual({ variable: "source", value: "competitor-take", control: "own" });
+    const ev2 = evidenceOf(base());
+    expect(competitorTest(tags({ post_style: "text-broll" }), ev2, controlRecipe(ev2), [{ variable: "post_style", value: "text-broll" }]).variable).toBe("source");
+  });
+
+  it("matching the control everywhere is a topic test; carousel and image styles never qualify", () => {
+    const ev = evidenceOf(base());
+    expect(competitorTest(tags(), ev, controlRecipe(ev), []).variable).toBe("source");
+    expect(competitorTest(tags({ post_style: "carousel" }), ev, controlRecipe(ev), []).variable).toBe("source");
+  });
+
+  it("a format note seeds a new-format post style test even while another new-format test is live", () => {
+    const ev = evidenceOf(base());
+    expect(competitorTest(tags({ post_style: "", format_note: "split screen, two speakers" }), ev, controlRecipe(ev), [{ variable: "post_style", value: NEW_FORMAT }])).toEqual({
+      variable: "post_style",
+      value: NEW_FORMAT,
+      control: "talking-head",
+    });
+  });
+
+  it("evidence counts source from the post, own by default; candidateTests never proposes source", () => {
+    const a = { ...post(), source: "competitor-take" as const };
+    const b = post();
+    const ev = evidenceCounts([a, b], scoresOf(score(a.id, 2), score(b.id, 2)), WINDOW);
+    expect(ev.source.map((r) => r.value)).toEqual([...SOURCE_VALUES]);
+    expect(ev.source.find((r) => r.value === "competitor-take")!.won).toBe(1);
+    expect(ev.source.find((r) => r.value === "own")!.won).toBe(1);
+    expect(candidateTests(ev, controlRecipe(ev), []).some((t) => t.variable === "source")).toBe(false);
+  });
+
+  it("tagsFromRecipe leaves post_style blank for a new-format recipe", () => {
+    expect(tagsFromRecipe({ post_style: NEW_FORMAT, cover: "none" }, "hook", NOW).post_style).toBe("");
+  });
+
+  it("the tally has a Source row and never lists new-format", () => {
+    const ev = evidenceOf(base());
+    const rows = tallyRows(ev);
+    expect(rows.map((r) => r.label)).toContain("Source");
+    expect(rows.flatMap((r) => r.values.map((v) => v.value))).not.toContain(NEW_FORMAT);
   });
 });
