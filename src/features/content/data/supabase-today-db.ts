@@ -1,13 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/shared/supabase/database.types";
 import { WINDOW_DAYS, scorePosts } from "@/features/content/engine/baseline";
-import { evidenceCounts, outcomeOf, tallyRows } from "@/features/content/engine/experiments";
+import { VIRAL_FROM } from "@/features/content/engine/baseline";
+import { creatorMedians, isFresh, multipleOf } from "@/features/content/engine/competitors";
+import { SOURCE_VALUES, evidenceCounts, outcomeOf, tallyRows, type SourceValue } from "@/features/content/engine/experiments";
 import { normalizePosts } from "@/features/content/engine/normalize";
 import { RECENT_HOOK_DAYS } from "@/features/content/engine/recreate";
 import type { WinnerPost } from "@/features/content/engine/winners";
 import { loadPostsForMath } from "./performance";
 import { loadQueued } from "./queries";
-import { STALE_RUN_MINUTES, type BriefView, type ExperimentRow, type IdeaLite, type NewExperiment, type RunRow, type TodayDb } from "./today";
+import { supabaseCompetitorsDb } from "./supabase-competitors-db";
+import { STALE_RUN_MINUTES, type BriefView, type CompetitorCandidate, type ExperimentRow, type IdeaLite, type NewExperiment, type RunRow, type TodayDb } from "./today";
 
 type Client = SupabaseClient<Database>;
 
@@ -16,7 +19,7 @@ const HOOKS_EACH = 40;
 const WINNER_HOOKS = 10;
 const LIVE = ["open", "posted", "judged", "unjudged"] as const;
 const EXP_COLUMNS =
-  "id, idea_id, day, slot, kind, moment, variable, value, recipe, reason, status, post_id, judge_at, verdict, judge_metrics, judged_at, created_at";
+  "id, idea_id, day, slot, kind, moment, variable, value, recipe, reason, status, post_id, judge_at, verdict, judge_metrics, judged_at, competitor_post_id, created_at";
 const RUN_COLUMNS = "id, day, kind, status, experiment_id, error, created_at";
 const IDEA_COLUMNS = "id, title, hook, pillar, hook_alt, status";
 
@@ -40,9 +43,37 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
   const runs = () => client.from("content_today_runs");
   const ideas = () => client.from("content_ideas");
 
-  const db: TodayDb = {
+  /** Idea id to source value, for ideas hanging from a competitor source (slice 6). Others are own. */
+  const postSources = async (ideaIds: string[]): Promise<Map<string, SourceValue>> => {
+    const out = new Map<string, SourceValue>();
+    if (ideaIds.length === 0) return out;
+    const { data: ideaRows, error } = await ideas().select("id, source_id").eq("user_id", userId).in("id", ideaIds);
+    if (error) throw new Error(`today idea sources: ${error.message}`);
+    const sourceIds = [...new Set((ideaRows ?? []).map((i) => (i as { source_id: string | null }).source_id).filter((x): x is string => !!x))];
+    if (sourceIds.length === 0) return out;
+    const { data: sources, error: sourceError } = await client.from("content_sources").select("id, kind, meta").eq("user_id", userId).eq("kind", "competitor").in("id", sourceIds);
+    if (sourceError) throw new Error(`today competitor sources: ${sourceError.message}`);
+    const angleBySource = new Map(
+      (sources ?? []).map((src) => {
+        const angle = ((src as { meta: { angle?: string } | null }).meta?.angle ?? "") as SourceValue;
+        return [(src as { id: string }).id, (SOURCE_VALUES as readonly string[]).includes(angle) ? angle : ("competitor-take" as SourceValue)];
+      })
+    );
+    for (const i of ideaRows ?? []) {
+      const row = i as { id: string; source_id: string | null };
+      const angle = row.source_id ? angleBySource.get(row.source_id) : undefined;
+      if (angle) out.set(row.id, angle);
+    }
+    return out;
+  };
+
+  const db: TodayDb & { postSources: typeof postSources } = {
+    postSources,
+
     async evidence(now) {
-      const posts = await loadPostsForMath(client, userId);
+      const loaded = await loadPostsForMath(client, userId);
+      const sources = await postSources([...new Set(loaded.map((p) => p.idea_id).filter((x): x is string => !!x))]);
+      const posts = loaded.map((p) => ({ ...p, source: (p.idea_id && sources.get(p.idea_id)) || ("own" as SourceValue) }));
       const { scores } = scorePosts(posts, now);
       const scoreMap = new Map(scores.map((s) => [s.id, s]));
       const windowStart = new Date(now.getTime() - WINDOW_DAYS * DAY);
@@ -271,6 +302,50 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
           },
         ])
       );
+    },
+
+    async competitorCandidate(day, now) {
+      const competitors = supabaseCompetitorsDb(client, userId);
+      const watching = new Set((await competitors.creators()).filter((c) => c.status === "watching").map((c) => c.id));
+      if (watching.size === 0) return null;
+      const posts = (await competitors.recentPosts(new Date(now.getTime() - WINDOW_DAYS * DAY).toISOString())).filter((p) => watching.has(p.creator_id));
+      const medians = creatorMedians(posts, now);
+      let best: CompetitorCandidate | null = null;
+      for (const p of posts) {
+        if (p.tagged_at === null || p.briefed_at !== null || !isFresh(p.posted_at, day)) continue;
+        const m = medians.get(p.creator_id);
+        const multiple = multipleOf(p.views, m);
+        if (multiple === null || multiple < VIRAL_FROM) continue;
+        if (!best || multiple > best.multiple) best = { post: p, username: p.username, multiple, thin: m?.thin ?? true };
+      }
+      return best;
+    },
+
+    async markCompetitorBriefed(postId, at) {
+      const { error } = await client.from("content_competitor_posts").update({ briefed_at: at }).eq("id", postId).eq("user_id", userId);
+      if (error) throw new Error(`today competitor briefed: ${error.message}`);
+    },
+
+    async insertCompetitorSource(c, angle) {
+      const { data, error } = await client
+        .from("content_sources")
+        .upsert(
+          {
+            user_id: userId,
+            kind: "competitor",
+            external_id: c.post.shortcode,
+            url: c.post.url,
+            title: (c.post.caption.trim() || `Reel by @${c.username}`).slice(0, 120),
+            status: "mined",
+            meta: { angle, username: c.username, multiple: c.multiple },
+          },
+          { onConflict: "user_id,kind,external_id" }
+        )
+        .select("id");
+      if (error) throw new Error(`today competitor source: ${error.message}`);
+      const id = (data?.[0] as { id: string } | undefined)?.id;
+      if (!id) throw new Error("today competitor source: no row written");
+      return id;
     },
 
     async page(day, now) {

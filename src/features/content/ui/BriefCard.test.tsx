@@ -30,6 +30,7 @@ const base: BriefView = {
   verdict: null,
   judge_metrics: {},
   judged_at: null,
+  competitor_post_id: null,
   created_at: "2026-10-27T10:00:00Z",
   idea: { id: "i1", title: "T", hook: "Your 401k is slow on purpose.", outline: [{ beat: "Say the line." }, { beat: "Pause." }, { beat: "Give the number." }], status: "queued" },
   post: null,

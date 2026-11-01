@@ -73,7 +73,13 @@ export const VARIABLE_LABEL: Record<Variable, string> = {
 };
 
 /** The slug or combination as the page words it. */
-export const valueLabel = (value: string): string => TAG_LABELS[value] ?? value.replace(/^./, (c) => c.toUpperCase());
+const EXTRA_LABELS: Record<string, string> = {
+  "new-format": "A new format",
+  own: "Your own topic",
+  "competitor-rebuttal": "Rebuttal of a competitor post",
+  "competitor-take": "A competitor's topic, your take",
+};
+export const valueLabel = (value: string): string => TAG_LABELS[value] ?? EXTRA_LABELS[value] ?? value.replace(/^./, (c) => c.toUpperCase());
 
 /** Every value a Reel brief can take for a variable. Reels never carry carousel or image. */
 export function valuesOf(variable: Counted): readonly string[] {

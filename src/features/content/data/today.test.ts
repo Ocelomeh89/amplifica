@@ -15,7 +15,7 @@ import {
   swapTest,
   type RunRow,
 } from "./today";
-import { DAY, NOW, exp, fakeDb, idea } from "./today.fake";
+import { DAY, NOW, candidate, exp, fakeDb, idea } from "./today.fake";
 
 const brief = (slot: number, over: Record<string, unknown> = {}) => ({ slot, title: `T${slot}`, hook: `H${slot}`, say: ["a", "b", "c"], message: "velocity", ...over });
 const caller = (out: unknown): ToolCaller & { calls: unknown[] } => {
@@ -235,5 +235,110 @@ describe("review fixes", () => {
     const f = fakeDb({ ideas: [idea("i1")], runs: [{ id: "r0", day: DAY, kind: "cron", status: "ready", experiment_id: null, error: "Inbox is empty", created_at: NOW.toISOString() }] });
     expect(await makeNow(f.db, NOW)).toMatchObject({ ok: true, runId: "r0" });
     expect(f.runs.find((r) => r.id === "r0")).toMatchObject({ status: "pending", error: "" });
+  });
+});
+
+/** Answers each call with the next output in turn. */
+const seq = (...outs: unknown[]): ToolCaller & { calls: { text: string }[] } => {
+  const calls: { text: string }[] = [];
+  return { calls, call: async (input) => (calls.push(input as { text: string }), outs[Math.min(calls.length - 1, outs.length - 1)]) };
+};
+
+describe("slice 6: the competitor brief", () => {
+  it("a fresh popular competitor post takes slot 2 as a topic test; slot 1 is a proposed brief", async () => {
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2")], candidate: candidate() });
+    const c = seq({ briefs: [brief(1), brief(2, { hook: "The 401k is the slow lane", title: "Why the 401k is slow" })] });
+    expect(await generateDaily(f.db, c, NOW)).toEqual({ made: 2, error: null });
+    const s1 = f.experiments.find((e) => e.slot === 1)!;
+    const s2 = f.experiments.find((e) => e.slot === 2)!;
+    expect(s1).toMatchObject({ kind: "proposed", idea_id: "i1", competitor_post_id: null });
+    expect(s2).toMatchObject({ kind: "competitor", variable: "source", value: "competitor-rebuttal", competitor_post_id: "cp1" });
+    expect(s2.reason).toContain("@micro.investing");
+    expect(f.calls.competitorSources).toEqual([{ shortcode: "A1", angle: "competitor-rebuttal" }]);
+    expect(f.calls.momentIdeas).toHaveLength(1);
+    expect(f.calls.briefed).toEqual(["cp1"]);
+    expect(c.calls[0].text).toContain("do not reuse its wording");
+  });
+
+  it("a format brief claims an Inbox idea, tests the competitor's value, and slot 1 avoids that variable", async () => {
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2")], candidate: candidate({ post_style: "text-broll" }) });
+    await generateDaily(f.db, seq({ briefs: [brief(1), brief(2)] }), NOW);
+    const s2 = f.experiments.find((e) => e.slot === 2)!;
+    expect(s2).toMatchObject({ kind: "competitor", variable: "post_style", value: "text-broll" });
+    expect(["i1", "i2"]).toContain(s2.idea_id);
+    expect(f.experiments.find((e) => e.slot === 1)!.variable).not.toBe("post_style");
+    expect(f.calls.momentIdeas).toHaveLength(0);
+  });
+
+  it("a format note seeds a new-format test and the note travels in the recipe", async () => {
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2")], candidate: candidate({ post_style: "", format_note: "split screen, two speakers" }) });
+    await generateDaily(f.db, seq({ briefs: [brief(1), brief(2)] }), NOW);
+    expect(f.experiments.find((e) => e.slot === 2)!).toMatchObject({ value: "new-format", recipe: expect.objectContaining({ format_note: "split screen, two speakers" }) });
+  });
+
+  it("no candidate: the day is slice 5's two proposed briefs", async () => {
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2")] });
+    await generateDaily(f.db, seq({ briefs: [brief(1), brief(2)] }), NOW);
+    expect(f.experiments.map((e) => e.kind)).toEqual(["proposed", "proposed"]);
+  });
+
+  it("a topic brief needs no Inbox idea", async () => {
+    const f = fakeDb({ ideas: [], candidate: candidate() });
+    expect(await generateDaily(f.db, seq({ briefs: [brief(2)] }), NOW)).toEqual({ made: 1, error: null });
+    expect(f.experiments.map((e) => [e.slot, e.kind])).toEqual([[2, "competitor"]]);
+  });
+
+  it("a post never seeds a second brief", async () => {
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2"), idea("i3"), idea("i4")], candidate: candidate() });
+    await generateDaily(f.db, seq({ briefs: [brief(1), brief(2)] }), NOW);
+    const DAY2 = new Date("2026-10-28T15:00:00Z");
+    await expireUnposted(f.db, DAY2);
+    await generateDaily(f.db, seq({ briefs: [brief(1), brief(2)] }), DAY2);
+    expect(f.experiments.filter((e) => e.kind === "competitor")).toHaveLength(1);
+  });
+
+  it("a copied brief is regenerated once and kept when the second is clean", async () => {
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2")], candidate: candidate() });
+    const copied = brief(2, { hook: "You should max out your 401k before anything else" });
+    const c = seq({ briefs: [brief(1), copied] }, { briefs: [brief(2, { hook: "The 401k is the slow lane" })] });
+    await generateDaily(f.db, c, NOW);
+    expect(c.calls).toHaveLength(2);
+    expect(f.experiments.find((e) => e.slot === 2)!.kind).toBe("competitor");
+  });
+
+  it("copied twice: slot 2 becomes a normal proposed brief and the post is used", async () => {
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2")], candidate: candidate() });
+    const copied = brief(2, { say: ["You should max out your 401k before anything else", "b", "c"] });
+    const c = seq({ briefs: [brief(1), copied] }, { briefs: [copied] }, { briefs: [brief(2)] });
+    expect(await generateDaily(f.db, c, NOW)).toEqual({ made: 2, error: null });
+    expect(c.calls).toHaveLength(3);
+    expect(f.experiments.find((e) => e.slot === 2)!).toMatchObject({ kind: "proposed", competitor_post_id: null, idea_id: "i2" });
+    expect(f.calls.briefed).toEqual(["cp1"]);
+    expect(f.calls.momentIdeas).toHaveLength(0);
+  });
+
+  it("swapping a topic brief claims a fresh Inbox idea, returns the competitor idea and clears the link", async () => {
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2")], candidate: candidate() });
+    await generateDaily(f.db, seq({ briefs: [brief(1), brief(2)] }), NOW);
+    const s2 = f.experiments.find((e) => e.slot === 2)!;
+    const competitorIdea = s2.idea_id;
+    const started = await swapTest(f.db, s2.id, NOW);
+    if (!started.ok) throw new Error(started.error);
+    await runSwap(f.db, seq({ briefs: [brief(2)] }), started.runId, s2.id, NOW);
+    expect(f.runs.find((r) => r.id === started.runId)!.status).toBe("ready");
+    expect(s2).toMatchObject({ kind: "proposed", competitor_post_id: null, idea_id: "i2" });
+    expect(s2.variable).not.toBe("source");
+    expect(f.calls.inbox).toContain(competitorIdea);
+  });
+
+  it("swapping a format brief keeps the idea and clears the link", async () => {
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2"), idea("i3")], candidate: candidate({ post_style: "text-broll" }) });
+    await generateDaily(f.db, seq({ briefs: [brief(1), brief(2)] }), NOW);
+    const s2 = f.experiments.find((e) => e.slot === 2)!;
+    const ideaId = s2.idea_id;
+    const started = await swapTest(f.db, s2.id, NOW);
+    if (!started.ok) throw new Error(started.error);
+    await runSwap(f.db, seq({ briefs: [brief(2)] }), started.runId, s2.id, NOW);
+    expect(s2).toMatchObject({ kind: "proposed", competitor_post_id: null, idea_id: ideaId });
   });
 });
