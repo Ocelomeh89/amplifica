@@ -25,8 +25,37 @@ describe("seedFromTracked", () => {
     ]);
   });
 
-  it("keeps a future-starting Amplicon at a positive offset", () => {
-    expect(seedFromTracked([a("f", 5000, "2027-01")], TODAY, null).book[0].startMonth).toBe(3);
+  it("schedules a future-starting Amplicon instead of booking it for free", () => {
+    const seed = seedFromTracked([a("f", 5000, "2027-01")], TODAY, null);
+    expect(seed.book).toEqual([]);
+    expect(seed.scheduled).toHaveLength(1);
+    expect(seed.scheduled[0].id).toBe("f");
+    expect(seed.scheduled[0].investment.startMonth).toBe(3);
+  });
+
+  it("an LTI maps to a flat coupon for its term", () => {
+    const lti: AmpliconLite = { ...a("r", 100000, "2026-01", 120, 0.04), incomeType: "LTI" };
+    const [inv] = seedFromTracked([lti], TODAY, null).book;
+    expect(inv.kind).toBe("lti");
+    expect(inv.monthlyPayout).toBeCloseTo(100000 * 0.04 / 12, 10);
+    expect(inv.termMonths).toBe(120);
+  });
+
+  it("LTIs and scheduled STIs never set the default draw size", () => {
+    const list: AmpliconLite[] = [
+      a("funded", 10000, "2026-01"),
+      { ...a("rental", 100000, "2026-09", 120, 0.04), incomeType: "LTI" },
+      a("planned", 40000, "2027-03"),
+    ];
+    expect(seedFromTracked(list, TODAY, null).nextDrawSize).toBe(10000);
+    // With no funded STI at all, a scheduled STI's size is the fallback.
+    expect(seedFromTracked([a("planned", 40000, "2027-03")], TODAY, null).nextDrawSize).toBe(40000);
+  });
+
+  it("maps LoCs to ledger lines; no LoCs means no lines", () => {
+    const seed = seedFromTracked([], TODAY, null, [{ id: "h", size: 50000, utilization: 12000, interestPct: 0.085 }]);
+    expect(seed.lines).toEqual([{ id: "h", rate: 0.085, size: 50000, balance: 12000 }]);
+    expect(seedFromTracked([], TODAY, null, []).lines).toBeUndefined();
   });
 
   it("drops matured Amplicons from the book", () => {
@@ -52,7 +81,7 @@ describe("seedFromTracked", () => {
   });
 
   it("no Amplicons → empty book, $0 draw", () => {
-    expect(seedFromTracked([], TODAY, null)).toEqual({ book: [], outstanding: 0, nextDrawSize: 0 });
+    expect(seedFromTracked([], TODAY, null)).toEqual({ book: [], outstanding: 0, nextDrawSize: 0, scheduled: [] });
   });
 
   it("tracked payouts in the simulator match the dashboard's buildSeries month by month", () => {

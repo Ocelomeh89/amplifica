@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { Pencil, Copy, Trash2 } from "lucide-react";
-import Field from "@/shared/ui/Field";
-import NumberInput from "@/shared/ui/NumberInput";
+import AmpliconFields from "./AmpliconFields";
 import { editAmplicon, duplicateAmplicon, deleteAmplicon } from "@/features/amplicons/data/actions";
 import { fmtCurrency, fmtPct, fmtDate } from "@/shared/format";
 
@@ -11,6 +10,7 @@ export interface AmpliconRowData {
   id: string;
   name: string;
   ai_type: string | null;
+  income_type: "STI" | "LTI";
   face_value: number;
   interest_pct: number;
   term_months: number;
@@ -42,41 +42,7 @@ export default function AmpliconRow({
             className="space-y-3"
           >
             <input type="hidden" name="id" value={a.id} />
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Field label="Name">
-                <input
-                  name="name"
-                  defaultValue={a.name}
-                  required
-                  className="w-full border border-edge rounded px-2 py-1.5 text-sm"
-                />
-              </Field>
-              <Field label="Type" hint="e.g. Real Estate Note, Trust Deed">
-                <input
-                  name="ai_type"
-                  defaultValue={a.ai_type ?? ""}
-                  className="w-full border border-edge rounded px-2 py-1.5 text-sm"
-                />
-              </Field>
-              <Field label="Face value ($)">
-                <NumberInput name="face_value" defaultValue={a.face_value} min={0} step={1000} required />
-              </Field>
-              <Field label="Term (months)">
-                <NumberInput name="term_months" defaultValue={a.term_months} min={1} step={1} required />
-              </Field>
-              <Field label="Annual interest (%)">
-                <NumberInput name="interest_pct" defaultValue={a.interest_pct * 100} min={0} step={0.1} required />
-              </Field>
-              <Field label="Start date">
-                <input
-                  name="start_date"
-                  type="date"
-                  defaultValue={a.start_date.slice(0, 10)}
-                  required
-                  className="w-full border border-edge rounded px-2 py-1.5 text-sm"
-                />
-              </Field>
-            </div>
+            <AmpliconFields d={a} cols={3} />
             <div className="flex gap-2">
               <button
                 type="submit"
@@ -101,10 +67,13 @@ export default function AmpliconRow({
   return (
     <tr className="border-b border-edge">
       <td className="py-2">{a.name}</td>
-      <td>{a.ai_type || "—"}</td>
+      <td>
+        <span className="text-[10px] font-semibold uppercase mr-1">{a.income_type}</span>
+        {a.ai_type || ""}
+      </td>
       <td>{fmtCurrency(a.face_value)}</td>
       <td>{fmtPct(a.interest_pct, 2)}</td>
-      <td>{a.term_months} mo</td>
+      <td>{a.income_type === "LTI" && a.term_months % 12 === 0 ? `${a.term_months / 12} yr` : `${a.term_months} mo`}</td>
       <td>{fmtDate(a.start_date)}</td>
       <td>{endMonth}</td>
       <td>{fmtCurrency(monthly)}</td>

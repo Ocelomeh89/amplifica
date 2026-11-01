@@ -24,6 +24,7 @@ export async function runCompetitorCron(a: {
     const collected = await collectRuns(a.db, apify, a.now);
     report.stored = collected.stored;
     report.failed = collected.failed;
+    errors.push(...collected.errors);
     const pull = await startWeeklyPull(a.db, apify, a.now, a.force);
     report.started = pull.started;
     if (pull.error) errors.push(pull.error);

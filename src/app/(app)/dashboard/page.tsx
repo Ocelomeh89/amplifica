@@ -1,5 +1,5 @@
 import { requireUser } from "@/shared/supabase/auth";
-import { fmtUSD0, fmtKUSD } from "@/shared/format";
+import { fmtUSD0, fmtKUSD, fmtMonth } from "@/shared/format";
 import { isoToYearMonth, currentYearMonth } from "@/shared/finance/dates";
 import {
   monthlyPayoutOf,
@@ -13,19 +13,27 @@ import InfoBox from "@/shared/ui/InfoBox";
 import ChartPair from "@/features/dashboard/ui/ChartPair";
 import { settingsFromRow } from "@/features/dashboard/settings";
 import { buildDashboardProjection, mergeProjection } from "@/features/dashboard/projection";
-import { latestAmpliconFaceValue } from "@/shared/finance/dashboard-seed";
+import { defaultNextDrawSize, type LocLite } from "@/shared/finance/dashboard-seed";
 import OptionalityMeter from "@/features/dashboard/ui/OptionalityMeter";
 import ProjectionSettingsPanel from "@/features/dashboard/ui/ProjectionSettingsPanel";
 
 export default async function DashboardPage() {
   const { supabase, user } = await requireUser();
 
-  const [{ data: profile }, { data: amplicons }, { data: projectionRow }] = await Promise.all([
+  const [{ data: profile }, { data: amplicons }, { data: projectionRow }, { data: locRows }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.from("amplicons").select("*"),
     // Errors (e.g. migration 0012 not yet applied) fall through to defaults.
     supabase.from("dashboard_projection_settings").select("*").eq("user_id", user.id).maybeSingle(),
+    supabase.from("locs").select("id, size, utilization, interest_pct"),
   ]);
+  // Numeric columns can arrive as strings; Number() normalises both.
+  const locs: LocLite[] = (locRows ?? []).map((l) => ({
+    id: l.id,
+    size: Number(l.size),
+    utilization: Number(l.utilization),
+    interestPct: Number(l.interest_pct ?? 0.1),
+  }));
   const projectionSettings = settingsFromRow(projectionRow ?? null);
 
   const todayMonth = currentYearMonth();
@@ -35,7 +43,9 @@ export default async function DashboardPage() {
     interestPct: a.interest_pct,
     termMonths: a.term_months,
     startMonth: isoToYearMonth(a.start_date),
+    incomeType: a.income_type ?? "STI",
   }));
+  const nameById = new Map((amplicons ?? []).map((a) => [a.id, a.name]));
 
   const activeNow = lites.filter((a) => isActiveAt(a, todayMonth));
   const currentMonthlyCashflow = activeNow.reduce((s, a) => s + monthlyPayoutOf(a), 0);
@@ -81,6 +91,7 @@ export default async function DashboardPage() {
     msc: monthlyContribution,
     cashflowGoalUSD,
     currentMonthlyCashflow,
+    locs,
   });
   const optionalityMonth = projection.optionality.kind === "reached" ? projection.optionality.month : null;
 
@@ -147,6 +158,36 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      {(projection.slips.length > 0 || projection.overLimit || projection.oversizedLtis.length > 0) && (
+        <div className="mb-4 rounded-lg border border-edge bg-card p-3 text-xs text-sub space-y-1">
+          {projection.slips.map((s) => (
+            <p key={s.id}>
+              <span className="font-semibold text-ink">{nameById.get(s.id) ?? "An Amplicon"}</span>{" "}
+              {s.actual
+                ? `is projected to start paying in ${fmtMonth(s.actual)}, not ${fmtMonth(s.requested)}: it is paid for from your line of credit at the next launch, once the current draw is mostly repaid.`
+                : `doesn't get a launch slot within the projection, so it never starts paying.`}
+            </p>
+          ))}
+          {projection.oversizedLtis.map((o) => (
+            <p key={`big-${o.id}`}>
+              <span className="font-semibold text-ink">{nameById.get(o.id) ?? "An LTI"}</span> is{" "}
+              {fmtUSD0(o.faceValue - o.drawSize)} bigger than your STI draw size when it launches (
+              {fmtUSD0(o.drawSize)}).{" "}
+              {o.paybackMonths != null
+                ? `Paying it back takes about ${o.paybackMonths} months before the next launch, instead of the usual 4 or fewer, which slows the flywheel.`
+                : "Your line of credit isn't paid back from it within the projection, so the flywheel stops launching."}{" "}
+              Keep an LTI at or below your draw size.
+            </p>
+          ))}
+          {projection.overLimit && (
+            <p>
+              From {fmtMonth(projection.overLimit.month)} the projection borrows more than your lines of credit allow, by
+              up to {fmtUSD0(projection.overLimit.peakExcess)}. You&apos;d need that much more credit to follow it.
+            </p>
+          )}
+        </div>
+      )}
+
       <ChartPair
         inceptionSeries={inceptionSeries}
         currentSeries={currentSeries}
@@ -158,7 +199,7 @@ export default async function DashboardPage() {
         controls={
           <ProjectionSettingsPanel
             settings={projectionSettings}
-            latestFaceValue={latestAmpliconFaceValue(lites)}
+            latestFaceValue={defaultNextDrawSize(lites, todayMonth)}
             msc={monthlyContribution}
           />
         }

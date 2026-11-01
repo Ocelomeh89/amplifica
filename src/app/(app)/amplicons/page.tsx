@@ -51,6 +51,7 @@ export default async function AmpliconsPage() {
                   interestPct: a.interest_pct,
                   termMonths: a.term_months,
                   startMonth,
+                  incomeType: a.income_type,
                 };
                 const monthly = monthlyPayoutOf(lite);
                 const active = isActiveAt(lite, todayMonth);
@@ -61,6 +62,7 @@ export default async function AmpliconsPage() {
                       id: a.id,
                       name: a.name,
                       ai_type: a.ai_type,
+                      income_type: a.income_type,
                       face_value: a.face_value,
                       interest_pct: a.interest_pct,
                       term_months: a.term_months,

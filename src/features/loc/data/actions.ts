@@ -3,7 +3,7 @@
 import { createClient } from "@/shared/supabase/server";
 import { requireUser } from "@/shared/supabase/auth";
 import { revalidatePath } from "next/cache";
-import { num, str } from "@/shared/forms";
+import { num, pct, str } from "@/shared/forms";
 
 export async function createLoC(formData: FormData) {
   const { supabase, user } = await requireUser();
@@ -12,6 +12,7 @@ export async function createLoC(formData: FormData) {
   const loc_type = str(formData, "loc_type") as "HELOC" | "PLOC";
   const size = num(formData, "size");
   const utilization = num(formData, "utilization");
+  const interest_pct = pct(formData, "interest_pct", 10);
 
   if (!name || (loc_type !== "HELOC" && loc_type !== "PLOC") || size <= 0) {
     throw new Error("Missing or invalid required fields.");
@@ -23,10 +24,12 @@ export async function createLoC(formData: FormData) {
     loc_type,
     size,
     utilization,
+    interest_pct,
   });
   if (error) throw new Error(error.message);
 
   revalidatePath("/loc");
+  revalidatePath("/dashboard");
 }
 
 export async function updateUtilization(formData: FormData) {
@@ -42,6 +45,24 @@ export async function updateUtilization(formData: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/loc");
+  revalidatePath("/dashboard");
+}
+
+export async function updateLoCRate(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const id = str(formData, "id");
+  const interest_pct = pct(formData, "interest_pct");
+  if (!id || !(interest_pct >= 0) || interest_pct > 1) return;
+
+  const { error } = await supabase
+    .from("locs")
+    .update({ interest_pct })
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/loc");
+  revalidatePath("/dashboard");
 }
 
 export async function deleteLoC(formData: FormData) {
@@ -51,4 +72,5 @@ export async function deleteLoC(formData: FormData) {
   const { error } = await supabase.from("locs").delete().eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/loc");
+  revalidatePath("/dashboard");
 }

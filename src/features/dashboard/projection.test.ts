@@ -51,14 +51,28 @@ describe("buildDashboardProjection", () => {
     expect(optionality.progress).toBeCloseTo(Math.min(600 / optionality.cashFlowAtOptionality, 1), 10);
   });
 
-  it("start delay pushes optionality to at least the delay month", () => {
-    const { optionality } = buildDashboardProjection({
+  it("a recorded LoC balance delays optionality versus none", () => {
+    const at = (utilization: number) => {
+      const o = buildDashboardProjection({
+        ...args,
+        locs: [{ id: "h", size: 100000, utilization, interestPct: 0.1 }],
+      }).optionality;
+      return o.kind === "reached" ? o.month : null;
+    };
+    expect(at(0)).not.toBeNull();
+    expect(at(40000)! > at(0)!).toBe(true);
+  });
+
+  it("reports a future Amplicon that waits past its date, and the over-limit month", () => {
+    const r = buildDashboardProjection({
       ...args,
-      cashflowGoalUSD: 1,
-      settings: { ...DEFAULT_PROJECTION_SETTINGS, startDelayMonths: 4 },
+      amplicons: [...amps, { id: "rental", faceValue: 100000, interestPct: 0.04, termMonths: 120, startMonth: "2026-12", incomeType: "LTI" }],
+      locs: [{ id: "h", size: 50000, utilization: 30000, interestPct: 0.1 }],
     });
-    expect(optionality.kind).toBe("reached");
-    if (optionality.kind === "reached") expect(optionality.month >= "2027-02").toBe(true);
+    expect(r.slips).toHaveLength(1);
+    expect(r.slips[0].id).toBe("rental");
+    expect(r.slips[0].actual == null || r.slips[0].actual > "2026-12").toBe(true);
+    expect(r.overLimit).not.toBeNull();
   });
 
   it("a $0 goal is the no-goal state, never 100%", () => {
@@ -74,6 +88,27 @@ describe("buildDashboardProjection", () => {
       kind: "not-reached",
       horizonYears: 30,
     });
+  });
+});
+
+describe("oversized LTI warning", () => {
+  const lti = (faceValue: number, startMonth: string): AmpliconLite => ({
+    id: "lti", faceValue, interestPct: 0.1, termMonths: 240, startMonth, incomeType: "LTI",
+  });
+
+  it("flags a planned LTI bigger than the draw size at its launch, without changing the projection", () => {
+    const big = buildDashboardProjection({ ...args, amplicons: [...amps, lti(100000, "2026-12")] });
+    expect(big.oversizedLtis).toHaveLength(1);
+    expect(big.oversizedLtis[0].drawSize).toBe(15000);
+    expect(big.oversizedLtis[0].faceValue).toBe(100000);
+  });
+
+  it("an LTI at or below the draw size is fine", () => {
+    expect(buildDashboardProjection({ ...args, amplicons: [...amps, lti(15000, "2026-12")] }).oversizedLtis).toEqual([]);
+  });
+
+  it("an LTI that has already started is never flagged", () => {
+    expect(buildDashboardProjection({ ...args, amplicons: [...amps, lti(100000, "2026-01")] }).oversizedLtis).toEqual([]);
   });
 });
 

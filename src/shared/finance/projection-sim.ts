@@ -11,6 +11,7 @@
 import {
   sanitizeSimInput,
   type ProjectionSimInput,
+  type ScheduledLaunch,
   type SimConfig,
 } from "./sim-input";
 import {
@@ -23,6 +24,15 @@ import {
   type ActiveInvestment,
   type InvestmentKind,
 } from "./sim-book";
+import {
+  accrueLines,
+  borrowFromLines,
+  cloneLines,
+  payDownLines,
+  totalBalance,
+  totalSize,
+  type LocLine,
+} from "./sim-ledger";
 
 export {
   PAYOFF_UPGRADE_MONTHS,
@@ -35,7 +45,8 @@ export {
   MAX_START_DELAY_MONTHS,
   sanitizeSimInput,
 } from "./sim-input";
-export type { ProjectionSimInput, SimConfig, SimInputIssue, SimSeed } from "./sim-input";
+export type { ProjectionSimInput, SimConfig, SimInputIssue, SimSeed, ScheduledLaunch } from "./sim-input";
+export type { LocLine } from "./sim-ledger";
 export type { ActiveInvestment, InvestmentKind } from "./sim-book";
 
 export interface ProjectionSimPoint {
@@ -92,6 +103,13 @@ export interface ProjectionSimResult {
   // any point in the run, not only at the horizon. Nothing in the Amplifier
   // reads it.
   bookByMonth: ActiveInvestment[][];
+  // Seeded runs with scheduled Amplicons: the first-payment month each one
+  // actually got (a scheduled Amplicon waits for a launch slot, so this can be
+  // later than requested). Absent from the map = never launched in the horizon.
+  scheduledStarts: Record<string, number>;
+  // Seeded runs with LoC lines: the user's total credit limit (Σ line sizes),
+  // for the over-limit warning. null when the run has no lines.
+  locLimit: number | null;
 }
 
 // A relaunch owed since the last payoff but not yet executed: it waits,
@@ -120,11 +138,54 @@ interface SimState {
   marketBalance: number;
   deployed: number;
   distributions: number;
+  // Seeded multi-line ledger; null = the scalar outstandingAmount alone (every
+  // unseeded run). When set, outstandingAmount mirrors Σ line balances.
+  lines: LocLine[] | null;
+  scheduled: ScheduledLaunch[];
+  scheduledStarts: Record<string, number>;
+}
+
+function syncOutstanding(state: SimState): void {
+  if (state.lines) state.outstandingAmount = totalBalance(state.lines);
+}
+
+// Add a draw to the LoC: one balance, or the cheapest line(s) with room.
+function borrow(state: SimState, amount: number): void {
+  if (state.lines) {
+    borrowFromLines(state.lines, amount);
+    syncOutstanding(state);
+  } else {
+    state.outstandingAmount += amount;
+  }
+}
+
+// Apply banked cash against the balance right after a draw.
+function applyCashToDraw(state: SimState): void {
+  const fromCash = Math.min(state.cash, state.outstandingAmount);
+  state.cash -= fromCash;
+  if (state.lines) {
+    payDownLines(state.lines, fromCash);
+    syncOutstanding(state);
+  } else {
+    state.outstandingAmount -= fromCash;
+  }
 }
 
 // Apply the month's net inflow to the ledger: surplus pays the LoC down and
 // banks past it as cash; a shortfall is covered from cash, then re-borrowed.
 function applyNetInflow(state: SimState, netInflow: number): void {
+  if (state.lines) {
+    if (netInflow >= 0) {
+      state.cash += payDownLines(state.lines, netInflow);
+    } else {
+      const shortfall = -netInflow;
+      const fromCash = Math.min(state.cash, shortfall);
+      state.cash -= fromCash;
+      borrowFromLines(state.lines, shortfall - fromCash);
+    }
+    syncOutstanding(state);
+    return;
+  }
   if (netInflow >= 0) {
     if (netInflow >= state.outstandingAmount) {
       state.cash += netInflow - state.outstandingAmount;
@@ -157,6 +218,7 @@ function payoffPredictedWithinGate(
   month: number
 ): boolean {
   if (config.payoffUpgradeMonths === Infinity) return true;
+  if (state.lines) return payoffPredictedOnLines(state, candidate, size, config, month);
   let balance = state.outstandingAmount + size;
   balance -= Math.min(state.cash, balance);
   if (balance <= 0) return true;
@@ -180,6 +242,57 @@ function payoffPredictedWithinGate(
   return false;
 }
 
+// The same forecast on the multi-line ledger: per-line accrual, highest-rate
+// paydown and cheapest-line draws, so the gate and the run never disagree.
+function payoffPredictedOnLines(
+  state: SimState,
+  candidate: ActiveInvestment,
+  size: number,
+  config: SimConfig,
+  month: number
+): boolean {
+  const lines = cloneLines(state.lines as LocLine[]);
+  borrowFromLines(lines, size);
+  payDownLines(lines, Math.min(state.cash, totalBalance(lines)));
+  if (totalBalance(lines) <= 0) return true;
+  const horizon = Math.ceil(config.payoffUpgradeMonths);
+  for (let j = 0; j < horizon; j++) {
+    const future = month + 1 + j;
+    accrueLines(lines);
+    const effMsc =
+      future >= config.mscStartMonth && (config.mscEndMonth == null || future < config.mscEndMonth) ? config.msc : 0;
+    const withdrawal =
+      config.withdrawalStartMonth != null && future >= config.withdrawalStartMonth ? config.monthlyWithdrawal : 0;
+    let inflow = effMsc - withdrawal;
+    for (const inv of state.book) {
+      if (isActive(inv, future)) inflow += inv.monthlyPayout;
+    }
+    if (isActive(candidate, future)) inflow += candidate.monthlyPayout;
+    if (inflow >= 0) payDownLines(lines, inflow);
+    else borrowFromLines(lines, -inflow);
+    const balance = totalBalance(lines);
+    if (balance <= 0 || balance < inflow) return true;
+  }
+  return false;
+}
+
+// A user-scheduled Amplicon takes this launch slot: drawn now, first payment
+// next month, no payoff gate, and the flywheel's own draw size is untouched.
+// lastInvStartMonth moves so the next step-up is judged on how fast THIS draw
+// was repaid.
+function launchScheduled(state: SimState, month: number): void {
+  const next = state.scheduled.shift() as ScheduledLaunch;
+  const inv: ActiveInvestment = { ...next.investment, startMonth: month + 1 };
+  state.book.push(inv);
+  state.investmentsLaunched += 1;
+  state.deployed += inv.faceValue;
+  borrow(state, inv.faceValue);
+  state.lastInvStartMonth = month + 1;
+  state.pendingLaunch = null;
+  state.scheduledStarts[next.id] = month + 1;
+  applyCashToDraw(state);
+}
+
 // The perpetual cadence (leaky-bucket): which kind a launch of `size` would
 // be. Pure preview — mixAcc is only advanced when the launch commits, so the
 // preview and the commit must share this exact condition.
@@ -200,7 +313,8 @@ function kindForSize(state: SimState, config: SimConfig, size: number): Investme
 // — which shrinks the effective draw and pulls the predicted payoff in — and
 // re-evaluates every month. Banked cash is deployed against the fresh draw.
 function manageLaunch(state: SimState, config: SimConfig, month: number, netInflow: number): void {
-  if (state.currentInvestmentSize <= 0 || month >= config.totalMonths - 1) {
+  const queued = state.scheduled.length > 0;
+  if ((state.currentInvestmentSize <= 0 && !queued) || month >= config.totalMonths - 1) {
     return;
   }
   if (state.pendingLaunch == null) {
@@ -209,6 +323,13 @@ function manageLaunch(state: SimState, config: SimConfig, month: number, netInfl
     const monthsToPayoff = month - state.lastInvStartMonth;
     state.pendingLaunch = { steppedEligible: monthsToPayoff < config.payoffUpgradeMonths };
   }
+
+  // A due scheduled Amplicon (its draw month has arrived) takes the slot.
+  if (queued && state.scheduled[0].investment.startMonth - 1 <= month) {
+    launchScheduled(state, month);
+    return;
+  }
+  if (state.currentInvestmentSize <= 0) return;
 
   const candidateSizes = state.pendingLaunch.steppedEligible
     ? [state.currentInvestmentSize * config.locIncrease, state.currentInvestmentSize]
@@ -230,13 +351,11 @@ function manageLaunch(state: SimState, config: SimConfig, month: number, netInfl
     if (kind === "perpetual") state.perpetualsLaunched += 1;
     // The leftover balance rolls into the fresh draw: the full Amplicon cost
     // is borrowed on top of what is still owed.
-    state.outstandingAmount += size;
+    borrow(state, size);
     state.lastInvStartMonth = month + 1;
     state.pendingLaunch = null;
 
-    const fromCash = Math.min(state.cash, state.outstandingAmount);
-    state.outstandingAmount -= fromCash;
-    state.cash -= fromCash;
+    applyCashToDraw(state);
     return;
   }
 }
@@ -251,22 +370,34 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
   // Seeded: no bootstrap draw. The tracked book pays as-is, the first draw is
   // tried at exactly nextDrawSize (never a step-up), and the payoff gate
   // decides when it lands.
+  // With real LoC lines the seeded balance is whatever the user owes today; a
+  // launch only becomes pending once the normal trigger fires (balance below
+  // one month's net inflow), and that first launch is never a step-up
+  // (lastInvStartMonth = -Infinity makes the payoff-speed test fail).
+  const seedLines = seed?.lines ? cloneLines(seed.lines) : null;
+  const seedOutstanding = seedLines ? totalBalance(seedLines) : seed?.outstanding ?? 0;
+  const seedPending = seedLines == null || seedOutstanding === 0;
   const state: SimState = seed
     ? {
         cash: 0,
-        outstandingAmount: seed.outstanding,
+        outstandingAmount: seedOutstanding,
         currentInvestmentSize: seed.nextDrawSize,
-        lastInvStartMonth: 0,
-        peakOutstanding: seed.outstanding,
+        lastInvStartMonth: seedPending ? 0 : -Infinity,
+        peakOutstanding: seedOutstanding,
         mixAcc: 0,
         book: seed.book.slice(),
-        pendingLaunch: { steppedEligible: false },
+        pendingLaunch: seedPending ? { steppedEligible: false } : null,
         investmentsLaunched: 0,
         perpetualsLaunched: 0,
         contributed: 0,
         marketBalance: 0,
         deployed: 0,
         distributions: 0,
+        lines: seedLines,
+        scheduled: (seed.scheduled ?? [])
+          .slice()
+          .sort((a, b) => a.investment.startMonth - b.investment.startMonth),
+        scheduledStarts: {},
       }
     : {
         cash: 0,
@@ -283,6 +414,9 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
         marketBalance: 0,
         deployed: initialInvestmentSize,
         distributions: 0,
+        lines: null,
+        scheduled: [],
+        scheduledStarts: {},
       };
 
   const series: ProjectionSimPoint[] = [];
@@ -300,7 +434,14 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
     // nothing accrues, banks, or launches.
     const idle = seed != null && m < seed.startDelayMonths;
 
-    if (!idle) state.outstandingAmount *= 1 + monthlyLocRate;
+    if (!idle) {
+      if (state.lines) {
+        accrueLines(state.lines);
+        syncOutstanding(state);
+      } else {
+        state.outstandingAmount *= 1 + monthlyLocRate;
+      }
+    }
 
     const payouts = collectPayouts(state.book, m);
     const cashFlow = effMsc + payouts.total;
@@ -361,5 +502,7 @@ export function runSimulation(input: ProjectionSimInput): ProjectionSimResult {
     finalDistributionsReceived: state.distributions,
     finalBook: state.book.slice(),
     bookByMonth,
+    scheduledStarts: state.scheduledStarts,
+    locLimit: state.lines ? totalSize(state.lines) : null,
   };
 }
