@@ -56,4 +56,12 @@ describe("0018_content_taste_sharpen.sql", () => {
     expect(sql.match(/auth\.uid\(\) = user_id/g)?.length).toBeGreaterThanOrEqual(15);
     expect(sql.match(/execute function public\.touch_updated_at/g)?.length).toBe(3);
   });
+
+  it("content_apply_taste_proposal runs as the caller and filters every write by p_user", () => {
+    const fn = from("create or replace function public.content_apply_taste_proposal");
+    expect(fn).toMatch(/security invoker/);
+    expect(fn).toMatch(/p_user uuid, p_proposal uuid, p_inserts jsonb, p_evidence jsonb, p_notes uuid\[\], p_at timestamptz/);
+    expect(fn.match(/p_user/g)!.length).toBeGreaterThanOrEqual(5);
+    expect(fn).toMatch(/where user_id = p_user/);
+  });
 });

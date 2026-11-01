@@ -368,6 +368,9 @@ export type Database = {
         Update: {
           hook?: string;
           hook_alt?: string | null;
+          belief_attacked?: string;
+          value_to_listener?: string;
+          why_it_stops?: string;
           hook_type?: string;
           title?: string;
           outline?: Json;
@@ -976,6 +979,17 @@ export type Database = {
           p_model: string;
           p_obsidian_path: string;
           p_redo: boolean;
+        };
+        Returns: undefined;
+      };
+      content_apply_taste_proposal: {
+        Args: {
+          p_user: string;
+          p_proposal: string;
+          p_inserts: Json;
+          p_evidence: Json;
+          p_notes: string[];
+          p_at: string;
         };
         Returns: undefined;
       };

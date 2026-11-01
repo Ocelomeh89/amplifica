@@ -57,7 +57,7 @@ export interface TasteDb {
   /** Sets the status and, with it, the active flag. False when no row matched. */
   setRule(id: string, patch: { status?: RuleStatus; rule?: string }): Promise<boolean>;
   insertManualRule(rule: string): Promise<string>;
-  page(): Promise<TastePage>;
+  page(now: Date): Promise<TastePage>;
 }
 
 const MINUTE = 60_000;

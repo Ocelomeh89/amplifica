@@ -92,3 +92,41 @@ create policy content_taste_proposals_select on public.content_taste_proposals f
 create policy content_taste_proposals_insert on public.content_taste_proposals for insert with check (auth.uid() = user_id);
 create policy content_taste_proposals_update on public.content_taste_proposals for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy content_taste_proposals_delete on public.content_taste_proposals for delete using (auth.uid() = user_id);
+
+-- A proposal's new rules, evidence on existing rules and the notes it read, in one
+-- transaction: a failure leaves the notes unused, so the next proposal reads them again.
+-- Runs as the caller (RLS applies) and filters every write by p_user as well.
+create or replace function public.content_apply_taste_proposal(
+  p_user uuid, p_proposal uuid, p_inserts jsonb, p_evidence jsonb, p_notes uuid[], p_at timestamptz
+) returns void
+language plpgsql
+security invoker
+as $$
+begin
+  insert into public.content_taste_rules (user_id, rule, evidence_count, origin, active, status, last_evidence_at, proposal_id, note_ids)
+  select p_user, i->>'rule', jsonb_array_length(i->'note_ids'), 'derived', false, 'proposed', p_at, p_proposal,
+         array(select jsonb_array_elements_text(i->'note_ids')::uuid)
+  from jsonb_array_elements(p_inserts) as i;
+
+  update public.content_taste_rules r
+  set note_ids = m.merged,
+      evidence_count = r.evidence_count + (cardinality(m.merged) - cardinality(r.note_ids)),
+      last_evidence_at = p_at
+  from (
+    select (e->>'rule_id')::uuid as rule_id,
+           array(select distinct x from unnest(
+             (select note_ids from public.content_taste_rules where id = (e->>'rule_id')::uuid and user_id = p_user)
+             || array(select jsonb_array_elements_text(e->'note_ids')::uuid)
+           ) as x) as merged
+    from jsonb_array_elements(p_evidence) as e
+  ) m
+  where r.id = m.rule_id and r.user_id = p_user and r.status in ('active', 'proposed');
+
+  update public.content_taste_notes
+  set proposal_id = p_proposal
+  where user_id = p_user and id = any(p_notes) and proposal_id is null;
+end;
+$$;
+
+revoke all on function public.content_apply_taste_proposal(uuid, uuid, jsonb, jsonb, uuid[], timestamptz) from public, anon;
+grant execute on function public.content_apply_taste_proposal(uuid, uuid, jsonb, jsonb, uuid[], timestamptz) to authenticated, service_role;
