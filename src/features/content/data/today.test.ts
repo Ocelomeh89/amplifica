@@ -357,3 +357,37 @@ describe("slice 6 review fixes", () => {
     expect((await makeNow(f.db, NOW)).ok).toBe(true);
   });
 });
+
+describe("taste rules and sharpens", () => {
+  it("the brief prompt carries the active rules", async () => {
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2")], rules: ["Name one real number."] });
+    const c = caller({ briefs: [brief(1), brief(2)] });
+    await generateDaily(f.db, c, NOW);
+    expect((c.calls[0] as { system: string }).system).toContain("- Name one real number.");
+  });
+
+  it("claiming an idea for a brief discards its live sharpen first", async () => {
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2")] });
+    await generateDaily(f.db, caller({ briefs: [brief(1), brief(2)] }), NOW);
+    expect(f.calls.discarded.sort()).toEqual(["i1", "i2"]);
+  });
+
+  it("a swap discards the sharpen on the idea it rewrites, and the swap prompt carries the rules", async () => {
+    const f = fakeDb({ ideas: [idea("i1")], experiments: [exp({ id: "e1", idea_id: "i1" })], rules: ["Take a side."] });
+    const started = await swapTest(f.db, "e1", NOW);
+    if (!started.ok) throw new Error(started.error);
+    const c = caller({ briefs: [brief(1)] });
+    await runSwap(f.db, c, started.runId, "e1", NOW);
+    expect(f.calls.discarded).toEqual(["i1"]);
+    expect((c.calls[0] as { system: string }).system).toContain("- Take a side.");
+  });
+
+  it("the moment prompt carries the rules too", async () => {
+    const f = fakeDb({ rules: ["Take a side."] });
+    const started = await startMoment(f.db, "Flying out at 6am", NOW);
+    if (!started.ok) throw new Error(started.error);
+    const c = caller({ briefs: [brief(3)] });
+    await runMoment(f.db, c, started.runId, "Flying out at 6am", NOW);
+    expect((c.calls[0] as { system: string }).system).toContain("- Take a side.");
+  });
+});

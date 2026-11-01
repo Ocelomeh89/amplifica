@@ -18,7 +18,7 @@ curl -sS --max-time 60 -o /tmp/context.json -w '%{http_code}' "$CONTENT_API_BASE
 
 Anything other than 200 is a failure — stop and post the step-7 failure line.
 
-It contains: `taste_rules`, `recent_feedback` (14 days, with `feedback_reason`),
+It contains: `taste_rules` (rules with origin `derived` are rules Miguel approved on the Taste page, so follow them), `recent_feedback` (14 days, with `feedback_reason`),
 `queue_depth` per format, `known_titles` (do not propose these again),
 `source_rules` (allow and deny patterns), `known_sources` (recordings already
 seen, with `status`), `requested_sources` (open these first),

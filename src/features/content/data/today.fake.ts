@@ -24,12 +24,12 @@ function evidence(): Evidence {
 
 type Snapshot = { hook: string; hook_alt: string | null; hook_type: string; title: string; outline: unknown; status: string; score: number };
 
-export function fakeDb(opts: { updateFails?: boolean; ideas?: IdeaLite[]; patchFails?: string[]; experiments?: ExperimentRow[]; runs?: RunRow[]; posted?: { exp: ExperimentRow; posted_at: string }[]; math?: Map<string, { multiplier: Multiplier; normalized: null }>; candidate?: CompetitorCandidate | null } = {}) {
+export function fakeDb(opts: { updateFails?: boolean; ideas?: IdeaLite[]; patchFails?: string[]; experiments?: ExperimentRow[]; runs?: RunRow[]; posted?: { exp: ExperimentRow; posted_at: string }[]; math?: Map<string, { multiplier: Multiplier; normalized: null }>; candidate?: CompetitorCandidate | null; rules?: string[] } = {}) {
   const ideas = new Map<string, IdeaLite & { hook_alt: string | null; status: string }>();
   for (const i of opts.ideas ?? []) ideas.set(i.id, { ...i, hook_alt: null, status: "inbox" });
   const experiments: ExperimentRow[] = [...(opts.experiments ?? [])];
   const runs: RunRow[] = [...(opts.runs ?? [])];
-  const calls = { patch: [] as string[], restore: [] as string[], inbox: [] as string[], sources: [] as string[], momentIdeas: [] as unknown[], runsInserted: 0, briefed: [] as string[], competitorSources: [] as { shortcode: string; angle: string }[] };
+  const calls = { patch: [] as string[], restore: [] as string[], inbox: [] as string[], sources: [] as string[], momentIdeas: [] as unknown[], runsInserted: 0, briefed: [] as string[], discarded: [] as string[], competitorSources: [] as { shortcode: string; angle: string }[] };
   let seq = 0;
   const impl: Partial<TodayDb> = {
     async evidence() {
@@ -87,6 +87,12 @@ export function fakeDb(opts: { updateFails?: boolean; ideas?: IdeaLite[]; patchF
       const id = `idea-m${++seq}`;
       ideas.set(id, { id, title: idea.title, hook: idea.hook, pillar: "", hook_alt: null, status: "queued" });
       return id;
+    },
+    async activeRules() {
+      return opts.rules ?? [];
+    },
+    async discardSharpen(ideaId) {
+      calls.discarded.push(ideaId);
     },
     async competitorCandidate() {
       const c = opts.candidate ?? null;

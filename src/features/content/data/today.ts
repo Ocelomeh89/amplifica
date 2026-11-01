@@ -152,6 +152,10 @@ export interface TodayDb {
   markCompetitorBriefed(postId: string, at: string): Promise<void>;
   /** The `competitor` source a topic brief's idea hangs from; `meta.angle` is the source value. */
   insertCompetitorSource(c: CompetitorCandidate, angle: SourceValue): Promise<string>;
+  /** Miguel's approved taste rules, best evidence first. */
+  activeRules(): Promise<string[]>;
+  /** Cancels a live Sharpen on the idea: once a brief claims it, a later Pick must not overwrite the brief. */
+  discardSharpen(ideaId: string): Promise<void>;
 }
 
 /** The cron run's error text when there was nothing in the Inbox to brief. Make now may run again after it. */
@@ -229,9 +233,12 @@ export async function makeNow(db: TodayDb, now: Date): Promise<Started> {
 
 const idsOf = (slots: BriefSlotInput[]) => slots.map((s) => s.slot);
 
-async function askClaude(caller: ToolCaller, slots: BriefSlotInput[], hooks: { winnerHooks: string[]; recentHooks: string[] }, fixed: Record<number, string>): Promise<BriefOut[]> {
+type BriefContext = { winnerHooks: string[]; recentHooks: string[]; rules: string[] };
+
+async function askClaude(caller: ToolCaller, slots: BriefSlotInput[], ctx: BriefContext, fixed: Record<number, string>): Promise<BriefOut[]> {
+  const { rules, ...hooks } = ctx;
   const raw = await caller.call({
-    system: briefSystemPrompt(),
+    system: briefSystemPrompt(rules),
     text: renderBriefTurn({ slots, ...hooks }),
     tool: { name: BRIEF_TOOL_NAME, description: "Record one brief for each slot.", schema: briefToolSchema() },
     maxTokens: 6000,
@@ -333,7 +340,7 @@ export async function runDaily(db: TodayDb, caller: ToolCaller, runId: string, n
         ...(p.competitor ? { competitor: competitorInput(p.competitor) } : {}),
       };
     };
-    const hooks = { winnerHooks, recentHooks };
+    const hooks: BriefContext = { winnerHooks, recentHooks, rules: await db.activeRules() };
     const briefs = await askClaude(caller, planned.map(inputFor), hooks, fixedMessages(planned));
     const briefFor = (slot: number) => briefs.find((x) => x.slot === slot)!;
 
@@ -365,6 +372,7 @@ export async function runDaily(db: TodayDb, caller: ToolCaller, runId: string, n
     for (const p of planned) {
       if (p.ideaId === null) continue;
       const i = ideaOf(p.ideaId)!;
+      await db.discardSharpen(p.ideaId);
       const before = await db.patchIdea(p.ideaId, briefIdeaPatch(briefFor(p.slot), p.test, control, i.hook_alt ?? i.hook));
       if (before === null) return await fail("An idea changed while the briefs were made. Try again.");
       patched.push({ id: p.ideaId, snapshot: before });
@@ -446,7 +454,7 @@ export async function runMoment(db: TodayDb, caller: ToolCaller, runId: string, 
     const [b] = await askClaude(
       caller,
       [{ slot: 3, test: pick.test, held: pick.control, idea: null, moment: text }],
-      { winnerHooks, recentHooks },
+      { winnerHooks, recentHooks, rules: await db.activeRules() },
       fixedMessages([{ slot: 3, test: pick.test }])
     );
     const sourceId = await db.insertMomentSource(text, day);
@@ -519,9 +527,10 @@ export async function runSwap(db: TodayDb, caller: ToolCaller, runId: string, ex
     const [b] = await askClaude(
       caller,
       [{ slot: old.slot, test, held: control, idea: { title: idea.title, hook: idea.hook, pillar: idea.pillar }, moment: old.moment }],
-      { winnerHooks, recentHooks },
+      { winnerHooks, recentHooks, rules: await db.activeRules() },
       fixedMessages([{ slot: old.slot, test }])
     );
+    await db.discardSharpen(idea.id);
     const before = await db.patchIdea(idea.id, briefIdeaPatch(b, test, control, idea.hook_alt ?? idea.hook));
     if (before === null) return await fail("The idea changed while the brief was made. Try again.");
     snapshot = { id: idea.id, snapshot: before };

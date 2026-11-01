@@ -150,3 +150,14 @@ describe("slice 6: competitor slots", () => {
       .toBe("From @ericsfinancials: 5.0× their typical views. Tests their post style.");
   });
 });
+
+describe("approved taste rules", () => {
+  it("lists them under their heading, and leaves the heading out when there are none", () => {
+    const p = briefSystemPrompt(["Open on the belief, never on a question.", "Name one real number."]);
+    expect(p).toContain("Miguel's approved rules");
+    expect(p).toContain("- Open on the belief, never on a question.");
+    expect(p).toContain("- Name one real number.");
+    expect(briefSystemPrompt()).not.toContain("Miguel's approved rules");
+    expect(briefSystemPrompt([])).not.toContain("Miguel's approved rules");
+  });
+});
