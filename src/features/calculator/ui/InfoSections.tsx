@@ -185,14 +185,9 @@ export default function InfoSections() {
         </p>
       </Section>
 
-      <div className="mt-10 pt-4 border-t border-edge text-xs text-sub space-y-2">
+      {/* The disclaimer lives in the shared PublicFooter directly below. */}
+      <div className="mt-10 pt-4 border-t border-edge text-xs text-sub">
         <p>Last updated: {LAST_UPDATED}</p>
-        <p>
-          Amplifica Wealth is an educational publisher, not a registered investment
-          adviser. Nothing on this page is financial, legal, or tax advice, and no
-          return is promised or implied. Borrowing to invest involves real risk,
-          including the loss of borrowed principal.
-        </p>
       </div>
     </div>
   );

@@ -11,7 +11,7 @@ export default function PublicFooter() {
             Engineer your future. Amplify your wealth. Live your way.
           </span>
           <div className="flex flex-wrap items-center gap-6">
-            <nav aria-label="Footer" className="flex gap-6 text-sm text-sub">
+            <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-sub">
               <Link href="/calculator" className="hover:text-purple">Calculator</Link>
               <a href={NEWSLETTER_URL} className="hover:text-purple">Newsletter</a>
               <a href={COMMUNITY_URL} className="hover:text-purple">Community</a>
