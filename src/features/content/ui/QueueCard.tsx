@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowUp, ArrowDown, Archive, CheckCircle2 } from "lucide-react";
 import type { ContentIdea } from "@/shared/supabase/database.types";
@@ -10,7 +10,20 @@ import CopyCommand from "./CopyCommand";
 import DraftBadge from "./DraftBadge";
 import FormatBadge from "./FormatBadge";
 
-export default function QueueCard({ idea, position, total, draft = null }: { idea: ContentIdea; position: number; total: number; draft?: DraftState | null }) {
+export default function QueueCard({
+  idea,
+  position,
+  total,
+  draft = null,
+  sharpenSlot,
+}: {
+  idea: ContentIdea;
+  position: number;
+  total: number;
+  draft?: DraftState | null;
+  /** The Sharpen panel for this idea, built by the page so the card stays free of server-action imports. */
+  sharpenSlot?: ReactNode;
+}) {
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,6 +92,7 @@ export default function QueueCard({ idea, position, total, draft = null }: { ide
           </form>
         </div>
         {error && <div className="text-xs text-red-600 mt-1">{error}</div>}
+        {sharpenSlot}
       </div>
     </article>
   );

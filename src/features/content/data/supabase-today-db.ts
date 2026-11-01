@@ -304,6 +304,27 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
       );
     },
 
+    async activeRules() {
+      const { data, error } = await client
+        .from("content_taste_rules")
+        .select("rule")
+        .eq("user_id", userId)
+        .eq("status", "active")
+        .order("evidence_count", { ascending: false });
+      if (error) throw new Error(`today rules: ${error.message}`);
+      return (data ?? []).map((r) => (r as { rule: string }).rule);
+    },
+
+    async discardSharpen(ideaId) {
+      const { error } = await client
+        .from("content_sharpens")
+        .update({ status: "discarded" })
+        .eq("user_id", userId)
+        .eq("idea_id", ideaId)
+        .in("status", ["pending", "ready"]);
+      if (error) throw new Error(`today discard sharpen: ${error.message}`);
+    },
+
     async competitorCandidate(day, now) {
       const competitors = supabaseCompetitorsDb(client, userId);
       const watching = new Set((await competitors.creators()).filter((c) => c.status === "watching").map((c) => c.id));

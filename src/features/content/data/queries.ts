@@ -1,5 +1,4 @@
 import "server-only";
-
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/shared/supabase/database.types";
 import { pickSnapshots } from "@/features/content/engine/snapshots";
@@ -9,6 +8,8 @@ import { summarizeDraft, type DraftState } from "@/features/content/engine/draft
 import type { RecreateOption } from "@/features/content/engine/recreate";
 import { STALE_PENDING_MINUTES } from "@/features/content/engine/recreate";
 import type { OpenRecreation } from "./recreate";
+import type { SharpenRow } from "./sharpen";
+import { supabaseSharpenDb } from "./supabase-sharpen-db";
 
 // Reads behind the /content pages. Every query is scoped to the user as well
 // as to RLS. The pages stay routing and layout; the Supabase calls live here.
@@ -159,6 +160,30 @@ export async function loadDraftStates(db: Db, userId: string, ideaIds: string[])
     if (s) out[id] = s;
   }
   return out;
+}
+
+/**
+ * Each idea's live Sharpen card, and why an idea cannot be sharpened: it is already drafted
+ * (a draft row or an Obsidian file) or it belongs to an open or posted Today brief.
+ */
+export async function loadSharpenStates(
+  db: Db,
+  userId: string,
+  ideas: { id: string; obsidian_path: string | null }[],
+  now: Date
+): Promise<{ sharpens: Record<string, SharpenRow>; blocked: Record<string, string> }> {
+  if (ideas.length === 0) return { sharpens: {}, blocked: {} };
+  const ids = ideas.map((i) => i.id);
+  const [live, drafts, briefs] = await Promise.all([
+    supabaseSharpenDb(db, userId).liveForIdeas(ids, now),
+    db.from("content_drafts").select("idea_id").eq("user_id", userId).in("idea_id", ids),
+    db.from("content_experiments").select("idea_id").eq("user_id", userId).in("idea_id", ids).in("status", ["open", "posted"]),
+  ]);
+  const blocked: Record<string, string> = {};
+  for (const i of ideas) if (i.obsidian_path) blocked[i.id] = "Already drafted.";
+  for (const r of must(drafts) ?? []) blocked[r.idea_id] = "Already drafted.";
+  for (const r of must(briefs) ?? []) if (!blocked[r.idea_id]) blocked[r.idea_id] = "This idea is in today's brief.";
+  return { sharpens: Object.fromEntries(live), blocked };
 }
 
 /** The newest draft row for the idea page, or null. */

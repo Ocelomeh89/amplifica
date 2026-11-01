@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import clsx from "clsx";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
@@ -20,9 +20,11 @@ export type IdeaCardProps = {
   onPassOpenChange?: (open: boolean) => void;
   badge?: string | null;
   rank?: number;
+  /** The Sharpen panel for this idea, built by the page so the card stays free of server-action imports. */
+  sharpenSlot?: ReactNode;
 };
 
-export default function IdeaCard({ idea, sourceUrl, siblings, focused, passOpen, onPassOpenChange, badge, rank }: IdeaCardProps) {
+export default function IdeaCard({ idea, sourceUrl, siblings, focused, passOpen, onPassOpenChange, badge, rank, sharpenSlot }: IdeaCardProps) {
   const [localOpen, setLocalOpen] = useState(false);
   const open = passOpen ?? localOpen;
   const setOpen = onPassOpenChange ?? setLocalOpen;
@@ -125,6 +127,7 @@ export default function IdeaCard({ idea, sourceUrl, siblings, focused, passOpen,
           </form>
         )}
       </div>
+      {sharpenSlot}
     </article>
   );
 }

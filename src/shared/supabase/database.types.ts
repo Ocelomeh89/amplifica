@@ -368,6 +368,9 @@ export type Database = {
         Update: {
           hook?: string;
           hook_alt?: string | null;
+          belief_attacked?: string;
+          value_to_listener?: string;
+          why_it_stops?: string;
           hook_type?: string;
           title?: string;
           outline?: Json;
@@ -420,6 +423,9 @@ export type Database = {
           evidence_count: number;
           origin: "derived" | "manual";
           active: boolean;
+          status: "proposed" | "active" | "off" | "rejected";
+          proposal_id: string | null;
+          note_ids: string[];
           last_evidence_at: string | null;
           created_at: string;
           updated_at: string;
@@ -430,13 +436,100 @@ export type Database = {
           evidence_count?: number;
           origin?: "derived" | "manual";
           active?: boolean;
+          status?: "proposed" | "active" | "off" | "rejected";
+          proposal_id?: string | null;
+          note_ids?: string[];
           last_evidence_at?: string | null;
         };
         Update: {
           rule?: string;
           evidence_count?: number;
           active?: boolean;
+          status?: "proposed" | "active" | "off" | "rejected";
+          proposal_id?: string | null;
+          note_ids?: string[];
           last_evidence_at?: string | null;
+        };
+        Relationships: [];
+      };
+      content_taste_notes: {
+        Row: {
+          id: string;
+          user_id: string;
+          idea_id: string | null;
+          chips: string[];
+          text: string;
+          source: "sharpen" | "pass";
+          proposal_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          idea_id?: string | null;
+          chips?: string[];
+          text?: string;
+          source: "sharpen" | "pass";
+          proposal_id?: string | null;
+        };
+        Update: {
+          proposal_id?: string | null;
+        };
+        Relationships: [];
+      };
+      content_sharpens: {
+        Row: {
+          id: string;
+          user_id: string;
+          idea_id: string;
+          note_id: string | null;
+          chips: string[];
+          text: string;
+          status: "pending" | "ready" | "failed" | "picked" | "discarded";
+          options: Json;
+          error: string;
+          picked_index: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          idea_id: string;
+          note_id?: string | null;
+          chips?: string[];
+          text?: string;
+          status?: "pending" | "ready" | "failed" | "picked" | "discarded";
+          options?: Json;
+          error?: string;
+          picked_index?: number | null;
+        };
+        Update: {
+          status?: "pending" | "ready" | "failed" | "picked" | "discarded";
+          options?: Json;
+          error?: string;
+          picked_index?: number | null;
+        };
+        Relationships: [];
+      };
+      content_taste_proposals: {
+        Row: {
+          id: string;
+          user_id: string;
+          status: "pending" | "ready" | "failed";
+          kind: "auto" | "manual";
+          error: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          status?: "pending" | "ready" | "failed";
+          kind: "auto" | "manual";
+          error?: string;
+        };
+        Update: {
+          status?: "pending" | "ready" | "failed";
+          error?: string;
         };
         Relationships: [];
       };
@@ -886,6 +979,17 @@ export type Database = {
           p_model: string;
           p_obsidian_path: string;
           p_redo: boolean;
+        };
+        Returns: undefined;
+      };
+      content_apply_taste_proposal: {
+        Args: {
+          p_user: string;
+          p_proposal: string;
+          p_inserts: Json;
+          p_evidence: Json;
+          p_notes: string[];
+          p_at: string;
         };
         Returns: undefined;
       };

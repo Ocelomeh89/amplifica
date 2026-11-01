@@ -69,4 +69,10 @@ describe("IdeaCard", () => {
     rerender(<IdeaCard idea={idea} sourceUrl={null} siblings={[]} />);
     expect(screen.queryByText(/^#\d/)).toBeNull();
   });
+  it("renders what the page puts in the sharpen slot below the actions, and nothing otherwise", () => {
+    const { rerender } = render(<IdeaCard idea={idea} sourceUrl={null} siblings={[]} sharpenSlot={<p>SHARPEN SLOT</p>} />);
+    expect(screen.getByText("SHARPEN SLOT")).toBeInTheDocument();
+    rerender(<IdeaCard idea={idea} sourceUrl={null} siblings={[]} />);
+    expect(screen.queryByText("SHARPEN SLOT")).toBeNull();
+  });
 });

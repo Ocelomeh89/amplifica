@@ -1,9 +1,10 @@
 import Link from "next/link";
 import clsx from "clsx";
 import { requireContentOwner } from "@/features/content/data/owner";
-import { loadDraftStates, loadQueued } from "@/features/content/data/queries";
+import { loadDraftStates, loadQueued, loadSharpenStates } from "@/features/content/data/queries";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import QueueCard from "@/features/content/ui/QueueCard";
+import SharpenPanel from "@/features/content/ui/SharpenPanel";
 import { FORMATS, FORMAT_LABEL, type Format } from "@/features/content/engine/types";
 
 export default async function ContentQueuePage({ searchParams }: { searchParams: { format?: string } }) {
@@ -14,6 +15,7 @@ export default async function ContentQueuePage({ searchParams }: { searchParams:
   const counts = Object.fromEntries(FORMATS.map((f) => [f, all.filter((i) => i.format === f).length])) as Record<Format, number>;
   const list = all.filter((i) => i.format === format);
   const drafts = await loadDraftStates(supabase, user.id, list.map((i) => i.id));
+  const sharp = await loadSharpenStates(supabase, user.id, list, new Date());
 
   return (
     <div className="max-w-3xl">
@@ -36,7 +38,16 @@ export default async function ContentQueuePage({ searchParams }: { searchParams:
       {list.length === 0 ? (
         <p className="text-sm text-sub">Nothing queued for {FORMAT_LABEL[format]} yet. Like an idea in the Inbox to add one.</p>
       ) : (
-        list.map((idea, i) => <QueueCard key={idea.id} idea={idea} position={i} total={list.length} draft={drafts[idea.id] ?? null} />)
+        list.map((idea, i) => (
+          <QueueCard
+            key={idea.id}
+            idea={idea}
+            position={i}
+            total={list.length}
+            draft={drafts[idea.id] ?? null}
+            sharpenSlot={<SharpenPanel ideaId={idea.id} sharpen={sharp.sharpens[idea.id] ?? null} blocked={sharp.blocked[idea.id] ?? null} />}
+          />
+        ))
       )}
     </div>
   );

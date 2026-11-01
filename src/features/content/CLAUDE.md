@@ -82,6 +82,14 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
   `competitors.fake.ts` for tests); `supabase-competitors-db.ts` the adapter and the Creators page;
   `competitor-cron.ts` the cron step; `competitor-actions.ts` the Creators page actions. Today's slot 2 lives in
   `data/today.ts`. UI: `CreatorsTable`, `AddCreatorForm`, the competitor line in `BriefCard`. Route `/content/creators`.
+- Sharpen and the taste loop (4c): `engine/sharpen.ts` (the four marks, 3-rewrite schema and prompt, the in-place idea
+  patch) and `engine/taste.ts` (constants, the proposal prompt, `mergeProposal`) are pure. `data/sharpen.ts` is the
+  Sharpen flow over `SharpenDb` (`sharpen.fake.ts`); `data/taste.ts` the notes, proposals and approval flow over
+  `TasteDb` (`taste.fake.ts`); `supabase-sharpen-db.ts` and `supabase-taste-db.ts` are the adapters (the proposal
+  write is the `content_apply_taste_proposal` SQL function); `sharpen-actions.ts` and `taste-actions.ts` hold the
+  Server Actions; `taste-run.ts` starts a proposal in the background (a plain module: every export of a
+  server-action file is an endpoint). UI: `SharpenPanel` (built by the pages and passed to the cards as a slot),
+  `TasteRules`. `loadSharpenStates` in `queries.ts` feeds the pages. Route `/content/taste`.
 - `routines/` (repo root) — routine instructions and README; `.claude/skills/`
   holds the local companions `/content-plaud`, `/content-daily`, `/content-draft` and
   `/content-voice`.
@@ -96,7 +104,7 @@ these are all the places that know it exists:
 - `src/app/robots.ts` — `/content` disallow; `src/app/content-route.test.ts` asserts it and the sitemap.
 - `vercel.json` — the daily metrics cron. `next.config.mjs` — `jsdom` external package.
 - `package.json` — `jsdom`, `@mozilla/readability`, `@anthropic-ai/sdk` are used only here.
-- `supabase/migrations/0008`, `0009`, `0011`, `0013`, `0014`, `0015`, `0016`, `0017` and the `content_*` types in `shared/supabase/database.types.ts`.
+- `supabase/migrations/0008`, `0009`, `0011`, `0013`, `0014`, `0015`, `0016`, `0017`, `0018` and the `content_*` types in `shared/supabase/database.types.ts`.
 - `routines/`, `.claude/skills/content-*` (incl. `content-draft`, `content-voice`), `docs/superpowers/**` — the routines and their docs.
 - Env: `CONTENT_OWNER_USER_ID`, `CONTENT_ENGINE_SECRET`, `CRON_SECRET`, `COMPOSIO_APIFY_CONNECTION_ID`, and the platform keys in `docs/PRODUCT-STATUS.md`.
 
@@ -203,6 +211,19 @@ these are all the places that know it exists:
   topic brief's swap takes a fresh Inbox idea. `new-format` is a recipe value only: Mark posted leaves
   `post_style` blank for it and the tally never counts it. A post's `source` comes from its idea's `competitor`
   source (`meta.angle`); everything else is `own`. Removed creators are never pulled and never seed briefs.
+- Sharpen (4c): one live sharpen per idea (partial unique index), 10 a day (every status counts), a pending row older
+  than 10 minutes is failed. Only an `inbox` or `queued` idea that has no draft or Obsidian file and no open or
+  posted Today experiment can be sharpened. Pick claims the row (`ready` to `picked`), re-checks the idea, then
+  rewrites it in place (old hook to `hook_alt`; status, format, pillar, score and rank stay) and, for a queued idea,
+  renames its ClickUp task (`refreshClickUpTask`, best effort) or creates the one it lacks. Try again reuses the chips and text and stores no second note. When Today claims an idea for a brief it
+  discards that idea's live sharpen first.
+- Taste rules (4c): a rule is `proposed`, `active`, `off` or `rejected`, and `active = (status = 'active')` is a
+  database check, so the context endpoint and every prompt read only approved rules. A note feeds at most one
+  proposal; a failed proposal leaves its notes unused. A proposal runs after 5 unused notes (silently) or on the Taste
+  page's button, at most 3 a day, one pending at a time (a partial unique index; pending ones older than 10 minutes
+  are failed first). `mergeProposal` drops any new rule matching an existing rule after lowercasing and
+  stripping punctuation: evidence for an active or proposed one, nothing for a rejected or turned-off one. Approved
+  rules reach the daily routine (context endpoint), Today's brief writer and Sharpen; Recreate does not use them.
 - `content_voice.built_from` is `{ files: [{path, mtime, bytes}], previous_profile_md }`.
 
 ## Seeding by hand

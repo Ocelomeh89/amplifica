@@ -89,4 +89,10 @@ describe("InboxList keyboard", () => {
     fireEvent.keyDown(input, { key: "l" });
     expect(likeIdea).not.toHaveBeenCalled();
   });
+
+  it("gives each idea its own sharpen slot from the page", () => {
+    render(<InboxList ideas={[idea("a"), idea("b")]} sourceUrls={{}} siblingsById={{}} sharpenSlots={{ a: <p>SLOT A</p>, b: <p>SLOT B</p> }} />);
+    expect(screen.getByText("SLOT A")).toBeInTheDocument();
+    expect(screen.getByText("SLOT B")).toBeInTheDocument();
+  });
 });

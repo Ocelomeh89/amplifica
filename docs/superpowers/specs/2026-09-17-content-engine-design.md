@@ -311,6 +311,8 @@ history backfills; `Mark posted` on an idea can later link one.
 
 ## Taste loop
 
+> Superseded (2026-11-01) by `2026-11-01-content-engine-taste-sharpen-design.md`: Miguel rarely passes, so the loop starts from Sharpen notes and rules wait for his approval. What follows is the original plan.
+
 - Every Pass stores a one-line reason on the idea. Every Like records the idea's
   format, pillar, and hook type.
 - After every 10 new reasons, or on demand from `/content/taste`, a Server Action

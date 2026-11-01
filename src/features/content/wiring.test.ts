@@ -16,10 +16,13 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/week/page.tsx",
       "src/app/(app)/content/today/page.tsx",
       "src/app/(app)/content/creators/page.tsx",
+      "src/app/(app)/content/taste/page.tsx",
       "src/app/(app)/content/ideas/[id]/page.tsx",
       "src/app/(app)/content/sources/page.tsx",
       "src/features/content/data/actions.ts",
       "src/features/content/data/competitor-actions.ts",
+      "src/features/content/data/sharpen-actions.ts",
+      "src/features/content/data/taste-actions.ts",
       "src/features/content/data/tag-actions.ts",
       "src/features/content/data/recreate-actions.ts",
       "src/features/content/data/today-actions.ts",
@@ -52,6 +55,7 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/sources/page.tsx",
       "src/app/(app)/content/today/page.tsx",
       "src/app/(app)/content/creators/page.tsx",
+      "src/app/(app)/content/taste/page.tsx",
     ];
     for (const f of pages) expect(read(f), f).not.toMatch(/supabase\s*\.from\(/);
   });
@@ -76,5 +80,15 @@ describe("content stays owner-only", () => {
     const competitors = route.indexOf("runCompetitorCron(");
     expect(competitors).toBeGreaterThan(route.indexOf("runMetricsCron("));
     expect(competitors).toBeLessThan(route.indexOf("runTodayCron("));
+  });
+
+  it("a Pass stores its reason as a note, and background helpers stay out of the 'use server' files", () => {
+    expect(read("src/features/content/data/actions.ts")).toContain("recordPassNote(");
+    // Every export of a "use server" file is a callable endpoint; the helper lives in a plain module.
+    for (const f of ["src/features/content/data/sharpen-actions.ts", "src/features/content/data/taste-actions.ts"]) {
+      const exports = read(f).match(/^export (?:async )?(?:function|const) (\w+)/gm) ?? [];
+      expect(exports.every((e) => /export async function \w+Action\b/.test(e)), f).toBe(true);
+    }
+    expect(read("src/features/content/data/taste-run.ts")).not.toContain('"use server"');
   });
 });

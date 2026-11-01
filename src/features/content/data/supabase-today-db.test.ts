@@ -119,4 +119,20 @@ describe("supabaseTodayDb", () => {
     expect(log).toContainEqual(["content_competitor_posts.update", { briefed_at: "2026-11-01T15:00:00Z" }]);
     expect(log).toContainEqual(["content_competitor_posts.eq", "user_id", "u1"]);
   });
+
+  it("activeRules reads only active rules for the owner, best evidence first", async () => {
+    const { client, log } = fakeClient({ content_taste_rules: { data: [{ rule: "A" }, { rule: "B" }] } });
+    expect(await supabaseTodayDb(client, "u1").activeRules()).toEqual(["A", "B"]);
+    expect(log).toContainEqual(["content_taste_rules.eq", "status", "active"]);
+    expect(log).toContainEqual(["content_taste_rules.eq", "user_id", "u1"]);
+  });
+
+  it("discardSharpen discards only a pending or ready sharpen of the idea, for the owner", async () => {
+    const { client, log } = fakeClient();
+    await supabaseTodayDb(client, "u1").discardSharpen("i1");
+    expect(log).toContainEqual(["content_sharpens.update", { status: "discarded" }]);
+    expect(log).toContainEqual(["content_sharpens.in", "status", ["pending", "ready"]]);
+    expect(log).toContainEqual(["content_sharpens.eq", "idea_id", "i1"]);
+    expect(log).toContainEqual(["content_sharpens.eq", "user_id", "u1"]);
+  });
 });

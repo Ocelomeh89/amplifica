@@ -14,6 +14,9 @@ import { linkBriefExperiment } from "@/features/content/data/mark-posted-brief";
 import { fetchVideoMeta } from "@/features/content/data/youtube-meta";
 import { requireContentOwner } from "@/features/content/data/owner";
 import { syncQueuedIdeasToClickUp } from "@/features/content/data/clickup";
+import { supabaseTasteDb } from "@/features/content/data/supabase-taste-db";
+import { recordPassNote } from "@/features/content/data/taste";
+import { startProposalInBackground } from "@/features/content/data/taste-run";
 import { str } from "@/shared/forms";
 import { reviveFields } from "@/features/content/engine/unused";
 import { nextRank, ranksAfterMove, visibleQueue } from "@/features/content/engine/queue";
@@ -80,6 +83,13 @@ export async function passIdea(formData: FormData) {
     .eq("id", id)
     .eq("user_id", user.id);
   if (error) throw new Error(error.message);
+  // The reason is a taste note too; the fifth waiting note starts a proposal. Best effort:
+  // the Pass has already happened and never fails here.
+  try {
+    if (reason && (await recordPassNote(supabaseTasteDb(supabase, user.id), id, reason)).due) await startProposalInBackground(user.id, "auto");
+  } catch {
+    /* the note is lost, the pass is not */
+  }
   revalidate();
 }
 
