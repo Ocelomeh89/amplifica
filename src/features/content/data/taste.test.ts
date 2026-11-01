@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ToolCaller } from "./claude";
 import { addManualRule, approveRule, proposalDue, recordPassNote, rejectRule, runProposal, setRuleOn, startProposal } from "./taste";
 import { NOW, fakeTasteDb, noteRow, ruleRow } from "./taste.fake";
+import type { TasteDb } from "./taste";
 
 const five = () => Array.from({ length: 5 }, (_, i) => noteRow(`n${i + 1}`));
 const answer = (out: unknown): ToolCaller & { calls: { text: string }[] } => {
@@ -127,5 +128,32 @@ describe("approval", () => {
     expect(f.rules[0]).toMatchObject({ rule: "Take a side.", status: "active", origin: "manual" });
     expect(await addManualRule(f.db, " ")).toEqual({ error: "A rule needs some words." });
     expect(await addManualRule(f.db, "x".repeat(201))).toEqual({ error: "Keep a rule under 200 characters." });
+  });
+});
+
+describe("review fixes", () => {
+  it("approve, reject and switch say so when the update matched no row", async () => {
+    const f = fakeTasteDb({ rules: [ruleRow("r1", "A", "proposed"), ruleRow("r2", "B", "active")] });
+    const vanished: TasteDb = { ...f.db, setRule: async () => false };
+    expect(await approveRule(vanished, "r1")).toEqual({ error: "That rule was not found." });
+    expect(await rejectRule(vanished, "r1")).toEqual({ error: "That rule was not found." });
+    expect(await setRuleOn(vanished, "r2", false)).toEqual({ error: "That rule was not found." });
+  });
+
+  it("two proposals started together make one: the second finds the first pending", async () => {
+    const f = fakeTasteDb({ notes: five() });
+    const [a, b] = await Promise.all([startProposal(f.db, "auto", NOW), startProposal(f.db, "auto", NOW)]);
+    expect([a, b].filter((r) => r.ok)).toHaveLength(1);
+    expect([a, b].find((r) => !r.ok)).toEqual({ ok: false, error: "Rules are already being proposed." });
+    expect(f.proposals).toHaveLength(1);
+  });
+
+  it("a proposal pending for more than 10 minutes no longer blocks a new one", async () => {
+    const f = fakeTasteDb({ notes: five() });
+    const first = await startProposal(f.db, "auto", NOW);
+    if (!first.ok) throw new Error(first.error);
+    f.proposals[0].created_at = new Date(NOW.getTime() - 11 * 60_000).toISOString();
+    expect(await startProposal(f.db, "auto", NOW)).toMatchObject({ ok: true });
+    expect(f.proposals[0]).toMatchObject({ status: "failed", error: "Timed out" });
   });
 });

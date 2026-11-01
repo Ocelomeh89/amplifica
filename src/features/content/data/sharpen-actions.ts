@@ -5,7 +5,7 @@ import { waitUntil } from "@vercel/functions";
 import { z } from "zod";
 import { createAdminClient } from "@/shared/supabase/admin";
 import { NOTE_TEXT_MAX } from "@/features/content/engine/taste";
-import { syncQueuedIdeasToClickUp } from "./clickup";
+import { refreshClickUpTask, syncQueuedIdeasToClickUp } from "./clickup";
 import { MissingApiKeyError, anthropicToolCaller, type ToolCaller } from "./claude";
 import { requireContentOwner } from "./owner";
 import { cancelSharpen, pickSharpen, retrySharpen, runSharpen, startSharpen, type SharpenStart } from "./sharpen";
@@ -49,7 +49,7 @@ function afterStart(result: SharpenStart, userId: string, caller: ToolCaller): S
 export async function startSharpenAction(formData: FormData): Promise<SharpenActionResult> {
   const { supabase, user } = await requireContentOwner();
   const input = startSchema.safeParse({ id: formData.get("id"), chips: formData.getAll("chips").map(String), text: String(formData.get("text") ?? "") });
-  if (!input.success) return { error: "Say what's off first." };
+  if (!input.success) return { error: input.error.issues.some((i) => i.path[0] === "id") ? "That idea was not found." : "Say what's off first." };
   const made = toolCaller();
   if ("error" in made) return { error: made.error };
   const result = await startSharpen(supabaseSharpenDb(supabase, user.id), input.data.id, { chips: input.data.chips, text: input.data.text }, new Date());
@@ -68,8 +68,12 @@ export async function pickSharpenAction(formData: FormData): Promise<{ error: st
     revalidate();
     return { error: r.error };
   }
-  // A queued idea is mirrored to ClickUp by title: best effort, never fails the pick.
-  if (r.queued) await syncQueuedIdeasToClickUp(supabase, user.id).catch(() => undefined);
+  // A queued idea is mirrored to ClickUp: rename the task it has, or create the one it lacks.
+  // Best effort, never fails the pick.
+  if (r.queued) {
+    await refreshClickUpTask(supabase, user.id, r.ideaId).catch(() => undefined);
+    await syncQueuedIdeasToClickUp(supabase, user.id).catch(() => undefined);
+  }
   revalidate();
   return { error: null };
 }

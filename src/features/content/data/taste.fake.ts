@@ -29,7 +29,11 @@ export function fakeTasteDb(seed: { notes?: NoteRow[]; rules?: RuleRow[]; applyF
       const p = proposals.find((x) => x.status === "pending" && x.created_at >= before);
       return p ? { id: p.id } : null;
     },
+    async expireStaleProposals(before) {
+      for (const p of proposals) if (p.status === "pending" && p.created_at < before) Object.assign(p, { status: "failed", error: "Timed out" });
+    },
     async insertProposal(kind) {
+      if (proposals.some((p) => p.status === "pending")) return null;
       const id = `p${++seq}`;
       proposals.push({ id, kind, status: "pending", error: "", created_at: NOW.toISOString() });
       return id;

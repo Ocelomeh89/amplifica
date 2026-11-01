@@ -51,6 +51,10 @@ describe("0018_content_taste_sharpen.sql", () => {
     expect(sharpens).toMatch(/text text not null default ''/);
   });
 
+  it("one pending proposal at a time per user", () => {
+    expect(sql).toMatch(/create unique index \w+ on public\.content_taste_proposals\s*\(user_id\)\s*where status = 'pending'/);
+  });
+
   it("the three new tables enable RLS with the four owner policies and the touch trigger", () => {
     expect(sql.match(/enable row level security/gi)?.length).toBe(3);
     expect(sql.match(/auth\.uid\(\) = user_id/g)?.length).toBeGreaterThanOrEqual(15);

@@ -96,4 +96,13 @@ describe("supabaseTasteDb", () => {
     expect(page.proposalsLeft).toBe(2);
     expect(page.notes[0].idea).toEqual({ title: "T", hook: "H" });
   });
+
+  it("insertProposal returns null on the one-pending unique conflict, and stale pending ones are failed first", async () => {
+    const { client, log } = fakeClient({ content_taste_proposals: { error: { code: "23505", message: "duplicate" } } });
+    const db = supabaseTasteDb(client, "u1");
+    expect(await db.insertProposal("auto")).toBeNull();
+    await db.expireStaleProposals("2026-11-01T14:50:00Z").catch(() => undefined);
+    expect(log).toContainEqual(["content_taste_proposals.update", { status: "failed", error: "Timed out" }]);
+    expect(log).toContainEqual(["content_taste_proposals.lt", "created_at", "2026-11-01T14:50:00Z"]);
+  });
 });

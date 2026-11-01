@@ -50,7 +50,10 @@ export interface TasteDb {
   proposalsSince(since: string): Promise<number>;
   /** A pending proposal created at or after `before` (ISO). */
   livePending(before: string): Promise<{ id: string } | null>;
-  insertProposal(kind: ProposalKind): Promise<string>;
+  /** Pending proposals created before this ISO instant become failed with "Timed out". */
+  expireStaleProposals(before: string): Promise<void>;
+  /** The new row's id, or null when a pending proposal already exists (one at a time). */
+  insertProposal(kind: ProposalKind): Promise<string | null>;
   finishProposal(id: string, patch: { status: "ready" } | { status: "failed"; error: string }): Promise<void>;
   /** New rules, evidence and marking the notes used, together: a failure leaves the notes unused. */
   applyProposal(id: string, merged: ReturnType<typeof mergeProposal>, noteIds: string[], at: string): Promise<void>;
@@ -61,6 +64,7 @@ export interface TasteDb {
 }
 
 const MINUTE = 60_000;
+const NOT_FOUND = { error: "That rule was not found." };
 const message = (e: unknown) => (e instanceof Error && e.message ? e.message : "Something went wrong.");
 
 export async function proposalDue(db: TasteDb): Promise<boolean> {
@@ -76,11 +80,15 @@ export async function recordPassNote(db: TasteDb, ideaId: string, reason: string
 
 export async function startProposal(db: TasteDb, kind: ProposalKind, now: Date): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   if ((await db.unusedNotes()).length === 0) return { ok: false, error: "No new notes to learn from yet." };
-  if (await db.livePending(new Date(now.getTime() - STALE_PENDING_MINUTES * MINUTE).toISOString())) return { ok: false, error: "Rules are already being proposed." };
+  const staleBefore = new Date(now.getTime() - STALE_PENDING_MINUTES * MINUTE).toISOString();
+  await db.expireStaleProposals(staleBefore);
+  if (await db.livePending(staleBefore)) return { ok: false, error: "Rules are already being proposed." };
   if ((await db.proposalsSince(chicagoDayStart(now).toISOString())) >= PROPOSALS_DAILY_CAP) {
     return { ok: false, error: `That's ${PROPOSALS_DAILY_CAP} proposals today. Try again tomorrow.` };
   }
-  return { ok: true, id: await db.insertProposal(kind) };
+  // Two starts in the same second both pass the check above; the database lets only one row in.
+  const id = await db.insertProposal(kind);
+  return id === null ? { ok: false, error: "Rules are already being proposed." } : { ok: true, id };
 }
 
 /** Writes the proposal's outcome. Never throws: it runs after the response. */
@@ -131,21 +139,18 @@ export async function approveRule(db: TasteDb, id: string, editedText?: string):
     if ("error" in checked) return checked;
     edit = checked.text;
   }
-  await db.setRule(id, { status: "active", ...(edit !== undefined ? { rule: edit } : {}) });
-  return { error: null };
+  return (await db.setRule(id, { status: "active", ...(edit !== undefined ? { rule: edit } : {}) })) ? { error: null } : NOT_FOUND;
 }
 
 export async function rejectRule(db: TasteDb, id: string): Promise<{ error: string | null }> {
   if ((await statusOf(db, id)) !== "proposed") return { error: "Only a proposed rule can be rejected." };
-  await db.setRule(id, { status: "rejected" });
-  return { error: null };
+  return (await db.setRule(id, { status: "rejected" })) ? { error: null } : NOT_FOUND;
 }
 
 export async function setRuleOn(db: TasteDb, id: string, on: boolean): Promise<{ error: string | null }> {
   const status = await statusOf(db, id);
   if (status !== "active" && status !== "off") return { error: "Only an active or turned-off rule can be switched." };
-  await db.setRule(id, { status: on ? "active" : "off" });
-  return { error: null };
+  return (await db.setRule(id, { status: on ? "active" : "off" })) ? { error: null } : NOT_FOUND;
 }
 
 export async function addManualRule(db: TasteDb, text: string): Promise<{ error: string | null }> {

@@ -68,6 +68,53 @@ export async function createClickUpTask(
   }
 }
 
+/** Puts a new name and description on an existing task. False on any failure; never throws. */
+export async function updateClickUpTask(
+  taskId: string,
+  input: { name: string; markdown: string },
+  env: ClickUpEnv,
+  fetchImpl: typeof fetch = fetch
+): Promise<boolean> {
+  if (!env.token) return false;
+  try {
+    const res = await fetchImpl(`https://api.clickup.com/api/v2/task/${taskId}`, {
+      method: "PUT",
+      headers: { Authorization: env.token, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: input.name, markdown_content: input.markdown }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) console.error(`clickup: update task failed with ${res.status}`);
+    return res.ok;
+  } catch (e) {
+    console.error("clickup: update task threw", e);
+    return false;
+  }
+}
+
+/**
+ * After an idea is rewritten (a Sharpen pick): rename the task it already has. An idea with no
+ * task is left for the next sync to create. Best effort; "none" means there was nothing to update.
+ */
+export async function refreshClickUpTask(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  ideaId: string,
+  env: ClickUpEnv = { token: process.env.CLICKUP_API_TOKEN, listId: process.env.CLICKUP_TASK_LIST_ID },
+  siteUrl: string = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  fetchImpl: typeof fetch = fetch
+): Promise<"updated" | "failed" | "none"> {
+  if (!env.token) return "none";
+  const { data, error } = await supabase
+    .from("content_ideas")
+    .select("id, format, title, hook, belief_attacked, value_to_listener, why_it_stops, outline, clickup_task_id")
+    .eq("id", ideaId)
+    .eq("user_id", userId)
+    .limit(1);
+  const idea = (data ?? [])[0];
+  if (error || !idea || !idea.clickup_task_id) return "none";
+  return (await updateClickUpTask(idea.clickup_task_id, taskFor(idea, siteUrl), env, fetchImpl)) ? "updated" : "failed";
+}
+
 /**
  * Create tasks for queued ideas that do not have one yet, newest first, a
  * few at a time. Called after every Like so an earlier failure heals. The

@@ -76,9 +76,17 @@ export function supabaseTasteDb(client: Client, userId: string): TasteDb & { pag
       return ((data ?? [])[0] as { id: string } | undefined) ?? null;
     },
 
+    async expireStaleProposals(before) {
+      const { error } = await proposals().update({ status: "failed", error: "Timed out" }).eq("user_id", userId).eq("status", "pending").lt("created_at", before);
+      fail("expire proposals", error);
+    },
+
     async insertProposal(kind) {
       const { data, error } = await proposals().insert({ user_id: userId, kind }).select("id");
-      fail("proposal", error);
+      if (error) {
+        if (error.code === "23505") return null;
+        throw new Error(`taste proposal: ${error.message}`);
+      }
       const id = (data?.[0] as { id: string } | undefined)?.id;
       if (!id) throw new Error("taste proposal: no row written");
       return id;

@@ -83,6 +83,10 @@ create table public.content_taste_proposals (
 );
 create index content_taste_proposals_user_created_idx on public.content_taste_proposals(user_id, created_at);
 
+-- One pending proposal at a time: two starts in the same second cannot both write rules.
+create unique index content_taste_proposals_pending_idx on public.content_taste_proposals (user_id)
+  where status = 'pending';
+
 create trigger content_taste_proposals_touch_updated_at
   before update on public.content_taste_proposals
   for each row execute function public.touch_updated_at();
