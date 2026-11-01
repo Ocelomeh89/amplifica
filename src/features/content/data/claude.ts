@@ -23,7 +23,7 @@ export const CLAUDE_CLIENT_OPTIONS = (apiKey: string, opts: { timeoutMs?: number
   maxRetries: opts.maxRetries ?? 1,
 });
 
-export type GenerateInput = { system: string; text: string; pdf?: { base64: string } };
+export type GenerateInput = { system: string; text: string; pdf?: { base64: string }; image?: { url: string } };
 
 /** One forced tool call. `empty` and `truncated` let a caller word its own failures. */
 export type ToolSpec = { name: string; description: string; schema: Record<string, unknown>; empty?: string; truncated?: string };
@@ -45,11 +45,12 @@ type MessagesClient = {
 
 export function claudeToolCaller(client: MessagesClient): ToolCaller {
   return {
-    async call({ system, text, pdf, tool, maxTokens = 8000, model = CLAUDE_MODEL }) {
+    async call({ system, text, pdf, image, tool, maxTokens = 8000, model = CLAUDE_MODEL }) {
       const content: Record<string, unknown>[] = [];
       if (pdf) {
         content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: pdf.base64 } });
       }
+      if (image) content.push({ type: "image", source: { type: "url", url: image.url } });
       content.push({ type: "text", text });
       const res = await client.messages.create({
         model,
