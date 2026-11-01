@@ -1,6 +1,6 @@
 # Content engine slice 6: competitor posts as Today briefs
 
-Status: draft 2026-11-01, decided with Miguel in conversation the same day. Builder check done; its
+Status: approved and built 2026-11-01 on branch feat/content-competitors; migration 0017 pending. Decided with Miguel in conversation the same day. Builder check done; its
 five questions are settled below as my calls, marked.
 Replaces the roadmap's "Competitors and Viral Watch" row (slice 6). Slices 1, 2, 3 and 5 are live.
 The Apify spike passed on 2026-10-20 (roadmap, "Spike result").

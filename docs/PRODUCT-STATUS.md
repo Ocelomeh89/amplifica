@@ -40,7 +40,7 @@ and the date of financial independence (FI).
 | Tests | Vitest 2.1 (+ jsdom, Testing Library) |
 | Package manager | pnpm |
 
-**Env vars:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`; server-only: `SUPABASE_SERVICE_ROLE_KEY` (lead capture), `BEEHIIV_API_KEY` + `BEEHIIV_PUBLICATION_ID` (newsletter subscribe), `NEXT_PUBLIC_SITE_URL` (auth redirects + `metadataBase`), `CONTENT_OWNER_USER_ID` + `CONTENT_ENGINE_SECRET` (content engine), `CRON_SECRET` (metrics cron), `COMPOSIO_API_KEY` + `COMPOSIO_IG_CONNECTION_ID` (Instagram metrics), `YOUTUBE_API_KEY` + `YOUTUBE_CHANNEL_ID` (YouTube metrics), `CLICKUP_API_TOKEN` + `CLICKUP_TASK_LIST_ID` (ClickUp mirror of liked ideas). See `.env.example`.
+**Env vars:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`; server-only: `SUPABASE_SERVICE_ROLE_KEY` (lead capture), `BEEHIIV_API_KEY` + `BEEHIIV_PUBLICATION_ID` (newsletter subscribe), `NEXT_PUBLIC_SITE_URL` (auth redirects + `metadataBase`), `CONTENT_OWNER_USER_ID` + `CONTENT_ENGINE_SECRET` (content engine), `CRON_SECRET` (metrics cron), `COMPOSIO_API_KEY` + `COMPOSIO_IG_CONNECTION_ID` (Instagram metrics), `COMPOSIO_APIFY_CONNECTION_ID` (weekly competitor pull; optional `COMPOSIO_APIFY_USER_ID` when the Apify account is linked under another Composio user), `YOUTUBE_API_KEY` + `YOUTUBE_CHANNEL_ID` (YouTube metrics), `CLICKUP_API_TOKEN` + `CLICKUP_TASK_LIST_ID` (ClickUp mirror of liked ideas). See `.env.example`.
 
 ---
 
@@ -303,7 +303,7 @@ Each feature folder pairs a Server Component `page.tsx` (reads rows) with `actio
 
 1. `pnpm install`. Node 24 LTS.
 2. Create a Supabase project; set `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`, plus `SUPABASE_SERVICE_ROLE_KEY` / `BEEHIIV_API_KEY` / `BEEHIIV_PUBLICATION_ID` for the `/calculator` lead capture (it degrades gracefully without Beehiiv: leads still insert, `beehiiv_synced` stays false).
-3. Apply `supabase/migrations/0001`→`0015` in order (`supabase db push` / `migration up`). This builds all tables, RLS, triggers, and the signup→profile automation.
+3. Apply `supabase/migrations/0001`→`0017` in order (`supabase db push` / `migration up`). This builds all tables, RLS, triggers, and the signup→profile automation.
 4. `pnpm dev` → http://localhost:3000. Sign up (a profile row auto-creates), then add Amplicons/LoCs and build Projections.
 5. `pnpm test` (Vitest, 99 finance tests) and `pnpm typecheck` (`tsc --noEmit`) before shipping. **Do not run `next build` while `next dev` is running** — it corrupts the dev server's `.next` cache.
 
