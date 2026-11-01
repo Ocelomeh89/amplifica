@@ -5,7 +5,10 @@
 import { monthlyPayment } from "./amortization";
 import type { SimConfig } from "./sim-input";
 
-export type InvestmentKind = "term" | "perpetual";
+// "lti" is a user-recorded Long-Term Income position (dashboard only): a flat
+// cash-on-cash coupon for its term, no principal back at the end. It pays like
+// a perpetual but is reported apart from the simulator's own perpetual mix.
+export type InvestmentKind = "term" | "perpetual" | "lti";
 
 export interface ActiveInvestment {
   kind: InvestmentKind;
@@ -17,6 +20,19 @@ export interface ActiveInvestment {
   // existing output.
   faceValue: number;
   monthlyRate: number;
+}
+
+// A Long-Term Income position: face × cash-on-cash / 12 every month for
+// `termMonths`, then nothing (no sale value in the first-pass model).
+export function makeLti(faceValue: number, cocPct: number, termMonths: number, startMonth: number): ActiveInvestment {
+  return {
+    kind: "lti",
+    monthlyPayout: faceValue * (cocPct / 12),
+    termMonths,
+    startMonth,
+    faceValue,
+    monthlyRate: cocPct / 12,
+  };
 }
 
 export function makeInvestment(
@@ -49,10 +65,10 @@ export function makeInvestment(
 // rest is return of capital. A term Amplicon amortizes, so interest is that
 // month's opening balance times the rate, falling as the balance does; the
 // closed form avoids walking the schedule. A perpetual returns no principal
-// within its term, so its whole coupon is interest.
+// within its term, so its whole coupon is interest; an LTI likewise.
 export function interestAt(inv: ActiveInvestment, month: number): number {
   if (!isActive(inv, month)) return 0;
-  if (inv.kind === "perpetual") return inv.monthlyPayout;
+  if (inv.kind === "perpetual" || inv.kind === "lti") return inv.monthlyPayout;
 
   const r = inv.monthlyRate;
   if (r <= 0) return 0;

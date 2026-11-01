@@ -4,6 +4,7 @@ import { fmtCurrency, fmtPct, fmtDate } from "@/shared/format";
 import Card from "@/shared/ui/Card";
 import NewLoCForm from "@/features/loc/ui/NewLoCForm";
 import UtilizationCell from "@/features/loc/ui/UtilizationCell";
+import RateCell from "@/features/loc/ui/RateCell";
 import { deleteLoC } from "@/features/loc/data/actions";
 
 export default async function LoCPage() {
@@ -57,6 +58,7 @@ export default async function LoCPage() {
                 <th className="py-2">Name</th>
                 <th>Type</th>
                 <th>Size</th>
+                <th>Rate</th>
                 <th>Utilization</th>
                 <th>Available</th>
                 <th>Util %</th>
@@ -73,6 +75,9 @@ export default async function LoCPage() {
                     <td className="py-2">{l.name}</td>
                     <td>{l.loc_type}</td>
                     <td>{fmtCurrency(l.size)}</td>
+                    <td>
+                      <RateCell id={l.id} value={l.interest_pct} />
+                    </td>
                     <td>
                       <UtilizationCell id={l.id} value={l.utilization} />
                     </td>

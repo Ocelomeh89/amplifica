@@ -82,17 +82,10 @@ export default function ProjectionSettingsPanel({
               <input id="horizon_years" name="horizon_years" type="number" min={5} max={50} step={1}
                 defaultValue={settings.horizonMonths / 12} className={input} />
             </div>
-            <div>
-              <label className={label} htmlFor="start_delay_months">Start delay</label>
-              <select id="start_delay_months" name="start_delay_months" defaultValue={settings.startDelayMonths} className={input}>
-                {[0, 1, 2, 3, 4, 5].map((n) => (
-                  <option key={n} value={n}>{n === 0 ? "None" : `${n} mo`}</option>
-                ))}
-              </select>
-            </div>
           </div>
           <p className="text-[10px] text-sub">
-            Months before the first projected draw. Until then, your payouts and savings pay down your line of credit.
+            The projection starts from what you owe on each line of credit today, at that line&apos;s own rate. LoC
+            rate here is used only if you haven&apos;t recorded any lines of credit.
           </p>
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" onClick={() => setOpen(false)} className="text-xs px-2 py-1 rounded bg-edge text-sub">Cancel</button>

@@ -49,6 +49,9 @@ export default function NewLoCForm() {
           <Field label="Utilization ($)">
             <NumberInput name="utilization" defaultValue={0} min={0} step={1000} />
           </Field>
+          <Field label="Interest rate (%)" hint="Annual. The dashboard projection accrues this line's balance at this rate.">
+            <NumberInput name="interest_pct" defaultValue={10} min={0} step={0.1} required />
+          </Field>
         </div>
         <div className="flex gap-2 mt-2">
           <button type="submit" className="bg-purple hover:bg-purple/90 transition-colors text-white text-sm px-4 py-1.5 rounded">

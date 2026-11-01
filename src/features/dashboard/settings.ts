@@ -19,7 +19,6 @@ export interface ProjectionSettings {
   locInterestPct: number; // decimal
   locIncrease: number;
   horizonMonths: number;
-  startDelayMonths: number;
 }
 
 export const DEFAULT_PROJECTION_SETTINGS: ProjectionSettings = {
@@ -29,7 +28,6 @@ export const DEFAULT_PROJECTION_SETTINGS: ProjectionSettings = {
   locInterestPct: 0.1,
   locIncrease: 1.5,
   horizonMonths: 360,
-  startDelayMonths: 0,
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
@@ -57,7 +55,6 @@ export function parseProjectionSettings(fd: FormData): ProjectionSettings {
     locInterestPct: clamp(pctOr("loc_interest_pct", d.locInterestPct), 0, 0.3),
     locIncrease: clamp(readNumber(fd, "loc_increase") ?? d.locIncrease, 1, 2),
     horizonMonths: clamp(Math.round(horizonYears == null ? d.horizonMonths : horizonYears * 12), 60, 600),
-    startDelayMonths: clamp(Math.round(readNumber(fd, "start_delay_months") ?? d.startDelayMonths), 0, 5),
   };
 }
 
@@ -72,7 +69,6 @@ export function settingsFromRow(row: DashboardProjectionSettingsRow | null): Pro
     locInterestPct: Number(row.loc_interest_pct),
     locIncrease: Number(row.loc_increase),
     horizonMonths: Number(row.horizon_months),
-    startDelayMonths: Number(row.start_delay_months),
   };
 }
 
@@ -84,6 +80,8 @@ export function settingsToRow(s: ProjectionSettings): Omit<DashboardProjectionSe
     loc_interest_pct: s.locInterestPct,
     loc_increase: s.locIncrease,
     horizon_months: s.horizonMonths,
-    start_delay_months: s.startDelayMonths,
+    // Start delay was retired 2026-11 (the projection now seeds the real LoC
+    // balance); the column stays and is written as 0.
+    start_delay_months: 0,
   };
 }

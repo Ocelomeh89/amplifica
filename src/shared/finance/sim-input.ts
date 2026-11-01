@@ -5,6 +5,7 @@
 // out-of-domain values are coerced to a defined fallback and reported.
 
 import type { ActiveInvestment } from "./sim-book";
+import type { LocLine } from "./sim-ledger";
 
 // Fixed payoff threshold, used two ways: a new Amplicon is only ever DRAWN
 // when its payoff is predicted to happen in fewer than this many months (the
@@ -39,11 +40,25 @@ export const MAX_START_DELAY_MONTHS = 5;
 // the user's tracked Amplicons (startMonth relative to month 0 = today), the
 // LoC balance at month 0, and the size of the first projected draw. During
 // the first `startDelayMonths` months the ledger is idle (see projection-sim).
+//
+// Optional (dashboard, 2026-11): `lines` replaces the scalar balance with the
+// user's real lines of credit (each with its own rate; `outstanding` is then
+// ignored), and `scheduled` lists user-recorded future Amplicons (STI or LTI)
+// that must be funded by a draw: each takes the first launch slot on or after
+// its `investment.startMonth`, bypassing the payoff gate and leaving the
+// flywheel's draw size alone. Both absent = the earlier seeded behavior.
+export interface ScheduledLaunch {
+  id: string;
+  investment: ActiveInvestment; // startMonth = earliest first-payment month
+}
+
 export interface SimSeed {
   book: ActiveInvestment[];
   outstanding: number;
   nextDrawSize: number;
   startDelayMonths: number;
+  lines?: LocLine[];
+  scheduled?: ScheduledLaunch[];
 }
 
 export interface ProjectionSimInput {
@@ -190,6 +205,17 @@ export function sanitizeSimInput(input: ProjectionSimInput): {
               max: MAX_START_DELAY_MONTHS,
               integer: true,
             }),
+            ...(input.seed.lines
+              ? {
+                  lines: input.seed.lines.map((l) => ({
+                    id: l.id,
+                    rate: sanitizeNumber(issues, "seed", l.rate, { fallback: 0, min: 0, max: MAX_ANNUAL_RATE }),
+                    size: sanitizeNumber(issues, "seed", l.size, { fallback: 0, min: 0, allowInfinity: true }),
+                    balance: sanitizeNumber(issues, "seed", l.balance, { fallback: 0, min: 0 }),
+                  })),
+                }
+              : {}),
+            ...(input.seed.scheduled ? { scheduled: input.seed.scheduled } : {}),
           },
   };
 

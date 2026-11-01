@@ -146,7 +146,8 @@ RLS: self select/update only (`auth.uid() = id`).
 | `face_value` | numeric(14,2) | principal |
 | `term_months` | integer | check > 0 |
 | `interest_pct` | numeric(7,6) | annual decimal, check ≥ 0 |
-| `start_date` | date | |
+| `start_date` | date | first-payment month |
+| `income_type` | text | **0018**: `'STI'` (default, amortizing) or `'LTI'` (flat `face × interest_pct / 12` for `term_months`, no principal back; `interest_pct` = annual cash-on-cash) |
 RLS: self CRUD. Index on `user_id`.
 
 ### `locs` (LineOfCredit) — migration 0001
@@ -159,6 +160,7 @@ RLS: self CRUD. Index on `user_id`.
 | `size` | numeric(14,2) | check ≥ 0 |
 | `utilization` | numeric(14,2) | default 0, check ≥ 0 |
 | `utilization_updated_at` | timestamptz | |
+| `interest_pct` | numeric(7,6) | **0018**: annual decimal, default 0.10; accrues this line's balance in the dashboard projection |
 RLS: self CRUD. Index on `user_id`.
 
 ### `projections` (flywheel simulation parameters) — migrations 0002–0004
@@ -222,7 +224,9 @@ Email is **not** unique: a retake adds a row (`leads` still dedupes by email). *
 | `dates.ts` | `YearMonth` ("YYYY-MM") helpers: `addMonths`, `monthsBetween`, etc. |
 | `projection.ts` | **Valuation** of a user's real Amplicons: builds a month-by-month series of cash flow + expected future payments (`externalNetWorth + Σ remaining value`) — the nominal sum of remaining payments, optionally discounted by a **global** `discountRatePct` (default `GLOBAL_DISCOUNT_RATE_PCT = 0`, i.e. nominal). Supports "inception" vs "current" ranges. |
 | `sim-input.ts` | **Simulator input contract**: `ProjectionSimInput`, all defaults/constants, and `sanitizeSimInput` — resolves raw input into a fully-defaulted, mathematically safe `SimConfig` (identity on the valid domain; NaN/negative/degenerate values coerced to defined fallbacks and reported as issues). Makes `runSimulation` total: the UI can feed it raw `Number()` conversions mid-edit and it never throws or emits non-finite numbers. |
-| `sim-book.ts` | **The Amplicon book**: launching term/perpetual investments, monthly payout collection, nominal remaining-value aggregation, active counts, and pruning of fully paid-out positions. |
+| `sim-ledger.ts` | **Multi-line LoC ledger** for the seeded dashboard run: per-line accrual, highest-rate-first paydown, cheapest-with-room draws (overflow to the cheapest line; limits never cap the math). Unused by the unseeded simulator. |
+| `dashboard-seed.ts` | `seedFromTracked`: tracked Amplicons + LoCs → `SimSeed`. First payment ≤ today = already funded (into the book); future-dated = **scheduled** (funded by a draw, see §6). |
+| `sim-book.ts` | **The Amplicon book**: launching term/perpetual/LTI investments, monthly payout collection, nominal remaining-value aggregation, active counts, and pruning of fully paid-out positions. |
 | `projection-sim.ts` | **The flywheel simulator** — the heart of Projections (see §6). Owns the monthly ledger loop (interest accrual → inflow → LoC application → relaunch policy → valuation) and re-exports the whole public API, so it remains the single import surface. Behavior is pinned by characterization tests (`projection-sim.golden.test.ts`) on the key scenario. |
 | `projection-fi.ts` | **FI solver**: `earliestSustainableWithdrawal(base, draw, {requireGrowth})` linearly scans the retirement month and returns the earliest at which you can stop the MSC and withdraw sustainably. |
 
@@ -256,6 +260,14 @@ so month 0 is the draw alone.
 `perpetualTriggerSize` (50000), `perpetualYieldPct` (0.10), `perpetualTermMonths` (360),
 `mscEndMonth` (∞), `withdrawalStartMonth`, `monthlyWithdrawal` (4500), `totalMonths` (480).
 
+**Seeded dashboard run (2026-11, "funded, not free"):** the dashboard seeds the simulator from the user's real position, not the bootstrap draw.
+- **Balance:** each LoC is a ledger line (utilization, own rate, size). Inflow pays the highest-rate line first; draws come from the cheapest line with room. The launch trigger reads the **total** balance. With a balance above the trigger, the first flywheel launch waits for the normal trigger and is never a step-up. No LoCs recorded → the single balance at the settings LoC rate, as before. The run reports `locLimit`; the dashboard warns from the first month total debt exceeds it.
+- **Scheduled Amplicons:** a tracked STI or LTI whose first payment is after today is not booked for free. It takes the **first launch slot on or after its date** (draw the month before first payment), **bypasses the payoff gate**, is drawn from the LoC like any launch, and leaves the flywheel's draw size alone (the next flywheel draw resumes the prior size; step-up eligibility is judged on how fast the scheduled draw was repaid). Several queue in date order, one per slot. `scheduledStarts` reports the actual first-payment month; the dashboard flags any that slipped.
+- **LTI positions** (`kind: "lti"`): flat coupon for the term, then nothing (first-pass: stable cash flow, no sale value). Their payout feeds the flywheel like any payout; their whole coupon counts as interest. LTIs never set the default draw size (latest already-funded STI; a scheduled STI only if none is funded).
+- **LTI sizing rule (warning only):** a planned LTI should be no bigger than the flywheel's STI draw size in the month it launches. The dashboard flags one that is, with how long its draw took to repay before the next launch. The projection still funds the full amount, and LTIs that have already started are never flagged.
+- **Start delay retired:** the 0–5 month idle setting stood in for the untracked LoC balance; the dashboard now passes 0 (engine support and DB column remain).
+- **Economics to expect:** an LTI sized like the STI it replaces costs a few months. In the key scenario, a same-size 10% / 20-year LTI swapped in at month 36 or 60 trims cash flow ≈5–15% for the first years, then is ahead by year 10–15 (e.g. $67.1k vs $61.6k/mo at +15 yr) and keeps paying after the STIs it displaced would have expired. Stalls come only from **oversized or low-yield** LTIs: the scheduled draw bypasses the payoff gate, so one many times the usual draw (or yielding below the LoC rate) can take years to repay while the STI book runs off.
+
 **Two growth modes (engine):** *fixed* (gate 3 or 4 — step up only when payoff is faster than the gate; default 4) vs *continuous* (`Infinity` — step up on every payoff), persisted to `payoff_upgrade_months` + `continuous_growth`. **As of V0.7 the UI controls for both are removed (parked — see §11);** the editor runs the engine default (fixed, gate 4). The engine and DB columns are retained, so re-enabling is a UI-only change.
 
 **Two finish lines (`projection-fi.ts`):** *Income FI* (expected future payments never erode while drawing — you live off income) and *Wealth FI* (they also keep growing). The FI surface is **non-monotone** (flywheel saw-tooth) — the solver uses a linear scan, not binary search.
@@ -279,8 +291,8 @@ so month 0 is the draw alone.
 
 **Authenticated `(app)`** (shared `Sidebar` layout):
 - `/dashboard` — net-worth & cash-flow charts over time (`ChartPair`), driven by the user's Amplicons via `projection.ts`. A "Project forward" toggle adds a dashed projection; the gear saves per-user settings (`dashboard_projection_settings`); the optionality meter shows today's cash flow as a share of the cash flow at the optionality month.
-- `/amplicons` — list + inline create/edit/delete (`AmpliconRow`, `NewAmpliconForm`, `actions.ts`).
-- `/loc` — list + create; `UtilizationCell` for live utilization edits.
+- `/amplicons` — list + inline create/edit/delete (`AmpliconRow`, `NewAmpliconForm`, shared `AmpliconFields` with the STI/LTI dropdown; FormData contract in `data/parse.ts`).
+- `/loc` — list + create; `UtilizationCell` and `RateCell` for live utilization and rate edits (both feed the dashboard projection).
 - `/projections` — list + "New projection" button; `/[id]` opens `EditorForm` (the live simulator: inputs, perpetual + drawdown controls, **Expected future payments @ 5/10/15yr (accumulation)** card, **financial-optionality readout**, `SimCharts`, `FlywheelExplainer`). `EditorForm` is a thin composition over the shared simulator UI in `src/features/simulator/` (`useSimulation` hook + `SimInputsGrid` + `SimResults`); the grid's `name=` attributes carry the `updateProjection` FormData contract. The five expert inputs (perpetual yield/mix/trigger, stop-MSC, withdrawal) sit behind a collapsed **"Advanced" ribbon**; collapsed fields are CSS-hidden, not unmounted, so the save FormData still posts them. **UI copy says "financial optionality"** (renamed from "financial independence" — engine names like `projection-fi.ts` are internal and unchanged).
 - `/settings` — profile settings form + light/dark `ThemeToggle`.
 

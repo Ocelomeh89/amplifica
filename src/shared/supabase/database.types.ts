@@ -38,6 +38,7 @@ export type Database = {
           term_months: number;
           interest_pct: number;
           start_date: string;
+          income_type: "STI" | "LTI";
           created_at: string;
           updated_at: string;
         };
@@ -49,6 +50,7 @@ export type Database = {
           term_months: number;
           interest_pct: number;
           start_date: string;
+          income_type?: "STI" | "LTI";
         };
         Update: {
           name?: string;
@@ -57,6 +59,7 @@ export type Database = {
           term_months?: number;
           interest_pct?: number;
           start_date?: string;
+          income_type?: "STI" | "LTI";
         };
         Relationships: [];
       };
@@ -68,6 +71,7 @@ export type Database = {
           loc_type: "HELOC" | "PLOC";
           size: number;
           utilization: number;
+          interest_pct: number;
           utilization_updated_at: string;
           created_at: string;
           updated_at: string;
@@ -78,12 +82,14 @@ export type Database = {
           loc_type: "HELOC" | "PLOC";
           size: number;
           utilization?: number;
+          interest_pct?: number;
         };
         Update: {
           name?: string;
           loc_type?: "HELOC" | "PLOC";
           size?: number;
           utilization?: number;
+          interest_pct?: number;
           utilization_updated_at?: string;
         };
         Relationships: [];

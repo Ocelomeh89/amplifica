@@ -31,7 +31,6 @@ describe("parseProjectionSettings", () => {
       locInterestPct: 0.075,
       locIncrease: 1.25,
       horizonMonths: 300,
-      startDelayMonths: 2,
     });
   });
 
@@ -74,7 +73,6 @@ describe("parseProjectionSettings", () => {
       locInterestPct: 0,
       locIncrease: 2,
       horizonMonths: 600,
-      startDelayMonths: 5,
     });
   });
 });
