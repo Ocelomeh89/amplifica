@@ -1,6 +1,6 @@
 # Content engine 4c: Sharpen and the taste loop
 
-Status: draft 2026-11-01, decided with Miguel in conversation the same day. Builder check done; its
+Status: approved and built 2026-11-01 on branch feat/content-taste; migration 0018 pending. Decided with Miguel in conversation the same day. Builder check done; its
 four questions are settled below as my calls, marked.
 Replaces the original design's "Taste loop" section (content-engine design 2026-09-17, PR 4c), which
 assumed Miguel would pass on bad ideas and say why. He rarely does.
