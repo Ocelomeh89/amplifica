@@ -4,8 +4,7 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import { createAmplicon } from "@/features/amplicons/data/actions";
 import Card from "@/shared/ui/Card";
-import Field from "@/shared/ui/Field";
-import NumberInput from "@/shared/ui/NumberInput";
+import AmpliconFields from "./AmpliconFields";
 
 export default function NewAmpliconForm() {
   const [open, setOpen] = useState(false);
@@ -24,38 +23,7 @@ export default function NewAmpliconForm() {
   return (
     <Card title="New Amplicon">
       <form action={async (fd) => { await createAmplicon(fd); setOpen(false); }} className="space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label="Name">
-            <input
-              name="name"
-              required
-              className="w-full border border-edge rounded px-2 py-1.5 text-sm"
-            />
-          </Field>
-          <Field label="Type" hint="e.g. Real Estate Note, Trust Deed">
-            <input
-              name="ai_type"
-              className="w-full border border-edge rounded px-2 py-1.5 text-sm"
-            />
-          </Field>
-          <Field label="Face value ($)">
-            <NumberInput name="face_value" defaultValue={25000} min={0} step={1000} required />
-          </Field>
-          <Field label="Term (months)">
-            <NumberInput name="term_months" defaultValue={36} min={1} step={1} required />
-          </Field>
-          <Field label="Annual interest (%)">
-            <NumberInput name="interest_pct" defaultValue={8} min={0} step={0.1} required />
-          </Field>
-          <Field label="Start date">
-            <input
-              name="start_date"
-              type="date"
-              required
-              className="w-full border border-edge rounded px-2 py-1.5 text-sm"
-            />
-          </Field>
-        </div>
+        <AmpliconFields />
         <div className="flex gap-2 mt-2">
           <button type="submit" className="bg-purple hover:bg-purple/90 transition-colors text-white text-sm px-4 py-1.5 rounded">
             Add Amplicon

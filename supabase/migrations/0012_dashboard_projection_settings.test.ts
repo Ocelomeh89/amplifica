@@ -23,6 +23,7 @@ describe("0012_dashboard_projection_settings.sql", () => {
     expect(sql).toContain(`loc_interest_pct numeric(5, 4) not null default ${d.locInterestPct.toFixed(2)}`);
     expect(sql).toContain(`loc_increase numeric(4, 2) not null default ${d.locIncrease.toFixed(2)}`);
     expect(sql).toContain(`horizon_months integer not null default ${d.horizonMonths}`);
-    expect(sql).toContain(`start_delay_months integer not null default ${d.startDelayMonths}`);
+    // Start delay retired 2026-11; the column keeps its 0 default.
+    expect(sql).toContain(`start_delay_months integer not null default 0`);
   });
 });

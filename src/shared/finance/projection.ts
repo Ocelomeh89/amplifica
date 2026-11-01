@@ -7,6 +7,10 @@ export interface AmpliconLite {
   interestPct: number;
   termMonths: number;
   startMonth: YearMonth;
+  // "LTI" = Long-Term Income: interestPct is the annual cash-on-cash rate and
+  // the payout is flat (face × rate / 12) for termMonths, with no principal
+  // back at the end. Absent = "STI" (fully amortizing).
+  incomeType?: "STI" | "LTI";
 }
 
 // Global discount rate for valuing future cash flows, as an annual decimal.
@@ -39,6 +43,7 @@ export interface ProjectionPoint {
 }
 
 export function monthlyPayoutOf(inv: AmpliconLite): number {
+  if (inv.incomeType === "LTI") return inv.faceValue * (inv.interestPct / 12);
   return monthlyPayment(inv.faceValue, inv.interestPct, inv.termMonths);
 }
 
