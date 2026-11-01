@@ -67,4 +67,11 @@ describe("content stays owner-only", () => {
     const vercel = JSON.parse(read("vercel.json")) as { crons: { path: string; schedule: string }[] };
     expect(vercel.crons).toEqual([{ path: "/api/content/cron/metrics", schedule: "0 10 * * *" }]);
   });
+
+  it("the competitor step runs after the pulls and before the Today tail", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    const competitors = route.indexOf("runCompetitorCron(");
+    expect(competitors).toBeGreaterThan(route.indexOf("runMetricsCron("));
+    expect(competitors).toBeLessThan(route.indexOf("runTodayCron("));
+  });
 });
