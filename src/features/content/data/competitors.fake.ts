@@ -23,7 +23,7 @@ export function fakeCompetitorsDb(seed: { creators?: CreatorRow[]; runs?: Compet
       if (c) c.status = "removed";
     },
     async setCreatorPull(ids, at, status) {
-      for (const c of state.creators) if (ids.includes(c.id)) Object.assign(c, { last_pulled_at: at, last_pull_status: status });
+      for (const c of state.creators) if (ids.includes(c.id)) Object.assign(c, at === null ? { last_pull_status: status } : { last_pulled_at: at, last_pull_status: status });
     },
     async latestRun() {
       return [...state.runs].sort((a, b) => b.started_at.localeCompare(a.started_at))[0] ?? null;
@@ -31,9 +31,9 @@ export function fakeCompetitorsDb(seed: { creators?: CreatorRow[]; runs?: Compet
     async pendingRuns() {
       return state.runs.filter((r) => r.status === "pending");
     },
-    async insertRun(apifyRunId, startedAt) {
+    async insertRun(apifyRunId, startedAt, usernames) {
       const rid = id("r");
-      state.runs.push({ id: rid, apify_run_id: apifyRunId, status: "pending", error: "", started_at: startedAt, finished_at: null, cost_usd: null, items: null });
+      state.runs.push({ id: rid, apify_run_id: apifyRunId, status: "pending", error: "", started_at: startedAt, finished_at: null, cost_usd: null, items: null, usernames });
       return rid;
     },
     async updateRun(rid, patch) {

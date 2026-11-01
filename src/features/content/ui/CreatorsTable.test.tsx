@@ -14,7 +14,7 @@ const page = (over: Partial<CreatorsPage> = {}): CreatorsPage => ({
     },
     { id: "c2", username: "gone", status: "removed", last_pulled_at: null, last_pull_status: null, median: null, count: 0, thin: true, popular: [] },
   ],
-  lastRun: { id: "r1", apify_run_id: "a", status: "ready", error: "", started_at: "2026-11-02T11:00:00Z", finished_at: "2026-11-03T11:00:00Z", cost_usd: 0.08, items: 41 },
+  lastRun: { id: "r1", apify_run_id: "a", status: "ready", error: "", started_at: "2026-11-02T11:00:00Z", finished_at: "2026-11-03T11:00:00Z", cost_usd: 0.08, items: 41, usernames: ["micro.investing"] },
   ...over,
 });
 

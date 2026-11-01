@@ -47,6 +47,7 @@ export type CompetitorRunRow = {
   finished_at: string | null;
   cost_usd: number | null;
   items: number | null;
+  usernames: string[];
 };
 export type CompetitorTagColumns = {
   hook_type: string;
@@ -72,11 +73,12 @@ export interface CompetitorsDb {
   /** Insert, or set an existing creator back to watching. */
   upsertCreator(username: string): Promise<void>;
   removeCreator(id: string): Promise<void>;
-  setCreatorPull(ids: string[], at: string, status: "ready" | "failed"): Promise<void>;
+  /** `at` null keeps last_pulled_at: it is the last successful pull, which decides the 90-day first window. */
+  setCreatorPull(ids: string[], at: string | null, status: "ready" | "failed"): Promise<void>;
   latestRun(): Promise<CompetitorRunRow | null>;
   pendingRuns(): Promise<CompetitorRunRow[]>;
-  insertRun(apifyRunId: string, startedAt: string): Promise<string>;
-  updateRun(id: string, patch: Partial<Omit<CompetitorRunRow, "id" | "apify_run_id" | "started_at">>): Promise<void>;
+  insertRun(apifyRunId: string, startedAt: string, usernames: string[]): Promise<string>;
+  updateRun(id: string, patch: Partial<Omit<CompetitorRunRow, "id" | "apify_run_id" | "started_at" | "usernames">>): Promise<void>;
   /** Insert, or update views, likes, comments, thumbnail and pulled_at on an existing shortcode. Returns rows written. */
   upsertPosts(posts: (CompetitorPostIn & { creator_id: string })[], pulledAt: string): Promise<number>;
   /** Every stored post since the instant, for the per-creator medians. */
@@ -110,7 +112,7 @@ export async function startWeeklyPull(db: CompetitorsDb, apify: ApifyClient, now
       if (latest && now.getTime() - new Date(latest.started_at).getTime() < 6 * DAY) return { started: false, error: null };
     }
     const { runId } = await apify.startRun({ usernames: watching.map((c) => c.username), newerThanDays: pullWindowDays(watching) });
-    await db.insertRun(runId, now.toISOString());
+    await db.insertRun(runId, now.toISOString(), watching.map((c) => c.username));
     return { started: true, error: null };
   } catch (e) {
     return { started: false, error: message(e) };
@@ -124,14 +126,16 @@ export async function collectRuns(db: CompetitorsDb, apify: ApifyClient, now: Da
   const runs = await db.pendingRuns();
   if (runs.length === 0) return { stored, failed };
   const watching = (await db.creators()).filter((c) => c.status === "watching");
-  const ids = watching.map((c) => c.id);
   const at = now.toISOString();
+  // Only the creators a run pulled get its outcome; one added while it ran stays never-pulled.
+  const inRun = (run: CompetitorRunRow) => watching.filter((c) => run.usernames.includes(c.username));
   const fail = async (run: CompetitorRunRow, error: string) => {
     await db.updateRun(run.id, { status: "failed", error, finished_at: at });
-    await db.setCreatorPull(ids, at, "failed");
+    await db.setCreatorPull(inRun(run).map((c) => c.id), null, "failed");
     failed += 1;
   };
   for (const run of runs) {
+    const pulled = inRun(run);
     try {
       const state = await apify.getRun(run.apify_run_id);
       if (state.status === "pending") {
@@ -147,13 +151,13 @@ export async function collectRuns(db: CompetitorsDb, apify: ApifyClient, now: Da
         continue;
       }
       const since = new Map(
-        watching.map((c) => [c.username, new Date(now.getTime() - (c.last_pulled_at === null ? FIRST_PULL_DAYS : REPULL_DAYS) * DAY)])
+        pulled.map((c) => [c.username, new Date(now.getTime() - (c.last_pulled_at === null ? FIRST_PULL_DAYS : REPULL_DAYS) * DAY)])
       );
-      const byName = new Map(watching.map((c) => [c.username, c.id]));
+      const byName = new Map(pulled.map((c) => [c.username, c.id]));
       const posts = mapApifyItems(await apify.datasetItems(state.datasetId), since).map((p) => ({ ...p, creator_id: byName.get(p.username) as string }));
       const written = posts.length > 0 ? await db.upsertPosts(posts, at) : 0;
       await db.updateRun(run.id, { status: "ready", finished_at: at, items: written, cost_usd: state.costUsd });
-      await db.setCreatorPull(ids, at, "ready");
+      await db.setCreatorPull(pulled.map((c) => c.id), at, "ready");
       stored += written;
     } catch (e) {
       // Left pending: the next cron tries again, and the 48-hour rule ends it.

@@ -78,6 +78,8 @@ create table public.content_competitor_runs (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   apify_run_id text not null,
+  -- The creators this run pulled; only they get its outcome.
+  usernames text[] not null default '{}',
   status text not null default 'pending' check (status in ('pending', 'ready', 'failed')),
   error text not null default '',
   started_at timestamptz not null default now(),

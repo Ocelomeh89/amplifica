@@ -299,7 +299,7 @@ export async function runDaily(db: TodayDb, caller: ToolCaller, runId: string, n
     // The competitor brief is picked first; the other slots then avoid its variable.
     let comp: Planned | null = null;
     if (candidate) {
-      const test = competitorTest(candidate.post, ev, control, liveTests);
+      const test = competitorTest(candidate.post, ev, control, liveTests, heldVariables);
       const ideaId = test.variable === "source" ? null : (freeIdeas.shift() ?? undefined);
       if (ideaId !== undefined) {
         comp = { slot: 2, test, ideaId, competitor: candidate };
@@ -398,7 +398,9 @@ export async function runDaily(db: TodayDb, caller: ToolCaller, runId: string, n
       });
       if (c) await db.markCompetitorBriefed(c.post.id, now.toISOString());
     }
-    await db.updateRun(runId, { status: "ready", experiment_id: last });
+    // A slot left empty for want of an Inbox idea keeps the run retryable by Make now.
+    const short = ideas.length === 0 && missing.some((s) => !planned.some((p) => p.slot === s));
+    await db.updateRun(runId, { status: "ready", experiment_id: last, ...(short ? { error: EMPTY_INBOX } : {}) });
     return { made: planned.length, error: null };
   } catch (e) {
     return await fail(message(e));

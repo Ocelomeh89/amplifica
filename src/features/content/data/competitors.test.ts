@@ -6,7 +6,7 @@ import { competitorPost, fakeApify, fakeCompetitorsDb } from "./competitors.fake
 const MONDAY = new Date("2026-11-02T11:00:00Z"); // 05:00 Chicago, Monday
 const TUESDAY = new Date("2026-11-03T11:00:00Z");
 const creator = (over: Partial<CreatorRow> = {}): CreatorRow => ({ id: "c1", username: "micro.investing", status: "watching", last_pulled_at: null, last_pull_status: null, ...over });
-const run = (over: Record<string, unknown> = {}) => ({ id: "r1", apify_run_id: "apify-1", status: "pending" as const, error: "", started_at: MONDAY.toISOString(), finished_at: null, cost_usd: null, items: null, ...over });
+const run = (over: Record<string, unknown> = {}) => ({ id: "r1", apify_run_id: "apify-1", status: "pending" as const, error: "", started_at: MONDAY.toISOString(), finished_at: null, cost_usd: null, items: null, usernames: ["micro.investing"], ...over });
 const item = (o: Record<string, unknown> = {}) => ({ ownerUsername: "micro.investing", type: "Video", shortCode: "A1", url: "https://www.instagram.com/p/A1/", timestamp: "2026-10-30T12:00:00.000Z", caption: "c", videoPlayCount: 900, ...o });
 const validTags = {
   hook_type: "paradox", onscreen_text: "repeats-hook", cover_face: true, cover_text: true, cover_number: false, cta_type: "save", post_style: "text-broll",
@@ -154,5 +154,30 @@ describe("addCreator and the Creators page", () => {
     expect(page.creators[0]).toMatchObject({ median: 100, count: 9, thin: false });
     expect(page.creators[0].popular).toEqual([{ id: "pop", url: "https://www.instagram.com/p/pop/", posted_at: "2026-10-28T12:00:00.000Z", multiple: 4, briefed: true }]);
     expect(page.creators[1]).toMatchObject({ median: null, count: 0, popular: [] });
+  });
+});
+
+describe("review fixes", () => {
+  it("a failed first run keeps the creator never-pulled, so the next pull still asks for 90 days", async () => {
+    const { db, state } = fakeCompetitorsDb({ creators: [creator()], runs: [run()] });
+    await collectRuns(db, fakeApify({ "apify-1": { status: "failed", datasetId: null, costUsd: 0, error: "FAILED: x" } }).apify, TUESDAY);
+    expect(state.creators[0]).toMatchObject({ last_pulled_at: null, last_pull_status: "failed" });
+    const { apify, started } = fakeApify();
+    await startWeeklyPull(db, apify, TUESDAY, true);
+    expect(started[0].newerThanDays).toBe(90);
+  });
+
+  it("a run marks only the creators it pulled; one added while it ran is still never-pulled", async () => {
+    const { db, state } = fakeCompetitorsDb({ creators: [creator(), creator({ id: "c2", username: "ericsfinancials" })], runs: [run()] });
+    await collectRuns(db, fakeApify({ "apify-1": { status: "ready", datasetId: "ds", costUsd: 0, error: "", items: [item(), item({ ownerUsername: "ericsfinancials", shortCode: "E1" })] } }).apify, TUESDAY);
+    expect(state.creators.find((c) => c.id === "c1")!.last_pull_status).toBe("ready");
+    expect(state.creators.find((c) => c.id === "c2")).toMatchObject({ last_pulled_at: null, last_pull_status: null });
+    expect(state.posts.map((p) => p.shortcode)).toEqual(["A1"]);
+  });
+
+  it("startWeeklyPull records the usernames it sent", async () => {
+    const { db, state } = fakeCompetitorsDb({ creators: [creator()] });
+    await startWeeklyPull(db, fakeApify().apify, MONDAY, false);
+    expect(state.runs[0].usernames).toEqual(["micro.investing"]);
   });
 });

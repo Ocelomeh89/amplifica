@@ -193,7 +193,9 @@ these are all the places that know it exists:
 - Competitors (slice 6): one Apify run a week (Monday cron, or `?competitors=now`) for every watching creator,
   capped at $1 by Apify's `maxTotalChargeUsd`; results are read from the run's dataset on a later cron and kept only
   when `ownerUsername` is a watched creator, the item is a Reel (`type` Video) and it falls in the creator's window
-  (90 days first, 21 after). A re-pull updates views; no snapshots. Popular is 3x the creator's 90-day median
+  (90 days first, 21 after). A run records the usernames it sent and only they get its outcome; a failed run
+  sets `last_pull_status` but keeps `last_pulled_at` (the last successful pull), so a creator whose first pull
+  failed still gets 90 days. A re-pull updates views; no snapshots. Popular is 3x the creator's 90-day median
   (thin under 8 Reels); fresh is 14 days. Only popular fresh posts are tagged, by Claude from caption and
   thumbnail, at most five per cron and only while the Today tail keeps 90 seconds. A post seeds at most one brief
   ever (`briefed_at`, set even when both copy checks fail), always in slot 2, and the competitor brief is picked

@@ -210,8 +210,9 @@ export type CompetitorTags = {
  * confidence, makes a format test (his topic in their format); otherwise the test is the
  * source (their topic, his view, his proven format). Never both.
  */
-export function competitorTest(post: CompetitorTags, ev: Evidence, control: Control, live: LiveTest[]): Test {
-  if (post.format_note) return { variable: "post_style", value: NEW_FORMAT, control: control.post_style };
+export function competitorTest(post: CompetitorTags, ev: Evidence, control: Control, live: LiveTest[], heldVariables: string[] = []): Test {
+  const topic: Test = { variable: "source", value: post.pushes_belief ? "competitor-rebuttal" : "competitor-take", control: "own" };
+  if (post.format_note) return heldVariables.includes("post_style") ? topic : { variable: "post_style", value: NEW_FORMAT, control: control.post_style };
   const held = new Set(live.map((l) => `${l.variable}:${l.value}`));
   const conf = (k: string) => post.tag_confidence[k] ?? 0;
   for (const variable of HELD_STILL) {
@@ -224,13 +225,13 @@ export function competitorTest(post: CompetitorTags, ev: Evidence, control: Cont
       value = post[variable] === "" ? null : post[variable];
       confidence = conf(variable);
     }
-    if (value === null || value === control[variable] || confidence < LOW_CONFIDENCE) continue;
+    if (heldVariables.includes(variable) || value === null || value === control[variable] || confidence < LOW_CONFIDENCE) continue;
     if (!(valuesOf(variable) as readonly string[]).includes(value)) continue;
     const row = ev[variable].find((r) => r.value === value);
     if (!row || row.total >= EXPLORE_BELOW || held.has(`${variable}:${value}`)) continue;
     return { variable, value, control: control[variable] };
   }
-  return { variable: "source", value: post.pushes_belief ? "competitor-rebuttal" : "competitor-take", control: "own" };
+  return topic;
 }
 
 export function renderReason(test: Test, ev: Evidence): string {

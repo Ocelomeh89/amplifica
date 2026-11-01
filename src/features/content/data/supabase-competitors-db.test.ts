@@ -83,6 +83,6 @@ describe("supabaseCompetitorsDb", () => {
 
   it("insertRun returns the new id", async () => {
     const { client } = fakeClient({ content_competitor_runs: { data: [{ id: "r9" }] } });
-    expect(await supabaseCompetitorsDb(client, "u1").insertRun("apify-1", "2026-11-02T11:00:00Z")).toBe("r9");
+    expect(await supabaseCompetitorsDb(client, "u1").insertRun("apify-1", "2026-11-02T11:00:00Z", ["micro.investing"])).toBe("r9");
   });
 });

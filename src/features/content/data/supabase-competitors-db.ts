@@ -7,7 +7,7 @@ type Client = SupabaseClient<Database>;
 
 const DAY = 86_400_000;
 const CREATOR_COLUMNS = "id, username, status, last_pulled_at, last_pull_status";
-const RUN_COLUMNS = "id, apify_run_id, status, error, started_at, finished_at, cost_usd, items";
+const RUN_COLUMNS = "id, apify_run_id, usernames, status, error, started_at, finished_at, cost_usd, items";
 const POST_COLUMNS =
   "id, creator_id, shortcode, url, posted_at, caption, views, likes, comments, duration_seconds, thumbnail_url, hook_type, onscreen_text, cover_face, cover_text, cover_number, cta_type, post_style, message, hook_text, tag_confidence, pushes_belief, format_note, tagged_at, briefed_at";
 
@@ -46,9 +46,10 @@ export function supabaseCompetitorsDb(client: Client, userId: string): Competito
       fail("remove creator", error);
     },
 
-    async setCreatorPull(ids: string[], at: string, status: "ready" | "failed") {
+    async setCreatorPull(ids: string[], at: string | null, status: "ready" | "failed") {
       if (ids.length === 0) return;
-      const { error } = await creators().update({ last_pulled_at: at, last_pull_status: status }).eq("user_id", userId).in("id", ids);
+      const patch = at === null ? { last_pull_status: status } : { last_pulled_at: at, last_pull_status: status };
+      const { error } = await creators().update(patch).eq("user_id", userId).in("id", ids);
       fail("creator pull", error);
     },
 
@@ -64,15 +65,15 @@ export function supabaseCompetitorsDb(client: Client, userId: string): Competito
       return (data ?? []) as CompetitorRunRow[];
     },
 
-    async insertRun(apifyRunId: string, startedAt: string) {
-      const { data, error } = await runs().insert({ user_id: userId, apify_run_id: apifyRunId, started_at: startedAt }).select("id");
+    async insertRun(apifyRunId: string, startedAt: string, usernames: string[]) {
+      const { data, error } = await runs().insert({ user_id: userId, apify_run_id: apifyRunId, started_at: startedAt, usernames }).select("id");
       fail("insert run", error);
       const id = (data?.[0] as { id: string } | undefined)?.id;
       if (!id) throw new Error("competitors insert run: no row written");
       return id;
     },
 
-    async updateRun(id: string, patch: Partial<Omit<CompetitorRunRow, "id" | "apify_run_id" | "started_at">>) {
+    async updateRun(id: string, patch: Partial<Omit<CompetitorRunRow, "id" | "apify_run_id" | "started_at" | "usernames">>) {
       const { error } = await runs().update(patch).eq("id", id).eq("user_id", userId);
       fail("update run", error);
     },

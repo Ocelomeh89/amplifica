@@ -342,3 +342,18 @@ describe("slice 6: the competitor brief", () => {
     expect(s2).toMatchObject({ kind: "proposed", competitor_post_id: null, idea_id: ideaId });
   });
 });
+
+describe("slice 6 review fixes", () => {
+  it("a competitor format test never shares a variable with a slot already live today", async () => {
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2")], candidate: candidate({ post_style: "text-broll" }), experiments: [exp({ id: "s1", idea_id: "i9", slot: 1, variable: "post_style", value: "animation" })] });
+    await generateDaily(f.db, seq({ briefs: [brief(2)] }), NOW);
+    expect(f.experiments.find((e) => e.slot === 2)!).toMatchObject({ kind: "competitor", variable: "source" });
+  });
+
+  it("a topic brief on an empty Inbox still records the empty Inbox, so Make now works once an idea arrives", async () => {
+    const f = fakeDb({ ideas: [], candidate: candidate() });
+    expect(await generateDaily(f.db, seq({ briefs: [brief(2)] }), NOW)).toEqual({ made: 1, error: null });
+    expect(f.runs.find((r) => r.kind === "cron")).toMatchObject({ status: "ready", error: "Inbox is empty" });
+    expect((await makeNow(f.db, NOW)).ok).toBe(true);
+  });
+});
