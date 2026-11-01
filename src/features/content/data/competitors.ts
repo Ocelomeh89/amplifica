@@ -119,12 +119,16 @@ export async function startWeeklyPull(db: CompetitorsDb, apify: ApifyClient, now
   }
 }
 
-/** Reads every finished run into posts; marks failed and stale runs. One run's error never stops the next. */
-export async function collectRuns(db: CompetitorsDb, apify: ApifyClient, now: Date): Promise<{ stored: number; failed: number }> {
+/**
+ * Reads every finished run into posts; marks failed and stale runs. One run's error never
+ * stops the next: it is returned in `errors` (and logged) so the cron reply says why.
+ */
+export async function collectRuns(db: CompetitorsDb, apify: ApifyClient, now: Date): Promise<{ stored: number; failed: number; errors: string[] }> {
   let stored = 0;
   let failed = 0;
+  const errors: string[] = [];
   const runs = await db.pendingRuns();
-  if (runs.length === 0) return { stored, failed };
+  if (runs.length === 0) return { stored, failed, errors };
   const watching = (await db.creators()).filter((c) => c.status === "watching");
   const at = now.toISOString();
   // Only the creators a run pulled get its outcome; one added while it ran stays never-pulled.
@@ -162,9 +166,10 @@ export async function collectRuns(db: CompetitorsDb, apify: ApifyClient, now: Da
     } catch (e) {
       // Left pending: the next cron tries again, and the 48-hour rule ends it.
       console.error("content competitor run", run.apify_run_id, message(e));
+      errors.push(`run ${run.apify_run_id}: ${message(e)}`);
     }
   }
-  return { stored, failed };
+  return { stored, failed, errors };
 }
 
 /** Popular, fresh, untagged posts, best first. */
