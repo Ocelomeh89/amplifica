@@ -15,9 +15,11 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/performance/[postId]/page.tsx",
       "src/app/(app)/content/week/page.tsx",
       "src/app/(app)/content/today/page.tsx",
+      "src/app/(app)/content/creators/page.tsx",
       "src/app/(app)/content/ideas/[id]/page.tsx",
       "src/app/(app)/content/sources/page.tsx",
       "src/features/content/data/actions.ts",
+      "src/features/content/data/competitor-actions.ts",
       "src/features/content/data/tag-actions.ts",
       "src/features/content/data/recreate-actions.ts",
       "src/features/content/data/today-actions.ts",
@@ -49,6 +51,7 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/ideas/[id]/page.tsx",
       "src/app/(app)/content/sources/page.tsx",
       "src/app/(app)/content/today/page.tsx",
+      "src/app/(app)/content/creators/page.tsx",
     ];
     for (const f of pages) expect(read(f), f).not.toMatch(/supabase\s*\.from\(/);
   });

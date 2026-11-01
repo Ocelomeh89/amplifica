@@ -31,6 +31,7 @@ const base: BriefView = {
   judge_metrics: {},
   judged_at: null,
   competitor_post_id: null,
+  competitor: null,
   created_at: "2026-10-27T10:00:00Z",
   idea: { id: "i1", title: "T", hook: "Your 401k is slow on purpose.", outline: [{ beat: "Say the line." }, { beat: "Pause." }, { beat: "Give the number." }], status: "queued" },
   post: null,
@@ -86,5 +87,38 @@ describe("BriefCard", () => {
   it("words a topic test without a control", () => {
     render(<BriefCard brief={{ ...base, variable: "topic", value: "new", recipe: { ...base.recipe, control: "" } }} />);
     expect(screen.getByText(/A topic the last 90 days have not covered/)).toBeTruthy();
+  });
+
+  it("a competitor brief credits and links the original, with the belief it pushes", () => {
+    render(
+      <BriefCard
+        brief={{
+          ...base,
+          slot: 2,
+          kind: "competitor",
+          variable: "source",
+          value: "competitor-rebuttal",
+          recipe: { ...base.recipe, control: "own" },
+          competitor_post_id: "cp1",
+          competitor: { username: "micro.investing", url: "https://www.instagram.com/p/A1/", multiple: 3.4, thin: true, pushes_belief: "max out your 401k", format_note: null },
+        }}
+      />
+    );
+    const link = screen.getByRole("link", { name: /Inspired by @micro.investing, 3.4× their typical views/ });
+    expect(link.getAttribute("href")).toBe("https://www.instagram.com/p/A1/");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(screen.getByText("Pushes: max out your 401k")).toBeTruthy();
+    expect(screen.getByText("Thin baseline")).toBeTruthy();
+    expect(screen.getByText("Source: rebuttal of a competitor post instead of your own topic")).toBeTruthy();
+  });
+
+  it("words a take and a new-format test", () => {
+    const competitor = { username: "ericsfinancials", url: "u", multiple: 5, thin: false, pushes_belief: null, format_note: "split screen, two speakers" };
+    const { unmount } = render(<BriefCard brief={{ ...base, kind: "competitor", variable: "source", value: "competitor-take", competitor }} />);
+    expect(screen.getByText("Source: a competitor's topic with your take instead of your own topic")).toBeTruthy();
+    unmount();
+    render(<BriefCard brief={{ ...base, kind: "competitor", variable: "post_style", value: "new-format", recipe: { ...base.recipe, post_style: "new-format", control: "talking-head" }, competitor }} />);
+    expect(screen.getByText("Post style: new format from @ericsfinancials instead of Talking head")).toBeTruthy();
+    expect(screen.getByText("New format: split screen, two speakers")).toBeTruthy();
   });
 });

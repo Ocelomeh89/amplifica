@@ -360,13 +360,39 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
 
       const ideaIds = [...new Set(exps.map((e) => e.idea_id))];
       const postIds = [...new Set(exps.map((e) => e.post_id).filter((x): x is string => x !== null))];
-      const [{ data: ideaRows }, { data: postRows }] = await Promise.all([
+      const competitorIds = [...new Set(exps.map((e) => e.competitor_post_id).filter((x): x is string => !!x))];
+      const [{ data: ideaRows }, { data: postRows }, { data: competitorRows }] = await Promise.all([
         ideaIds.length > 0 ? ideas().select("id, title, hook, outline, status").eq("user_id", userId).in("id", ideaIds) : Promise.resolve({ data: [] }),
         postIds.length > 0 ? client.from("content_posts").select("id, url").eq("user_id", userId).in("id", postIds) : Promise.resolve({ data: [] }),
+        competitorIds.length > 0
+          ? client.from("content_competitor_posts").select("id, url, pushes_belief, format_note, creator_id").eq("user_id", userId).in("id", competitorIds)
+          : Promise.resolve({ data: [] }),
       ]);
+      const creatorNames = new Map(
+        competitorIds.length > 0 ? (await supabaseCompetitorsDb(client, userId).creators()).map((c) => [c.id, c.username] as const) : []
+      );
+      type CompetitorRow = { id: string; url: string; pushes_belief: string | null; format_note: string | null; creator_id: string };
+      const competitorById = new Map(((competitorRows ?? []) as CompetitorRow[]).map((c) => [c.id, c]));
+      const competitorOf = (e: ExperimentRow): BriefView["competitor"] => {
+        const c = e.competitor_post_id ? competitorById.get(e.competitor_post_id) : undefined;
+        if (!c) return null;
+        return {
+          username: creatorNames.get(c.creator_id) ?? "",
+          url: c.url,
+          multiple: Number(e.recipe.competitor_multiple ?? 0),
+          thin: e.recipe.competitor_thin === "yes",
+          pushes_belief: c.pushes_belief,
+          format_note: c.format_note,
+        };
+      };
       const ideaById = new Map((ideaRows ?? []).map((i) => [(i as { id: string }).id, i as unknown as NonNullable<BriefView["idea"]>]));
       const postById = new Map((postRows ?? []).map((p) => [(p as { id: string }).id, p as unknown as NonNullable<BriefView["post"]>]));
-      const view = (e: ExperimentRow): BriefView => ({ ...e, idea: ideaById.get(e.idea_id) ?? null, post: e.post_id ? (postById.get(e.post_id) ?? null) : null });
+      const view = (e: ExperimentRow): BriefView => ({
+        ...e,
+        idea: ideaById.get(e.idea_id) ?? null,
+        post: e.post_id ? (postById.get(e.post_id) ?? null) : null,
+        competitor: competitorOf(e),
+      });
 
       const runList = (runRows ?? []).map((r) => toRun(r as unknown as Record<string, unknown>));
       const aged = (r: RunRow): RunRow =>

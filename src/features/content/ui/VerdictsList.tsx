@@ -13,6 +13,7 @@ export default function VerdictsList({ items }: { items: BriefView[] }) {
         return (
           <li key={b.id} className="py-2 text-sm">
             <span className="font-semibold">{b.verdict ? VERDICT_LABEL[b.verdict] : "Unjudged"}</span> · {testInWords(b)}
+            {b.recipe.format_note && <span className="text-sub"> · New format: {b.recipe.format_note}</span>}
             <span className="block text-sub">
               {b.verdict ? `Views ${times(m.multiplier)} · Saves ${times(m.n_saves)} · Watch time ${times(m.n_watch)}` : m.reason}
               {b.post_id && (

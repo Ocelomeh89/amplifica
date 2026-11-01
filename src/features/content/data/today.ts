@@ -90,9 +90,13 @@ export type RunRow = {
 export type IdeaLite = { id: string; title: string; hook: string; pillar: string; hook_alt: string | null; status: string };
 export type IdeaSnapshot = { hook: string; hook_alt: string | null; hook_type: string; title: string; outline: unknown; status: string; score: number };
 
+export type BriefCompetitor = { username: string; url: string; multiple: number; thin: boolean; pushes_belief: string | null; format_note: string | null };
+
 export type BriefView = ExperimentRow & {
   idea: { id: string; title: string; hook: string; outline: { beat: string }[]; status: string } | null;
   post: { id: string; url: string } | null;
+  /** The competitor post a brief came from, while the brief still carries the link (slice 6). */
+  competitor: BriefCompetitor | null;
 };
 
 export type TodayPage = {
@@ -378,6 +382,8 @@ export async function runDaily(db: TodayDb, caller: ToolCaller, runId: string, n
       }
       const recipe = recipeFor(p.test, control, b.message, topic);
       if (p.test.value === NEW_FORMAT && c?.post.format_note) recipe.format_note = c.post.format_note;
+      // The card's "Inspired by" line reads the multiple and thin flag as they were when the brief was made.
+      if (c) Object.assign(recipe, { competitor_multiple: c.multiple.toFixed(1), competitor_thin: c.thin ? "yes" : "" });
       last = await db.insertExperiment({
         ...blankExperiment,
         idea_id: ideaId as string,

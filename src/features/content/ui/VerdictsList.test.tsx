@@ -12,7 +12,7 @@ const b = (over: Partial<BriefView>): BriefView =>
   ({
     id: "e1", idea_id: "i1", day: "2026-10-20", slot: 1, kind: "proposed", moment: "", variable: "hook_type", value: "paradox",
     recipe: { control: "question" }, reason: "", status: "judged", post_id: "p1", judge_at: null, verdict: "won",
-    judge_metrics: { multiplier: 1.6, n_saves: 1.2, n_watch: 0.9 }, judged_at: "2026-10-27T10:00:00Z", created_at: "", idea: null, post: null,
+    judge_metrics: { multiplier: 1.6, n_saves: 1.2, n_watch: 0.9 }, judged_at: "2026-10-27T10:00:00Z", created_at: "", idea: null, post: null, competitor_post_id: null, competitor: null,
     ...over,
   }) as BriefView;
 
@@ -32,5 +32,10 @@ describe("VerdictsList", () => {
   it("says so when empty", () => {
     render(<VerdictsList items={[]} />);
     expect(screen.getByText(/No verdicts this week/)).toBeTruthy();
+  });
+
+  it("shows the format note of a new-format verdict", () => {
+    render(<VerdictsList items={[b({ variable: "post_style", value: "new-format", recipe: { control: "talking-head", format_note: "split screen" } })]} />);
+    expect(screen.getByText(/New format: split screen/)).toBeTruthy();
   });
 });
