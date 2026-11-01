@@ -1,17 +1,17 @@
 import { statusOf, type Multiplier, type PostScore, type Status } from "./baseline";
 import type { NormalizedPost } from "./normalize";
-import { CTA_TYPES, HOOK_TYPES, MESSAGES, ONSCREEN_TEXT, POST_STYLES, TAG_LABELS, type PostTags } from "./tags";
+import { CTA_TYPES, HOOK_TYPES, LOW_CONFIDENCE, MESSAGES, ONSCREEN_TEXT, POST_STYLES, TAG_LABELS, type PostTags } from "./tags";
 import { isEligible, type WinnerPost } from "./winners";
 
 // Today: daily briefs as one-variable tests. Pure logic for the evidence counts,
 // control recipe, picker, reason and verdict lives here; nothing in this file
 // touches the database.
 
-/** Every choice a brief can test: the six tags (cover is one) plus topic. */
-export const VARIABLES = ["hook_type", "onscreen_text", "cta_type", "post_style", "cover", "message", "topic"] as const;
+/** Every choice a brief can test: the six tags (cover is one), topic, and source (slice 6: competitor or own). */
+export const VARIABLES = ["hook_type", "onscreen_text", "cta_type", "post_style", "cover", "message", "topic", "source"] as const;
 /** The form choices a brief holds still at the control recipe. Message and topic come from the idea. */
 export const HELD_STILL = ["hook_type", "onscreen_text", "cta_type", "post_style", "cover"] as const;
-export const EXPERIMENT_KINDS = ["proposed", "moment"] as const;
+export const EXPERIMENT_KINDS = ["proposed", "moment", "competitor"] as const;
 export const EXPERIMENT_STATUSES = ["open", "posted", "judged", "unjudged", "skipped", "discarded"] as const;
 export const VERDICTS = ["won", "lost", "flat"] as const;
 export const RUN_KINDS = ["cron", "swap", "moment", "makenow"] as const;
@@ -55,7 +55,11 @@ export function coverValue(t: Pick<PostTags, "cover_face" | "cover_text" | "cove
 }
 
 export type Counted = Exclude<Variable, "topic">;
-export const COUNTED: readonly Counted[] = [...HELD_STILL, "message"];
+export const COUNTED: readonly Counted[] = [...HELD_STILL, "message", "source"];
+
+/** Where a post's topic came from (slice 6). Own unless its idea has a competitor source. */
+export const SOURCE_VALUES = ["own", "competitor-rebuttal", "competitor-take"] as const;
+export type SourceValue = (typeof SOURCE_VALUES)[number];
 
 export const VARIABLE_LABEL: Record<Variable, string> = {
   hook_type: "Hook type",
@@ -65,10 +69,17 @@ export const VARIABLE_LABEL: Record<Variable, string> = {
   cover: "Cover",
   message: "Message",
   topic: "Topic",
+  source: "Source",
 };
 
 /** The slug or combination as the page words it. */
-export const valueLabel = (value: string): string => TAG_LABELS[value] ?? value.replace(/^./, (c) => c.toUpperCase());
+const EXTRA_LABELS: Record<string, string> = {
+  "new-format": "A new format",
+  own: "Your own topic",
+  "competitor-rebuttal": "Rebuttal of a competitor post",
+  "competitor-take": "A competitor's topic, your take",
+};
+export const valueLabel = (value: string): string => TAG_LABELS[value] ?? EXTRA_LABELS[value] ?? value.replace(/^./, (c) => c.toUpperCase());
 
 /** Every value a Reel brief can take for a variable. Reels never carry carousel or image. */
 export function valuesOf(variable: Counted): readonly string[] {
@@ -79,20 +90,24 @@ export function valuesOf(variable: Counted): readonly string[] {
     case "post_style": return POST_STYLES.filter((s) => s !== "carousel" && s !== "image");
     case "message": return MESSAGES;
     case "cover": return COVER_VALUES;
+    case "source": return SOURCE_VALUES;
   }
 }
 
 export type ValueCount = { value: string; won: number; lost: number; flat: number; total: number; share: number };
 export type Evidence = Record<Counted, ValueCount[]>;
 
-function tagOf(p: WinnerPost, variable: Counted): string | null {
+export type EvidencePost = WinnerPost & { source?: SourceValue };
+
+function tagOf(p: EvidencePost, variable: Counted): string | null {
   if (variable === "cover") return coverValue(p);
+  if (variable === "source") return p.source ?? "own";
   const v = p[variable];
   return v === "" ? null : v;
 }
 
 /** Wins, losses and flats per value, over tagged Reels in the window whose views have settled enough to rank. */
-export function evidenceCounts(posts: WinnerPost[], scores: Map<string, PostScore>, windowStart: Date): Evidence {
+export function evidenceCounts(posts: EvidencePost[], scores: Map<string, PostScore>, windowStart: Date): Evidence {
   const ev = Object.fromEntries(
     COUNTED.map((v) => [v, valuesOf(v).map((value) => ({ value, won: 0, lost: 0, flat: 0, total: 0, share: 0 }))])
   ) as Evidence;
@@ -136,8 +151,9 @@ export type LiveTest = { variable: string; value: string };
 /** One ranked list: promising leads with thin evidence first, then untried values; topic only when nothing else is left. */
 export function candidateTests(ev: Evidence, control: Control, live: LiveTest[]): Test[] {
   const held = new Set(live.map((l) => `${l.variable}:${l.value}`));
-  const controls: Record<Counted, string> = { ...control, message: bestValue(ev.message) };
-  const all = COUNTED.flatMap((variable) =>
+  const controls: Record<Counted, string> = { ...control, message: bestValue(ev.message), source: "own" };
+  // Source is never proposed on its own: only a competitor post creates a source test.
+  const all = COUNTED.filter((v) => v !== "source").flatMap((variable) =>
     ev[variable]
       .filter((r) => r.value !== controls[variable] && !held.has(`${variable}:${r.value}`))
       .map((r) => ({ test: { variable, value: r.value, control: controls[variable] } as Test, row: r }))
@@ -173,8 +189,54 @@ export function pickMoment(ev: Evidence, live: LiveTest[], heldVariables: string
   return test ? { control, test } : null;
 }
 
+/** A post style no listed value fits. A recipe value only: never written to a post's tags or counted. */
+export const NEW_FORMAT = "new-format";
+
+export type CompetitorTags = {
+  hook_type: string;
+  onscreen_text: string;
+  cta_type: string;
+  post_style: string;
+  cover_face: boolean | null;
+  cover_text: boolean | null;
+  cover_number: boolean | null;
+  tag_confidence: Record<string, number>;
+  pushes_belief: string | null;
+  format_note: string | null;
+};
+
+/**
+ * What a competitor post tests. A format choice Miguel has barely tried, tagged with
+ * confidence, makes a format test (his topic in their format); otherwise the test is the
+ * source (their topic, his view, his proven format). Never both.
+ */
+export function competitorTest(post: CompetitorTags, ev: Evidence, control: Control, live: LiveTest[], heldVariables: string[] = []): Test {
+  const topic: Test = { variable: "source", value: post.pushes_belief ? "competitor-rebuttal" : "competitor-take", control: "own" };
+  if (post.format_note) return heldVariables.includes("post_style") ? topic : { variable: "post_style", value: NEW_FORMAT, control: control.post_style };
+  const held = new Set(live.map((l) => `${l.variable}:${l.value}`));
+  const conf = (k: string) => post.tag_confidence[k] ?? 0;
+  for (const variable of HELD_STILL) {
+    let value: string | null;
+    let confidence: number;
+    if (variable === "cover") {
+      value = coverValue(post);
+      confidence = Math.min(conf("cover_face"), conf("cover_text"), conf("cover_number"));
+    } else {
+      value = post[variable] === "" ? null : post[variable];
+      confidence = conf(variable);
+    }
+    if (heldVariables.includes(variable) || value === null || value === control[variable] || confidence < LOW_CONFIDENCE) continue;
+    if (!(valuesOf(variable) as readonly string[]).includes(value)) continue;
+    const row = ev[variable].find((r) => r.value === value);
+    if (!row || row.total >= EXPLORE_BELOW || held.has(`${variable}:${value}`)) continue;
+    return { variable, value, control: control[variable] };
+  }
+  return topic;
+}
+
 export function renderReason(test: Test, ev: Evidence): string {
   if (test.variable === "topic") return "Every form choice has enough evidence; a fresh topic is the open question.";
+  if (test.variable === "source") return "A competitor's popular topic, told your way in your proven format.";
   const row = ev[test.variable].find((r) => r.value === test.value);
   if (!row || row.total === 0) return "No post in the last 90 days has tried this.";
   const thin = row.total < EXPLORE_BELOW ? " That is thin evidence, so it is worth testing." : "";
@@ -237,7 +299,7 @@ export function tagsFromRecipe(recipe: Record<string, string>, hook: string, now
     onscreen_text: recipe.onscreen_text ?? "",
     message: recipe.message ?? "",
     cta_type: recipe.cta_type ?? "",
-    post_style: recipe.post_style ?? "",
+    post_style: recipe.post_style === NEW_FORMAT ? "" : (recipe.post_style ?? ""),
     ...flags,
   };
   return {

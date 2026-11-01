@@ -1,7 +1,9 @@
 import type { Multiplier } from "@/features/content/engine/baseline";
 import { chicagoIsoDate } from "@/features/content/engine/best-times";
 import {
+  NEW_FORMAT,
   candidateTests,
+  competitorTest,
   controlRecipe,
   judgeExperiment,
   pickDay,
@@ -13,6 +15,7 @@ import {
   type JudgeMetrics,
   type LiveTest,
   type RunKind,
+  type SourceValue,
   type TallyRow,
   type Test,
   type Variable,
@@ -25,14 +28,18 @@ import {
   briefOutputSchema,
   briefSystemPrompt,
   briefToolSchema,
+  competitorReason,
   momentIdea,
   recipeFor,
   renderBriefTurn,
   type BriefOut,
   type BriefSlotInput,
+  type CompetitorInput,
   type MomentIdea,
 } from "@/features/content/engine/today-brief";
+import { sharesCopiedRun } from "@/features/content/engine/competitors";
 import type { ToolCaller } from "./claude";
+import type { CompetitorPostRow } from "./competitors";
 import { chicagoDayStart } from "./recreate";
 
 // Slice 5: the day's briefs. Everything here runs against TodayDb so the flow is tested
@@ -51,7 +58,7 @@ export type ExperimentRow = {
   idea_id: string;
   day: string;
   slot: number;
-  kind: "proposed" | "moment";
+  kind: "proposed" | "moment" | "competitor";
   moment: string;
   variable: Variable;
   value: string;
@@ -63,8 +70,12 @@ export type ExperimentRow = {
   verdict: Verdict | null;
   judge_metrics: JudgeMetrics | { reason: string } | Record<string, never>;
   judged_at: string | null;
+  competitor_post_id: string | null;
   created_at: string;
 };
+
+/** A fresh, popular, tagged competitor post that has never seeded a brief (slice 6). */
+export type CompetitorCandidate = { post: CompetitorPostRow; username: string; multiple: number; thin: boolean };
 
 export type RunRow = {
   id: string;
@@ -79,9 +90,13 @@ export type RunRow = {
 export type IdeaLite = { id: string; title: string; hook: string; pillar: string; hook_alt: string | null; status: string };
 export type IdeaSnapshot = { hook: string; hook_alt: string | null; hook_type: string; title: string; outline: unknown; status: string; score: number };
 
+export type BriefCompetitor = { username: string; url: string; multiple: number; thin: boolean; pushes_belief: string | null; format_note: string | null };
+
 export type BriefView = ExperimentRow & {
   idea: { id: string; title: string; hook: string; outline: { beat: string }[]; status: string } | null;
   post: { id: string; url: string } | null;
+  /** The competitor post a brief came from, while the brief still carries the link (slice 6). */
+  competitor: BriefCompetitor | null;
 };
 
 export type TodayPage = {
@@ -99,7 +114,7 @@ export type TodayPage = {
 export type PostMath = { multiplier: Multiplier; normalized: Pick<NormalizedPost, "n_saves" | "n_watch"> | null };
 
 export type NewExperiment = Omit<ExperimentRow, "id" | "created_at">;
-export type ExperimentPatch = Partial<Pick<NewExperiment, "status" | "verdict" | "judge_metrics" | "judged_at" | "post_id" | "judge_at" | "variable" | "value" | "recipe" | "reason">>;
+export type ExperimentPatch = Partial<Pick<NewExperiment, "status" | "verdict" | "judge_metrics" | "judged_at" | "post_id" | "judge_at" | "variable" | "value" | "recipe" | "reason" | "idea_id" | "kind" | "competitor_post_id">>;
 
 export interface TodayDb {
   evidence(now: Date): Promise<{ ev: Evidence; winnerHooks: string[]; recentHooks: string[] }>;
@@ -131,6 +146,12 @@ export interface TodayDb {
   postedToJudge(): Promise<{ exp: ExperimentRow; posted_at: string }[]>;
   postMath(postIds: string[], now: Date): Promise<Map<string, PostMath>>;
   page(day: string, now: Date): Promise<TodayPage>;
+  /** The most popular fresh, tagged, unbriefed post of a watching creator, or null. */
+  competitorCandidate(day: string, now: Date): Promise<CompetitorCandidate | null>;
+  /** A post seeds at most one brief: stamped whatever happens to the brief. */
+  markCompetitorBriefed(postId: string, at: string): Promise<void>;
+  /** The `competitor` source a topic brief's idea hangs from; `meta.angle` is the source value. */
+  insertCompetitorSource(c: CompetitorCandidate, angle: SourceValue): Promise<string>;
 }
 
 /** The cron run's error text when there was nothing in the Inbox to brief. Make now may run again after it. */
@@ -223,7 +244,24 @@ async function askClaude(caller: ToolCaller, slots: BriefSlotInput[], hooks: { w
 const fixedMessages = (slots: { slot: number; test: Test }[]) =>
   Object.fromEntries(slots.filter((s) => s.test.variable === "message").map((s) => [s.slot, s.test.value]));
 
-/** The cron's body: two briefs from the Inbox. Writes the run row; never throws. */
+const competitorInput = (c: CompetitorCandidate): CompetitorInput => ({
+  username: c.username,
+  caption: c.post.caption,
+  hookText: c.post.hook_text,
+  pushesBelief: c.post.pushes_belief,
+  formatNote: c.post.format_note,
+});
+
+const copies = (b: BriefOut, c: CompetitorCandidate) => sharesCopiedRun([b.hook, ...b.say].join(" "), [c.post.caption, c.post.hook_text]);
+
+const blankExperiment = { moment: "", status: "open" as const, post_id: null, judge_at: null, verdict: null, judge_metrics: {}, judged_at: null };
+
+type Planned = { slot: number; test: Test; ideaId: string | null; competitor: CompetitorCandidate | null };
+
+/**
+ * The cron's body: two briefs. Slot 2 goes to a fresh popular competitor post when there
+ * is one (slice 6); the rest come from the Inbox. Writes the run row; never throws.
+ */
 export async function runDaily(db: TodayDb, caller: ToolCaller, runId: string, now: Date): Promise<{ made: number; error: string | null }> {
   const day = chicagoIsoDate(now);
   const patched: { id: string; snapshot: IdeaSnapshot }[] = [];
@@ -249,51 +287,120 @@ export async function runDaily(db: TodayDb, caller: ToolCaller, runId: string, n
       await db.updateRun(runId, { status: "ready" });
       return { made: 0, error: null };
     }
-    const ideas = await db.unclaimedInboxIdeas(missing.length);
-    if (ideas.length === 0) {
-      await db.updateRun(runId, { status: "ready", error: EMPTY_INBOX });
-      return { made: 0, error: null };
-    }
+    const candidate = missing.includes(2) ? await db.competitorCandidate(day, now) : null;
+    const ideas = await db.unclaimedInboxIdeas(missing.length + 1);
     const { ev, winnerHooks, recentHooks } = await db.evidence(now);
-    const { control, slots } = pickDay(ev, await db.liveTests(), ideas.map((i) => i.id), live.map((e) => e.variable));
-    if (slots.length === 0) return await fail("No test is left to run today.");
-    const planned = slots.map((s, i) => ({ ...s, slot: missing[i] }));
-    const inputs: BriefSlotInput[] = planned.map((p) => {
-      const i = ideas.find((x) => x.id === p.ideaId)!;
-      return { slot: p.slot, test: p.test, held: control, idea: { title: i.title, hook: i.hook, pillar: i.pillar }, moment: "" };
-    });
-    const briefs = await askClaude(caller, inputs, { winnerHooks, recentHooks }, fixedMessages(planned));
+    const liveTests = await db.liveTests();
+    const control = controlRecipe(ev);
+    const heldVariables: string[] = live.map((e) => e.variable);
+    const planned: Planned[] = [];
+    const freeIdeas = ideas.map((i) => i.id);
+
+    // The competitor brief is picked first; the other slots then avoid its variable.
+    let comp: Planned | null = null;
+    if (candidate) {
+      const test = competitorTest(candidate.post, ev, control, liveTests, heldVariables);
+      const ideaId = test.variable === "source" ? null : (freeIdeas.shift() ?? undefined);
+      if (ideaId !== undefined) {
+        comp = { slot: 2, test, ideaId, competitor: candidate };
+        heldVariables.push(test.variable);
+      }
+    }
+    const rest = missing.filter((s) => !(comp && s === 2));
+    if (rest.length > 0 && freeIdeas.length > 0) {
+      const { slots } = pickDay(ev, liveTests, freeIdeas.slice(0, rest.length), heldVariables);
+      slots.forEach((p, k) => planned.push({ slot: rest[k], test: p.test, ideaId: p.ideaId, competitor: null }));
+    }
+    if (comp) planned.push(comp);
+    planned.sort((a, b) => a.slot - b.slot);
+    if (planned.length === 0) {
+      if (ideas.length === 0) {
+        await db.updateRun(runId, { status: "ready", error: EMPTY_INBOX });
+        return { made: 0, error: null };
+      }
+      return await fail("No test is left to run today.");
+    }
+
+    const ideaOf = (id: string | null) => (id === null ? undefined : ideas.find((x) => x.id === id));
+    const inputFor = (p: Planned): BriefSlotInput => {
+      const i = ideaOf(p.ideaId);
+      return {
+        slot: p.slot,
+        test: p.test,
+        held: control,
+        idea: i ? { title: i.title, hook: i.hook, pillar: i.pillar } : null,
+        moment: "",
+        ...(p.competitor ? { competitor: competitorInput(p.competitor) } : {}),
+      };
+    };
+    const hooks = { winnerHooks, recentHooks };
+    const briefs = await askClaude(caller, planned.map(inputFor), hooks, fixedMessages(planned));
+    const briefFor = (slot: number) => briefs.find((x) => x.slot === slot)!;
+
+    // The copy check: one retry, then slot 2 becomes a normal proposed brief.
+    if (comp && copies(briefFor(2), comp.competitor!)) {
+      const [again] = await askClaude(caller, [inputFor(comp)], hooks, fixedMessages([comp]));
+      if (!copies(again, comp.competitor!)) {
+        briefs.splice(briefs.indexOf(briefFor(2)), 1, again);
+      } else {
+        await db.markCompetitorBriefed(comp.competitor!.post.id, now.toISOString());
+        planned.splice(planned.indexOf(comp), 1);
+        briefs.splice(briefs.indexOf(briefFor(2)), 1);
+        if (comp.ideaId) freeIdeas.unshift(comp.ideaId);
+        const used = new Set(planned.map((p) => p.ideaId));
+        const spare = freeIdeas.filter((id) => !used.has(id));
+        const held = [...live.map((e) => e.variable), ...planned.map((p) => p.test.variable)];
+        const { slots } = pickDay(ev, liveTests, spare.slice(0, 1), held);
+        comp = null;
+        if (slots[0]) {
+          const p: Planned = { slot: 2, test: slots[0].test, ideaId: slots[0].ideaId, competitor: null };
+          const [b] = await askClaude(caller, [inputFor(p)], hooks, fixedMessages([p]));
+          planned.push(p);
+          briefs.push({ ...b, slot: 2 });
+        }
+      }
+    }
+    if (planned.length === 0) return await fail("No test is left to run today.");
 
     for (const p of planned) {
-      const b = briefs.find((x) => x.slot === p.slot)!;
-      const i = ideas.find((x) => x.id === p.ideaId)!;
-      const before = await db.patchIdea(p.ideaId, briefIdeaPatch(b, p.test, control, i.hook_alt ?? i.hook));
+      if (p.ideaId === null) continue;
+      const i = ideaOf(p.ideaId)!;
+      const before = await db.patchIdea(p.ideaId, briefIdeaPatch(briefFor(p.slot), p.test, control, i.hook_alt ?? i.hook));
       if (before === null) return await fail("An idea changed while the briefs were made. Try again.");
       patched.push({ id: p.ideaId, snapshot: before });
     }
     let last: string | null = null;
     for (const p of planned) {
-      const b = briefs.find((x) => x.slot === p.slot)!;
-      const i = ideas.find((x) => x.id === p.ideaId)!;
+      const b = briefFor(p.slot);
+      const c = p.competitor;
+      let ideaId = p.ideaId;
+      let topic = ideaOf(p.ideaId)?.title ?? b.title;
+      if (ideaId === null && c) {
+        const sourceId = await db.insertCompetitorSource(c, p.test.value as SourceValue);
+        ideaId = await db.insertMomentIdea(momentIdea(b, p.test, control, sourceId, day));
+        topic = b.title;
+      }
+      const recipe = recipeFor(p.test, control, b.message, topic);
+      if (p.test.value === NEW_FORMAT && c?.post.format_note) recipe.format_note = c.post.format_note;
+      // The card's "Inspired by" line reads the multiple and thin flag as they were when the brief was made.
+      if (c) Object.assign(recipe, { competitor_multiple: c.multiple.toFixed(1), competitor_thin: c.thin ? "yes" : "" });
       last = await db.insertExperiment({
-        idea_id: p.ideaId,
+        ...blankExperiment,
+        idea_id: ideaId as string,
         day,
         slot: p.slot,
-        kind: "proposed",
-        moment: "",
+        kind: c ? "competitor" : "proposed",
         variable: p.test.variable,
         value: p.test.value,
-        recipe: recipeFor(p.test, control, b.message, i.title),
-        reason: renderReason(p.test, ev),
-        status: "open",
-        post_id: null,
-        judge_at: null,
-        verdict: null,
-        judge_metrics: {},
-        judged_at: null,
+        recipe,
+        reason: c ? competitorReason({ username: c.username, multiple: c.multiple, thin: c.thin, pushesBelief: c.post.pushes_belief }, p.test) : renderReason(p.test, ev),
+        competitor_post_id: c ? c.post.id : null,
       });
+      if (c) await db.markCompetitorBriefed(c.post.id, now.toISOString());
     }
-    await db.updateRun(runId, { status: "ready", experiment_id: last });
+    // A slot left empty for want of an Inbox idea keeps the run retryable by Make now.
+    const short = ideas.length === 0 && missing.some((s) => !planned.some((p) => p.slot === s));
+    await db.updateRun(runId, { status: "ready", experiment_id: last, ...(short ? { error: EMPTY_INBOX } : {}) });
     return { made: planned.length, error: null };
   } catch (e) {
     return await fail(message(e));
@@ -349,6 +456,7 @@ export async function runMoment(db: TodayDb, caller: ToolCaller, runId: string, 
       day,
       slot: 3,
       kind: "moment",
+      competitor_post_id: null,
       moment: text,
       variable: pick.test.variable,
       value: pick.test.value,
@@ -398,8 +506,11 @@ export async function runSwap(db: TodayDb, caller: ToolCaller, runId: string, ex
   try {
     const old = await db.getExperiment(experimentId);
     if (!old || old.status !== "open") return await fail("That brief changed. Reload and try again.");
-    const idea = await db.idea(old.idea_id);
-    if (!idea) return await fail("The idea is gone.");
+    // A competitor topic brief swaps to a fresh Inbox idea: keeping their topic under a new test would change two things.
+    const fromCompetitorTopic = old.kind === "competitor" && old.variable === "source";
+    const oldIdeaId = old.idea_id;
+    const idea = fromCompetitorTopic ? ((await db.unclaimedInboxIdeas(1))[0] ?? null) : await db.idea(old.idea_id);
+    if (!idea) return await fail(fromCompetitorTopic ? `${EMPTY_INBOX}. Add an idea, then swap.` : "The idea is gone.");
     const { ev, winnerHooks, recentHooks } = await db.evidence(now);
     const heldVariables = new Set((await db.liveSlots(day)).map((e) => e.variable));
     const control: Control = controlRecipe(ev);
@@ -420,7 +531,9 @@ export async function runSwap(db: TodayDb, caller: ToolCaller, runId: string, ex
       value: test.value,
       recipe: recipeFor(test, control, b.message, idea.title),
       reason: renderReason(test, ev),
+      ...(old.kind === "competitor" ? { kind: "proposed" as const, competitor_post_id: null, idea_id: idea.id } : {}),
     });
+    if (fromCompetitorTopic) await db.returnToInbox(oldIdeaId);
     await db.updateRun(runId, { status: "ready", experiment_id: old.id });
   } catch (e) {
     await fail(message(e));

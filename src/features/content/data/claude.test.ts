@@ -33,6 +33,14 @@ describe("claudeIdeaGenerator", () => {
     expect(content[0]).toEqual({ type: "document", source: { type: "base64", media_type: "application/pdf", data: "QUJD" } });
     expect(content[1]).toEqual({ type: "text", text: "U" });
   });
+  it("sends an image by URL before the text, with the caller's model", async () => {
+    const { client, create } = fakeClient([{ type: "tool_use", input: {} }]);
+    await claudeToolCaller(client).call({ system: "S", text: "U", image: { url: "https://cdn.example/a.jpg" }, tool: { name: "t", description: "d", schema: {} }, model: "claude-sonnet-5-5" });
+    const args = create.mock.calls[0][0] as Record<string, any>;
+    expect(args.messages[0].content[0]).toEqual({ type: "image", source: { type: "url", url: "https://cdn.example/a.jpg" } });
+    expect(args.messages[0].content[1]).toEqual({ type: "text", text: "U" });
+    expect(args.model).toBe("claude-sonnet-5-5");
+  });
   it("throws when the answer has no tool call", async () => {
     const { client } = fakeClient([{ type: "text" }]);
     await expect(claudeIdeaGenerator(client).generate({ system: "S", text: "U" })).rejects.toThrow(/no ideas/i);

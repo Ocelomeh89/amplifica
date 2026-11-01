@@ -23,6 +23,7 @@ export const SOURCE_KINDS = [
   "comment",
   "scan",
   "manual",
+  "competitor",
 ] as const;
 export type SourceKind = (typeof SOURCE_KINDS)[number];
 

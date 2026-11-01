@@ -15,9 +15,11 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/performance/[postId]/page.tsx",
       "src/app/(app)/content/week/page.tsx",
       "src/app/(app)/content/today/page.tsx",
+      "src/app/(app)/content/creators/page.tsx",
       "src/app/(app)/content/ideas/[id]/page.tsx",
       "src/app/(app)/content/sources/page.tsx",
       "src/features/content/data/actions.ts",
+      "src/features/content/data/competitor-actions.ts",
       "src/features/content/data/tag-actions.ts",
       "src/features/content/data/recreate-actions.ts",
       "src/features/content/data/today-actions.ts",
@@ -49,6 +51,7 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/ideas/[id]/page.tsx",
       "src/app/(app)/content/sources/page.tsx",
       "src/app/(app)/content/today/page.tsx",
+      "src/app/(app)/content/creators/page.tsx",
     ];
     for (const f of pages) expect(read(f), f).not.toMatch(/supabase\s*\.from\(/);
   });
@@ -66,5 +69,12 @@ describe("content stays owner-only", () => {
     expect(route).toContain("createAdminClient()");
     const vercel = JSON.parse(read("vercel.json")) as { crons: { path: string; schedule: string }[] };
     expect(vercel.crons).toEqual([{ path: "/api/content/cron/metrics", schedule: "0 10 * * *" }]);
+  });
+
+  it("the competitor step runs after the pulls and before the Today tail", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    const competitors = route.indexOf("runCompetitorCron(");
+    expect(competitors).toBeGreaterThan(route.indexOf("runMetricsCron("));
+    expect(competitors).toBeLessThan(route.indexOf("runTodayCron("));
   });
 });

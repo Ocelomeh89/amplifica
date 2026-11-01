@@ -6,6 +6,7 @@ import {
   briefOutputSchema,
   briefSystemPrompt,
   briefToolSchema,
+  competitorReason,
   momentIdea,
   momentIdeaSchema,
   recipeFor,
@@ -110,5 +111,42 @@ describe("momentIdea", () => {
   it("builds a Reel idea linked to the moment's source", () => {
     const idea = momentIdea(brief(), { variable: "hook_type", value: "story-moment", control: "question" }, held, "11111111-1111-4111-8111-111111111111", "2026-10-27");
     expect(idea).toMatchObject({ format: "reel", score: 1, batch_date: "2026-10-27", source_id: "11111111-1111-4111-8111-111111111111", hook_type: "story-moment" });
+  });
+});
+
+describe("slice 6: competitor slots", () => {
+  const comp = { username: "micro.investing", caption: "You should max out your 401k", hookText: "Max it out", pushesBelief: "max out your 401k", formatNote: null };
+
+  it("quotes the competitor's post under the do-not-reuse label and words a rebuttal test", () => {
+    const t = renderBriefTurn({
+      slots: [{ slot: 2, test: { variable: "source", value: "competitor-rebuttal", control: "own" }, held, idea: null, moment: "", competitor: comp }],
+      winnerHooks: [],
+      recentHooks: [],
+    });
+    expect(t).toContain("Their post by @micro.investing (do not reuse its wording):");
+    expect(t).toContain('"You should max out your 401k"');
+    expect(t).toContain("It pushes: max out your 401k");
+    expect(t).toContain("The test: their topic, answered with Miguel's rebuttal");
+  });
+
+  it("a format test names the creator and the format note", () => {
+    const t = renderBriefTurn({
+      slots: [{ slot: 2, test: { variable: "post_style", value: "new-format", control: "talking-head" }, held, idea: { title: "I", hook: "H", pillar: "" }, moment: "", competitor: { ...comp, pushesBelief: null, formatNote: "split screen" } }],
+      winnerHooks: [],
+      recentHooks: [],
+    });
+    expect(t).toContain("from @micro.investing");
+    expect(t).toContain("Their format (copy the format, not the words): split screen");
+  });
+
+  it("the system prompt carries the never-reuse rule", () => {
+    expect(briefSystemPrompt()).toContain("Never reuse its hook wording or script");
+  });
+
+  it("competitorReason states the creator, the multiple, the belief and a thin baseline", () => {
+    expect(competitorReason({ username: "micro.investing", multiple: 3.42, thin: true, pushesBelief: "max out your 401k" }, { variable: "source", value: "competitor-rebuttal", control: "own" }))
+      .toBe('From @micro.investing: 3.4× their typical views. Pushes "max out your 401k". Thin baseline.');
+    expect(competitorReason({ username: "ericsfinancials", multiple: 5, thin: false, pushesBelief: null }, { variable: "post_style", value: "text-broll", control: "talking-head" }))
+      .toBe("From @ericsfinancials: 5.0× their typical views. Tests their post style.");
   });
 });

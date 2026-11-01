@@ -85,8 +85,12 @@ the egress proxy), then the `base.en` download failed on Hugging Face's Xet host
 Locally the same download fails until `HF_HUB_DISABLE_XET=1` is set; the routine now sets it.
 Whether `*.cdninstagram.com` and `*.fbcdn.net` serve video from the cloud is still untested.
 
-**Proof (fill in after the next cloud run with untagged posts):** date, the report's tools
-line, how many `hook_spoken` values were written, and any host the run still needed.
+**Proof, partial (2026-10-31):** the cloud run with the Hugging Face hosts allowed
+reported "tools: ok": `faster-whisper` and `imageio-ffmpeg` installed and `ffmpeg`
+resolved. The queue was empty (`remaining` 0), so no speech model was downloaded and no
+`hook_spoken` values were written. Still unproven: the model download from Hugging Face
+and the video hosts. Fill in date, `hook_spoken` count and any extra host after the
+first cloud run that has untagged posts.
 
 `/content-tag` runs the same file from Claude Code on the Mac, where there is no
 allowlist. The first backfill tags up to 100 posts per run.

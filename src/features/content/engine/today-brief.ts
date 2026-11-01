@@ -73,6 +73,13 @@ when Miguel is on camera, on-screen cards when it is words over footage, an anim
 or a screen recording. Change only the variable the slot tests; every other recipe
 choice stays as given. Never repeat a recent hook or one of his best hooks. Hooks
 follow the rules above; no return promises, no hype.
+
+## Competitor posts
+
+Some slots carry another creator's popular post. Never reuse its hook wording or script:
+answer it, do not restate it. A rebuttal opens on the belief and Miguel's counter, in his
+canon where one fits. A format test describes the format concretely enough to film: the
+shots, the on-screen text and the pacing.
 `.trim();
 
 export function briefSystemPrompt(): string {
@@ -86,12 +93,26 @@ export function briefSystemPrompt(): string {
   ].join("\n\n");
 }
 
+export type CompetitorInput = { username: string; caption: string; hookText: string; pushesBelief: string | null; formatNote: string | null };
+
 export type BriefSlotInput = {
   slot: number;
   test: Test;
   held: Control;
   idea: { title: string; hook: string; pillar: string } | null;
   moment: string;
+  competitor?: CompetitorInput;
+};
+
+const testLineFor = (s: BriefSlotInput): string => {
+  if (s.test.variable === "topic") return "The test: a topic the last 90 days have not covered.";
+  if (s.test.variable === "source") {
+    return s.test.value === "competitor-rebuttal"
+      ? "The test: their topic, answered with Miguel's rebuttal of the belief it pushes, instead of his own topic."
+      : "The test: their topic, told with Miguel's own take, instead of his own topic.";
+  }
+  const from = s.competitor ? ` from @${s.competitor.username}` : "";
+  return `The test: ${VARIABLE_LABEL[s.test.variable]}: ${valueLabel(s.test.value)}${from}${s.test.control ? ` instead of ${valueLabel(s.test.control)}` : ""}.`;
 };
 
 const heldLine = (held: Control, test: Test): string =>
@@ -102,11 +123,14 @@ const heldLine = (held: Control, test: Test): string =>
 export function renderBriefTurn(a: { slots: BriefSlotInput[]; winnerHooks: string[]; recentHooks: string[] }): string {
   const lines: string[] = [];
   for (const s of a.slots) {
-    const testLine =
-      s.test.variable === "topic"
-        ? "The test: a topic the last 90 days have not covered."
-        : `The test: ${VARIABLE_LABEL[s.test.variable]}: ${valueLabel(s.test.value)}${s.test.control ? ` instead of ${valueLabel(s.test.control)}` : ""}.`;
-    lines.push(`## Slot ${s.slot}`, testLine, `Held still: ${heldLine(s.held, s.test)}.`);
+    lines.push(`## Slot ${s.slot}`, testLineFor(s), `Held still: ${heldLine(s.held, s.test)}.`);
+    if (s.competitor) {
+      const c = s.competitor;
+      lines.push(`Their post by @${c.username} (do not reuse its wording):`, `"${c.caption.trim()}"`);
+      if (c.hookText) lines.push(`Their hook: "${c.hookText}"`);
+      if (c.pushesBelief) lines.push(`It pushes: ${c.pushesBelief}`);
+      if (c.formatNote) lines.push(`Their format (copy the format, not the words): ${c.formatNote}`);
+    }
     if (s.moment) {
       lines.push(`Moment: ${s.moment}`, "Build the Reel around this moment from Miguel's day.");
     } else if (s.idea) {
@@ -116,6 +140,8 @@ export function renderBriefTurn(a: { slots: BriefSlotInput[]; winnerHooks: strin
           ? `The message is the test: argue ${s.test.value} and rewrite the idea's angle to fit it.`
           : "Keep the idea's topic and pick the canon message it already argues."
       );
+    } else if (s.competitor) {
+      lines.push("Build the Reel on their topic and pick the canon message Miguel's answer argues.");
     }
     lines.push("");
   }
@@ -167,4 +193,16 @@ export function recipeFor(test: Test, held: Control, message: string, topic: str
   const recipe: Record<string, string> = { ...held };
   if ((HELD_STILL as readonly string[]).includes(test.variable)) recipe[test.variable] = test.value;
   return { ...recipe, message, topic, control: test.control };
+}
+
+/** Why a competitor brief was picked, for the card. */
+export function competitorReason(c: { username: string; multiple: number; thin: boolean; pushesBelief: string | null }, test: Test): string {
+  const parts = [`From @${c.username}: ${c.multiple.toFixed(1)}× their typical views.`];
+  if (test.variable === "source") {
+    if (c.pushesBelief) parts.push(`Pushes "${c.pushesBelief}".`);
+  } else {
+    parts.push(`Tests their ${VARIABLE_LABEL[test.variable].toLowerCase()}.`);
+  }
+  if (c.thin) parts.push("Thin baseline.");
+  return parts.join(" ");
 }

@@ -1,6 +1,6 @@
 import { evidenceCounts, type Evidence, type LiveTest } from "@/features/content/engine/experiments";
 import type { Multiplier } from "@/features/content/engine/baseline";
-import type { ExperimentRow, IdeaLite, RunRow, TodayDb } from "./today";
+import type { CompetitorCandidate, ExperimentRow, IdeaLite, RunRow, TodayDb } from "./today";
 
 // An in-memory TodayDb for the Today tests.
 
@@ -24,12 +24,12 @@ function evidence(): Evidence {
 
 type Snapshot = { hook: string; hook_alt: string | null; hook_type: string; title: string; outline: unknown; status: string; score: number };
 
-export function fakeDb(opts: { updateFails?: boolean; ideas?: IdeaLite[]; patchFails?: string[]; experiments?: ExperimentRow[]; runs?: RunRow[]; posted?: { exp: ExperimentRow; posted_at: string }[]; math?: Map<string, { multiplier: Multiplier; normalized: null }> } = {}) {
+export function fakeDb(opts: { updateFails?: boolean; ideas?: IdeaLite[]; patchFails?: string[]; experiments?: ExperimentRow[]; runs?: RunRow[]; posted?: { exp: ExperimentRow; posted_at: string }[]; math?: Map<string, { multiplier: Multiplier; normalized: null }>; candidate?: CompetitorCandidate | null } = {}) {
   const ideas = new Map<string, IdeaLite & { hook_alt: string | null; status: string }>();
   for (const i of opts.ideas ?? []) ideas.set(i.id, { ...i, hook_alt: null, status: "inbox" });
   const experiments: ExperimentRow[] = [...(opts.experiments ?? [])];
   const runs: RunRow[] = [...(opts.runs ?? [])];
-  const calls = { patch: [] as string[], restore: [] as string[], inbox: [] as string[], sources: [] as string[], momentIdeas: [] as unknown[], runsInserted: 0 };
+  const calls = { patch: [] as string[], restore: [] as string[], inbox: [] as string[], sources: [] as string[], momentIdeas: [] as unknown[], runsInserted: 0, briefed: [] as string[], competitorSources: [] as { shortcode: string; angle: string }[] };
   let seq = 0;
   const impl: Partial<TodayDb> = {
     async evidence() {
@@ -88,6 +88,17 @@ export function fakeDb(opts: { updateFails?: boolean; ideas?: IdeaLite[]; patchF
       ideas.set(id, { id, title: idea.title, hook: idea.hook, pillar: "", hook_alt: null, status: "queued" });
       return id;
     },
+    async competitorCandidate() {
+      const c = opts.candidate ?? null;
+      return c && !calls.briefed.includes(c.post.id) ? c : null;
+    },
+    async markCompetitorBriefed(postId) {
+      calls.briefed.push(postId);
+    },
+    async insertCompetitorSource(c, angle) {
+      calls.competitorSources.push({ shortcode: c.post.shortcode, angle });
+      return "22222222-2222-4222-8222-222222222222";
+    },
     async runFor(day, kind) {
       return runs.find((r) => r.day === day && r.kind === kind) ?? null;
     },
@@ -139,7 +150,45 @@ export const exp = (over: Partial<ExperimentRow> = {}): ExperimentRow => ({
   verdict: null,
   judge_metrics: {},
   judged_at: null,
+  competitor_post_id: null,
   created_at: NOW.toISOString(),
   ...over,
+});
+
+/** A popular competitor post. Tagged like the fake evidence's control (first listed value where it has no posts) unless overridden, so it seeds a topic test. */
+export const candidate = (over: Partial<CompetitorCandidate["post"]> = {}, meta: Partial<Omit<CompetitorCandidate, "post">> = {}): CompetitorCandidate => ({
+  username: "micro.investing",
+  multiple: 3.4,
+  thin: false,
+  ...meta,
+  post: {
+    id: "cp1",
+    creator_id: "c1",
+    shortcode: "A1",
+    url: "https://www.instagram.com/p/A1/",
+    username: "micro.investing",
+    posted_at: "2026-10-25T12:00:00.000Z",
+    caption: "You should max out your 401k before anything else",
+    views: 3400,
+    likes: 100,
+    comments: 10,
+    duration_seconds: 30,
+    thumbnail_url: null,
+    hook_type: "question",
+    onscreen_text: "repeats-hook",
+    cover_face: true,
+    cover_text: false,
+    cover_number: false,
+    cta_type: "comment-keyword",
+    post_style: "talking-head",
+    message: "",
+    hook_text: "Max out your 401k first",
+    tag_confidence: { hook_type: 0.9, onscreen_text: 0.9, cta_type: 0.9, post_style: 0.9, cover_face: 0.9, cover_text: 0.9, cover_number: 0.9 },
+    pushes_belief: "max out your 401k",
+    format_note: null,
+    tagged_at: "2026-10-26T11:00:00Z",
+    briefed_at: null,
+    ...over,
+  },
 });
 

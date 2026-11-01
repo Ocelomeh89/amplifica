@@ -5,7 +5,7 @@ import { useState } from "react";
 import { markPosted } from "@/features/content/data/actions";
 import { skipBriefAction, swapBrief } from "@/features/content/data/today-actions";
 import type { BriefView } from "@/features/content/data/today";
-import { HELD_STILL, VARIABLE_LABEL, valueLabel } from "@/features/content/engine/experiments";
+import { HELD_STILL, NEW_FORMAT, VARIABLE_LABEL, valueLabel } from "@/features/content/engine/experiments";
 
 const btn = "min-h-11 px-4 rounded-lg border border-edge bg-card text-sm hover:bg-edge/60 disabled:opacity-50 disabled:cursor-not-allowed";
 const chicagoDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Chicago" });
@@ -14,8 +14,17 @@ const times = (n: unknown) => (typeof n === "number" ? `${n.toFixed(2)}×` : "no
 export const VERDICT_LABEL = { won: "Won", lost: "Lost", flat: "Flat" } as const;
 
 /** "Hook type: Paradox instead of Question" */
-export function testInWords(b: Pick<BriefView, "variable" | "value" | "recipe">): string {
+export function testInWords(b: Pick<BriefView, "variable" | "value" | "recipe"> & { competitor?: BriefView["competitor"] }): string {
   if (b.variable === "topic") return "A topic the last 90 days have not covered";
+  if (b.variable === "source") {
+    return b.value === "competitor-rebuttal"
+      ? "Source: rebuttal of a competitor post instead of your own topic"
+      : "Source: a competitor's topic with your take instead of your own topic";
+  }
+  if (b.value === NEW_FORMAT) {
+    const from = b.competitor?.username ? ` from @${b.competitor.username}` : "";
+    return `Post style: new format${from}${b.recipe.control ? ` instead of ${valueLabel(b.recipe.control)}` : ""}`;
+  }
   const control = b.recipe.control;
   return `${VARIABLE_LABEL[b.variable]}: ${valueLabel(b.value)}${control ? ` instead of ${valueLabel(control)}` : ""}`;
 }
@@ -57,6 +66,16 @@ export default function BriefCard({ brief }: { brief: BriefView }) {
         {brief.status === "posted" && " · Posted"}
       </p>
       {brief.kind === "moment" && brief.moment && <p className="text-sm text-sub mb-1">Moment: {brief.moment}</p>}
+      {brief.competitor && (
+        <div className="text-sm text-sub mb-1">
+          <a href={brief.competitor.url} target="_blank" rel="noopener noreferrer" className="text-purple hover:underline">
+            Inspired by @{brief.competitor.username}, {brief.competitor.multiple.toFixed(1)}× their typical views
+          </a>
+          {brief.competitor.pushes_belief && <p>Pushes: {brief.competitor.pushes_belief}</p>}
+          {brief.competitor.format_note && <p>New format: {brief.competitor.format_note}</p>}
+          {brief.competitor.thin && <p>Thin baseline</p>}
+        </div>
+      )}
       <p className="text-xs text-sub mb-2">
         {valueLabel(r.post_style ?? "")} · Cover: {valueLabel(r.cover ?? "none")} · CTA: {valueLabel(r.cta_type ?? "none")}
       </p>
