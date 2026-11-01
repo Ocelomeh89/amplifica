@@ -61,4 +61,13 @@ describe("runCompetitorCron", () => {
     });
     expect(report.error).toMatch(/ANTHROPIC_API_KEY/);
   });
+
+  it("a run that could not be collected shows its reason in the report", async () => {
+    const { db } = fakeCompetitorsDb({
+      creators: [watching],
+      runs: [{ id: "r1", apify_run_id: "gone", status: "pending", error: "", started_at: MONDAY.toISOString(), finished_at: null, cost_usd: null, items: null, usernames: ["micro.investing"] }],
+    });
+    const report = await runCompetitorCron({ db, apifyFor: () => fakeApify().apify, callerFor: () => caller, now: new Date("2026-11-03T11:00:00Z"), force: false, timeLeft: () => 250 });
+    expect(report.error).toBe("run gone: no run gone");
+  });
 });

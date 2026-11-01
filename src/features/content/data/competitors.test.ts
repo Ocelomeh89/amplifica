@@ -60,7 +60,7 @@ describe("collectRuns", () => {
     const { apify } = fakeApify({
       "apify-1": { status: "ready", datasetId: "ds", costUsd: 0.08, error: "", items: [item(), item({ shortCode: "B2", ownerUsername: "collab.guy" }), item({ shortCode: "C3", type: "Sidecar" })] },
     });
-    expect(await collectRuns(db, apify, TUESDAY)).toEqual({ stored: 1, failed: 0 });
+    expect(await collectRuns(db, apify, TUESDAY)).toMatchObject({ stored: 1, failed: 0 });
     expect(state.posts.map((p) => [p.shortcode, p.creator_id, p.views])).toEqual([["A1", "c1", 900]]);
     expect(state.runs[0]).toMatchObject({ status: "ready", items: 1, cost_usd: 0.08 });
     expect(state.creators[0]).toMatchObject({ last_pull_status: "ready", last_pulled_at: TUESDAY.toISOString() });
@@ -75,7 +75,7 @@ describe("collectRuns", () => {
 
   it("a failed run is recorded with its error and marks creators failed", async () => {
     const { db, state } = fakeCompetitorsDb({ creators: [creator()], runs: [run()] });
-    expect(await collectRuns(db, fakeApify({ "apify-1": { status: "failed", datasetId: null, costUsd: 0.01, error: "FAILED: blocked" } }).apify, TUESDAY)).toEqual({ stored: 0, failed: 1 });
+    expect(await collectRuns(db, fakeApify({ "apify-1": { status: "failed", datasetId: null, costUsd: 0.01, error: "FAILED: blocked" } }).apify, TUESDAY)).toMatchObject({ stored: 0, failed: 1 });
     expect(state.runs[0]).toMatchObject({ status: "failed", error: "FAILED: blocked" });
     expect(state.creators[0].last_pull_status).toBe("failed");
   });
@@ -93,7 +93,9 @@ describe("collectRuns", () => {
   it("one run throwing does not stop the next", async () => {
     const { db, state } = fakeCompetitorsDb({ creators: [creator()], runs: [run({ id: "r1", apify_run_id: "missing" }), run({ id: "r2", apify_run_id: "apify-2" })] });
     const { apify } = fakeApify({ "apify-2": { status: "ready", datasetId: "ds2", costUsd: 0, error: "", items: [item()] } });
-    expect(await collectRuns(db, apify, TUESDAY)).toEqual({ stored: 1, failed: 0 });
+    const result = await collectRuns(db, apify, TUESDAY);
+    expect(result).toMatchObject({ stored: 1, failed: 0 });
+    expect(result.errors).toEqual(["run missing: no run missing"]);
     expect(state.runs.map((r) => r.status)).toEqual(["pending", "ready"]);
   });
 });
