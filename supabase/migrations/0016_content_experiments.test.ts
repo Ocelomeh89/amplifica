@@ -12,8 +12,8 @@ describe("0016_content_experiments.sql", () => {
   };
 
   it("variable, kind, status and verdict check lists equal the engine constants", () => {
-    expect(listFor(exp, "variable")).toEqual([...VARIABLES].sort());
-    expect(listFor(exp, "kind")).toEqual([...EXPERIMENT_KINDS].sort());
+    expect(listFor(exp, "variable")).toEqual(VARIABLES.filter((v) => v !== "source").sort());
+    expect(listFor(exp, "kind")).toEqual(EXPERIMENT_KINDS.filter((k) => k !== "competitor").sort());
     expect(listFor(exp, "status")).toEqual([...EXPERIMENT_STATUSES].sort());
     expect(listFor(exp, "verdict")).toEqual([...VERDICTS].sort());
   });

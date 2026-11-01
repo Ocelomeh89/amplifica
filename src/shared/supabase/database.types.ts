@@ -248,7 +248,7 @@ export type Database = {
         Row: {
           id: string;
           user_id: string;
-          kind: "granola" | "wispr" | "plaud" | "vault" | "url" | "upload" | "comment" | "scan" | "manual";
+          kind: "granola" | "wispr" | "plaud" | "vault" | "url" | "upload" | "comment" | "scan" | "manual" | "competitor";
           external_id: string;
           title: string;
           url: string | null;
@@ -262,7 +262,7 @@ export type Database = {
         };
         Insert: {
           user_id: string;
-          kind: "granola" | "wispr" | "plaud" | "vault" | "url" | "upload" | "comment" | "scan" | "manual";
+          kind: "granola" | "wispr" | "plaud" | "vault" | "url" | "upload" | "comment" | "scan" | "manual" | "competitor";
           external_id: string;
           title?: string;
           url?: string | null;
@@ -572,9 +572,9 @@ export type Database = {
           idea_id: string;
           day: string;
           slot: number;
-          kind: "proposed" | "moment";
+          kind: "proposed" | "moment" | "competitor";
           moment: string;
-          variable: "hook_type" | "onscreen_text" | "cta_type" | "post_style" | "cover" | "message" | "topic";
+          variable: "hook_type" | "onscreen_text" | "cta_type" | "post_style" | "cover" | "message" | "topic" | "source";
           value: string;
           recipe: Json;
           reason: string;
@@ -584,6 +584,7 @@ export type Database = {
           verdict: "won" | "lost" | "flat" | null;
           judge_metrics: Json;
           judged_at: string | null;
+          competitor_post_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -592,9 +593,9 @@ export type Database = {
           idea_id: string;
           day: string;
           slot: number;
-          kind: "proposed" | "moment";
+          kind: "proposed" | "moment" | "competitor";
           moment?: string;
-          variable: "hook_type" | "onscreen_text" | "cta_type" | "post_style" | "cover" | "message" | "topic";
+          variable: "hook_type" | "onscreen_text" | "cta_type" | "post_style" | "cover" | "message" | "topic" | "source";
           value: string;
           recipe?: Json;
           reason?: string;
@@ -604,11 +605,15 @@ export type Database = {
           verdict?: "won" | "lost" | "flat" | null;
           judge_metrics?: Json;
           judged_at?: string | null;
+          competitor_post_id?: string | null;
         };
         Update: {
+          idea_id?: string;
+          kind?: "proposed" | "moment" | "competitor";
+          competitor_post_id?: string | null;
           slot?: number;
           moment?: string;
-          variable?: "hook_type" | "onscreen_text" | "cta_type" | "post_style" | "cover" | "message" | "topic";
+          variable?: "hook_type" | "onscreen_text" | "cta_type" | "post_style" | "cover" | "message" | "topic" | "source";
           value?: string;
           recipe?: Json;
           reason?: string;
@@ -618,6 +623,151 @@ export type Database = {
           verdict?: "won" | "lost" | "flat" | null;
           judge_metrics?: Json;
           judged_at?: string | null;
+        };
+        Relationships: [];
+      };
+      content_creators: {
+        Row: {
+          id: string;
+          user_id: string;
+          platform: "instagram";
+          username: string;
+          status: "watching" | "removed";
+          last_pulled_at: string | null;
+          last_pull_status: "ready" | "failed" | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          platform?: "instagram";
+          username: string;
+          status?: "watching" | "removed";
+          last_pulled_at?: string | null;
+          last_pull_status?: "ready" | "failed" | null;
+        };
+        Update: {
+          status?: "watching" | "removed";
+          last_pulled_at?: string | null;
+          last_pull_status?: "ready" | "failed" | null;
+        };
+        Relationships: [];
+      };
+      content_competitor_posts: {
+        Row: {
+          id: string;
+          user_id: string;
+          creator_id: string;
+          shortcode: string;
+          url: string;
+          posted_at: string;
+          caption: string;
+          views: number | null;
+          likes: number | null;
+          comments: number | null;
+          duration_seconds: number | null;
+          thumbnail_url: string | null;
+          pulled_at: string;
+          hook_type: string;
+          onscreen_text: string;
+          cover_face: boolean | null;
+          cover_text: boolean | null;
+          cover_number: boolean | null;
+          cta_type: string;
+          post_style: string;
+          message: string;
+          hook_text: string;
+          tag_confidence: Json;
+          tagged_at: string | null;
+          pushes_belief: string | null;
+          format_note: string | null;
+          briefed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          creator_id: string;
+          shortcode: string;
+          url: string;
+          posted_at: string;
+          caption?: string;
+          views?: number | null;
+          likes?: number | null;
+          comments?: number | null;
+          duration_seconds?: number | null;
+          thumbnail_url?: string | null;
+          pulled_at?: string;
+          hook_type?: string;
+          onscreen_text?: string;
+          cover_face?: boolean | null;
+          cover_text?: boolean | null;
+          cover_number?: boolean | null;
+          cta_type?: string;
+          post_style?: string;
+          message?: string;
+          hook_text?: string;
+          tag_confidence?: Json;
+          tagged_at?: string | null;
+          pushes_belief?: string | null;
+          format_note?: string | null;
+          briefed_at?: string | null;
+        };
+        Update: {
+          caption?: string;
+          views?: number | null;
+          likes?: number | null;
+          comments?: number | null;
+          duration_seconds?: number | null;
+          thumbnail_url?: string | null;
+          pulled_at?: string;
+          hook_type?: string;
+          onscreen_text?: string;
+          cover_face?: boolean | null;
+          cover_text?: boolean | null;
+          cover_number?: boolean | null;
+          cta_type?: string;
+          post_style?: string;
+          message?: string;
+          hook_text?: string;
+          tag_confidence?: Json;
+          tagged_at?: string | null;
+          pushes_belief?: string | null;
+          format_note?: string | null;
+          briefed_at?: string | null;
+        };
+        Relationships: [];
+      };
+      content_competitor_runs: {
+        Row: {
+          id: string;
+          user_id: string;
+          apify_run_id: string;
+          status: "pending" | "ready" | "failed";
+          error: string;
+          started_at: string;
+          finished_at: string | null;
+          cost_usd: number | null;
+          items: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          apify_run_id: string;
+          status?: "pending" | "ready" | "failed";
+          error?: string;
+          started_at?: string;
+          finished_at?: string | null;
+          cost_usd?: number | null;
+          items?: number | null;
+        };
+        Update: {
+          status?: "pending" | "ready" | "failed";
+          error?: string;
+          finished_at?: string | null;
+          cost_usd?: number | null;
+          items?: number | null;
         };
         Relationships: [];
       };

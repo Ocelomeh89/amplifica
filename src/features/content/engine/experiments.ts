@@ -7,11 +7,11 @@ import { isEligible, type WinnerPost } from "./winners";
 // control recipe, picker, reason and verdict lives here; nothing in this file
 // touches the database.
 
-/** Every choice a brief can test: the six tags (cover is one) plus topic. */
-export const VARIABLES = ["hook_type", "onscreen_text", "cta_type", "post_style", "cover", "message", "topic"] as const;
+/** Every choice a brief can test: the six tags (cover is one), topic, and source (slice 6: competitor or own). */
+export const VARIABLES = ["hook_type", "onscreen_text", "cta_type", "post_style", "cover", "message", "topic", "source"] as const;
 /** The form choices a brief holds still at the control recipe. Message and topic come from the idea. */
 export const HELD_STILL = ["hook_type", "onscreen_text", "cta_type", "post_style", "cover"] as const;
-export const EXPERIMENT_KINDS = ["proposed", "moment"] as const;
+export const EXPERIMENT_KINDS = ["proposed", "moment", "competitor"] as const;
 export const EXPERIMENT_STATUSES = ["open", "posted", "judged", "unjudged", "skipped", "discarded"] as const;
 export const VERDICTS = ["won", "lost", "flat"] as const;
 export const RUN_KINDS = ["cron", "swap", "moment", "makenow"] as const;
@@ -54,7 +54,7 @@ export function coverValue(t: Pick<PostTags, "cover_face" | "cover_text" | "cove
   return parts.length === 0 ? "none" : parts.join("+");
 }
 
-export type Counted = Exclude<Variable, "topic">;
+export type Counted = Exclude<Variable, "topic" | "source">;
 export const COUNTED: readonly Counted[] = [...HELD_STILL, "message"];
 
 export const VARIABLE_LABEL: Record<Variable, string> = {
@@ -65,6 +65,7 @@ export const VARIABLE_LABEL: Record<Variable, string> = {
   cover: "Cover",
   message: "Message",
   topic: "Topic",
+  source: "Source",
 };
 
 /** The slug or combination as the page words it. */
@@ -175,6 +176,7 @@ export function pickMoment(ev: Evidence, live: LiveTest[], heldVariables: string
 
 export function renderReason(test: Test, ev: Evidence): string {
   if (test.variable === "topic") return "Every form choice has enough evidence; a fresh topic is the open question.";
+  if (test.variable === "source") return "A competitor's popular topic, told your way in your proven format.";
   const row = ev[test.variable].find((r) => r.value === test.value);
   if (!row || row.total === 0) return "No post in the last 90 days has tried this.";
   const thin = row.total < EXPLORE_BELOW ? " That is thin evidence, so it is worth testing." : "";
