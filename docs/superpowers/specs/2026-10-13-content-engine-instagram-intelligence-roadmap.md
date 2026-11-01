@@ -228,6 +228,6 @@ Checked against Meta's docs on 2026-10-13. Revisit only when a slice above is bl
 
 ## Next step
 
-Slices 1, 2, 3 and 5 are live (2026-10-31). Next is slice 6, competitors and Viral
-Watch, specced on its own from the spike result above. Slice 7 follows; slice 4 waits
-for the weekly review.
+Slices 1, 2, 3, 5 and 6 and the taste loop (4c, Sharpen) are live (2026-11-02). The build is
+paused; `docs/superpowers/content-next-steps.md` lists the open acceptance checks and the next
+builds: the weekly review (PR 5, with slice 4), then slice 7, then creator suggestions.
