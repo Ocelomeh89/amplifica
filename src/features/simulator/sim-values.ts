@@ -59,19 +59,20 @@ export function projectionToSimValues(p: Projection): SimValues {
 }
 
 // Starting values for the public calculator. Same as the projections table
-// defaults except msc (the DB default of 0 would render an empty simulation)
-// and withdrawalAmount, both set to the benchmark scenario the site quotes.
+// defaults except msc (the DB default of 0 would render an empty simulation),
+// term, invInterestPct, locInterestPct and withdrawalAmount, which Miguel set
+// for the public page on 2026-11-05 (30 mo, 10%, 7%, $4,500/mo).
 export const PUBLIC_DEFAULT_VALUES: SimValues = {
   msc: 2000,
   factor: 5,
-  term: 36,
-  invInterestPct: 8,
+  term: 30,
+  invInterestPct: 10,
   locIncrease: 1.5,
-  locInterestPct: 10,
+  locInterestPct: 7,
   marketReturnPct: 10,
   perpetualMixPct: 0,
   perpetualYieldPct: 10,
   perpetualTrigger: 50000,
   mscEndMonth: "",
-  withdrawalAmount: 3000,
+  withdrawalAmount: 4500,
 };

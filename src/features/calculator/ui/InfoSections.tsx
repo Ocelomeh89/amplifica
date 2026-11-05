@@ -20,7 +20,7 @@ const faqs = [
   },
   {
     q: "What is an Amplicon?",
-    a: "An Amplicon is our name for one investment cycle. These can be short term or long term. For example, an amortized investment that pays a level monthly amount over a fixed term (36 months), like a loan you own the receiving side of. Each payoff gets you closer to a larger deployment. That repeating cycle is the amplification.",
+    a: "An Amplicon is our name for one investment cycle. These can be short term or long term. For example, an amortized investment that pays a level monthly amount over a fixed term (30 months), like a loan you own the receiving side of. Each payoff gets you closer to a larger deployment. That repeating cycle is the amplification.",
   },
   {
     q: "Can I use the strategy without a HELOC?",
@@ -133,23 +133,23 @@ export default function InfoSections() {
       <Section title="What the model shows: a benchmark scenario">
         <p className="text-sm leading-relaxed mb-3">
           These are model outputs under one fixed set of assumptions: a $2,000
-          monthly contribution, investments amortizing at 8%, a line of credit
-          costing 10%, and the calculator&apos;s defaults otherwise. Actual returns
-          based on your investment choices and consistency. No guaranteed returns.
+          monthly contribution, investments amortizing at 10% over 30 months, a
+          line of credit costing 7%, and the calculator&apos;s defaults otherwise.
+          Actual returns depend on your investment choices and consistency.
         </p>
         <ul className="text-sm leading-relaxed list-disc pl-5 space-y-2">
           <li>
             The system&apos;s own cash flow (investment payments only, excluding the
-            contribution) first crosses $45,000 per month at roughly 15 years, month
-            179 of the simulation.
+            contribution) first crosses $45,000 per month at roughly 11 and a half
+            years, month 137 of the simulation.
           </li>
           <li>
-            Boost, such as reducing term length from 36 to 24 months, move the same
-            milestone to 10 years and under.
+            A boost, such as cutting the term from 30 to 24 months, moves the same
+            milestone to just under 10 years, month 119.
           </li>
           <li>
             With 24-month terms, stopping the contribution at year 10 leaves a
-            self-sustaining system: expected future payments never erode and cash
+            self-sustaining system: expected future payments keep growing and cash
             flow keeps compounding on its own.
           </li>
         </ul>
