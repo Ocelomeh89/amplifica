@@ -14,6 +14,8 @@ import { pullInstagram } from "@/features/content/data/pulls/instagram";
 import { CHANNEL_HANDLE, pullYouTube } from "@/features/content/data/pulls/youtube";
 
 export const dynamic = "force-dynamic";
+// Next 14 still caches GET fetches here (the Supabase reads) without this; see wiring.test.ts.
+export const fetchCache = "force-no-store";
 export const maxDuration = 300;
 
 const PLATFORMS: CronPlatform[] = ["instagram", "youtube", "beehiiv"];

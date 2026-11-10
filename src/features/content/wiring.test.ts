@@ -45,6 +45,21 @@ describe("content stays owner-only", () => {
     for (const f of routes) expect(read(f), f).toContain("authorizeRoutine(req, process.env.");
   });
 
+  it("every GET /api/content route opts out of Next's fetch cache", () => {
+    // Next 14 caches GET fetches in a route handler (the Supabase reads) even with
+    // dynamic = "force-dynamic"; on Vercel that served a stale "no pending runs" to the
+    // cron for days and stale taste rules to the routines (2026-11-10).
+    const getRoutes = [
+      "src/app/api/content/context/route.ts",
+      "src/app/api/content/found/queued/route.ts",
+      "src/app/api/content/drafts/queue/route.ts",
+      "src/app/api/content/tags/queue/route.ts",
+      "src/app/api/content/cron/metrics/route.ts",
+      "src/app/api/content/voice/route.ts",
+    ];
+    for (const f of getRoutes) expect(read(f), f).toContain('export const fetchCache = "force-no-store";');
+  });
+
   it("pages hold no Supabase queries: reads live in data/queries.ts", () => {
     const pages = [
       "src/app/(app)/content/page.tsx",
