@@ -225,6 +225,10 @@ these are all the places that know it exists:
   stripping punctuation: evidence for an active or proposed one, nothing for a rejected or turned-off one. Approved
   rules reach the daily routine (context endpoint), Today's brief writer and Sharpen; Recreate does not use them.
 - `content_voice.built_from` is `{ files: [{path, mtime, bytes}], previous_profile_md }`.
+- Every GET `/api/content` route exports `fetchCache = "force-no-store"` beside `dynamic = "force-dynamic"`.
+  Next 14 caches a GET route handler's fetches (every Supabase read) without it, and Vercel keeps that
+  cache across requests: a query whose URL never changes (pending runs, active taste rules) is served
+  stale indefinitely. `wiring.test.ts` asserts it; a new GET route goes on that list.
 
 ## Seeding by hand
 
