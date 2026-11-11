@@ -11,12 +11,16 @@ import { filteredCards } from "@/features/content/engine/performance-view";
 import { parseWindow } from "@/features/content/engine/overview";
 import { parseTagFilters } from "@/features/content/engine/tags";
 import TagFilters from "@/features/content/ui/TagFilters";
+import GateFailedList from "@/features/content/ui/GateFailedList";
+import { loadGateFailed, loadPillarBalance } from "@/features/content/data/queries";
+import { PILLARS } from "@/features/content/engine/brand";
 
 export default async function ContentPerformancePage({ searchParams }: { searchParams: { window?: string; tag?: string | string[] } }) {
   const { supabase, user } = await requireContentOwner();
   const window = parseWindow(searchParams.window);
   const now = new Date();
   const posts = await loadPostsForMath(supabase, user.id);
+  const [gateFailed, balance] = await Promise.all([loadGateFailed(supabase, user.id), loadPillarBalance(supabase, user.id, now)]);
   const byId = new Map(posts.map((p) => [p.id, p]));
   const normalized = normalizePosts(posts, now);
   const { groups, doubleDown, stop } = attribute(normalized);
@@ -61,6 +65,10 @@ export default async function ContentPerformancePage({ searchParams }: { searchP
     <div className="max-w-5xl">
       <h1 className="text-xl font-semibold mb-2">Content</h1>
       <ContentTabs />
+      <p className="text-xs text-sub mb-3">
+        This week by pillar: {PILLARS.map((p) => `${p.name} ${balance[p.slug]}`).join(" · ")}
+      </p>
+      <GateFailedList rows={gateFailed} />
       {posts.length === 0 ? (
         <p className="text-sm text-sub">No posts yet. The metrics cron fills this every morning; Mark posted on a queued idea adds one by hand.</p>
       ) : (

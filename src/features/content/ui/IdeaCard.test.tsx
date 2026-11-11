@@ -53,6 +53,15 @@ describe("IdeaCard", () => {
     expect(screen.getByText("Story")).toBeInTheDocument();
   });
 
+  it("shows the reader and pillar for a gated idea, and the raw pillar for a legacy one", () => {
+    const gate = { result: { verdict: "pass", reader: "stephen", pillar: "expensive-tuition", amplifica_pillar: "the-numbers", failed: [] }, rewritten: false, checked_at: "x" };
+    const { unmount } = render(<IdeaCard idea={{ ...idea, gate, pillar: "expensive-tuition" }} sourceUrl={null} siblings={[]} />);
+    expect(screen.getByText("Stephen · Expensive Tuition")).toBeInTheDocument();
+    unmount();
+    render(<IdeaCard idea={{ ...idea, pillar: "optionality" }} sourceUrl={null} siblings={[]} />);
+    expect(screen.getByText("optionality")).toBeInTheDocument();
+  });
+
   it("has Like and Pass buttons", () => {
     render(<IdeaCard idea={idea} sourceUrl={null} siblings={[]} />);
     expect(screen.getByRole("button", { name: /Like/ })).toBeInTheDocument();

@@ -293,3 +293,18 @@ export function pillarBalance(rows: { pillar: string; at: string }[], now: Date)
   }
   return out;
 }
+
+/** The card line for a gated idea, e.g. "Daniel · The W-2 Advantage"; null before the gate or on a fail. */
+export function gateLine(gate: unknown): string | null {
+  const r = (gate as { result?: Partial<GateResult> } | null)?.result;
+  if (!r || r.verdict !== "pass" || !r.reader || !r.pillar) return null;
+  return `${r.reader[0].toUpperCase()}${r.reader.slice(1)} · ${pillarName(r.pillar)}`;
+}
+
+export function gateItemLabel(item: string): string {
+  return GATE_ITEMS.find((g) => g.item === item)?.label ?? item;
+}
+
+export function amplificaPillarName(slug: string): string {
+  return AMPLIFICA_PILLARS.find((p) => p.slug === slug)?.name ?? slug;
+}

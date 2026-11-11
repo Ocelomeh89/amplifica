@@ -10,6 +10,8 @@ import { STALE_PENDING_MINUTES } from "@/features/content/engine/recreate";
 import type { OpenRecreation } from "./recreate";
 import type { SharpenRow } from "./sharpen";
 import { supabaseSharpenDb } from "./supabase-sharpen-db";
+import { PILLAR_SLUGS, pillarBalance, type PillarSlug } from "@/features/content/engine/brand";
+
 
 // Reads behind the /content pages. Every query is scoped to the user as well
 // as to RLS. The pages stay routing and layout; the Supabase calls live here.
@@ -243,4 +245,51 @@ export async function loadOpenRecreations(db: Db, userId: string, now: Date): Pr
       source: { id: r.source_post_id, thumbnail_url: post?.thumbnail_url ?? "", caption: post?.caption ?? "" },
     };
   });
+}
+
+export type GateFailedRow = { id: string; title: string; format: Format; source: string | null; failed: { item: string; reason: string }[] };
+
+/** Ideas the brand gate held back, newest first, with their source title and the failed items. */
+export async function loadGateFailed(db: Db, userId: string): Promise<GateFailedRow[]> {
+  const { data, error } = await db
+    .from("content_ideas")
+    .select("id, title, format, source_id, gate")
+    .eq("user_id", userId)
+    .eq("status", "gate_failed")
+    .order("updated_at", { ascending: false })
+    .limit(50);
+  if (error) throw new Error(`gate failed ideas: ${error.message}`);
+  const rows = (data ?? []) as { id: string; title: string; format: Format; source_id: string | null; gate: unknown }[];
+  const sourceIds = Array.from(new Set(rows.map((r) => r.source_id).filter((x): x is string => x !== null)));
+  const titles = new Map<string, string>();
+  if (sourceIds.length > 0) {
+    const { data: sources, error: e2 } = await db.from("content_sources").select("id, title").eq("user_id", userId).in("id", sourceIds);
+    if (e2) throw new Error(`gate failed sources: ${e2.message}`);
+    for (const s of (sources ?? []) as { id: string; title: string }[]) titles.set(s.id, s.title);
+  }
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    format: r.format,
+    source: r.source_id ? titles.get(r.source_id) ?? null : null,
+    failed: ((r.gate as { result?: { failed?: { item: string; reason: string }[] } } | null)?.result?.failed ?? []).map((f) => ({ item: f.item, reason: f.reason })),
+  }));
+}
+
+/** This Chicago week's passed ideas and posted pieces, per personal pillar. */
+export async function loadPillarBalance(db: Db, userId: string, now: Date): Promise<Record<PillarSlug, number>> {
+  const since = new Date(now.getTime() - 8 * 86_400_000).toISOString();
+  const [ideas, posts] = await Promise.all([
+    db.from("content_ideas").select("pillar, gate").eq("user_id", userId).in("pillar", [...PILLAR_SLUGS]).gte("updated_at", since),
+    db.from("content_posts").select("message, posted_at").eq("user_id", userId).in("message", [...PILLAR_SLUGS]).gte("posted_at", since),
+  ]);
+  if (ideas.error) throw new Error(`pillar balance ideas: ${ideas.error.message}`);
+  if (posts.error) throw new Error(`pillar balance posts: ${posts.error.message}`);
+  const rows = [
+    ...((ideas.data ?? []) as { pillar: string; gate: { checked_at?: string; result?: { verdict?: string } } | null }[])
+      .filter((i) => i.gate?.result?.verdict === "pass" && i.gate.checked_at)
+      .map((i) => ({ pillar: i.pillar, at: i.gate!.checked_at! })),
+    ...((posts.data ?? []) as { message: string; posted_at: string }[]).map((p) => ({ pillar: p.message, at: p.posted_at })),
+  ];
+  return pillarBalance(rows, now);
 }

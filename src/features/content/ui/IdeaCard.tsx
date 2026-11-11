@@ -8,6 +8,7 @@ import type { ContentIdea } from "@/shared/supabase/database.types";
 import type { Format, OutlineBeat } from "@/features/content/engine/types";
 import { likeIdea, passIdea } from "@/features/content/data/actions";
 import FormatBadge from "./FormatBadge";
+import { gateLine } from "@/features/content/engine/brand";
 
 export type IdeaCardProps = {
   idea: ContentIdea;
@@ -42,7 +43,11 @@ export default function IdeaCard({ idea, sourceUrl, siblings, focused, passOpen,
         {rank !== undefined && <span className="text-[11px] font-semibold text-sub">#{rank}</span>}
         <FormatBadge format={idea.format} />
         {badge && <span className="text-[10px] uppercase tracking-wide text-purple">{badge}</span>}
-        {idea.pillar && <span className="text-[10px] text-sub uppercase tracking-wide">{idea.pillar}</span>}
+        {gateLine(idea.gate) ? (
+          <span className="text-[10px] text-sub">{gateLine(idea.gate)}</span>
+        ) : (
+          idea.pillar && <span className="text-[10px] text-sub uppercase tracking-wide">{idea.pillar}</span>
+        )}
         {idea.hook_type && <span className="text-[10px] text-sub">{idea.hook_type}</span>}
         <span className="ml-auto text-[10px] text-sub">score {idea.score.toFixed(2)}</span>
       </div>

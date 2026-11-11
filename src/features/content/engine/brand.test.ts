@@ -87,3 +87,13 @@ describe("brand standard", () => {
     expect(b.length).toBeLessThan(gateSystemPrompt().length);
   });
 });
+
+describe("gateLine", () => {
+  it("names the reader and the pillar from a stored gate record, and nothing for a legacy idea", async () => {
+    const { gateLine } = await import("./brand");
+    const gate = { result: { verdict: "pass", reader: "stephen", pillar: "expensive-tuition", amplifica_pillar: "the-numbers", failed: [] }, rewritten: false, checked_at: "x" };
+    expect(gateLine(gate)).toBe("Stephen · Expensive Tuition");
+    expect(gateLine(null)).toBeNull();
+    expect(gateLine({ result: { verdict: "fail", reader: null, pillar: null } })).toBeNull();
+  });
+});
