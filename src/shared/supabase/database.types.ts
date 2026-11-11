@@ -332,13 +332,18 @@ export type Database = {
           chain_id: string | null;
           score: number;
           batch_date: string;
-          status: "inbox" | "queued" | "rejected" | "posted" | "archived";
+          status: "inbox" | "queued" | "rejected" | "posted" | "archived" | "gating" | "gate_failed";
           queue_rank: number | null;
           feedback_reason: string | null;
           feedback_at: string | null;
           clickup_task_id: string | null;
           obsidian_path: string | null;
           source_post_id: string | null;
+          gate: Json | null;
+          gate_original: Json | null;
+          gate_attempts: number;
+          ingest_batch: string | null;
+          digest_posted_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -361,9 +366,12 @@ export type Database = {
           chain_id?: string | null;
           score?: number;
           batch_date?: string;
-          status?: "inbox" | "queued" | "rejected" | "posted" | "archived";
+          status?: "inbox" | "queued" | "rejected" | "posted" | "archived" | "gating" | "gate_failed";
           queue_rank?: number | null;
           obsidian_path?: string | null;
+          gate?: Json | null;
+          gate_original?: Json | null;
+          ingest_batch?: string | null;
         };
         Update: {
           hook?: string;
@@ -374,7 +382,7 @@ export type Database = {
           hook_type?: string;
           title?: string;
           outline?: Json;
-          status?: "inbox" | "queued" | "rejected" | "posted" | "archived";
+          status?: "inbox" | "queued" | "rejected" | "posted" | "archived" | "gating" | "gate_failed";
           queue_rank?: number | null;
           feedback_reason?: string | null;
           feedback_at?: string | null;
@@ -383,6 +391,11 @@ export type Database = {
           obsidian_path?: string | null;
           batch_date?: string;
           source_post_id?: string | null;
+          gate?: Json | null;
+          gate_original?: Json | null;
+          gate_attempts?: number;
+          digest_posted_at?: string | null;
+          pillar?: string;
         };
         Relationships: [];
       };

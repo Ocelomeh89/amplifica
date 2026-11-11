@@ -82,6 +82,13 @@ describe("content stays owner-only", () => {
     expect(queries.match(/\.neq\("kind", "comment"\)/g)?.length).toBe(1);
   });
 
+  it("idea actions never act on an idea the brand gate holds", () => {
+    const src = read("src/features/content/data/actions.ts");
+    const body = (name: string) => src.slice(src.indexOf(`export async function ${name}(`), src.indexOf("\nexport ", src.indexOf(`export async function ${name}(`) + 1));
+    for (const name of ["likeIdea", "passIdea", "markPosted"]) expect(body(name), name).toContain("GATE_HELD");
+    expect(body("archiveIdea")).toContain('.neq("status", "gating")');
+  });
+
   it("the metrics cron is bearer-protected by CRON_SECRET and scheduled once", () => {
     const route = read("src/app/api/content/cron/metrics/route.ts");
     expect(route).toContain("authorizeRoutine(req, process.env.CRON_SECRET)");

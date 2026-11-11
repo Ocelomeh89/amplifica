@@ -30,7 +30,7 @@ export type SourceKind = (typeof SOURCE_KINDS)[number];
 export const SOURCE_STATUSES = ["allowed", "denied", "pending", "mined"] as const;
 export type SourceStatus = (typeof SOURCE_STATUSES)[number];
 
-export const IDEA_STATUSES = ["inbox", "queued", "rejected", "posted", "archived"] as const;
+export const IDEA_STATUSES = ["inbox", "queued", "rejected", "posted", "archived", "gating", "gate_failed"] as const;
 export type IdeaStatus = (typeof IDEA_STATUSES)[number];
 
 /** Instagram media type. Migration 0013's check constraint is the source of truth; "" means unknown. */
