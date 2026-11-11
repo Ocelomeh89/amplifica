@@ -16,6 +16,9 @@ import { buildDashboardProjection, mergeProjection } from "@/features/dashboard/
 import { defaultNextDrawSize, type LocLite } from "@/shared/finance/dashboard-seed";
 import OptionalityMeter from "@/features/dashboard/ui/OptionalityMeter";
 import ProjectionSettingsPanel from "@/features/dashboard/ui/ProjectionSettingsPanel";
+import { runFundCheck } from "@/shared/finance/fund-check";
+import { loadFundCheckInput } from "@/features/investments/data/load";
+import FundCheckCard from "@/features/investments/ui/FundCheckCard";
 
 export default async function DashboardPage() {
   const { supabase, user } = await requireUser();
@@ -94,6 +97,9 @@ export default async function DashboardPage() {
     locs,
   });
   const optionalityMonth = projection.optionality.kind === "reached" ? projection.optionality.month : null;
+
+  // Fund check: warning-only, reads the same Amplicon schedules, changes no number above.
+  const fundCheck = runFundCheck(await loadFundCheckInput(supabase, todayMonth));
 
   return (
     <div className="max-w-5xl">
@@ -187,6 +193,8 @@ export default async function DashboardPage() {
           )}
         </div>
       )}
+
+      <FundCheckCard result={fundCheck} />
 
       <ChartPair
         inceptionSeries={inceptionSeries}
