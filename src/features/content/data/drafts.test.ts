@@ -1,18 +1,31 @@
 import { describe, expect, it, vi } from "vitest";
-import { DraftStoreError, getDraftQueue, postDraft, QUEUE_LIMIT, type DraftIdea, type DraftsDb } from "./drafts";
+import { DraftStoreError, getDraftQueue, postDraft as postDraftWith, QUEUE_LIMIT, type DraftCheck, type DraftIdea, type DraftsDb } from "./drafts";
+
+const RESULT = { verdict: "pass" as const, reader: "daniel" as const, pillar: "w2-advantage" as const, amplifica_pillar: "the-numbers" as const, failed: [] };
+const FAILED = { ...RESULT, verdict: "fail" as const, reader: null, pillar: null, amplifica_pillar: null, failed: [{ item: "downside" as const, reason: "No risk named." }] };
+const passing: DraftCheck = async (_format, fields) => ({ status: "passed", fields, rewritten: false, result: RESULT, original: fields });
+const failing: DraftCheck = async () => ({ status: "failed", result: FAILED, original: {} });
+const erroring: DraftCheck = async () => ({ status: "error", error: "down" });
+const postDraft = (db: DraftsDb, input: unknown, check: DraftCheck = passing) => postDraftWith(db, input, check);
 
 const ID = "7b1f6c52-0a6e-4f43-9d1e-2f6b8f7d3a10";
 const NOW = new Date("2026-10-07T12:00:00Z");
 
 const idea = (over: Partial<DraftIdea> = {}): DraftIdea => ({
   id: ID, format: "reel", title: "t", hook: "I took a W-2.", hook_alt: null, belief_attacked: "", value_to_listener: "",
-  why_it_stops: "", outline: [], quote: "q", quote_ref: "r", pillar: "p", hook_type: "h", status: "queued", has_draft: false, ...over,
+  why_it_stops: "", outline: [], quote: "q", quote_ref: "r", pillar: "p", hook_type: "h", status: "queued", has_draft: false, draft_gate_fails: 0, ...over,
 });
 
-function fakeDb(over: Partial<DraftsDb> = {}): DraftsDb & { stored: unknown[] } {
+function fakeDb(over: Partial<DraftsDb> = {}): DraftsDb & { stored: unknown[]; gates: unknown[]; fails: unknown[] } {
   const stored: unknown[] = [];
+  const gates: unknown[] = [];
+  const fails: unknown[] = [];
   return {
     stored,
+    gates,
+    fails,
+    setGate: async (id, record) => { gates.push([id, record]); },
+    gateFail: async (id, result, fails_, final) => { fails.push({ id, result, fails: fails_, final }); },
     queuedWithoutDraft: async (limit, _now) => ({ ideas: [idea()].slice(0, limit), total: 1 }),
     ideaById: async () => idea(),
     voice: async () => ({ profile_md: "profile", exemplars: [], built_from: { files: [] }, built_at: "2026-10-01T00:00:00Z" }),
@@ -125,5 +138,38 @@ describe("postDraft", () => {
   it("lets an unexpected store failure propagate", async () => {
     const db = fakeDb({ storeDraft: async () => { throw new Error("boom"); } });
     await expect(postDraft(db, body)).rejects.toThrow("boom");
+  });
+});
+
+describe("postDraft and the brand gate", () => {
+  it("a passing draft is stored and the idea gets the gate record", async () => {
+    const db = fakeDb();
+    const r = await postDraft(db, body, passing);
+    expect(r.status).toBe(200);
+    expect(db.stored).toHaveLength(1);
+    expect(db.gates[0]).toMatchObject([ID, { result: RESULT, rewritten: false }]);
+  });
+
+  it("a first fail returns 422 with the failed items and stores nothing", async () => {
+    const db = fakeDb();
+    const r = await postDraft(db, body, failing);
+    expect(r).toEqual({ status: 422, body: { ok: false, error: "brand_gate", failed: FAILED.failed, final: false } });
+    expect(db.stored).toHaveLength(0);
+    expect(db.fails).toEqual([{ id: ID, result: FAILED, fails: 1, final: false }]);
+  });
+
+  it("a second fail is final: 422 final, nothing stored, the idea leaves the queue", async () => {
+    const db = fakeDb({ ideaById: async () => idea({ draft_gate_fails: 1 }) });
+    const r = await postDraft(db, body, failing);
+    expect(r).toEqual({ status: 422, body: { ok: false, error: "brand_gate", failed: FAILED.failed, final: true } });
+    expect(db.stored).toHaveLength(0);
+    expect(db.fails).toEqual([{ id: ID, result: FAILED, fails: 2, final: true }]);
+  });
+
+  it("a gate error is a 503 and changes nothing", async () => {
+    const db = fakeDb();
+    expect(await postDraft(db, body, erroring)).toEqual({ status: 503, body: { ok: false, error: "brand_gate_unavailable" } });
+    expect(db.stored).toHaveLength(0);
+    expect(db.fails).toHaveLength(0);
   });
 });

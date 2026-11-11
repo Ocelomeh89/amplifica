@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/shared/supabase/database.types";
+import { gateRecord } from "./brand-gate";
+import type { Database, Json } from "@/shared/supabase/database.types";
 import { DraftStoreError, type DraftIdea, type DraftsDb } from "./drafts";
 import type { Format } from "@/features/content/engine/types";
 import type { VoiceDb } from "./voice";
@@ -8,13 +9,14 @@ import { UNPOSTED_DAYS } from "@/features/content/engine/unused";
 type Client = SupabaseClient<Database>;
 
 const IDEA_COLUMNS =
-  "id, format, title, hook, hook_alt, belief_attacked, value_to_listener, why_it_stops, outline, quote, quote_ref, pillar, hook_type, status";
+  "id, format, title, hook, hook_alt, belief_attacked, value_to_listener, why_it_stops, outline, quote, quote_ref, pillar, hook_type, status, gate";
 
 export function supabaseDraftsDb(client: Client, userId: string): DraftsDb {
   const toIdea = (r: Record<string, unknown>, hasDraft: boolean): DraftIdea => ({
     ...(r as Omit<DraftIdea, "has_draft" | "format">),
     format: r.format as Format,
     has_draft: hasDraft,
+    draft_gate_fails: Number((r.gate as { draft_fails?: number } | null)?.draft_fails ?? 0),
   });
 
   return {
@@ -54,6 +56,18 @@ export function supabaseDraftsDb(client: Client, userId: string): DraftsDb {
         .limit(1);
       if (draftError) throw new Error(`drafts: ${draftError.message}`);
       return toIdea(data, (drafts ?? []).length > 0);
+    },
+
+    async setGate(ideaId, record) {
+      const { error } = await client.from("content_ideas").update({ gate: record as unknown as Json }).eq("id", ideaId).eq("user_id", userId);
+      if (error) throw new Error(`draft gate: ${error.message}`);
+    },
+
+    async gateFail(ideaId, result, fails, final) {
+      const gate = { ...gateRecord(result, false, new Date(), final ? "queued" : undefined), draft_fails: fails } as unknown as Json;
+      const patch = final ? { gate, status: "gate_failed" as const, queue_rank: null } : { gate };
+      const { error } = await client.from("content_ideas").update(patch).eq("id", ideaId).eq("user_id", userId).eq("status", "queued");
+      if (error) throw new Error(`draft gate fail: ${error.message}`);
     },
 
     async voice() {

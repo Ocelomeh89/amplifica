@@ -122,6 +122,12 @@ describe("content stays owner-only", () => {
     expect(read("src/features/content/data/gate-run.ts").indexOf("postDigests(")).toBeGreaterThan(read("src/features/content/data/gate-run.ts").indexOf("runGateSweep("));
   });
 
+  it("a posted draft is checked by the brand gate without a rewrite", () => {
+    const route = read("src/app/api/content/drafts/route.ts");
+    expect(route).toContain("gatePiece(");
+    expect(route).toContain("rewrite: false");
+  });
+
   it("a Pass stores its reason as a note, and background helpers stay out of the 'use server' files", () => {
     expect(read("src/features/content/data/actions.ts")).toContain("recordPassNote(");
     // Every export of a "use server" file is a callable endpoint; the helper lives in a plain module.
