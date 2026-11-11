@@ -1,0 +1,67 @@
+import {
+  GATE_TOOL_NAME,
+  gateOutputSchema,
+  gateSystemPrompt,
+  gateToolSchema,
+  renderGateTurn,
+  retiredWordHits,
+  type GateFields,
+  type GateResult,
+} from "@/features/content/engine/brand";
+import type { ToolCaller } from "./claude";
+
+// The brand gate: one check (with a rewrite on a fail when asked), then one re-check of the rewrite.
+// Never throws; an API or schema problem is `error`, which callers treat as "not checked yet".
+
+export type GateOutcome =
+  | { status: "passed"; fields: GateFields; rewritten: boolean; result: GateResult; original: GateFields }
+  | { status: "failed"; result: GateResult; original: GateFields }
+  | { status: "error"; error: string };
+
+type Checked = GateResult & { rewrite?: GateFields };
+
+const message = (e: unknown) => (e instanceof Error && e.message ? e.message : "Something went wrong.");
+
+/** Forces a fail when the model passed text that still uses retired vocabulary. */
+function withRetiredWords(r: Checked, fields: GateFields): Checked {
+  const text = Object.values(fields)
+    .map((v) => (Array.isArray(v) ? v.join("\n") : v))
+    .join("\n");
+  const hits = retiredWordHits(text);
+  if (hits.length === 0) return r;
+  return {
+    ...r,
+    verdict: "fail",
+    failed: [...r.failed.filter((f) => f.item !== "retired-words"), { item: "retired-words", reason: `Uses retired words: ${hits.join(", ")}.` }],
+  };
+}
+
+async function check(caller: ToolCaller, format: string, fields: GateFields, rewrite: boolean): Promise<Checked> {
+  const keys = Object.keys(fields);
+  const raw = await caller.call({
+    system: gateSystemPrompt(),
+    text: renderGateTurn({ format, fields, rewrite }),
+    tool: { name: GATE_TOOL_NAME, description: "Record the brand check of this piece.", schema: gateToolSchema(keys, rewrite) },
+    maxTokens: 4000,
+  });
+  const parsed = gateOutputSchema(keys, rewrite).safeParse(raw);
+  if (!parsed.success) throw new Error(`brand gate: ${parsed.error.issues.map((i) => i.message).join(" ")}`);
+  return withRetiredWords(parsed.data as Checked, fields);
+}
+
+const resultOf = ({ rewrite: _rewrite, ...r }: Checked): GateResult => r;
+
+export async function gatePiece(caller: ToolCaller, piece: { format: string; fields: GateFields }, opts: { rewrite: boolean }): Promise<GateOutcome> {
+  const original = piece.fields;
+  try {
+    const first = await check(caller, piece.format, original, opts.rewrite);
+    if (first.verdict === "pass") return { status: "passed", fields: original, rewritten: false, result: resultOf(first), original };
+    if (!opts.rewrite || !first.rewrite) return { status: "failed", result: resultOf(first), original };
+    const rewritten = first.rewrite;
+    const second = await check(caller, piece.format, rewritten, false);
+    if (second.verdict === "pass") return { status: "passed", fields: rewritten, rewritten: true, result: resultOf(second), original };
+    return { status: "failed", result: resultOf(second), original };
+  } catch (e) {
+    return { status: "error", error: message(e) };
+  }
+}
