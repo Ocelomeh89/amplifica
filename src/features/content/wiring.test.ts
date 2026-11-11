@@ -122,6 +122,13 @@ describe("content stays owner-only", () => {
     expect(read("src/features/content/data/gate-run.ts").indexOf("postDigests(")).toBeGreaterThan(read("src/features/content/data/gate-run.ts").indexOf("runGateSweep("));
   });
 
+  it("the backfill runs only on request, dry unless asked to run", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    expect(route).toContain('params.get("backfill")');
+    expect(route).toContain('dryRun: backfill !== "run"');
+    expect(route.indexOf("runBackfill(")).toBeLessThan(route.indexOf("runMetricsCron("));
+  });
+
   it("a posted draft is checked by the brand gate without a rewrite", () => {
     const route = read("src/app/api/content/drafts/route.ts");
     expect(route).toContain("gatePiece(");

@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/shared/supabase/database.types";
 import { gateRecord } from "./brand-gate";
 import type { DigestBatch, DigestDb } from "./gate-digest";
+import type { BackfillDb, BackfillIdea } from "./gate-backfill";
+import { refreshClickUpTask } from "./clickup";
 import { ideaPatchFrom, type GateDb, type GatingIdea } from "./gate-sweep";
 
 type Client = SupabaseClient<Database>;
@@ -100,6 +102,80 @@ export function supabaseDigestDb(client: Client, userId: string): DigestDb {
     async markDigested(batch, at) {
       const { error } = await client.from("content_ideas").update({ digest_posted_at: at }).eq("user_id", userId).eq("ingest_batch", batch).is("digest_posted_at", null);
       if (error) throw new Error(`brand gate digest stamp: ${error.message}`);
+    },
+  };
+}
+
+/** The one-time backfill over ideas from before the gate. Every query filters by the owner. */
+export function supabaseBackfillDb(client: Client, userId: string): BackfillDb {
+  const ideas = () => client.from("content_ideas");
+  const fail = (what: string, error: { message: string } | null) => {
+    if (error) throw new Error(`brand gate backfill ${what}: ${error.message}`);
+  };
+  return {
+    async candidates(limit) {
+      const { data, error } = await ideas()
+        .select(`${GATING_COLUMNS}, status, queue_rank, obsidian_path`)
+        .eq("user_id", userId)
+        .in("status", ["inbox", "queued"])
+        .is("gate", null)
+        .order("status", { ascending: false })
+        .limit(limit);
+      fail("candidates", error);
+      const rows = (data ?? []) as unknown as (Omit<BackfillIdea, "held"> & { obsidian_path: string | null })[];
+      if (rows.length === 0) return [];
+      const ids = rows.map((r) => r.id);
+      const [drafts, experiments] = await Promise.all([
+        client.from("content_drafts").select("idea_id").eq("user_id", userId).in("idea_id", ids),
+        client.from("content_experiments").select("idea_id").eq("user_id", userId).in("idea_id", ids).in("status", ["open", "posted"]),
+      ]);
+      fail("drafts", drafts.error);
+      fail("experiments", experiments.error);
+      const held = new Set([...(drafts.data ?? []), ...(experiments.data ?? [])].map((r) => (r as { idea_id: string }).idea_id));
+      return rows.map(({ obsidian_path, ...r }) => ({ ...r, held: obsidian_path !== null || held.has(r.id) }));
+    },
+
+    async applyPass(idea, o) {
+      const text = o.rewritten ? ideaPatchFrom(idea, o.fields) : null;
+      const patch = {
+        ...(text
+          ? {
+              title: text.title,
+              hook: text.hook,
+              ...(text.hook_alt !== undefined ? { hook_alt: text.hook_alt } : {}),
+              belief_attacked: text.belief_attacked,
+              value_to_listener: text.value_to_listener,
+              why_it_stops: text.why_it_stops,
+              outline: text.outline as unknown as Json,
+              gate_original: o.original as unknown as Json,
+            }
+          : {}),
+        pillar: o.result.pillar ?? "",
+        gate: gateRecord(o.result, o.rewritten, new Date()) as unknown as Json,
+      };
+      const { error } = await ideas().update(patch).eq("id", idea.id).eq("user_id", userId).in("status", ["inbox", "queued"]).is("gate", null);
+      fail("pass", error);
+    },
+
+    async applyFail(idea, o) {
+      const gate = gateRecord(o.result, false, new Date(), idea.status) as unknown as Json;
+      const { error } = await ideas()
+        .update({ status: "gate_failed", queue_rank: null, gate })
+        .eq("id", idea.id)
+        .eq("user_id", userId)
+        .in("status", ["inbox", "queued"])
+        .is("gate", null);
+      fail("fail", error);
+    },
+
+    async markSkipped(id) {
+      const gate = { result: null, rewritten: false, checked_at: new Date().toISOString(), skipped: true } as unknown as Json;
+      const { error } = await ideas().update({ gate }).eq("id", id).eq("user_id", userId).is("gate", null);
+      fail("skip", error);
+    },
+
+    async refreshClickUp(id) {
+      await refreshClickUpTask(client, userId, id);
     },
   };
 }

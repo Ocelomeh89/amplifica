@@ -5,7 +5,8 @@ import { runMetricsCron, type CronPlatform } from "@/features/content/data/metri
 import { supabaseMetricsDb } from "@/features/content/data/supabase-db";
 import { runCompetitorCron } from "@/features/content/data/competitor-cron";
 import { runGateSweep } from "@/features/content/data/gate-sweep";
-import { supabaseDigestDb, supabaseGateDb } from "@/features/content/data/supabase-gate-db";
+import { supabaseBackfillDb, supabaseDigestDb, supabaseGateDb } from "@/features/content/data/supabase-gate-db";
+import { runBackfill } from "@/features/content/data/gate-backfill";
 import { clickUpChatPoster, postDigests } from "@/features/content/data/gate-digest";
 import { supabaseCompetitorsDb } from "@/features/content/data/supabase-competitors-db";
 import { apifyClientFromEnv } from "@/features/content/data/pulls/apify";
@@ -28,6 +29,7 @@ const PLATFORMS: CronPlatform[] = ["instagram", "youtube", "beehiiv"];
 // weekly competitor pull on any day (and runs the competitor step with `?platform=`).
 const BUDGET_SECONDS = 280;
 const GATE_SWEEP_LIMIT = 20;
+const BACKFILL_LIMIT = 25;
 export async function GET(req: Request) {
   const startedAt = new Date();
   const auth = authorizeRoutine(req, process.env.CRON_SECRET);
@@ -36,6 +38,22 @@ export async function GET(req: Request) {
   const params = new URL(req.url).searchParams;
   const only = params.get("platform");
   const forceCompetitors = params.get("competitors") === "now";
+  // `?backfill=dry` reports what the brand gate would do to ideas from before it existed and
+  // writes nothing; `?backfill=run` applies it, 25 ideas a call. Nothing else runs.
+  const backfill = params.get("backfill");
+  if (backfill === "dry" || backfill === "run") {
+    try {
+      const report = await runBackfill(supabaseBackfillDb(createAdminClient(), owner), anthropicToolCaller({ timeoutMs: 60_000, maxRetries: 0 }), {
+        dryRun: backfill !== "run",
+        limit: BACKFILL_LIMIT,
+        timeLeft: () => BUDGET_SECONDS - (Date.now() - startedAt.getTime()) / 1000,
+      });
+      return NextResponse.json({ backfill, ...report });
+    } catch (e) {
+      console.error("content gate backfill failed", e);
+      return NextResponse.json({ backfill, error: (e as Error).message }, { status: 500 });
+    }
+  }
   const wanted = PLATFORMS.filter((p) => !only || p === only);
   if (wanted.length === 0) {
     return NextResponse.json({ error: `unknown platform ${only}` }, { status: 400 });
