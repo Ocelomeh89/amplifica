@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { parseOptionForm, monthStart, versionRow } from "./parse";
+import { parseOptionForm, monthStart, versionRow, parseMoveForm, parseCheckinForm } from "./parse";
 
 const fd = (entries: Record<string, string>) => {
   const f = new FormData();
@@ -73,5 +73,49 @@ describe("versions", () => {
   it("a same-month edit upserts on the version key", () => {
     const src = readFileSync("src/features/investments/data/actions.ts", "utf8");
     expect(src).toContain('onConflict: "option_id,effective_month"');
+  });
+});
+
+
+describe("parseMoveForm", () => {
+  it("maps default-growth to null", () => {
+    expect(parseMoveForm(fd({ from: "default-growth", to: "opt1", amount: "5000", month: "2026-03" }))).toEqual({
+      from_option_id: null,
+      to_option_id: "opt1",
+      amount: 5000,
+      move_month: "2026-03-01",
+    });
+  });
+
+  it("rejects a move to the same option", () => {
+    expect(() => parseMoveForm(fd({ from: "opt1", to: "opt1", amount: "5", month: "2026-03" }))).toThrow();
+  });
+
+  it("rejects a non-positive amount", () => {
+    expect(() => parseMoveForm(fd({ from: "opt1", to: "opt2", amount: "0", month: "2026-03" }))).toThrow();
+  });
+
+  it("rejects a missing month", () => {
+    expect(() => parseMoveForm(fd({ from: "opt1", to: "opt2", amount: "5", month: "" }))).toThrow();
+  });
+});
+
+describe("parseCheckinForm", () => {
+  it("rejects a future check-in", () => {
+    expect(() => parseCheckinForm(fd({ option: "opt1", value: "10", month: "2026-12" }), "2026-11")).toThrow(
+      "A check-in can't be in the future."
+    );
+  });
+
+  it("accepts a check-in of zero", () => {
+    expect(parseCheckinForm(fd({ option: "default-growth", value: "0", month: "2026-11" }), "2026-11")).toEqual({
+      investment_option_id: null,
+      value: 0,
+      checkin_month: "2026-11-01",
+    });
+  });
+
+  it("rejects a negative value", () => {
+    expect(() => parseCheckinForm(fd({ option: "opt1", value: "-1", month: "2026-10" }), "2026-11")).toThrow();
   });
 });

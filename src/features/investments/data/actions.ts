@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/shared/supabase/auth";
 import { str } from "@/shared/forms";
 import { currentYearMonth, type YearMonth } from "@/shared/finance/dates";
-import { runFundCheck, type FundStatus } from "@/shared/finance/fund-check";
+import { runFundCheck, termsAt, type FundStatus } from "@/shared/finance/fund-check";
 import { fmtMonth } from "@/shared/format";
-import { parseOptionForm, versionRow, monthStart } from "./parse";
+import { parseOptionForm, versionRow, monthStart, parseMoveForm, parseCheckinForm } from "./parse";
 import { loadFundCheckInput } from "./load";
 
 function refresh() {
@@ -100,4 +100,44 @@ export async function deleteInvestmentOption(fd: FormData): Promise<{ error: str
   if (error) throw new Error(error.message);
   refresh();
   return { error: null };
+}
+
+export async function createFundMove(fd: FormData): Promise<void> {
+  const { supabase, user } = await requireUser();
+  const f = parseMoveForm(fd);
+  if (f.from_option_id) {
+    const input = await loadFundCheckInput(supabase, currentYearMonth());
+    const src = input.options.find((o) => o.id === f.from_option_id);
+    if (!src) throw new Error("Unknown option.");
+    if (!termsAt(src, f.move_month.slice(0, 7)).liquid) throw new Error("You can't sell an illiquid option.");
+  }
+  const { error } = await supabase.from("fund_moves").insert({ user_id: user.id, ...f });
+  if (error) throw new Error(error.message);
+  refresh();
+}
+
+export async function deleteFundMove(fd: FormData): Promise<void> {
+  const { supabase, user } = await requireUser();
+  const id = str(fd, "id");
+  if (!id) return;
+  const { error } = await supabase.from("fund_moves").delete().eq("id", id).eq("user_id", user.id);
+  if (error) throw new Error(error.message);
+  refresh();
+}
+
+export async function createCheckin(fd: FormData): Promise<void> {
+  const { supabase, user } = await requireUser();
+  const f = parseCheckinForm(fd, currentYearMonth());
+  const { error } = await supabase.from("holding_checkins").insert({ user_id: user.id, ...f });
+  if (error) throw new Error(error.message);
+  refresh();
+}
+
+export async function deleteCheckin(fd: FormData): Promise<void> {
+  const { supabase, user } = await requireUser();
+  const id = str(fd, "id");
+  if (!id) return;
+  const { error } = await supabase.from("holding_checkins").delete().eq("id", id).eq("user_id", user.id);
+  if (error) throw new Error(error.message);
+  refresh();
 }

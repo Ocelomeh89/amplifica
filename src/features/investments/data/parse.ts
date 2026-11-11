@@ -1,7 +1,7 @@
 // The investment-options FormData contracts. Rates arrive in whole points.
 
 import { checkbox, num, pct, str } from "@/shared/forms";
-import type { OptionType } from "@/shared/finance/fund-check";
+import { DEFAULT_GROWTH_ID, type OptionType } from "@/shared/finance/fund-check";
 import type { YearMonth } from "@/shared/finance/dates";
 
 const TYPES: OptionType[] = ["amortized", "interest_only", "appreciation"];
@@ -47,4 +47,40 @@ export function versionRow(optionId: string, userId: string, f: OptionFields, mo
     term_months: f.term_months,
     liquid: f.liquid,
   };
+}
+
+const optionIdOrNull = (raw: string): string | null => (raw === DEFAULT_GROWTH_ID ? null : raw);
+const isMonth = (s: string) => /^\d{4}-\d{2}$/.test(s);
+
+export interface MoveFields {
+  from_option_id: string | null; // null = Default growth
+  to_option_id: string | null;
+  amount: number;
+  move_month: string;
+}
+
+export function parseMoveForm(fd: FormData): MoveFields {
+  const from = str(fd, "from");
+  const to = str(fd, "to");
+  const amount = num(fd, "amount");
+  const month = str(fd, "month");
+  if (!from || !to || from === to || !(amount > 0) || !isMonth(month)) {
+    throw new Error("Pick two different options, an amount above $0 and a month.");
+  }
+  return { from_option_id: optionIdOrNull(from), to_option_id: optionIdOrNull(to), amount, move_month: monthStart(month) };
+}
+
+export interface CheckinFields {
+  investment_option_id: string | null; // null = Default growth
+  value: number;
+  checkin_month: string;
+}
+
+export function parseCheckinForm(fd: FormData, today: YearMonth): CheckinFields {
+  const option = str(fd, "option");
+  const value = num(fd, "value");
+  const month = str(fd, "month");
+  if (!option || !(value >= 0) || !isMonth(month)) throw new Error("Enter a value of $0 or more and a month.");
+  if (month > today) throw new Error("A check-in can't be in the future.");
+  return { investment_option_id: optionIdOrNull(option), value, checkin_month: monthStart(month) };
 }
