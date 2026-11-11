@@ -211,7 +211,7 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
       return id;
     },
 
-    async insertMomentIdea(idea) {
+    async insertMomentIdea(idea, gate) {
       const { data, error } = await ideas()
         .insert({
           user_id: userId,
@@ -231,6 +231,7 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
           score: idea.score,
           batch_date: idea.batch_date,
           status: "queued",
+          ...(gate ? { gate: gate as unknown as Json, pillar: gate.result.pillar ?? idea.pillar } : {}),
         })
         .select("id");
       if (error) throw new Error(`today moment idea: ${error.message}`);

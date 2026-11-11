@@ -63,6 +63,15 @@ describe("supabaseTodayDb", () => {
     expect(log).toContainEqual(["content_ideas.eq", "user_id", "u1"]);
   });
 
+  it("insertMomentIdea stores the brand gate record and its pillar", async () => {
+    const { client, log } = fakeClient({ content_ideas: { data: [{ id: "m1" }] } });
+    const result = { verdict: "pass" as const, reader: "stephen" as const, pillar: "expensive-tuition" as const, amplifica_pillar: "the-numbers" as const, failed: [] };
+    const idea = { source_id: "11111111-1111-4111-8111-111111111111", format: "reel" as const, title: "T", hook: "H", hook_alt: null, belief_attacked: "", value_to_listener: "", why_it_stops: "", outline: [], quote: "", quote_ref: "", pillar: "", hook_type: "", score: 1, batch_date: "2026-10-27" };
+    await supabaseTodayDb(client, "u1").insertMomentIdea(idea as never, { result, rewritten: false, checked_at: "2026-10-27T15:00:00.000Z" });
+    const insert = log.find((c) => c[0] === "content_ideas.insert")![1] as Record<string, unknown>;
+    expect(insert).toMatchObject({ pillar: "expensive-tuition", gate: { result } });
+  });
+
   it("unclaimedInboxIdeas excludes every idea that ever had an experiment, not only live ones", async () => {
     const { client, log } = fakeClient({ content_experiments: { data: [{ idea_id: "i1" }] }, content_ideas: { data: [{ id: "i1", title: "t", hook: "h", pillar: "", hook_alt: null, status: "inbox" }, { id: "i2", title: "t", hook: "h", pillar: "", hook_alt: null, status: "inbox" }] } });
     const out = await supabaseTodayDb(client, "u1").unclaimedInboxIdeas(5);

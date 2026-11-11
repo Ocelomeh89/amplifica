@@ -26,7 +26,7 @@ export function sweepInBackground(userId: string, ids: string[]): void {
   }
   const client = createAdminClient();
   const run = async () => {
-    await runGateSweep(supabaseGateDb(client, userId), caller, { limit: ids.length, ids, timeLeft: () => BUDGET_SECONDS - (Date.now() - started) / 1000 });
+    await runGateSweep(supabaseGateDb(client, userId), caller, { limit: ids.length, ids, reserve: 20, concurrency: 4, timeLeft: () => BUDGET_SECONDS - (Date.now() - started) / 1000 });
     // The batch is settled now (unless the gate errored), so its digest goes out without waiting for the cron.
     await postDigests(
       supabaseDigestDb(client, userId),

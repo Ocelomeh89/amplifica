@@ -24,6 +24,9 @@ import {
 import type { NormalizedPost } from "@/features/content/engine/normalize";
 import {
   BRIEF_TOOL_NAME,
+  HOOK_MAX as BRIEF_HOOK_MAX,
+  SAY_MAX,
+  SAY_MIN,
   briefIdeaPatch,
   briefOutputSchema,
   briefSystemPrompt,
@@ -39,6 +42,7 @@ import {
 } from "@/features/content/engine/today-brief";
 import { sharesCopiedRun } from "@/features/content/engine/competitors";
 import type { ToolCaller } from "./claude";
+import { gatePiece, gateRecord, type GateRecord } from "./brand-gate";
 import type { CompetitorPostRow } from "./competitors";
 import { chicagoDayStart } from "./recreate";
 
@@ -49,7 +53,7 @@ import { chicagoDayStart } from "./recreate";
 /** On-demand briefs (swap, moment, make now) allowed per America/Chicago day. */
 export const TODAY_DAILY_CAP = 5;
 /** Generation inside the metrics cron is skipped with fewer seconds than this left. */
-export const TODAY_MIN_SECONDS = 90;
+export const TODAY_MIN_SECONDS = 150;
 /** A pending run older than this is shown as timed out and may be started again. */
 export const STALE_RUN_MINUTES = 10;
 
@@ -129,12 +133,12 @@ export interface TodayDb {
   insertExperiment(row: NewExperiment): Promise<string>;
   updateExperiment(id: string, patch: ExperimentPatch): Promise<void>;
   /** Rewrites an Inbox or queued idea; returns what it was, or null when it is gone or already posted. */
-  patchIdea(id: string, patch: ReturnType<typeof briefIdeaPatch>): Promise<IdeaSnapshot | null>;
+  patchIdea(id: string, patch: BriefPatch): Promise<IdeaSnapshot | null>;
   restoreIdea(id: string, snapshot: IdeaSnapshot): Promise<void>;
   /** Back to the Inbox with no queue rank; only touches an idea that is still queued. */
   returnToInbox(ideaId: string): Promise<void>;
   insertMomentSource(moment: string, day: string): Promise<string>;
-  insertMomentIdea(idea: MomentIdea): Promise<string>;
+  insertMomentIdea(idea: MomentIdea, gate?: GateRecord): Promise<string>;
   runFor(day: string, kind: RunKind): Promise<RunRow | null>;
   getRun(id: string): Promise<RunRow | null>;
   /** Null when the day's cron run already exists. */
@@ -246,6 +250,24 @@ async function askClaude(caller: ToolCaller, slots: BriefSlotInput[], ctx: Brief
   const parsed = briefOutputSchema(idsOf(slots), fixed).safeParse(raw);
   if (!parsed.success) throw new Error(parsed.error.issues.map((i) => i.message).join(" "));
   return parsed.data.briefs;
+}
+
+/** A brief's idea rewrite, plus the brand gate's record and the pillar it confirmed. */
+export type BriefPatch = ReturnType<typeof briefIdeaPatch> & { gate?: GateRecord; pillar?: string };
+
+export const NO_BRAND_BRIEF = "None of today's briefs met the brand standard.";
+
+/**
+ * The brand gate on one brief: a check, one rewrite on a fail, a re-check. The gate's pillar must
+ * be the pillar the brief was built on. Null means the brief is dropped; a gate error counts as a fail.
+ */
+export async function gateBrief(caller: ToolCaller, b: BriefOut, now: Date): Promise<{ brief: BriefOut; gate: GateRecord } | null> {
+  const o = await gatePiece(caller, { format: "reel", fields: { title: b.title, hook: b.hook, say: b.say } }, { rewrite: true });
+  if (o.status !== "passed" || o.result.pillar !== b.message) return null;
+  const say = Array.isArray(o.fields.say) ? o.fields.say : [String(o.fields.say)];
+  const hook = String(o.fields.hook);
+  if (say.length < SAY_MIN || say.length > SAY_MAX || hook.length > BRIEF_HOOK_MAX) return null;
+  return { brief: { ...b, title: String(o.fields.title), hook, say }, gate: gateRecord(o.result, o.rewritten, now) };
 }
 
 const fixedMessages = (slots: { slot: number; test: Test }[]) =>
@@ -369,11 +391,27 @@ export async function runDaily(db: TodayDb, caller: ToolCaller, runId: string, n
     }
     if (planned.length === 0) return await fail("No test is left to run today.");
 
+    // The brand gate: a brief that does not pass leaves its slot empty and its idea untouched.
+    const gates = new Map<number, GateRecord>();
+    for (const p of [...planned]) {
+      const b = briefFor(p.slot);
+      const g = await gateBrief(caller, b, now);
+      if (g) {
+        briefs.splice(briefs.indexOf(b), 1, g.brief);
+        gates.set(p.slot, g.gate);
+      } else {
+        planned.splice(planned.indexOf(p), 1);
+        briefs.splice(briefs.indexOf(b), 1);
+      }
+    }
+    if (planned.length === 0) return await fail(NO_BRAND_BRIEF);
+
     for (const p of planned) {
       if (p.ideaId === null) continue;
       const i = ideaOf(p.ideaId)!;
       await db.discardSharpen(p.ideaId);
-      const before = await db.patchIdea(p.ideaId, briefIdeaPatch(briefFor(p.slot), p.test, control, i.hook_alt ?? i.hook));
+      const brief = briefFor(p.slot);
+      const before = await db.patchIdea(p.ideaId, { ...briefIdeaPatch(brief, p.test, control, i.hook_alt ?? i.hook), gate: gates.get(p.slot), pillar: brief.message });
       if (before === null) return await fail("An idea changed while the briefs were made. Try again.");
       patched.push({ id: p.ideaId, snapshot: before });
     }
@@ -385,7 +423,7 @@ export async function runDaily(db: TodayDb, caller: ToolCaller, runId: string, n
       let topic = ideaOf(p.ideaId)?.title ?? b.title;
       if (ideaId === null && c) {
         const sourceId = await db.insertCompetitorSource(c, p.test.value as SourceValue);
-        ideaId = await db.insertMomentIdea(momentIdea(b, p.test, control, sourceId, day));
+        ideaId = await db.insertMomentIdea(momentIdea(b, p.test, control, sourceId, day), gates.get(p.slot));
         topic = b.title;
       }
       const recipe = recipeFor(p.test, control, b.message, topic);
@@ -451,14 +489,17 @@ export async function runMoment(db: TodayDb, caller: ToolCaller, runId: string, 
     const pick = pickMoment(ev, await db.liveTests(), (await db.liveSlots(day)).map((e) => e.variable));
     if (!pick) return await fail("No test is left to run today.");
     const text = moment.trim();
-    const [b] = await askClaude(
+    const [raw] = await askClaude(
       caller,
       [{ slot: 3, test: pick.test, held: pick.control, idea: null, moment: text }],
       { winnerHooks, recentHooks, rules: await db.activeRules() },
       fixedMessages([{ slot: 3, test: pick.test }])
     );
+    const g = await gateBrief(caller, raw, now);
+    if (!g) return await fail("The brief did not meet the brand standard. Try a different moment.");
+    const b = g.brief;
     const sourceId = await db.insertMomentSource(text, day);
-    const ideaId = await db.insertMomentIdea(momentIdea(b, pick.test, pick.control, sourceId, day));
+    const ideaId = await db.insertMomentIdea(momentIdea(b, pick.test, pick.control, sourceId, day), g.gate);
     const id = await db.insertExperiment({
       idea_id: ideaId,
       day,
@@ -524,14 +565,17 @@ export async function runSwap(db: TodayDb, caller: ToolCaller, runId: string, ex
     const control: Control = controlRecipe(ev);
     const test = candidateTests(ev, control, await db.liveTests()).find((t) => !heldVariables.has(t.variable));
     if (!test) return await fail("No other test is left to run today.");
-    const [b] = await askClaude(
+    const [raw] = await askClaude(
       caller,
       [{ slot: old.slot, test, held: control, idea: { title: idea.title, hook: idea.hook, pillar: idea.pillar }, moment: old.moment }],
       { winnerHooks, recentHooks, rules: await db.activeRules() },
       fixedMessages([{ slot: old.slot, test }])
     );
+    const g = await gateBrief(caller, raw, now);
+    if (!g) return await fail("The new brief did not meet the brand standard. Try again.");
+    const b = g.brief;
     await db.discardSharpen(idea.id);
-    const before = await db.patchIdea(idea.id, briefIdeaPatch(b, test, control, idea.hook_alt ?? idea.hook));
+    const before = await db.patchIdea(idea.id, { ...briefIdeaPatch(b, test, control, idea.hook_alt ?? idea.hook), gate: g.gate, pillar: b.message });
     if (before === null) return await fail("The idea changed while the brief was made. Try again.");
     snapshot = { id: idea.id, snapshot: before };
     // Rewritten in place: one write, so a failure leaves the old brief exactly as it was.

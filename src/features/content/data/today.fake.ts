@@ -1,6 +1,8 @@
 import { evidenceCounts, type Evidence, type LiveTest } from "@/features/content/engine/experiments";
 import type { Multiplier } from "@/features/content/engine/baseline";
 import type { CompetitorCandidate, ExperimentRow, IdeaLite, RunRow, TodayDb } from "./today";
+import type { ToolCaller, ToolCallInput } from "./claude";
+import { GATE_TOOL_NAME } from "@/features/content/engine/brand";
 
 // An in-memory TodayDb for the Today tests.
 
@@ -198,3 +200,32 @@ export const candidate = (over: Partial<CompetitorCandidate["post"]> = {}, meta:
   },
 });
 
+
+/**
+ * Wraps a test caller so brand-gate calls pass: the verdict's pillar is the message of the brief
+ * whose hook the gate is checking, from the briefs the wrapped caller last returned. Override a
+ * hook's verdict with `verdicts` (keyed by hook). Gate calls are not recorded in the base caller.
+ */
+export function gatePassing<T extends ToolCaller>(base: T, verdicts: Record<string, unknown> = {}): T & { gateCalls: string[] } {
+  let lastBriefs: { hook: string; message: string }[] = [];
+  const gateCalls: string[] = [];
+  return {
+    ...base,
+    gateCalls,
+    async call(input: ToolCallInput) {
+      if (input.tool.name === GATE_TOOL_NAME) {
+        gateCalls.push(input.text);
+        const b = lastBriefs.find((x) => input.text.includes(x.hook));
+        if (b && verdicts[b.hook] !== undefined) {
+          const v = verdicts[b.hook];
+          if (v instanceof Error) throw v;
+          return v;
+        }
+        return { verdict: "pass", reader: "daniel", pillar: b?.message ?? "w2-advantage", amplifica_pillar: "the-numbers", failed: [] };
+      }
+      const out = (await base.call(input)) as { briefs?: { hook: string; message: string }[] };
+      if (out && Array.isArray(out.briefs)) lastBriefs = [...out.briefs, ...lastBriefs];
+      return out;
+    },
+  };
+}

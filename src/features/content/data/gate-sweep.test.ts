@@ -44,12 +44,30 @@ describe("runGateSweep", () => {
     expect(db.rows[0]).toMatchObject({ status: "gating", gate_attempts: 1, lastError: "down" });
   });
 
-  it("stops when less than 120 seconds remain", async () => {
+  it("stops when less than 180 seconds remain, so the competitor step and Today keep their time", async () => {
     const db = fakeGateDb([idea("a"), idea("b")]);
-    let left = 250;
+    let left = 340;
     const res = await runGateSweep(db, caller([pass, pass]), { limit: 10, timeLeft: () => (left -= 90) });
     expect(res.passed).toBe(1);
     expect(db.rows[1].status).toBe("gating");
+  });
+
+  it("takes a smaller reserve when given one, and checks ideas in parallel up to the concurrency", async () => {
+    const db = fakeGateDb([idea("a"), idea("b"), idea("c")]);
+    let inFlight = 0;
+    let peak = 0;
+    const slow: ToolCaller = {
+      async call() {
+        inFlight++;
+        peak = Math.max(peak, inFlight);
+        await new Promise((r) => setTimeout(r, 5));
+        inFlight--;
+        return pass;
+      },
+    };
+    const res = await runGateSweep(db, slow, { limit: 10, timeLeft: () => 100, reserve: 20, concurrency: 2 });
+    expect(res.passed).toBe(3);
+    expect(peak).toBe(2);
   });
 
   it("only takes the ids it is given", async () => {

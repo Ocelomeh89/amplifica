@@ -27,7 +27,7 @@ export interface GateDb {
 }
 
 /** Stop while this many seconds remain, so the cron's later steps keep their time. */
-export const SWEEP_RESERVE_SECONDS = 120;
+export const SWEEP_RESERVE_SECONDS = 180;
 
 const asText = (v: string | string[] | undefined) => (Array.isArray(v) ? v.join("\n") : v ?? "");
 const asList = (v: string | string[] | undefined) => (Array.isArray(v) ? v : v ? [v] : []);
@@ -61,12 +61,13 @@ export function ideaPatchFrom(i: GatingIdea, f: GateFields) {
 export async function runGateSweep(
   db: GateDb,
   caller: ToolCaller,
-  a: { limit: number; timeLeft: () => number; ids?: string[] }
+  a: { limit: number; timeLeft: () => number; ids?: string[]; reserve?: number; concurrency?: number }
 ): Promise<{ passed: number; failed: number; errors: number }> {
   const out = { passed: 0, failed: 0, errors: 0 };
+  const reserve = a.reserve ?? SWEEP_RESERVE_SECONDS;
+  const width = Math.max(1, a.concurrency ?? 1);
   const ideas = await db.gatingIdeas(a.limit, a.ids);
-  for (const idea of ideas) {
-    if (a.timeLeft() < SWEEP_RESERVE_SECONDS) break;
+  const one = async (idea: GatingIdea) => {
     const o = await gatePiece(caller, { format: idea.format, fields: gateFieldsOf(idea) }, { rewrite: true });
     try {
       if (o.status === "passed") {
@@ -83,6 +84,10 @@ export async function runGateSweep(
       console.error("brand gate: could not store the outcome", idea.id, e instanceof Error ? e.message : e);
       out.errors += 1;
     }
+  };
+  for (let k = 0; k < ideas.length; k += width) {
+    if (a.timeLeft() < reserve) break;
+    await Promise.all(ideas.slice(k, k + width).map(one));
   }
   return out;
 }
