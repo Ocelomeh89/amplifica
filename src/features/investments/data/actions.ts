@@ -27,7 +27,11 @@ export async function createInvestmentOption(fd: FormData): Promise<void> {
   const { error: vErr } = await supabase
     .from("investment_option_versions")
     .insert(versionRow(data.id, user.id, f, currentYearMonth()));
-  if (vErr) throw new Error(vErr.message);
+  if (vErr) {
+    // Never leave an option without terms behind.
+    await supabase.from("investment_options").delete().eq("id", data.id).eq("user_id", user.id);
+    throw new Error(vErr.message);
+  }
   refresh();
 }
 

@@ -45,6 +45,8 @@ export interface Lot {
 }
 
 export function termsAt(option: FundOption, month: YearMonth): OptionTerms {
+  // An option saved without terms (a half-failed write) behaves as Default growth.
+  if (option.versions.length === 0) return termsAt(DEFAULT_GROWTH, month);
   let inEffect: OptionVersion | null = null;
   let earliest: OptionVersion | null = null;
   for (const v of option.versions) {

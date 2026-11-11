@@ -4,24 +4,8 @@ import { createClient } from "@/shared/supabase/server";
 import { requireUser } from "@/shared/supabase/auth";
 import { revalidatePath } from "next/cache";
 import { str } from "@/shared/forms";
-import { parseAmpliconForm, parseAllocations, type AllocationField } from "./parse";
-
-type Client = Awaited<ReturnType<typeof requireUser>>["supabase"];
-
-// Replace an Amplicon's split. An empty split means Default growth.
-async function writeAllocations(supabase: Client, userId: string, ampliconId: string, allocs: AllocationField[]) {
-  const { error: delErr } = await supabase
-    .from("amplicon_allocations")
-    .delete()
-    .eq("amplicon_id", ampliconId)
-    .eq("user_id", userId);
-  if (delErr) throw new Error(delErr.message);
-  if (allocs.length === 0) return;
-  const { error } = await supabase
-    .from("amplicon_allocations")
-    .insert(allocs.map((a) => ({ user_id: userId, amplicon_id: ampliconId, ...a })));
-  if (error) throw new Error(error.message);
-}
+import { parseAmpliconForm, parseAllocations } from "./parse";
+import { writeAllocations } from "./allocations";
 
 export async function createAmplicon(formData: FormData) {
   const { supabase, user } = await requireUser();

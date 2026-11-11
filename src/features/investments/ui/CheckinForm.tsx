@@ -23,7 +23,7 @@ export default function CheckinForm({ optionId, today, onDone }: { optionId: str
       <input type="hidden" name="option" value={optionId} />
       <label className="text-[11px] text-sub uppercase tracking-wide">
         Value ($)
-        <input name="value" type="number" min={0} step={100} required className={inputCls} />
+        <input name="value" type="number" min={0} step="any" required className={inputCls} />
       </label>
       <label className="text-[11px] text-sub uppercase tracking-wide">
         Month

@@ -83,3 +83,9 @@ describe("stepLot", () => {
     expect(lot.principal).toBeCloseTo(1020.1, 9);
   });
 });
+
+describe("termsAt with no versions", () => {
+  it("falls back to Default growth instead of crashing", () => {
+    expect(termsAt({ id: "x", name: "x", versions: [] }, "2026-01")).toEqual(termsAt(DEFAULT_GROWTH, "2026-01"));
+  });
+});

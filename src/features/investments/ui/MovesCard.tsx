@@ -64,7 +64,7 @@ export default function MovesCard({
         </label>
         <label className="text-[11px] text-sub uppercase tracking-wide">
           Amount ($)
-          <input name="amount" type="number" min={1} step={100} required className={inputCls} />
+          <input name="amount" type="number" min={0.01} step="any" required className={inputCls} />
         </label>
         <label className="text-[11px] text-sub uppercase tracking-wide">
           Month
