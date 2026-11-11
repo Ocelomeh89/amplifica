@@ -42,7 +42,7 @@ describe("supabaseTagsDb.untagged", () => {
     const row = {
       id: "p1", external_id: "SC1", url: "u", media_type: "reel", posted_at: "2026-10-20T00:00:00Z",
       caption: "c", hook_used: "", thumbnail_url: "t",
-      tag_locks: ["hook_type"], hook_type: "paradox", message: "velocity",
+      tag_locks: ["hook_type"], hook_type: "paradox", message: "w2-advantage",
       onscreen_text: "", cta_type: "", post_style: "", cover_face: null, cover_text: null, cover_number: null,
     };
     const { client } = fakeClient([row], 12);

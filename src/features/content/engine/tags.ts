@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PILLAR_SLUGS, pillarName } from "./brand";
 
 // The six choices Miguel makes on a post, as values the tagging routine, the
 // endpoint, the migration checks and the Performance page all share. Slices 3
@@ -17,7 +18,10 @@ export const HOOK_TYPES = [
   "warning",
 ] as const;
 export const ONSCREEN_TEXT = ["repeats-hook", "adds-to-hook", "none"] as const;
-export const MESSAGES = [
+/** A post's message is its personal brand pillar (brand gate, 2026-11-10). */
+export const MESSAGES = [...PILLAR_SLUGS, "none"] as const;
+/** The old canon arguments: kept on history and hand-locked tags, never written again. */
+export const LEGACY_MESSAGES = [
   "scoreboard",
   "velocity",
   "dollars-not-yourself",
@@ -25,7 +29,6 @@ export const MESSAGES = [
   "credit-ladder",
   "system-over-willpower",
   "forced-sale",
-  "none",
 ] as const;
 export const CTA_TYPES = ["comment-keyword", "save", "share", "follow", "link-in-bio", "none"] as const;
 export const POST_STYLES = [
@@ -67,11 +70,13 @@ const LISTS = {
 
 const titleCase = (slug: string) => slug.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
 /** Slug to display label. Slugs shared by lists (none) read the same in each. */
-export const TAG_LABELS: Record<string, string> = Object.fromEntries(
-  Object.values(LISTS)
+export const TAG_LABELS: Record<string, string> = Object.fromEntries([
+  ...Object.values(LISTS)
     .flat()
-    .map((s) => [s, titleCase(s)])
-);
+    .map((s) => [s, titleCase(s)]),
+  ...PILLAR_SLUGS.map((s) => [s, pillarName(s)]),
+  ...LEGACY_MESSAGES.map((s) => [s, `${titleCase(s)} (old)`]),
+]);
 
 export type PostTags = {
   hook_type: string;

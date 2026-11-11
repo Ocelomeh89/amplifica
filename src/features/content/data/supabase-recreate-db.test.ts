@@ -111,7 +111,7 @@ describe("supabaseRecreateDb", () => {
   it("sourceContext joins insights, figures and recent hooks, and returns null for a missing post", async () => {
     const post = {
       id: "p1", platform: "instagram", format: "reel", media_type: "reel", thumbnail_url: "", pillar: "method", hook_type: "question",
-      hook_used: "", caption: "Cap", url: "u", idea_id: null, posted_at: "2026-10-20T00:00:00Z", onscreen_text: "", message: "velocity",
+      hook_used: "", caption: "Cap", url: "u", idea_id: null, posted_at: "2026-10-20T00:00:00Z", onscreen_text: "", message: "w2-advantage",
       cta_type: "", post_style: "talking-head-text", cover_face: true, cover_text: null, cover_number: null, hook_spoken: "Spoken", hook_onscreen: "",
       tag_confidence: {}, tag_locks: [], tagged_at: "2026-10-21T00:00:00Z",
     };

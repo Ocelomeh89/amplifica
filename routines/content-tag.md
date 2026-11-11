@@ -139,14 +139,12 @@ Send only values from these lists, written exactly as shown.
 - `adds-to-hook`: different words that add to it.
 - `none`: no opening on-screen text.
 
-`message`: which core argument the post makes. `none` when it argues none of them.
-- `scoreboard`: cash flow is the scoreboard, not net worth; 25x is a withdrawal rate.
-- `velocity`: velocity beats rate; same return, more turns; short cycles.
-- `dollars-not-yourself`: keep the paycheck, move the dollars; quitting to get rich is wrong.
-- `debt-efficiency`: rank debt by what it takes (payment over balance), not by rate.
-- `credit-ladder`: the source you can access and repay beats the cheapest rate; the five-source ladder.
-- `system-over-willpower`: a plan that runs itself beats one that needs discipline.
-- `forced-sale`: people lose money on a forced sale, not a bad asset; size, reserves, horizon.
+`message`: which personal brand pillar the post serves. `none` when it serves none of them.
+- `freedom-paradox`: The Freedom Paradox. What does it really mean to be free?
+- `expensive-tuition`: Expensive Tuition. What does failure teach us that success cannot?
+- `physics-of-wealth`: The Physics of Wealth. What happens when we stop guessing and start thinking systematically?
+- `w2-advantage`: The W-2 Advantage. What if your paycheck isn't the thing holding you back?
+- `life-by-design`: Life by Design. For what are we building this wealth?
 - `none`
 
 `cta_type`: what the caption or video asks the viewer to do.
@@ -185,7 +183,7 @@ One invalid value rejects the whole batch, so check every value against the list
       "id": "5b9d1d1e-7c4e-4a39-9a55-0d8b3e1f2a10",
       "hook_type": "belief-attacking",
       "onscreen_text": "repeats-hook",
-      "message": "velocity",
+      "message": "w2-advantage",
       "cta_type": "comment-keyword",
       "post_style": "talking-head-text",
       "cover_face": true,

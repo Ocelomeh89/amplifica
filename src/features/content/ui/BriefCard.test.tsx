@@ -22,7 +22,7 @@ const base: BriefView = {
   moment: "",
   variable: "hook_type",
   value: "belief-attacking",
-  recipe: { hook_type: "belief-attacking", onscreen_text: "none", cta_type: "save", post_style: "talking-head-text", cover: "face", message: "velocity", topic: "401k", control: "question" },
+  recipe: { hook_type: "belief-attacking", onscreen_text: "none", cta_type: "save", post_style: "talking-head-text", cover: "face", message: "w2-advantage", topic: "401k", control: "question" },
   reason: "Belief attacking won 3 of 4 Reels in the last 90 days.",
   status: "open",
   post_id: null,
@@ -45,7 +45,7 @@ describe("BriefCard", () => {
     expect(screen.getByText(/Hook type: Belief attacking instead of Question/)).toBeTruthy();
     const held = screen.getByText(/Held still:/).parentElement!.textContent!;
     expect(held).toContain("Post style: Talking head text");
-    expect(held).toContain("Message: Velocity");
+    expect(held).toContain("Message: The W-2 Advantage");
     expect(held).not.toContain("Hook type");
     expect(screen.getByText(/won 3 of 4 Reels/)).toBeTruthy();
   });

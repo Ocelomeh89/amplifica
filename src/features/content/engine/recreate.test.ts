@@ -14,11 +14,11 @@ import {
 } from "./recreate";
 import type { WinnerInsights } from "./winners";
 
-const opt = (topic: string, message = "velocity") => ({ hook: `Hook about ${topic}`, angle: `Angle on ${topic}`, topic, message });
+const opt = (topic: string, message = "w2-advantage") => ({ hook: `Hook about ${topic}`, angle: `Angle on ${topic}`, topic, message });
 const three = (message?: string) => [opt("a", message), opt("b", message), opt("c", message)];
 
 describe("recreateOutputSchema", () => {
-  const same = recreateOutputSchema("same-recipe", "velocity");
+  const same = recreateOutputSchema("same-recipe", "w2-advantage");
   it("accepts exactly 3 options", () => {
     expect(same.safeParse({ options: three() }).success).toBe(true);
   });
@@ -30,19 +30,19 @@ describe("recreateOutputSchema", () => {
     expect(same.safeParse({ options: [opt("Cash flow"), opt("  cash   FLOW "), opt("c")] }).success).toBe(false);
   });
   it("adjacent rejects none, blank, the source message, and values outside MESSAGES", () => {
-    const adj = recreateOutputSchema("adjacent", "velocity");
-    for (const bad of ["none", "", "velocity", "made-up"]) {
-      expect(adj.safeParse({ options: [opt("a", bad), opt("b", "scoreboard"), opt("c", "forced-sale")] }).success).toBe(false);
+    const adj = recreateOutputSchema("adjacent", "w2-advantage");
+    for (const bad of ["none", "", "w2-advantage", "made-up"]) {
+      expect(adj.safeParse({ options: [opt("a", bad), opt("b", "physics-of-wealth"), opt("c", "expensive-tuition")] }).success).toBe(false);
     }
-    expect(adj.safeParse({ options: [opt("a", "scoreboard"), opt("b", "forced-sale"), opt("c", "credit-ladder")] }).success).toBe(true);
+    expect(adj.safeParse({ options: [opt("a", "physics-of-wealth"), opt("b", "expensive-tuition"), opt("c", "life-by-design")] }).success).toBe(true);
   });
   it("same-recipe requires message equal to the source message", () => {
-    expect(same.safeParse({ options: [opt("a", "scoreboard"), opt("b"), opt("c")] }).success).toBe(false);
+    expect(same.safeParse({ options: [opt("a", "physics-of-wealth"), opt("b"), opt("c")] }).success).toBe(false);
   });
   it("same-recipe with a blank or none source accepts any canon message or none", () => {
     for (const src of ["", "none"]) {
       const s = recreateOutputSchema("same-recipe", src);
-      expect(s.safeParse({ options: [opt("a", "none"), opt("b", "scoreboard"), opt("c", "forced-sale")] }).success).toBe(true);
+      expect(s.safeParse({ options: [opt("a", "none"), opt("b", "physics-of-wealth"), opt("c", "expensive-tuition")] }).success).toBe(true);
       expect(s.safeParse({ options: [opt("a", "nonsense"), opt("b"), opt("c")] }).success).toBe(false);
     }
   });
@@ -62,7 +62,7 @@ describe("recreateToolSchema", () => {
 const source: RecreateSource = {
   hook_type: "question",
   onscreen_text: "repeats-hook",
-  message: "system-over-willpower",
+  message: "freedom-paradox",
   cta_type: "follow",
   post_style: "talking-head-text",
   cover_face: true,
@@ -84,12 +84,12 @@ describe("renderRecreateTurn", () => {
   it("names the mode rule and the source hook", () => {
     const t = renderRecreateTurn({ ...base, mode: "same-recipe" });
     expect(t).toContain("Keep the hook type question");
-    expect(t).toContain("system-over-willpower");
+    expect(t).toContain("freedom-paradox");
     expect(t).toContain("Do you have a system or are you winging it?");
   });
   it("adjacent asks for a different canon message per option", () => {
     const t = renderRecreateTurn({ ...base, mode: "adjacent" });
-    expect(t).toContain("other than system-over-willpower");
+    expect(t).toContain("other than freedom-paradox");
   });
   it("same-recipe frees the topic and message when the source has none", () => {
     const t = renderRecreateTurn({ ...base, mode: "same-recipe", source: { ...source, message: "none" } });

@@ -17,7 +17,7 @@ import {
 } from "./today";
 import { DAY, NOW, candidate, exp, fakeDb, idea } from "./today.fake";
 
-const brief = (slot: number, over: Record<string, unknown> = {}) => ({ slot, title: `T${slot}`, hook: `H${slot}`, say: ["a", "b", "c"], message: "velocity", ...over });
+const brief = (slot: number, over: Record<string, unknown> = {}) => ({ slot, title: `T${slot}`, hook: `H${slot}`, say: ["a", "b", "c"], message: "w2-advantage", ...over });
 const caller = (out: unknown): ToolCaller & { calls: unknown[] } => {
   const calls: unknown[] = [];
   return { calls, call: async (input) => (calls.push(input), out) };

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CANON_MESSAGES } from "./recreate";
+import { PILLAR_MESSAGES } from "./recreate";
 import { CTA_TYPES, HOOK_TYPES, MESSAGES, ONSCREEN_TEXT, POST_STYLES, TAG_NAMES } from "./tags";
 
 // Slice 6: labelling a popular competitor Reel with Miguel's own tag lists, from its
@@ -45,7 +45,7 @@ export function competitorTagToolSchema(): Record<string, unknown> {
       cover_number: { type: "boolean", description: "The cover shows a number." },
       cta_type: enumOrBlank(CTA_TYPES, "The call to action, usually in the caption."),
       post_style: enumOrBlank(REEL_STYLES, "The Reel's format. Blank, with a format_note, when none fits."),
-      message: enumOrBlank(MESSAGES, "The canon argument it makes, if it makes one. Usually blank for a competitor."),
+      message: enumOrBlank(MESSAGES, "The personal pillar it serves, if one fits. Usually blank for a competitor."),
       hook_text: { type: "string", description: "The opening line as best you can tell, under 200 characters." },
       tag_confidence: {
         type: "object",
@@ -67,8 +67,8 @@ export function competitorTagSystemPrompt(): string {
     "Confidence is honest: below 0.6 whenever the cover image cannot show the label (for example on-screen text that may appear only later in the video).",
     "pushes_belief is the conventional money advice the post promotes, in a few words (for example \"max out your 401k\" or \"buy term, invest the rest\"). Null when it promotes none.",
     "format_note describes the format in one line, only when no listed post style fits; then post_style is blank. Otherwise null.",
-    "The canon arguments, for the message field:",
-    CANON_MESSAGES.trim(),
+    "The pillars, for the message field:",
+    PILLAR_MESSAGES.trim(),
   ].join("\n\n");
 }
 

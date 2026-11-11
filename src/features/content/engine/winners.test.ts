@@ -147,14 +147,14 @@ describe("winnerInsights", () => {
   });
 
   it("counts posts on the message and how many sit above median", () => {
-    const tagged = field((rank) => ({ message: rank === 1 || rank === 2 || rank === 30 ? "velocity" : "" }));
-    const r = run({ ...subject, message: "velocity" }, tagged);
+    const tagged = field((rank) => ({ message: rank === 1 || rank === 2 || rank === 30 ? "w2-advantage" : "" }));
+    const r = run({ ...subject, message: "w2-advantage" }, tagged);
     if (r.state !== "ok") throw new Error("expected ok");
-    expect(r.message).toBe("Message: Velocity. 3 posts carry it, 2 above median.");
+    expect(r.message).toBe("Message: The W-2 Advantage. 3 posts carry it, 2 above median.");
   });
 
   it("has no message line for a blank or none message", () => {
-    const r = run(subject, field(() => ({ message: "velocity" })));
+    const r = run(subject, field(() => ({ message: "w2-advantage" })));
     if (r.state !== "ok") throw new Error("expected ok");
     expect(r.message).toBeNull();
   });

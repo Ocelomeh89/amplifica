@@ -13,13 +13,13 @@ import { recreatedIdeaSchema, type RecreateMode, type RecreateOption } from "@/f
 
 const NOW = new Date("2026-10-26T15:00:00Z"); // 10:00 in Chicago, day starts 05:00Z
 const POST = "5b9d1d1e-7c4e-4a39-9a55-0d8b3e1f2a10";
-const opt = (topic: string, message = "velocity"): RecreateOption => ({ hook: `Hook ${topic}`, angle: `Angle ${topic}`, topic, message });
+const opt = (topic: string, message = "w2-advantage"): RecreateOption => ({ hook: `Hook ${topic}`, angle: `Angle ${topic}`, topic, message });
 const OPTIONS = [opt("a"), opt("b"), opt("c")];
 
 const CTX: RecreateContext = {
   post: { id: POST, hook_type: "question", pillar: "method", tagged_at: "2026-10-20T00:00:00Z" },
   source: {
-    hook_type: "question", onscreen_text: "repeats-hook", message: "velocity", cta_type: "none", post_style: "talking-head-text",
+    hook_type: "question", onscreen_text: "repeats-hook", message: "w2-advantage", cta_type: "none", post_style: "talking-head-text",
     cover_face: true, cover_text: true, cover_number: false, hook_spoken: "Spoken hook", hook_onscreen: "", tag_confidence: {},
     tag_locks: [], tagged_at: "2026-10-20T00:00:00Z", caption: "Caption", media_type: "reel", figures: ["Views: 1"],
   },
@@ -106,7 +106,7 @@ const readyRow = async (db: ReturnType<typeof fakeDb>, mode: RecreateMode = "sam
   const s = await startRecreation(db, POST, mode, NOW);
   if (!s.ok) throw new Error("start failed");
   // Adjacent options must leave the source message (velocity), or the row would end failed instead of ready.
-  const options = mode === "adjacent" ? [opt("a", "scoreboard"), opt("b", "forced-sale"), opt("c", "credit-ladder")] : OPTIONS;
+  const options = mode === "adjacent" ? [opt("a", "physics-of-wealth"), opt("b", "expensive-tuition"), opt("c", "life-by-design")] : OPTIONS;
   await runRecreation(db, caller({ options }), s.id, NOW);
   return s.id;
 };

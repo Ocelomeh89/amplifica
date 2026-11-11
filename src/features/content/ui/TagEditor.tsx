@@ -42,15 +42,17 @@ export default function TagEditor({ id, row, onDone }: { id: string; row: PostTa
       <input type="hidden" name="id" value={id} />
       {SELECTS.map((s) => {
         const value = row[s.name];
+        // A stored value no longer in the list (an old canon message) stays visible and selected.
+        const list: readonly string[] = value && !(s.list as readonly string[]).includes(value) ? [value, ...s.list] : s.list;
         return (
           <label key={s.name} className="text-sm">
             <span className="block text-sub mb-1">{s.label}</span>
             <input type="hidden" name={`orig_${s.name}`} value={value} />
             <select name={s.name} defaultValue={value} className={input}>
               <option value="">Not tagged</option>
-              {s.list.map((v) => (
+              {list.map((v) => (
                 <option key={v} value={v}>
-                  {TAG_LABELS[v]}
+                  {TAG_LABELS[v] ?? v}
                 </option>
               ))}
             </select>

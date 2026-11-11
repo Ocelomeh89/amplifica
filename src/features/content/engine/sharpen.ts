@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { CONTENT_POSITIONING, IDEAS_PROMPT } from "./prompts/ideas";
-import { CANON_MESSAGES, between } from "./recreate";
+import { PILLAR_MESSAGES, between } from "./recreate";
 import { HOOK_TYPES, type HookType } from "./tags";
 
 // Sharpen: an unfinished idea becomes 3 rewrites aimed at what Miguel calls usable. Pure:
@@ -96,7 +96,7 @@ export function sharpenSystemPrompt(rules: string[]): string {
     "You sharpen Miguel Graf's content ideas.",
     CONTENT_POSITIONING.trim(),
     ideaRules,
-    CANON_MESSAGES,
+    PILLAR_MESSAGES,
     SHARPEN_RULES,
   ];
   if (rules.length > 0) parts.push(["## Miguel's approved rules", ...rules.map((r) => `- ${r}`)].join("\n"));

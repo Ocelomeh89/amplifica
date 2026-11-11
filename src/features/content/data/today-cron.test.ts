@@ -6,7 +6,7 @@ import { runTodayCron } from "./today-cron";
 import { NOW, exp, fakeDb, idea } from "./today.fake";
 
 const okCaller: ToolCaller = {
-  call: async () => ({ briefs: [{ slot: 1, title: "T", hook: "H", say: ["a", "b", "c"], message: "velocity" }] }),
+  call: async () => ({ briefs: [{ slot: 1, title: "T", hook: "H", say: ["a", "b", "c"], message: "w2-advantage" }] }),
 };
 
 /** A clock that reads `usedSeconds` after the start. */
