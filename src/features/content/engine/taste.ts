@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CONTENT_POSITIONING } from "./prompts/ideas";
+import { BRAND_CONTEXT } from "./prompts/ideas";
 
 // Sharpen and the taste loop (content engine 4c). The constants live here so the
 // migration test can hold the SQL check lists to them. Below them: the rule proposal
@@ -95,7 +95,7 @@ new words. If the notes add nothing new, return empty lists.
 `.trim();
 
 export function proposalSystemPrompt(): string {
-  return ["You turn Miguel Graf's notes on weak content ideas into rules.", CONTENT_POSITIONING.trim(), PROPOSAL_RULES].join("\n\n");
+  return ["You turn Miguel Graf's notes on weak content ideas into rules.", BRAND_CONTEXT, PROPOSAL_RULES].join("\n\n");
 }
 
 const noteLine = (n: NoteLite): string => {

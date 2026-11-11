@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CONTENT_POSITIONING, IDEAS_PROMPT } from "./prompts/ideas";
+import { BRAND_CONTEXT, IDEAS_PROMPT } from "./prompts/ideas";
 import { ingestIdeaSchema } from "./schema";
 import { HOOK_TYPES, MESSAGES, type PostTags } from "./tags";
 import { PILLARS } from "./brand";
@@ -113,7 +113,7 @@ export function recreateSystemPrompt(): string {
   const rules = between(IDEAS_PROMPT, "## What makes an idea good here", "## Ranking and dedupe");
   return [
     "You help Miguel Graf repeat what works. Given one of his Instagram posts and what is known about why it did well, you write 3 options for a new Reel.",
-    CONTENT_POSITIONING.trim(),
+    BRAND_CONTEXT,
     rules,
     PILLAR_MESSAGES,
     OPTION_RULES,

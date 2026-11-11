@@ -18,7 +18,7 @@ export function angleBlock(angle: Angle, competitor = ""): string {
       "ANGLE: COUNTERPOINT.",
       who,
       "Find the strongest claim in it that Miguel's evidence disagrees with and argue the other side.",
-      "Argue with the claim, never the person. Do not attack sound basics (HYSAs, reserves, basic ETF investing) to manufacture contrast; the content positioning above still wins.",
+      "Argue with the claim, never the person. Do not attack sound basics (HYSAs, reserves, basic ETF investing) to manufacture contrast; the brand above still wins.",
       "Set quote_ref to the source URL. Make the first outline beat read \"They said: <their claim> / We say: <our position>\".",
     ].join("\n");
   }

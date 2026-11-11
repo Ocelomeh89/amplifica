@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { HELD_STILL, VARIABLE_LABEL, valueLabel, type Control, type Test } from "./experiments";
-import { CONTENT_POSITIONING, IDEAS_PROMPT } from "./prompts/ideas";
+import { BRAND_CONTEXT, IDEAS_PROMPT } from "./prompts/ideas";
 import { PILLAR_MESSAGES, between } from "./recreate";
 import { ingestIdeaSchema } from "./schema";
 import { HOOK_TYPES, MESSAGES } from "./tags";
@@ -84,10 +84,10 @@ shots, the on-screen text and the pacing.
 
 export function briefSystemPrompt(approvedRules: string[] = []): string {
   const rules = between(IDEAS_PROMPT, "## What makes an idea good here", "## Ranking and dedupe");
-  const approved = approvedRules.length > 0 ? [["## Miguel's approved rules", ...approvedRules.map((r) => `- ${r}`)].join("\n")] : [];
+  const approved = approvedRules.length > 0 ? [["## Miguel's approved rules", "If a taste rule conflicts with the brand, the brand wins.", ...approvedRules.map((r) => `- ${r}`)].join("\n")] : [];
   return [
     "You write Miguel Graf's morning briefs. Each brief is one Instagram Reel that tests exactly one choice against the recipe that already works for him.",
-    CONTENT_POSITIONING.trim(),
+    BRAND_CONTEXT,
     rules,
     PILLAR_MESSAGES,
     BRIEF_RULES,
