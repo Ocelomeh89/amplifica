@@ -115,9 +115,12 @@ export interface FundMove {
   toId: string;
   amount: number;
   month: YearMonth;
+  stranded?: boolean; // "deleted": the money still leaves the source but lands in Default growth
 }
 
 export interface FundCheckin {
+  id?: string;
+  stranded?: boolean; // "deleted": after the rescale the whole holding moves to Default growth
   optionId: string;
   value: number;
   month: YearMonth;
@@ -239,7 +242,8 @@ export function runFundCheck(input: FundCheckInput): FundCheckResult {
       const available = termsFor(mv.fromId, m).liquid ? totalOf(src) : 0;
       if (mv.amount > available + EPS) cappedMoveIds.push(mv.id);
       const moved = takeFrom(src, Math.min(mv.amount, available));
-      if (moved > 0) lotsOf(mv.toId).push({ principal: moved, startMonth: m });
+      const dest = mv.stranded ? DEFAULT_GROWTH_ID : mv.toId;
+      if (moved > 0) lotsOf(dest).push({ principal: moved, startMonth: m });
     }
 
     // 3. Growth and income.
@@ -263,6 +267,10 @@ export function runFundCheck(input: FundCheckInput): FundCheckResult {
         for (const l of lots) l.principal *= f;
       } else if (c.value > 0) {
         lots.push({ principal: c.value, startMonth: m });
+      }
+      if (c.stranded && c.optionId !== DEFAULT_GROWTH_ID) {
+        const strandedValue = takeFrom(lots, totalOf(lots));
+        if (strandedValue > 0) lotsOf(DEFAULT_GROWTH_ID).push({ principal: strandedValue, startMonth: m });
       }
     }
 
@@ -316,4 +324,18 @@ export function runFundCheck(input: FundCheckInput): FundCheckResult {
     holdingsToday,
     months,
   };
+}
+
+const STATUS_RANK: Record<FundStatus, number> = { ok: 0, "runs-out": 1, "short-now": 2 };
+
+// Does `after` look worse than `before`? A worse status, or the same
+// "runs out" with an earlier month. Drives the edit form's "Save anyway".
+export function isWorse(
+  before: Pick<FundCheckResult, "status" | "runOutMonth">,
+  after: Pick<FundCheckResult, "status" | "runOutMonth">
+): boolean {
+  const a = STATUS_RANK[after.status];
+  const b = STATUS_RANK[before.status];
+  if (a !== b) return a > b;
+  return after.status === "runs-out" && !!after.runOutMonth && !!before.runOutMonth && after.runOutMonth < before.runOutMonth;
 }

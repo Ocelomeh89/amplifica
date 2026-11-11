@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isWorse,
   runFundCheck,
   DEFAULT_GROWTH_ID,
   type FundAmplicon,
@@ -188,4 +189,45 @@ describe("runFundCheck", () => {
       else expect(m.illiquidValue).toBe(0);
     }
   });
+
+  it("a stranded move lands in Default growth", () => {
+    const r = run({
+      amplicons: [amp([{ optionId: "idx0", pct: 1 }])],
+      moves: [{ id: "m1", fromId: "idx0", toId: "rent6", amount: 12000, month: "2026-02", stranded: true }],
+      today: "2026-02",
+    });
+    expect(r.status).toBe("ok");
+    expect(r.holdingsToday.rent6).toBeUndefined();
+    // The moved lot starts this month (no growth yet); February's 1000 is sold from it.
+    expect(r.holdingsToday[DEFAULT_GROWTH_ID]).toBeCloseTo(11000, 6);
+  });
+
+  it("a stranded check-in moves the whole holding to Default growth", () => {
+    const r = run({
+      amplicons: [amp([{ optionId: "rent6", pct: 1 }])],
+      checkins: [{ id: "c1", optionId: "rent6", value: 15000, month: "2026-02", stranded: true }],
+      today: "2026-02",
+    });
+    expect(r.holdingsToday.rent6).toBeUndefined();
+    expect(r.holdingsToday[DEFAULT_GROWTH_ID]).toBeCloseTo(15000 - (1000 - 60), 6);
+    expect(r.status).toBe("ok");
+  });
 });
+
+describe("isWorse", () => {
+  const s = (status: "ok" | "runs-out" | "short-now", runOutMonth: string | null = null) => ({ status, runOutMonth });
+  it("ranks ok < runs out < short this month", () => {
+    expect(isWorse(s("ok"), s("runs-out", "2030-01"))).toBe(true);
+    expect(isWorse(s("runs-out", "2030-01"), s("short-now"))).toBe(true);
+    expect(isWorse(s("short-now"), s("ok"))).toBe(false);
+  });
+  it("an earlier run-out month is worse; the same or later is not", () => {
+    expect(isWorse(s("runs-out", "2030-01"), s("runs-out", "2029-06"))).toBe(true);
+    expect(isWorse(s("runs-out", "2030-01"), s("runs-out", "2030-01"))).toBe(false);
+    expect(isWorse(s("runs-out", "2030-01"), s("runs-out", "2031-01"))).toBe(false);
+  });
+  it("staying short this month is not worse", () => {
+    expect(isWorse(s("short-now"), s("short-now"))).toBe(false);
+  });
+});
+
