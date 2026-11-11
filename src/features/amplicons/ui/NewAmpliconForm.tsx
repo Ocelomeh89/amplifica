@@ -5,8 +5,9 @@ import { Plus } from "lucide-react";
 import { createAmplicon } from "@/features/amplicons/data/actions";
 import Card from "@/shared/ui/Card";
 import AmpliconFields from "./AmpliconFields";
+import type { AllocationOption } from "./AllocationFields";
 
-export default function NewAmpliconForm() {
+export default function NewAmpliconForm({ options }: { options: AllocationOption[] }) {
   const [open, setOpen] = useState(false);
 
   if (!open) {
@@ -23,7 +24,7 @@ export default function NewAmpliconForm() {
   return (
     <Card title="New Amplicon">
       <form action={async (fd) => { await createAmplicon(fd); setOpen(false); }} className="space-y-3">
-        <AmpliconFields />
+        <AmpliconFields options={options} />
         <div className="flex gap-2 mt-2">
           <button type="submit" className="bg-purple hover:bg-purple/90 transition-colors text-white text-sm px-4 py-1.5 rounded">
             Add Amplicon

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Pencil, Copy, Trash2 } from "lucide-react";
 import AmpliconFields from "./AmpliconFields";
+import type { AllocationOption } from "./AllocationFields";
 import { editAmplicon, duplicateAmplicon, deleteAmplicon } from "@/features/amplicons/data/actions";
 import { fmtCurrency, fmtPct, fmtDate } from "@/shared/format";
 
@@ -22,11 +23,15 @@ export default function AmpliconRow({
   monthly,
   endMonth,
   active,
+  options,
+  allocations,
 }: {
   amplicon: AmpliconRowData;
   monthly: number;
   endMonth: string;
   active: boolean;
+  options: AllocationOption[];
+  allocations: { investment_option_id: string; pct: number }[];
 }) {
   const [editing, setEditing] = useState(false);
 
@@ -42,7 +47,7 @@ export default function AmpliconRow({
             className="space-y-3"
           >
             <input type="hidden" name="id" value={a.id} />
-            <AmpliconFields d={a} cols={3} />
+            <AmpliconFields d={a} cols={3} options={options} allocations={allocations} />
             <div className="flex gap-2">
               <button
                 type="submit"

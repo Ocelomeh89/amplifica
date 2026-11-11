@@ -4,6 +4,7 @@ import { useState } from "react";
 import Field from "@/shared/ui/Field";
 import { fmtCurrency } from "@/shared/format";
 import type { IncomeType } from "@/features/amplicons/data/parse";
+import AllocationFields, { type AllocationOption } from "./AllocationFields";
 
 // The Amplicon form body, shared by create and edit. The STI/LTI dropdown
 // switches the term and rate fields; the FormData contract lives in
@@ -21,7 +22,17 @@ export interface AmpliconFieldDefaults {
   start_date?: string;
 }
 
-export default function AmpliconFields({ d = {}, cols = 2 }: { d?: AmpliconFieldDefaults; cols?: 2 | 3 }) {
+export default function AmpliconFields({
+  d = {},
+  cols = 2,
+  options = [],
+  allocations = [],
+}: {
+  d?: AmpliconFieldDefaults;
+  cols?: 2 | 3;
+  options?: AllocationOption[];
+  allocations?: { investment_option_id: string; pct: number }[];
+}) {
   const [type, setType] = useState<IncomeType>(d.income_type ?? "STI");
   const [face, setFace] = useState(String(d.face_value ?? 25000));
   const [ratePct, setRatePct] = useState(String(d.interest_pct != null ? +(d.interest_pct * 100).toFixed(4) : type === "LTI" ? 4 : 8));
@@ -72,6 +83,7 @@ export default function AmpliconFields({ d = {}, cols = 2 }: { d?: AmpliconField
       <Field label={lti ? "First payment" : "Start date"}>
         <input name="start_date" type="date" required defaultValue={d.start_date?.slice(0, 10)} className={input} />
       </Field>
+      <AllocationFields options={options} initial={allocations} />
       {lti && (
         <p className="sm:col-span-full text-[11px] text-sub -mt-1">
           The projection treats this cash flow as steady for the whole term and assumes no sale value at the end. A

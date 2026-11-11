@@ -34,3 +34,28 @@ export function parseAmpliconForm(fd: FormData): AmpliconFields {
   }
   return fields;
 }
+
+// Where the face value went: up to 3 rows (alloc_option_i, alloc_pct_i in
+// whole points). Empty = not split, which the fund check counts as Default growth.
+export interface AllocationField {
+  investment_option_id: string;
+  pct: number; // decimal
+}
+
+export const MAX_ALLOCATIONS = 3;
+
+export function parseAllocations(fd: FormData): AllocationField[] {
+  const out: AllocationField[] = [];
+  for (let i = 0; i < MAX_ALLOCATIONS; i++) {
+    const id = str(fd, `alloc_option_${i}`).trim();
+    if (!id) continue;
+    const share = pct(fd, `alloc_pct_${i}`);
+    if (!(share > 0)) throw new Error("Each share must be above 0%.");
+    if (out.some((a) => a.investment_option_id === id)) throw new Error("Use each investment once.");
+    out.push({ investment_option_id: id, pct: share });
+  }
+  if (out.length > 0 && Math.abs(out.reduce((s, a) => s + a.pct, 0) - 1) > 0.0001) {
+    throw new Error("Split must add up to 100%.");
+  }
+  return out;
+}

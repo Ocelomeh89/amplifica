@@ -8,10 +8,17 @@ import AmpliconRow from "@/features/amplicons/ui/AmpliconRow";
 export default async function AmpliconsPage() {
   const { supabase } = await requireUser();
 
-  const { data: amplicons } = await supabase
-    .from("amplicons")
-    .select("*")
-    .order("start_date", { ascending: false });
+  const [{ data: amplicons }, { data: optionRows }, { data: allocRows }] = await Promise.all([
+    supabase.from("amplicons").select("*").order("start_date", { ascending: false }),
+    // Missing tables (migration 0019 not applied) read as empty: no split UI rows.
+    supabase.from("investment_options").select("id, name").order("name"),
+    supabase.from("amplicon_allocations").select("amplicon_id, investment_option_id, pct"),
+  ]);
+  const options = optionRows ?? [];
+  const allocationsOf = (id: string) =>
+    (allocRows ?? [])
+      .filter((r) => r.amplicon_id === id)
+      .map((r) => ({ investment_option_id: r.investment_option_id, pct: Number(r.pct) }));
 
   const todayMonth = new Date().toISOString().slice(0, 7);
 
@@ -19,7 +26,7 @@ export default async function AmpliconsPage() {
     <div className="max-w-5xl">
       <h1 className="text-xl font-semibold mb-4">Amplicons</h1>
 
-      <NewAmpliconForm />
+      <NewAmpliconForm options={options} />
 
       <Card>
         {!amplicons || amplicons.length === 0 ? (
@@ -71,6 +78,8 @@ export default async function AmpliconsPage() {
                     monthly={monthly}
                     endMonth={endMonth}
                     active={active}
+                    options={options}
+                    allocations={allocationsOf(a.id)}
                   />
                 );
               })}
