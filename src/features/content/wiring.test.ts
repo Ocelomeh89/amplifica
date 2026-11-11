@@ -104,6 +104,21 @@ describe("content stays owner-only", () => {
     expect(competitors).toBeLessThan(route.indexOf("runTodayCron("));
   });
 
+  it("the brand gate sweeps after the pulls and before the competitor step", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    const sweep = route.indexOf("runGateSweep(");
+    expect(sweep).toBeGreaterThan(route.indexOf("runMetricsCron("));
+    expect(sweep).toBeLessThan(route.indexOf("runCompetitorCron("));
+  });
+
+  it("every new idea is swept by the brand gate right after it is written", () => {
+    const ingest = read("src/app/api/content/ingest/route.ts");
+    expect(ingest).toContain("batch: ");
+    expect(ingest).toContain("sweepInBackground(");
+    expect(read("src/features/content/data/actions.ts")).toContain("sweepInBackground(");
+    expect(read("src/features/content/data/gate-run.ts")).not.toContain('"use server"');
+  });
+
   it("a Pass stores its reason as a note, and background helpers stay out of the 'use server' files", () => {
     expect(read("src/features/content/data/actions.ts")).toContain("recordPassNote(");
     // Every export of a "use server" file is a callable endpoint; the helper lives in a plain module.

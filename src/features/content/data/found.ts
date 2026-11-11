@@ -47,7 +47,7 @@ export interface FoundDeps {
   ingestDb: IngestDb;
 }
 
-export type FoundResult = { ok: true; count: number; sourceId: string } | { ok: false; error: string };
+export type FoundResult = { ok: true; count: number; sourceId: string; ideaIds: string[] } | { ok: false; error: string };
 
 type Resolved = {
   kind: "url" | "upload";
@@ -209,7 +209,7 @@ export async function mineFound(deps: FoundDeps, userId: string, input: FoundInp
     } catch (e) {
       console.error("found content: bookkeeping failed after ideas were written", e instanceof Error ? e.message : "unknown error");
     }
-    return { ok: true, count: written.ideas.length, sourceId: written.sources[0].id };
+    return { ok: true, count: written.ideas.length, sourceId: written.sources[0].id, ideaIds: written.ideas.map((i) => i.id) };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Something went wrong. Nothing was saved." };
   }

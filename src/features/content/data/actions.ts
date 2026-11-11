@@ -17,6 +17,7 @@ import { syncQueuedIdeasToClickUp } from "@/features/content/data/clickup";
 import { supabaseTasteDb } from "@/features/content/data/supabase-taste-db";
 import { recordPassNote } from "@/features/content/data/taste";
 import { startProposalInBackground } from "@/features/content/data/taste-run";
+import { sweepInBackground } from "@/features/content/data/gate-run";
 import { str } from "@/shared/forms";
 import { reviveFields } from "@/features/content/engine/unused";
 import { nextRank, ranksAfterMove, visibleQueue } from "@/features/content/engine/queue";
@@ -333,6 +334,8 @@ async function runFound(
   };
   const result = await mineFound(deps, userId, input);
   if (!result.ok) return { error: result.error };
+  // The ideas wait for the brand gate; they reach the Inbox once it passes them.
+  sweepInBackground(userId, result.ideaIds);
   revalidate();
   return { error: null, count: result.count };
 }

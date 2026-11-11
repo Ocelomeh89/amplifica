@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ToolCaller, ToolCallInput } from "./claude";
-import { gatePiece } from "./brand-gate";
+import { gatePiece, gateRecord } from "./brand-gate";
 
 /** Returns queued responses in order; a queued Error is thrown. */
 function scripted(responses: unknown[]): ToolCaller & { calls: ToolCallInput[] } {
@@ -77,5 +77,13 @@ describe("gatePiece", () => {
     expect((await gatePiece(scripted([{}]), piece, { rewrite: true })).status).toBe("error");
     expect((await gatePiece(scripted([fail({ rewrite }), new Error("down")]), piece, { rewrite: true })).status).toBe("error");
     expect((await gatePiece(scripted([fail({ rewrite }), {}]), piece, { rewrite: true })).status).toBe("error");
+  });
+});
+
+describe("gateRecord", () => {
+  it("is what an idea's gate column stores", () => {
+    const result = { verdict: "pass" as const, reader: "daniel" as const, pillar: "w2-advantage" as const, amplifica_pillar: "the-numbers" as const, failed: [] };
+    expect(gateRecord(result, true, new Date("2026-11-10T12:00:00Z"))).toEqual({ result, rewritten: true, checked_at: "2026-11-10T12:00:00.000Z" });
+    expect(gateRecord(result, false, new Date("2026-11-10T12:00:00Z"), "queued").prior_status).toBe("queued");
   });
 });

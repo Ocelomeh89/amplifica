@@ -4,6 +4,7 @@ import { authorizeRoutine } from "@/features/content/data/api-auth";
 import { ingestSchema } from "@/features/content/engine/schema";
 import { ingestPayload } from "@/features/content/data/ingest";
 import { supabaseIngestDb } from "@/features/content/data/supabase-db";
+import { sweepInBackground } from "@/features/content/data/gate-run";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,9 @@ export async function POST(req: Request) {
 
   try {
     const client = createAdminClient();
-    const result = await ingestPayload(supabaseIngestDb(client, owner), parsed.data, owner);
+    // One batch per ingest call: the ClickUp digest lists the batch's ideas once the gate settles them.
+    const result = await ingestPayload(supabaseIngestDb(client, owner), parsed.data, owner, undefined, { batch: crypto.randomUUID() });
+    sweepInBackground(owner, result.ideas.map((i) => i.id));
     return NextResponse.json({
       ok: true,
       sources: result.sources,

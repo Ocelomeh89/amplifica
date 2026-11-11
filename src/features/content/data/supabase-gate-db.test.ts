@@ -1,0 +1,72 @@
+import { describe, expect, it, vi } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/shared/supabase/database.types";
+import { supabaseGateDb } from "./supabase-gate-db";
+
+vi.mock("server-only", () => ({}));
+
+type Call = [string, ...unknown[]];
+
+function fakeClient(data: unknown = []) {
+  const log: Call[] = [];
+  const client = {
+    from(table: string) {
+      log.push([`${table}.from`]);
+      const b: Record<string, unknown> = {
+        then: (ok: (v: unknown) => unknown) => Promise.resolve({ data, error: null }).then(ok),
+      };
+      for (const m of ["select", "eq", "in", "is", "not", "order", "limit", "update", "maybeSingle"]) {
+        b[m] = (...args: unknown[]) => {
+          log.push([`${table}.${m}`, ...args]);
+          return b;
+        };
+      }
+      return b;
+    },
+  };
+  return { client: client as unknown as SupabaseClient<Database>, log };
+}
+
+const result = { verdict: "pass" as const, reader: "daniel" as const, pillar: "w2-advantage" as const, amplifica_pillar: "the-numbers" as const, failed: [] };
+const idea = { id: "i1", format: "reel", title: "T", hook: "H", belief_attacked: "B", value_to_listener: "V", why_it_stops: "W", outline: [{ beat: "a", note: "n" }] };
+const updates = (log: Call[]) => log.filter((c) => c[0] === "content_ideas.update").map((c) => c[1] as Record<string, unknown>);
+
+describe("supabaseGateDb", () => {
+  it("filters every read and write by the owner and only touches gating rows", async () => {
+    const { client, log } = fakeClient([{ gate_attempts: 2 }]);
+    const db = supabaseGateDb(client, "u1");
+    await db.gatingIdeas(5);
+    await db.applyPass("i1", { status: "passed", fields: {}, rewritten: false, result, original: {} }, idea);
+    await db.applyFail("i1", { status: "failed", result: { ...result, verdict: "fail" }, original: {} });
+    await db.bumpAttempt("i1", "down");
+    expect(log.filter((c) => c[0] === "content_ideas.from").length).toBe(log.filter((c) => c[0] === "content_ideas.eq" && c[1] === "user_id" && c[2] === "u1").length);
+    expect(log.filter((c) => c[0] === "content_ideas.eq" && c[1] === "status" && c[2] === "gating").length).toBe(5);
+  });
+
+  it("a plain pass sets inbox, the pillar and the gate record, and no text", async () => {
+    const { client, log } = fakeClient();
+    await supabaseGateDb(client, "u1").applyPass("i1", { status: "passed", fields: {}, rewritten: false, result, original: {} }, idea);
+    const [u] = updates(log);
+    expect(u).toMatchObject({ status: "inbox", pillar: "w2-advantage", gate: { result, rewritten: false } });
+    expect(u.hook).toBeUndefined();
+    expect(u.gate_original).toBeUndefined();
+  });
+
+  it("a rewritten pass writes the new text and keeps the original", async () => {
+    const { client, log } = fakeClient();
+    const fields = { title: "T2", hook: "H2", belief_attacked: "B2", value_to_listener: "V2", why_it_stops: "W2", outline: ["x"] };
+    await supabaseGateDb(client, "u1").applyPass("i1", { status: "passed", fields, rewritten: true, result, original: { hook: "H" } }, idea);
+    const [u] = updates(log);
+    expect(u).toMatchObject({ status: "inbox", hook: "H2", hook_alt: "H", outline: [{ beat: "x", note: "n" }], gate_original: { hook: "H" } });
+  });
+
+  it("a fail sets gate_failed and bumpAttempt increments the count", async () => {
+    const { client, log } = fakeClient([{ gate_attempts: 2 }]);
+    const db = supabaseGateDb(client, "u1");
+    await db.applyFail("i1", { status: "failed", result: { ...result, verdict: "fail" }, original: {} });
+    await db.bumpAttempt("i1", "down");
+    const [f, b] = updates(log);
+    expect(f).toMatchObject({ status: "gate_failed", gate: { prior_status: "gating" } });
+    expect(b).toEqual({ gate_attempts: 3 });
+  });
+});

@@ -4,6 +4,8 @@ import { authorizeRoutine } from "@/features/content/data/api-auth";
 import { runMetricsCron, type CronPlatform } from "@/features/content/data/metrics";
 import { supabaseMetricsDb } from "@/features/content/data/supabase-db";
 import { runCompetitorCron } from "@/features/content/data/competitor-cron";
+import { runGateSweep } from "@/features/content/data/gate-sweep";
+import { supabaseGateDb } from "@/features/content/data/supabase-gate-db";
 import { supabaseCompetitorsDb } from "@/features/content/data/supabase-competitors-db";
 import { apifyClientFromEnv } from "@/features/content/data/pulls/apify";
 import { anthropicToolCaller } from "@/features/content/data/claude";
@@ -24,6 +26,7 @@ const PLATFORMS: CronPlatform[] = ["instagram", "youtube", "beehiiv"];
 // `?platform=` narrows to one pull for a manual check. `?competitors=now` starts the
 // weekly competitor pull on any day (and runs the competitor step with `?platform=`).
 const BUDGET_SECONDS = 280;
+const GATE_SWEEP_LIMIT = 20;
 export async function GET(req: Request) {
   const startedAt = new Date();
   const auth = authorizeRoutine(req, process.env.CRON_SECRET);
@@ -46,6 +49,20 @@ export async function GET(req: Request) {
 
   try {
     const report = await runMetricsCron({ db: supabaseMetricsDb(createAdminClient(), owner), userId: owner, now: new Date(), pulls });
+    // The brand gate releases any idea still waiting (a background sweep that died, or an API
+    // outage). Before the competitor step and Today, so a released idea can be briefed today.
+    let gate: Awaited<ReturnType<typeof runGateSweep>> | { error: string } | null = null;
+    if (!only) {
+      try {
+        gate = await runGateSweep(supabaseGateDb(createAdminClient(), owner), anthropicToolCaller({ timeoutMs: 60_000, maxRetries: 0 }), {
+          limit: GATE_SWEEP_LIMIT,
+          timeLeft: () => BUDGET_SECONDS - (Date.now() - startedAt.getTime()) / 1000,
+        });
+      } catch (e) {
+        console.error("content gate sweep failed", e);
+        gate = { error: (e as Error).message };
+      }
+    }
     // Competitor posts are collected and tagged before Today so a fresh one can take slot 2.
     // Like Today, a failure here never fails the metrics run.
     let competitors: Awaited<ReturnType<typeof runCompetitorCron>> | { error: string } | null = null;
@@ -78,7 +95,7 @@ export async function GET(req: Request) {
       console.error("content today cron failed", e);
       today = { error: (e as Error).message };
     }
-    return NextResponse.json({ ...report, competitors, today }, { status: report.ok ? 200 : 500 });
+    return NextResponse.json({ ...report, gate, competitors, today }, { status: report.ok ? 200 : 500 });
   } catch (e) {
     console.error("content metrics cron failed", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

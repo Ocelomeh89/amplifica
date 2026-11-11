@@ -32,7 +32,7 @@ describe("FoundSourcesList", () => {
     const fd = regenerateFound.mock.calls[0][0];
     expect(fd.get("id")).toBe("s1");
     expect(fd.get("angle")).toBe("twist");
-    await waitFor(() => expect(screen.getByText("3 ideas added to the Inbox.")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("3 ideas written. They reach the Inbox once they pass the brand check.")).toBeInTheDocument());
   });
   it("labels an allowed (unmined) source as queued", () => {
     render(

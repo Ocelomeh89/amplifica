@@ -65,3 +65,10 @@ export async function gatePiece(caller: ToolCaller, piece: { format: string; fie
     return { status: "error", error: message(e) };
   }
 }
+
+export type GateRecord = { result: GateResult; rewritten: boolean; checked_at: string; prior_status?: string };
+
+/** What an idea's `gate` column stores. */
+export function gateRecord(result: GateResult, rewritten: boolean, now: Date, priorStatus?: string): GateRecord {
+  return { result, rewritten, checked_at: now.toISOString(), ...(priorStatus ? { prior_status: priorStatus } : {}) };
+}
