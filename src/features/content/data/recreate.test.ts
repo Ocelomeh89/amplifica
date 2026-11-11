@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MissingApiKeyError, type ToolCaller } from "./claude";
+import { withGatePass } from "./gate.fake";
 import {
   pickOption,
   regenerate,
@@ -101,7 +102,7 @@ function fakeDb(opts: { ctx?: RecreateContext | null; tagged?: boolean; insertFa
   return db;
 }
 
-const caller = (raw: unknown): ToolCaller => ({ call: async () => raw });
+const caller = (raw: unknown): ToolCaller => withGatePass({ call: async () => raw });
 const readyRow = async (db: ReturnType<typeof fakeDb>, mode: RecreateMode = "same-recipe") => {
   const s = await startRecreation(db, POST, mode, NOW);
   if (!s.ok) throw new Error("start failed");
@@ -205,7 +206,7 @@ describe("pickOption", () => {
     const r = await pickOption(db, id, 1, NOW);
     expect(r).toEqual({ ideaId: "idea1" });
     const idea = recreatedIdeaSchema.parse(db.ideas[0]);
-    expect(idea).toMatchObject({ format: "reel", score: 1, hook: "Hook b", source_post_id: POST, batch_date: "2026-10-26", pillar: "method" });
+    expect(idea).toMatchObject({ format: "reel", score: 1, hook: "Hook b", source_post_id: POST, batch_date: "2026-10-26", pillar: "w2-advantage" });
     expect(db.rows.find((x) => x.id === id)).toMatchObject({ status: "picked", idea_id: "idea1" });
   });
 
@@ -284,5 +285,34 @@ describe("regenerate", () => {
     const s = await startRecreation(db, POST, "same-recipe", NOW);
     if (!s.ok) throw new Error("x");
     expect(await regenerate(db, s.id, NOW)).toMatchObject({ ok: false }); // still pending
+  });
+});
+
+describe("the brand gate on Recreate", () => {
+  const failV = { verdict: "fail", reader: null, pillar: null, amplifica_pillar: null, failed: [{ item: "situation", reason: "Vague." }] };
+
+  it("keeps only the options that pass", async () => {
+    const db = fakeDb();
+    const s = await startRecreation(db, POST, "same-recipe", NOW);
+    if (!s.ok) throw new Error("start failed");
+    await runRecreation(db, withGatePass({ call: async () => ({ options: OPTIONS }) }, (t) => (t.includes("Hook b") ? undefined : failV)), s.id, NOW);
+    const row = db.rows.find((r) => r.id === s.id)!;
+    expect(row.status).toBe("ready");
+    expect(row.options.map((o) => o.topic)).toEqual(["b"]);
+  });
+
+  it("fails with the exact copy when none pass", async () => {
+    const db = fakeDb();
+    const s = await startRecreation(db, POST, "same-recipe", NOW);
+    if (!s.ok) throw new Error("start failed");
+    await runRecreation(db, withGatePass({ call: async () => ({ options: OPTIONS }) }, () => failV), s.id, NOW);
+    expect(db.rows.find((r) => r.id === s.id)).toMatchObject({ status: "failed", error: "None of the options met the brand standard." });
+  });
+
+  it("a picked option inserts its idea with the gate record and pillar", async () => {
+    const db = fakeDb();
+    const id = await readyRow(db);
+    await pickOption(db, id, 0, NOW);
+    expect(db.ideas[0]).toMatchObject({ pillar: "w2-advantage", gate: { result: { verdict: "pass" } } });
   });
 });

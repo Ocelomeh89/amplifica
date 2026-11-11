@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ToolCaller, ToolCallInput } from "./claude";
-import { gatePiece, gateRecord } from "./brand-gate";
+import { gateOptions, gatePiece, gateRecord } from "./brand-gate";
+import { withGatePass } from "./gate.fake";
 
 /** Returns queued responses in order; a queued Error is thrown. */
 function scripted(responses: unknown[]): ToolCaller & { calls: ToolCallInput[] } {
@@ -85,5 +86,16 @@ describe("gateRecord", () => {
     const result = { verdict: "pass" as const, reader: "daniel" as const, pillar: "w2-advantage" as const, amplifica_pillar: "the-numbers" as const, failed: [] };
     expect(gateRecord(result, true, new Date("2026-11-10T12:00:00Z"))).toEqual({ result, rewritten: true, checked_at: "2026-11-10T12:00:00.000Z" });
     expect(gateRecord(result, false, new Date("2026-11-10T12:00:00Z"), "queued").prior_status).toBe("queued");
+  });
+});
+
+describe("gateOptions", () => {
+  const failV = { verdict: "fail", reader: null, pillar: null, amplifica_pillar: null, failed: [{ item: "reader", reason: "Nobody." }] };
+  it("keeps the options that pass with their result attached and drops fails and errors", async () => {
+    const c = withGatePass({ call: async () => ({}) }, (text) => (text.includes("bad") ? failV : text.includes("boom") ? new Error("down") : undefined));
+    const out = await gateOptions(c, [{ hook: "good" }, { hook: "bad" }, { hook: "boom" }], (o) => ({ hook: o.hook }), "reel");
+    expect(out.map((o) => o.hook)).toEqual(["good"]);
+    expect(out[0].gate).toMatchObject({ verdict: "pass", pillar: "w2-advantage" });
+    expect(c.gateCalls).toHaveLength(3);
   });
 });

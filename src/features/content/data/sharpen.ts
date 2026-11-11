@@ -11,6 +11,18 @@ import {
 } from "@/features/content/engine/sharpen";
 import { NOTE_TEXT_MAX, SHARPEN_CHIPS, SHARPEN_DAILY_CAP, type SharpenStatus } from "@/features/content/engine/taste";
 import type { ToolCaller } from "./claude";
+import { gateColumns, gateOptions } from "./brand-gate";
+
+export const NO_BRAND_REWRITE = "None of the rewrites met the brand standard.";
+
+const sharpenGateFields = (o: SharpenOption) => ({
+  title: o.title,
+  hook: o.hook,
+  belief_attacked: o.belief_attacked,
+  value_to_listener: o.value_to_listener,
+  why_it_stops: o.why_it_stops,
+  outline: o.outline,
+});
 import { chicagoDayStart } from "./recreate";
 
 // Sharpen, behind an interface so every branch is testable without a database: start a
@@ -49,7 +61,7 @@ export interface SharpenDb {
   /** pending, ready or failed to discarded. False when it was none of those. */
   discard(id: string): Promise<boolean>;
   /** Rewrites the idea only while it is still inbox or queued; false when no row matched. */
-  patchIdea(id: string, patch: ReturnType<typeof sharpenIdeaPatch>): Promise<boolean>;
+  patchIdea(id: string, patch: ReturnType<typeof sharpenIdeaPatch> & ReturnType<typeof gateColumns>): Promise<boolean>;
   activeRules(): Promise<string[]>;
 }
 
@@ -118,7 +130,10 @@ export async function runSharpen(db: SharpenDb, caller: ToolCaller, id: string):
     });
     const parsed = sharpenOutputSchema.safeParse(raw);
     if (!parsed.success) return fail(parsed.error.issues.map((i) => i.message).join(" "));
-    await db.finish(id, { status: "ready", options: parsed.data.options });
+    // The brand gate: a rewrite that misses the standard is dropped, never shown.
+    const kept = await gateOptions(caller, parsed.data.options, sharpenGateFields, idea.format);
+    if (kept.length === 0) return fail(NO_BRAND_REWRITE);
+    await db.finish(id, { status: "ready", options: kept });
   } catch (e) {
     await fail(message(e));
   }
@@ -139,7 +154,7 @@ export async function pickSharpen(db: SharpenDb, id: string, index: number): Pro
     }
     const option = row.options[index];
     if (!option) throw new Error("missing option");
-    if (!(await db.patchIdea(idea.id, sharpenIdeaPatch(option, idea.hook)))) throw new Error("idea not written");
+    if (!(await db.patchIdea(idea.id, { ...sharpenIdeaPatch(option, idea.hook), ...gateColumns(option.gate, new Date()) }))) throw new Error("idea not written");
     return { ideaId: idea.id, queued: idea.status === "queued" };
   } catch {
     await db.unclaim(id).catch(() => undefined);

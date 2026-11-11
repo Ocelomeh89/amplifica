@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { BRAND_CONTEXT, IDEAS_PROMPT } from "./prompts/ideas";
+import type { GateResult } from "./brand";
 import { PILLAR_MESSAGES, between } from "./recreate";
 import { HOOK_TYPES, type HookType } from "./tags";
 
@@ -33,6 +34,8 @@ export type SharpenOption = {
   why_it_stops: string;
   outline: string[];
   what_changed: string;
+  /** The brand gate's verdict on this rewrite (passed options only). */
+  gate?: GateResult;
 };
 
 const text = (max: number) => z.string().trim().min(1).max(max);

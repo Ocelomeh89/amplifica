@@ -2,7 +2,7 @@ import { z } from "zod";
 import { BRAND_CONTEXT, IDEAS_PROMPT } from "./prompts/ideas";
 import { ingestIdeaSchema } from "./schema";
 import { HOOK_TYPES, MESSAGES, type PostTags } from "./tags";
-import { PILLARS } from "./brand";
+import { PILLARS, type GateResult } from "./brand";
 import type { WinnerInsights } from "./winners";
 
 // Slice 3: Recreate. A source post becomes 3 hook-and-angle options; the picked
@@ -24,7 +24,8 @@ export const MODE_LABEL: Record<RecreateMode, string> = {
   adjacent: "Adjacent topic",
 };
 
-export type RecreateOption = { hook: string; angle: string; topic: string; message: string };
+/** `gate` is the brand gate's verdict, on options that passed it. */
+export type RecreateOption = { hook: string; angle: string; topic: string; message: string; gate?: GateResult };
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 const blankOrNone = (m: string) => m === "" || m === "none";

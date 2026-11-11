@@ -72,3 +72,20 @@ export type GateRecord = { result: GateResult; rewritten: boolean; checked_at: s
 export function gateRecord(result: GateResult, rewritten: boolean, now: Date, priorStatus?: string): GateRecord {
   return { result, rewritten, checked_at: now.toISOString(), ...(priorStatus ? { prior_status: priorStatus } : {}) };
 }
+
+/**
+ * Checks each option once (no rewrite: they already are rewrites), in parallel, and keeps the ones
+ * that pass with their result attached. A fail or a gate error drops the option.
+ */
+export async function gateOptions<T>(caller: ToolCaller, options: T[], fieldsOf: (o: T) => GateFields, format: string): Promise<(T & { gate: GateResult })[]> {
+  const outcomes = await Promise.all(options.map((o) => gatePiece(caller, { format, fields: fieldsOf(o) }, { rewrite: false })));
+  return options.flatMap((o, k) => {
+    const r = outcomes[k];
+    return r.status === "passed" ? [{ ...o, gate: r.result }] : [];
+  });
+}
+
+/** The idea columns a picked, gated option writes. */
+export function gateColumns(gate: GateResult | undefined, now: Date): { gate?: GateRecord; pillar?: string } {
+  return gate ? { gate: gateRecord(gate, false, now), pillar: gate.pillar ?? undefined } : {};
+}

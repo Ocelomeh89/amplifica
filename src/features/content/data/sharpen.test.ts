@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { ToolCaller } from "./claude";
 import { cancelSharpen, pickSharpen, retrySharpen, runSharpen, sharpenBlock, startSharpen } from "./sharpen";
 import { NOW, fakeSharpenDb, option, sharpIdea } from "./sharpen.fake";
+import { withGatePass } from "./gate.fake";
 import { SHARPEN_DAILY_CAP } from "@/features/content/engine/taste";
 
 const caller = (out: unknown): ToolCaller & { calls: { system: string; text: string }[] } => {
   const calls: { system: string; text: string }[] = [];
-  return { calls, call: async (input) => (calls.push(input as never), out) };
+  return withGatePass({ calls, call: async (input) => (calls.push(input as never), out) });
 };
 const good = { options: [option(1), option(2), option(3)] };
 const start = (f: ReturnType<typeof fakeSharpenDb>, chips = ["Hook too weak"], text = "") => startSharpen(f.db, "i1", { chips, text }, NOW);
@@ -187,5 +188,38 @@ describe("sharpenBlock", () => {
     expect(sharpenBlock(sharpIdea())).toBeNull();
     expect(sharpenBlock(null)).toBe("That idea was not found.");
     expect(sharpenBlock(sharpIdea("i1", { status: "queued" }))).toBeNull();
+  });
+});
+
+describe("the brand gate on Sharpen", () => {
+  const failV = { verdict: "fail", reader: null, pillar: null, amplifica_pillar: null, failed: [{ item: "reader", reason: "Nobody." }] };
+
+  it("keeps only the rewrites that pass, each with its gate result", async () => {
+    const f = fakeSharpenDb();
+    const t = await start(f);
+    if (!t.ok) throw new Error("start failed");
+    const c = withGatePass({ call: async () => good }, (text) => (text.includes("Hook 2") ? undefined : failV));
+    await runSharpen(f.db, c, t.id);
+    expect(f.rows[0].status).toBe("ready");
+    expect(f.rows[0].options.map((o) => o.hook)).toEqual(["Hook 2"]);
+    expect((f.rows[0].options[0] as { gate?: { pillar: string } }).gate?.pillar).toBe("w2-advantage");
+  });
+
+  it("fails with the exact copy when no rewrite passes, keeping the note", async () => {
+    const f = fakeSharpenDb();
+    const t = await start(f);
+    if (!t.ok) throw new Error("start failed");
+    await runSharpen(f.db, withGatePass({ call: async () => good }, () => failV), t.id);
+    expect(f.rows[0]).toMatchObject({ status: "failed", error: "None of the rewrites met the brand standard." });
+    expect(f.notes).toHaveLength(1);
+  });
+
+  it("a picked rewrite writes the gate record and its pillar to the idea", async () => {
+    const f = fakeSharpenDb();
+    const t = await start(f);
+    if (!t.ok) throw new Error("start failed");
+    await runSharpen(f.db, caller(good), t.id);
+    await pickSharpen(f.db, t.id, 0);
+    expect(f.calls.patches[0]).toMatchObject({ pillar: "w2-advantage", gate: { result: { verdict: "pass" }, rewritten: false } });
   });
 });

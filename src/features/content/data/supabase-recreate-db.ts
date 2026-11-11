@@ -123,6 +123,7 @@ export function supabaseRecreateDb(client: Client, userId: string): RecreateDb {
           batch_date: idea.batch_date,
           status: "inbox",
           source_post_id: idea.source_post_id,
+          ...(idea.gate ? { gate: idea.gate as unknown as Json } : {}),
         })
         .select("id");
       if (error) throw new Error(`recreate idea: ${error.message}`);
