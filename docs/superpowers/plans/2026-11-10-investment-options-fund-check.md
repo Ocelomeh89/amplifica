@@ -312,3 +312,29 @@ export function parseAllocations(fd: FormData): AllocationField[]; // fields all
 - [ ] **Step 2:** Run `pnpm test && pnpm typecheck && pnpm build`. Expected: all pass. `git diff main --stat -- src/shared/finance/projection-sim.ts src/shared/finance/sim-*.ts src/shared/finance/projection.ts src/shared/finance/projection-fi.ts src/shared/finance/dashboard-seed.ts src/shared/finance/amortization.ts src/features/dashboard/projection.ts src/features/compare src/features/simulator` prints nothing.
 - [ ] **Step 3: Commit** `docs: investment options and the fund check`
 - [ ] **Step 4:** Leave the branch for Miguel. Don't push, open a PR or apply the migration without his go-ahead.
+
+---
+
+## Revision 2026-11-10b
+
+Spec: the "Revision 2026-11-10b" section of the spec. Migration 0019 has not been applied anywhere, so it is edited in place.
+
+### Task 10: Migration revision
+- `0019`: add `unique (id, user_id)` on `investment_options` and (via `alter table public.amplicons add constraint amplicons_id_user_id_key unique (id, user_id)`) on `amplicons`. Composite FKs `(x_id, user_id)` on versions, allocations, moves, check-ins. A new `amplicon_splits(id, user_id, amplicon_id, created_at)` with `(amplicon_id, user_id) → amplicons on delete cascade`. `amplicon_allocations.split_id` replaces `amplicon_id`. Splits and allocations are select/insert only. Moves and check-ins are select/insert/update, plus `stranded_at timestamptz`. `save_amplicon_split(p_amplicon_id uuid, p_allocations jsonb) returns uuid`, `security invoker`.
+- Tests: in `0019_investment_options.test.ts`, 6 tables; composite FKs present; no delete policy on splits, allocations, moves or check-ins; the function is `security invoker`; the only alter on an existing table is the amplicons unique constraint.
+
+### Task 11: Engine — stranding and "worse"
+- In `fund-check.ts`: `FundMove.stranded?: boolean` (the destination becomes Default growth); `FundCheckin.stranded?: boolean` (after the rescale, the whole holding moves to Default growth); `FundCheckin.id?: string`. `isWorse(before, after): boolean`, where status ranks ok 0 < runs-out 1 < short-now 2, and an earlier `runOutMonth` at equal rank is worse.
+- Tests: a stranded move ends up in Default growth (status "ok" where the unstranded move to rent6 runs out); a stranded check-in empties the holding into Default growth; `isWorse` table.
+
+### Task 12: Data — split versions, strand actions, preview
+- `amplicons/data/allocations.ts`: `saveSplit(supabase, ampliconId, allocs)` → RPC `save_amplicon_split`; a no-op when equal to the current version (pure `sameSplit(a, b)`, tested); a no-op on a missing function or table when `allocs` is empty. `restoreSplit(fd)` action. `duplicateAmplicon` copies the current version.
+- `investments`: `strandFundMove`, `strandCheckin` (update `stranded_at`, only where null) replace the delete actions; `previewOptionEdit` returns `{ worse, status, runOutMonth }`. The loader reads the current split per Amplicon, plus stranded flags and check-in ids; usage counts allocation rows across all versions.
+
+### Task 13: UI
+- AmpliconRow: Undo (when there are ≥ 2 versions) and History (each version's date and summary, with Restore).
+- MovesCard / new CheckinsCard: delete → inline confirmation "This can't be undone. The money stays out of {source} and moves to Default growth." Stranded rows are shown muted.
+- OptionForm: "Save anyway" only when `worse`.
+
+### Task 14: Local Supabase
+- Outside the repo: `../amplifica-local-db` (Supabase CLI project). A script copies `supabase/migrations/*.sql` with sequential version prefixes (the repo has duplicate `0008`–`0018` prefixes the CLI rejects). `supabase start`. The worktree gets an untracked `.env.development.local` pointing at it.

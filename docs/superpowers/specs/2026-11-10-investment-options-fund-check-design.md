@@ -208,3 +208,14 @@ This is a new pure module in `shared/finance/`, so it gets the same no-I/O and b
 
 - Feeding fund surplus into the flywheel projection (a math change, so it needs Miguel's sign-off).
 - Volatility or stress scenarios for appreciation holdings.
+
+## Revision 2026-11-10b (decided by Miguel after the first build)
+
+1. **Split history with undo.** A split is never deleted or overwritten. Every save is a new version (`amplicon_splits` header + `amplicon_allocations` rows), written atomically by the `save_amplicon_split` database function. A version with no rows means Default growth. Saving a split identical to the current one writes nothing. **Undo** restores the previous version, and **History** can restore any version, by saving it again as a new version. The fund check uses the current version for the Amplicon's whole life.
+2. **Per user, enforced in the database.** Composite foreign keys on `(id, user_id)` ensure every version, split, allocation, move and check-in points only at the same user's options and Amplicons. Splits and allocations are insert-only (no update or delete policy). Because history keeps every option a split ever used, an option that has appeared in any split version can't be deleted.
+3. **Warn only if it gets worse.** The edit preview runs the fund check with and without the edit. "Save anyway" appears only when the edit makes the status worse (ok → runs out → short this month), or brings the run-out month earlier.
+4. **Deleting a move or check-in strands the money in Default growth.** Nothing is deleted: the row gets `stranded_at`.
+   - **Stranded move:** the amount still leaves the source in its month and lands in Default growth.
+   - **Stranded check-in:** the holding is still set to the checked-in value in that month, then its whole value moves to Default growth.
+   - The UI asks first: "This can't be undone." Stranded rows stay listed, marked.
+5. **Local testing.** A local Supabase (Docker) with migrations 0001–0019, so the branch can be exercised without touching production.
