@@ -57,7 +57,16 @@ const textOf = (f: GateFields) => Object.values(f).map((v) => (Array.isArray(v) 
 const FIGURE = /(?<![A-Za-z-])\$?\d(?:[\d,.]*\d)?(?:%|k\b|x\b)?(?![\d(]|k\))/gi;
 const NOT_FIGURES = new Set(["401k", "1099"]);
 const norm = (t: string) => t.toLowerCase().replace(/,/g, "");
-const figuresIn = (text: string) => (text.match(FIGURE) ?? []).map((t) => t.replace(/\.$/, "")).filter((t) => !NOT_FIGURES.has(norm(t)));
+/**
+ * A figure is money, a rate, a multiple, or a number written with a comma, a decimal or four or more
+ * digits (years like 2026 excepted). Bare small numbers are step counts and list numbers, not claims.
+ */
+const isFigure = (t: string) => {
+  if (/[$%]|k$|x$/i.test(t) || /[,.]/.test(t)) return true;
+  return /^\d{4,}$/.test(t) && !/^(19|20)\d\d$/.test(t);
+};
+const figuresIn = (text: string) =>
+  (text.match(FIGURE) ?? []).map((t) => t.replace(/\.$/, "")).filter((t) => !NOT_FIGURES.has(norm(t)) && isFigure(t));
 
 /** Figures a rewrite added that neither the original nor Miguel's verified figures contain. */
 export function addedFigures(original: GateFields, rewritten: GateFields): string[] {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ToolCaller, ToolCallInput } from "./claude";
-import { gateOptions, gatePiece, gateRecord } from "./brand-gate";
+import { addedFigures, gateOptions, gatePiece, gateRecord } from "./brand-gate";
 import { withGatePass } from "./gate.fake";
 
 /** Returns queued responses in order; a queued Error is thrown. */
@@ -59,6 +59,12 @@ describe("gatePiece", () => {
     const o = await gatePiece(c, piece, { rewrite: true });
     expect(o.status).toBe("failed");
     if (o.status === "failed") expect(o.result.failed).toContainEqual({ item: "guardrails", reason: "The rewrite adds figures the original did not have: $40k, 9%." });
+  });
+
+  it("does not count step numbers, counts or years as figures; money, rates and multiples still count", () => {
+    const original = { hook: "Pay down the card first" };
+    expect(addedFigures(original, { hook: "Step 4 of 5: give it 3 weeks and 30 years, as in 2026" })).toEqual([]);
+    expect(addedFigures(original, { hook: "A $40k HELOC at 9.5% is 3x the 1,200 you pay" })).toEqual(["$40k", "9.5%", "3x", "1,200"]);
   });
 
   it("does not count account and form names like 401k or W-2 as figures", async () => {
