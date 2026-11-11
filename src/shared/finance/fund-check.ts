@@ -5,7 +5,8 @@
 // monthlyPayoutOf / isActiveAt the dashboard uses and changes no engine number.
 
 import { monthlyPayment } from "./amortization";
-import { monthsBetween, type YearMonth } from "./dates";
+import { addMonths, monthsBetween, type YearMonth } from "./dates";
+import { isActiveAt, monthlyPayoutOf, type AmpliconLite } from "./projection";
 
 export type OptionType = "amortized" | "interest_only" | "appreciation";
 
@@ -92,4 +93,225 @@ export function stepLot(lot: Lot, terms: OptionTerms, month: YearMonth): { cash:
   const pay = monthlyPayment(lot.principal, terms.ratePct, term - k + 1);
   lot.principal -= pay - lot.principal * r;
   return { cash: pay, closed: false };
+}
+
+// --- The monthly replay -------------------------------------------------------
+
+export interface Allocation {
+  optionId: string;
+  pct: number; // decimal
+}
+
+// A tracked Amplicon plus where its face value went. No allocations = 100% Default growth.
+export interface FundAmplicon extends AmpliconLite {
+  allocations: Allocation[];
+}
+
+export interface FundMove {
+  id: string;
+  fromId: string; // DEFAULT_GROWTH_ID for Default growth
+  toId: string;
+  amount: number;
+  month: YearMonth;
+}
+
+export interface FundCheckin {
+  optionId: string;
+  value: number;
+  month: YearMonth;
+}
+
+export interface FundCheckInput {
+  amplicons: FundAmplicon[];
+  options: FundOption[];
+  moves: FundMove[];
+  checkins: FundCheckin[];
+  today: YearMonth;
+}
+
+export interface FundMonth {
+  month: YearMonth;
+  income: number;
+  payments: number;
+  soldToCover: number;
+  uncovered: number;
+  liquidValue: number;
+  illiquidValue: number;
+}
+
+export type FundStatus = "ok" | "short-now" | "runs-out";
+
+export interface FundCheckResult {
+  status: FundStatus;
+  runOutMonth: YearMonth | null; // first month after today with an uncovered payment
+  liquidToday: number;
+  liquidAtEnd: number;
+  endMonth: YearMonth | null; // last month any Amplicon pays
+  unallocatedCount: number;
+  cappedMoveIds: string[];
+  holdingsToday: Record<string, number>; // option id (incl. DEFAULT_GROWTH_ID) → total principal
+  months: FundMonth[];
+}
+
+// Below half a cent a shortfall is float noise, not a missed payment.
+const EPS = 0.005;
+
+function totalOf(lots: Lot[]): number {
+  let t = 0;
+  for (const l of lots) t += l.principal;
+  return t;
+}
+
+// Take `amount` out of a holding, proportionally across its lots; returns what was taken.
+function takeFrom(lots: Lot[], amount: number): number {
+  const total = totalOf(lots);
+  if (total <= 0 || amount <= 0) return 0;
+  const taken = Math.min(amount, total);
+  const keep = (total - taken) / total;
+  for (const l of lots) l.principal *= keep;
+  return taken;
+}
+
+export function runFundCheck(input: FundCheckInput): FundCheckResult {
+  const { amplicons, moves, checkins, today } = input;
+  const options = new Map<string, FundOption>();
+  options.set(DEFAULT_GROWTH_ID, DEFAULT_GROWTH);
+  for (const o of input.options) options.set(o.id, o);
+  const unallocatedCount = amplicons.filter((a) => a.allocations.length === 0).length;
+
+  if (amplicons.length === 0) {
+    return {
+      status: "ok",
+      runOutMonth: null,
+      liquidToday: 0,
+      liquidAtEnd: 0,
+      endMonth: null,
+      unallocatedCount,
+      cappedMoveIds: [],
+      holdingsToday: {},
+      months: [],
+    };
+  }
+
+  let firstMonth = addMonths(amplicons[0].startMonth, -1);
+  let endMonth = addMonths(amplicons[0].startMonth, amplicons[0].termMonths - 1);
+  for (const a of amplicons) {
+    const draw = addMonths(a.startMonth, -1);
+    const last = addMonths(a.startMonth, a.termMonths - 1);
+    if (draw < firstMonth) firstMonth = draw;
+    if (last > endMonth) endMonth = last;
+  }
+
+  const holdings = new Map<string, Lot[]>();
+  for (const id of options.keys()) holdings.set(id, []);
+  const lotsOf = (id: string): Lot[] => {
+    let lots = holdings.get(id);
+    if (!lots) {
+      lots = [];
+      holdings.set(id, lots);
+    }
+    return lots;
+  };
+  const termsFor = (id: string, m: YearMonth): OptionTerms => termsAt(options.get(id) ?? DEFAULT_GROWTH, m);
+
+  // A move dated before the fund exists has nothing to move.
+  const cappedMoveIds: string[] = moves.filter((mv) => mv.month < firstMonth).map((mv) => mv.id);
+
+  const months: FundMonth[] = [];
+  let holdingsToday: Record<string, number> = {};
+  const n = monthsBetween(firstMonth, endMonth);
+  for (let i = 0; i <= n; i++) {
+    const m = addMonths(firstMonth, i);
+
+    // 1. Deposits: each Amplicon is drawn the month before its first payment.
+    for (const a of amplicons) {
+      if (addMonths(a.startMonth, -1) !== m) continue;
+      const allocs = a.allocations.length > 0 ? a.allocations : [{ optionId: DEFAULT_GROWTH_ID, pct: 1 }];
+      for (const al of allocs) lotsOf(al.optionId).push({ principal: a.faceValue * al.pct, startMonth: m });
+    }
+
+    // 2. Moves: capped at the source's balance; an illiquid source can't be sold.
+    for (const mv of moves) {
+      if (mv.month !== m) continue;
+      const src = lotsOf(mv.fromId);
+      const available = termsFor(mv.fromId, m).liquid ? totalOf(src) : 0;
+      if (mv.amount > available + EPS) cappedMoveIds.push(mv.id);
+      const moved = takeFrom(src, Math.min(mv.amount, available));
+      if (moved > 0) lotsOf(mv.toId).push({ principal: moved, startMonth: m });
+    }
+
+    // 3. Growth and income.
+    let income = 0;
+    for (const [id, lots] of holdings) {
+      const t = termsFor(id, m);
+      for (const lot of lots) {
+        const step = stepLot(lot, t, m);
+        income += step.cash;
+      }
+      holdings.set(id, lots.filter((l) => l.principal > 0 || monthsBetween(l.startMonth, m) <= 0));
+    }
+
+    // 4. Check-ins replace the derived value.
+    for (const c of checkins) {
+      if (c.month !== m) continue;
+      const lots = lotsOf(c.optionId);
+      const total = totalOf(lots);
+      if (total > 0) {
+        const f = c.value / total;
+        for (const l of lots) l.principal *= f;
+      } else if (c.value > 0) {
+        lots.push({ principal: c.value, startMonth: m });
+      }
+    }
+
+    // 5. Payments: income first, then sell liquid holdings, lowest rate first.
+    let payments = 0;
+    for (const a of amplicons) if (isActiveAt(a, m)) payments += monthlyPayoutOf(a);
+    let shortfall = Math.max(payments - income, 0);
+    let soldToCover = 0;
+    if (shortfall > 0) {
+      const sellable = [...holdings.keys()]
+        .filter((id) => termsFor(id, m).liquid)
+        .sort((x, y) => termsFor(x, m).ratePct - termsFor(y, m).ratePct || (x < y ? -1 : x > y ? 1 : 0));
+      for (const id of sellable) {
+        if (shortfall <= 0) break;
+        const sold = takeFrom(lotsOf(id), shortfall);
+        soldToCover += sold;
+        shortfall -= sold;
+      }
+    }
+
+    // 6. Record.
+    let liquidValue = 0;
+    let illiquidValue = 0;
+    const byOption: Record<string, number> = {};
+    for (const [id, lots] of holdings) {
+      const v = totalOf(lots);
+      if (v > 0) byOption[id] = v;
+      if (termsFor(id, m).liquid) liquidValue += v;
+      else illiquidValue += v;
+    }
+    months.push({ month: m, income, payments, soldToCover, uncovered: shortfall, liquidValue, illiquidValue });
+    if (m === today) holdingsToday = byOption;
+    if (i === n && today > endMonth) holdingsToday = byOption;
+  }
+
+  // Past months only build today's balances; their shortfalls are never reported.
+  const now = months.find((mo) => mo.month === today);
+  const ahead = months.find((mo) => mo.month > today && mo.uncovered > EPS);
+  const status: FundStatus = now && now.uncovered > EPS ? "short-now" : ahead ? "runs-out" : "ok";
+  const last = months[months.length - 1];
+  const liquidToday = today < firstMonth ? 0 : now ? now.liquidValue : last.liquidValue;
+
+  return {
+    status,
+    runOutMonth: status === "runs-out" && ahead ? ahead.month : null,
+    liquidToday,
+    liquidAtEnd: last.liquidValue,
+    endMonth,
+    unallocatedCount,
+    cappedMoveIds,
+    holdingsToday,
+    months,
+  };
 }
