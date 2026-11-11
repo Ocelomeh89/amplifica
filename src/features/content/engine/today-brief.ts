@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { HELD_STILL, VARIABLE_LABEL, valueLabel, type Control, type Test } from "./experiments";
-import { CONTENT_POSITIONING, IDEAS_PROMPT } from "./prompts/ideas";
-import { CANON_MESSAGES, between } from "./recreate";
+import { BRAND_CONTEXT, IDEAS_PROMPT } from "./prompts/ideas";
+import { PILLAR_MESSAGES, between } from "./recreate";
 import { ingestIdeaSchema } from "./schema";
 import { HOOK_TYPES, MESSAGES } from "./tags";
 
@@ -53,7 +53,7 @@ export function briefToolSchema(): Record<string, unknown> {
             title: { type: "string", description: "A short working title for the Reel." },
             hook: { type: "string", description: `The first line the audience sees or hears, under ${HOOK_MAX} characters.` },
             say: { type: "array", items: { type: "string" }, description: `${SAY_MIN} to ${SAY_MAX} short lines, beat by beat.` },
-            message: { type: "string", enum: [...MESSAGES], description: "The canon argument this Reel makes." },
+            message: { type: "string", enum: [...MESSAGES], description: "The personal pillar this Reel serves." },
           },
           required: ["slot", "title", "hook", "say", "message"],
         },
@@ -68,7 +68,7 @@ const BRIEF_RULES = `
 
 Call the tool with one brief for each slot you are given. Each brief has a title, a
 hook (the first line, under ${HOOK_MAX} characters), ${SAY_MIN} to ${SAY_MAX} lines on what to say, and a message
-(one canon argument). Write the lines for the form in the slot's recipe: spoken beats
+(the personal pillar it serves). Write the lines for the form in the slot's recipe: spoken beats
 when Miguel is on camera, on-screen cards when it is words over footage, an animation
 or a screen recording. Change only the variable the slot tests; every other recipe
 choice stays as given. Never repeat a recent hook or one of his best hooks. Hooks
@@ -78,18 +78,18 @@ follow the rules above; no return promises, no hype.
 
 Some slots carry another creator's popular post. Never reuse its hook wording or script:
 answer it, do not restate it. A rebuttal opens on the belief and Miguel's counter, in his
-canon where one fits. A format test describes the format concretely enough to film: the
+pillars where one fits. A format test describes the format concretely enough to film: the
 shots, the on-screen text and the pacing.
 `.trim();
 
 export function briefSystemPrompt(approvedRules: string[] = []): string {
   const rules = between(IDEAS_PROMPT, "## What makes an idea good here", "## Ranking and dedupe");
-  const approved = approvedRules.length > 0 ? [["## Miguel's approved rules", ...approvedRules.map((r) => `- ${r}`)].join("\n")] : [];
+  const approved = approvedRules.length > 0 ? [["## Miguel's approved rules", "If a taste rule conflicts with the brand, the brand wins.", ...approvedRules.map((r) => `- ${r}`)].join("\n")] : [];
   return [
     "You write Miguel Graf's morning briefs. Each brief is one Instagram Reel that tests exactly one choice against the recipe that already works for him.",
-    CONTENT_POSITIONING.trim(),
+    BRAND_CONTEXT,
     rules,
-    CANON_MESSAGES,
+    PILLAR_MESSAGES,
     BRIEF_RULES,
     ...approved,
   ].join("\n\n");
@@ -140,10 +140,10 @@ export function renderBriefTurn(a: { slots: BriefSlotInput[]; winnerHooks: strin
       lines.push(
         s.test.variable === "message"
           ? `The message is the test: argue ${s.test.value} and rewrite the idea's angle to fit it.`
-          : "Keep the idea's topic and pick the canon message it already argues."
+          : "Keep the idea's topic and pick the pillar it already serves."
       );
     } else if (s.competitor) {
-      lines.push("Build the Reel on their topic and pick the canon message Miguel's answer argues.");
+      lines.push("Build the Reel on their topic and pick the pillar Miguel's answer serves.");
     }
     lines.push("");
   }

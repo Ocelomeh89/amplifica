@@ -37,7 +37,7 @@ function post(over: Partial<WinnerPost> = {}): WinnerPost {
     posted_at: "2026-10-01T12:00:00Z",
     hook_type: "question",
     onscreen_text: "none",
-    message: "velocity",
+    message: "w2-advantage",
     cta_type: "save",
     post_style: "talking-head",
     cover_face: true,
@@ -109,6 +109,12 @@ describe("outcomeOf and valuesOf", () => {
 });
 
 describe("evidenceCounts", () => {
+  it("counts a pillar message and skips an old canon message", () => {
+    const ev = evidenceOf(batch({ message: "velocity" }, 1, 1), batch({ message: "w2-advantage" }, 1, 1));
+    expect(ev.message.find((v) => v.value === "w2-advantage")!.total).toBe(1);
+    expect(ev.message.some((v) => v.value === "velocity")).toBe(false);
+  });
+
   it("counts only tagged, eligible Reels in the window", () => {
     const won = batch({ hook_type: "question" }, 1, 1);
     const carousel = batch({ media_type: "carousel", hook_type: "paradox" }, 1, 1);
@@ -303,7 +309,7 @@ describe("judgeExperiment", () => {
 });
 
 describe("tagsFromRecipe", () => {
-  const recipe = { hook_type: "paradox", onscreen_text: "adds-to-hook", cta_type: "save", post_style: "text-broll", cover: "face+number", message: "velocity", topic: "x" };
+  const recipe = { hook_type: "paradox", onscreen_text: "adds-to-hook", cta_type: "save", post_style: "text-broll", cover: "face+number", message: "w2-advantage", topic: "x" };
   it("writes the six tags, explicit cover flags and the hook as the spoken hook", () => {
     const t = tagsFromRecipe(recipe, "Your 401k is slow.", NOW);
     expect(t).toMatchObject({
@@ -311,7 +317,7 @@ describe("tagsFromRecipe", () => {
       onscreen_text: "adds-to-hook",
       cta_type: "save",
       post_style: "text-broll",
-      message: "velocity",
+      message: "w2-advantage",
       cover_face: true,
       cover_text: false,
       cover_number: true,

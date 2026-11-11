@@ -4,6 +4,10 @@ import { authorizeRoutine } from "@/features/content/data/api-auth";
 import { runMetricsCron, type CronPlatform } from "@/features/content/data/metrics";
 import { supabaseMetricsDb } from "@/features/content/data/supabase-db";
 import { runCompetitorCron } from "@/features/content/data/competitor-cron";
+import { runGateSweep } from "@/features/content/data/gate-sweep";
+import { supabaseBackfillDb, supabaseDigestDb, supabaseGateDb } from "@/features/content/data/supabase-gate-db";
+import { runBackfill } from "@/features/content/data/gate-backfill";
+import { clickUpChatPoster, postDigests } from "@/features/content/data/gate-digest";
 import { supabaseCompetitorsDb } from "@/features/content/data/supabase-competitors-db";
 import { apifyClientFromEnv } from "@/features/content/data/pulls/apify";
 import { anthropicToolCaller } from "@/features/content/data/claude";
@@ -24,6 +28,9 @@ const PLATFORMS: CronPlatform[] = ["instagram", "youtube", "beehiiv"];
 // `?platform=` narrows to one pull for a manual check. `?competitors=now` starts the
 // weekly competitor pull on any day (and runs the competitor step with `?platform=`).
 const BUDGET_SECONDS = 280;
+const GATE_SWEEP_LIMIT = 20;
+const GATE_CALL_SECONDS = 30;
+const BACKFILL_LIMIT = 25;
 export async function GET(req: Request) {
   const startedAt = new Date();
   const auth = authorizeRoutine(req, process.env.CRON_SECRET);
@@ -32,6 +39,22 @@ export async function GET(req: Request) {
   const params = new URL(req.url).searchParams;
   const only = params.get("platform");
   const forceCompetitors = params.get("competitors") === "now";
+  // `?backfill=dry` reports what the brand gate would do to ideas from before it existed and
+  // writes nothing; `?backfill=run` applies it, 25 ideas a call. Nothing else runs.
+  const backfill = params.get("backfill");
+  if (backfill === "dry" || backfill === "run") {
+    try {
+      const report = await runBackfill(supabaseBackfillDb(createAdminClient(), owner), anthropicToolCaller({ timeoutMs: 60_000, maxRetries: 0 }), {
+        dryRun: backfill !== "run",
+        limit: BACKFILL_LIMIT,
+        timeLeft: () => BUDGET_SECONDS - (Date.now() - startedAt.getTime()) / 1000,
+      });
+      return NextResponse.json({ backfill, ...report });
+    } catch (e) {
+      console.error("content gate backfill failed", e);
+      return NextResponse.json({ backfill, error: (e as Error).message }, { status: 500 });
+    }
+  }
   const wanted = PLATFORMS.filter((p) => !only || p === only);
   if (wanted.length === 0) {
     return NextResponse.json({ error: `unknown platform ${only}` }, { status: 400 });
@@ -78,7 +101,36 @@ export async function GET(req: Request) {
       console.error("content today cron failed", e);
       today = { error: (e as Error).message };
     }
-    return NextResponse.json({ ...report, competitors, today }, { status: report.ok ? 200 : 500 });
+    // The brand gate releases any idea still waiting (a background sweep that died, or an API
+    // outage). Last, on the time Today leaves: the background sweep after ingest does most of the work.
+    let gate: Awaited<ReturnType<typeof runGateSweep>> | { error: string } | null = null;
+    if (!only) {
+      try {
+        gate = await runGateSweep(supabaseGateDb(createAdminClient(), owner), anthropicToolCaller({ timeoutMs: GATE_CALL_SECONDS * 1000, maxRetries: 0 }), {
+          limit: GATE_SWEEP_LIMIT,
+          timeLeft: () => BUDGET_SECONDS - (Date.now() - startedAt.getTime()) / 1000,
+        });
+      } catch (e) {
+        console.error("content gate sweep failed", e);
+        gate = { error: (e as Error).message };
+      }
+    }
+    // The ClickUp digest lists a routine batch's ideas once the gate has settled all of them.
+    let digests: number | { error: string } = 0;
+    if (!only) {
+      try {
+        digests = await postDigests(
+          supabaseDigestDb(createAdminClient(), owner),
+          clickUpChatPoster({ token: process.env.CLICKUP_API_TOKEN, workspaceId: process.env.CLICKUP_WORKSPACE_ID }),
+          new Date(),
+          process.env.NEXT_PUBLIC_SITE_URL ?? "https://amplificawealth.com"
+        );
+      } catch (e) {
+        console.error("content gate digest failed", e);
+        digests = { error: (e as Error).message };
+      }
+    }
+    return NextResponse.json({ ...report, gate, digests, competitors, today }, { status: report.ok ? 200 : 500 });
   } catch (e) {
     console.error("content metrics cron failed", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

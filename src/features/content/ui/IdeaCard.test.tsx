@@ -35,6 +35,7 @@ const idea: ContentIdea = {
   obsidian_path: null,
   source_post_id: null,
   created_at: "2026-09-17T11:00:00Z",
+  gate: null, gate_original: null, gate_attempts: 0, ingest_batch: null, digest_posted_at: null,
   updated_at: "2026-09-17T11:00:00Z",
 };
 
@@ -50,6 +51,25 @@ describe("IdeaCard", () => {
     expect(screen.getByText(/every extra dollar goes to the machine/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Joe\/Miguel/ })).toHaveAttribute("href", "https://notes.granola.ai/d/x");
     expect(screen.getByText("Story")).toBeInTheDocument();
+  });
+
+  it("shows the reader and pillar for a gated idea, and the raw pillar for a legacy one", () => {
+    const gate = { result: { verdict: "pass", reader: "stephen", pillar: "expensive-tuition", amplifica_pillar: "the-numbers", failed: [] }, rewritten: false, checked_at: "x" };
+    const { unmount } = render(<IdeaCard idea={{ ...idea, gate, pillar: "expensive-tuition" }} sourceUrl={null} siblings={[]} />);
+    expect(screen.getByText("Stephen · Expensive Tuition")).toBeInTheDocument();
+    unmount();
+    render(<IdeaCard idea={{ ...idea, pillar: "optionality" }} sourceUrl={null} siblings={[]} />);
+    expect(screen.getByText("optionality")).toBeInTheDocument();
+  });
+
+  it("offers no Like or Pass on an idea the brand gate holds, and says why", () => {
+    const { unmount } = render(<IdeaCard idea={{ ...idea, status: "gating" }} sourceUrl={null} siblings={[]} />);
+    expect(screen.queryByRole("button", { name: /Like/ })).not.toBeInTheDocument();
+    expect(screen.getByText("Waiting for the brand check.")).toBeInTheDocument();
+    unmount();
+    render(<IdeaCard idea={{ ...idea, status: "gate_failed" }} sourceUrl={null} siblings={[]} />);
+    expect(screen.queryByRole("button", { name: /Pass/ })).not.toBeInTheDocument();
+    expect(screen.getByText("Didn't pass the brand check. Archive it from Performance.")).toBeInTheDocument();
   });
 
   it("has Like and Pass buttons", () => {

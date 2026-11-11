@@ -97,6 +97,18 @@ describe("supabaseRecreateDb", () => {
     expect(insert).not.toHaveProperty("chain_key");
   });
 
+  it("insertIdea stores the brand gate record when the option carried one", async () => {
+    const { client, log } = fakeClient({ content_ideas: { data: [{ id: "i1" }] } });
+    const result = { verdict: "pass" as const, reader: "daniel" as const, pillar: "w2-advantage" as const, amplifica_pillar: "the-numbers" as const, failed: [] };
+    await supabaseRecreateDb(client, "u1").insertIdea({
+      format: "reel", title: "T", hook: "H", belief_attacked: "", value_to_listener: "", why_it_stops: "Topic: x",
+      outline: [], quote: "", quote_ref: "", pillar: "w2-advantage", hook_type: "question", score: 1, batch_date: "2026-10-26",
+      source_post_id: "5b9d1d1e-7c4e-4a39-9a55-0d8b3e1f2a10", gate: { result, rewritten: false, checked_at: "2026-10-26T00:00:00.000Z" },
+    });
+    const insert = log.find((c) => c[0] === "content_ideas.insert")![1] as Record<string, unknown>;
+    expect(insert).toMatchObject({ pillar: "w2-advantage", gate: { result } });
+  });
+
   it("every read filters by the owner", async () => {
     const { client, log } = fakeClient({ content_recreations: { data: [ROW], count: 3 } });
     const db = supabaseRecreateDb(client, "u1");
@@ -111,7 +123,7 @@ describe("supabaseRecreateDb", () => {
   it("sourceContext joins insights, figures and recent hooks, and returns null for a missing post", async () => {
     const post = {
       id: "p1", platform: "instagram", format: "reel", media_type: "reel", thumbnail_url: "", pillar: "method", hook_type: "question",
-      hook_used: "", caption: "Cap", url: "u", idea_id: null, posted_at: "2026-10-20T00:00:00Z", onscreen_text: "", message: "velocity",
+      hook_used: "", caption: "Cap", url: "u", idea_id: null, posted_at: "2026-10-20T00:00:00Z", onscreen_text: "", message: "w2-advantage",
       cta_type: "", post_style: "talking-head-text", cover_face: true, cover_text: null, cover_number: null, hook_spoken: "Spoken", hook_onscreen: "",
       tag_confidence: {}, tag_locks: [], tagged_at: "2026-10-21T00:00:00Z",
     };

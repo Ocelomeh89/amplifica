@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { CONTENT_POSITIONING, IDEAS_PROMPT } from "./prompts/ideas";
+import { BRAND_CONTEXT, IDEAS_PROMPT } from "./prompts/ideas";
 import { ingestIdeaSchema } from "./schema";
-import { HOOK_TYPES, MESSAGES, type Message, type PostTags } from "./tags";
+import { HOOK_TYPES, LEGACY_MESSAGES, MESSAGES, type PostTags } from "./tags";
+import { PILLARS, type GateResult } from "./brand";
 import type { WinnerInsights } from "./winners";
 
 // Slice 3: Recreate. A source post becomes 3 hook-and-angle options; the picked
@@ -23,10 +24,12 @@ export const MODE_LABEL: Record<RecreateMode, string> = {
   adjacent: "Adjacent topic",
 };
 
-export type RecreateOption = { hook: string; angle: string; topic: string; message: string };
+/** `gate` is the brand gate's verdict, on options that passed it. */
+export type RecreateOption = { hook: string; angle: string; topic: string; message: string; gate?: GateResult };
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
-const blankOrNone = (m: string) => m === "" || m === "none";
+// An old canon message counts as no message: options can only carry the five pillars now.
+const blankOrNone = (m: string) => m === "" || m === "none" || (LEGACY_MESSAGES as readonly string[]).includes(m);
 
 const optionSchema = z.object({
   hook: z.string().trim().min(1).max(200),
@@ -55,7 +58,7 @@ export function recreateOutputSchema(mode: RecreateMode, sourceMessage: string) 
             path: ["options", i, "message"],
             message:
               mode === "adjacent"
-                ? `Option ${i + 1} needs a canon message other than "${sourceMessage || "none"}".`
+                ? `Option ${i + 1} needs a pillar other than "${sourceMessage || "none"}".`
                 : `Option ${i + 1} must keep the source message.`,
           });
         }
@@ -77,7 +80,7 @@ export function recreateToolSchema(): Record<string, unknown> {
             hook: { type: "string", description: "The first line the audience sees or hears." },
             angle: { type: "string", description: "One line on the take this reel makes." },
             topic: { type: "string", description: "A few words naming the topic. Distinct across the 3 options." },
-            message: { type: "string", enum: [...MESSAGES], description: "The canon argument this option makes." },
+            message: { type: "string", enum: [...MESSAGES], description: "The personal pillar this option serves." },
           },
           required: ["hook", "angle", "topic", "message"],
         },
@@ -103,7 +106,7 @@ const OPTION_RULES = `
 
 Call the tool with exactly 3 options for a Reel. Each option has a hook (the
 first line, under 140 characters), an angle (one line: the take the reel makes),
-a topic (a few words), and a message (one canon argument). The 3 topics must
+a topic (a few words), and a message (the pillar it serves). The 3 topics must
 differ. Never repeat the source post's hook or any recent hook you are given.
 Hooks follow the rules above; no return promises, no hype.
 `.trim();
@@ -112,31 +115,21 @@ export function recreateSystemPrompt(): string {
   const rules = between(IDEAS_PROMPT, "## What makes an idea good here", "## Ranking and dedupe");
   return [
     "You help Miguel Graf repeat what works. Given one of his Instagram posts and what is known about why it did well, you write 3 options for a new Reel.",
-    CONTENT_POSITIONING.trim(),
+    BRAND_CONTEXT,
     rules,
-    CANON_MESSAGES,
+    PILLAR_MESSAGES,
     OPTION_RULES,
   ].join("\n\n");
 }
 
-/** The canon arguments, one line each, so the model knows what a message slug means. Same wording as routines/content-tag.md. */
-const MESSAGE_MEANING: Record<Exclude<Message, "none">, string> = {
-  scoreboard: "cash flow is the scoreboard, not net worth; 25x is a withdrawal rate.",
-  velocity: "velocity beats rate; same return, more turns; short cycles.",
-  "dollars-not-yourself": "keep the paycheck, move the dollars; quitting to get rich is wrong.",
-  "debt-efficiency": "rank debt by what it takes (payment over balance), not by rate.",
-  "credit-ladder": "the source you can access and repay beats the cheapest rate; the five-source ladder.",
-  "system-over-willpower": "a plan that runs itself beats one that needs discipline.",
-  "forced-sale": "people lose money on a forced sale, not a bad asset; size, reserves, horizon.",
-};
+/** The personal pillars, one line each, so the model knows what a message slug means. Same wording as routines/content-tag.md. */
+export const PILLAR_MESSAGES = `
+## The pillars (the message field)
 
-export const CANON_MESSAGES = `
-## The canon messages
+Each option's message is the personal brand pillar it serves:
 
-Each option's message is one of these arguments:
-
-${(Object.keys(MESSAGE_MEANING) as (keyof typeof MESSAGE_MEANING)[]).map((m) => `- ${m}: ${MESSAGE_MEANING[m]}`).join("\n")}
-- none: the option argues none of them.
+${PILLARS.map((p) => `- ${p.slug}: ${p.name}. ${p.question}`).join("\n")}
+- none: the option serves none of them.
 `.trim();
 
 const CAPTION_CHARS = 600;
@@ -144,10 +137,10 @@ const CAPTION_CHARS = 600;
 function modeRule(mode: RecreateMode, s: RecreateSource): string {
   const keep = `Keep the hook type ${s.hook_type || "as it is"} and the post style ${s.post_style || "as it is"}`;
   if (mode === "adjacent") {
-    return `${keep}. Move to a canon message other than ${s.message || "none"}, one per option, and name it in each option's message. Choose 3 different topics.`;
+    return `${keep}. Move to a pillar other than ${s.message || "none"}, one per option, and name it in each option's message. Choose 3 different topics.`;
   }
   if (blankOrNone(s.message)) {
-    return `${keep}. The topic is free. Choose 3 different topics; each message may be any canon message or none.`;
+    return `${keep}. The topic is free. Choose 3 different topics; each message may be any pillar or none.`;
   }
   return `${keep} and the message ${s.message}. Choose 3 different topics under that message.`;
 }

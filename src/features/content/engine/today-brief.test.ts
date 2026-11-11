@@ -21,7 +21,7 @@ const brief = (over: Partial<BriefOut> = {}): BriefOut => ({
   title: "Why your 401k is slow",
   hook: "Your 401k is slow on purpose.",
   say: ["Say the line.", "Pause.", "Give the one number."],
-  message: "velocity",
+  message: "w2-advantage",
   ...over,
 });
 
@@ -41,9 +41,9 @@ describe("briefOutputSchema", () => {
     expect(one.safeParse({ briefs: [brief({ message: "freedom" })] }).success).toBe(false);
   });
   it("rejects a message other than the fixed one for a slot testing message", () => {
-    const fixed = briefOutputSchema([1], { 1: "scoreboard" });
-    expect(fixed.safeParse({ briefs: [brief({ message: "velocity" })] }).success).toBe(false);
-    expect(fixed.safeParse({ briefs: [brief({ message: "scoreboard" })] }).success).toBe(true);
+    const fixed = briefOutputSchema([1], { 1: "physics-of-wealth" });
+    expect(fixed.safeParse({ briefs: [brief({ message: "w2-advantage" })] }).success).toBe(false);
+    expect(fixed.safeParse({ briefs: [brief({ message: "physics-of-wealth" })] }).success).toBe(true);
   });
   it("the tool schema is named and requires briefs", () => {
     expect(BRIEF_TOOL_NAME).toBe("record_briefs");
@@ -94,10 +94,10 @@ describe("briefIdeaPatch and recipeFor", () => {
     expect(briefIdeaPatch(brief(), { variable: "post_style", value: "text-broll", control: "talking-head" }, held, "x").hook_type).toBe("question");
   });
   it("recipeFor replaces the tested held value and adds message and topic", () => {
-    expect(recipeFor({ variable: "post_style", value: "text-broll", control: "talking-head" }, held, "velocity", "401k fees")).toEqual({
+    expect(recipeFor({ variable: "post_style", value: "text-broll", control: "talking-head" }, held, "w2-advantage", "401k fees")).toEqual({
       ...held,
       post_style: "text-broll",
-      message: "velocity",
+      message: "w2-advantage",
       topic: "401k fees",
       control: "talking-head",
     });

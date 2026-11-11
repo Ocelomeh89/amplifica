@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/shared/supabase/database.types";
+import { gateRecord } from "./brand-gate";
+import type { Database, Json } from "@/shared/supabase/database.types";
 import { DraftStoreError, type DraftIdea, type DraftsDb } from "./drafts";
 import type { Format } from "@/features/content/engine/types";
 import type { VoiceDb } from "./voice";
@@ -8,14 +9,22 @@ import { UNPOSTED_DAYS } from "@/features/content/engine/unused";
 type Client = SupabaseClient<Database>;
 
 const IDEA_COLUMNS =
-  "id, format, title, hook, hook_alt, belief_attacked, value_to_listener, why_it_stops, outline, quote, quote_ref, pillar, hook_type, status";
+  "id, format, title, hook, hook_alt, belief_attacked, value_to_listener, why_it_stops, outline, quote, quote_ref, pillar, hook_type, status, gate";
 
 export function supabaseDraftsDb(client: Client, userId: string): DraftsDb {
   const toIdea = (r: Record<string, unknown>, hasDraft: boolean): DraftIdea => ({
     ...(r as Omit<DraftIdea, "has_draft" | "format">),
     format: r.format as Format,
     has_draft: hasDraft,
+    draft_gate_fails: Number((r.gate as { draft?: { fails?: number } } | null)?.draft?.fails ?? 0),
   });
+
+  /** The idea's gate record, so draft results nest under it instead of replacing it. */
+  const currentGate = async (ideaId: string): Promise<Record<string, unknown>> => {
+    const { data, error } = await client.from("content_ideas").select("gate").eq("id", ideaId).eq("user_id", userId);
+    if (error) throw new Error(`draft gate read: ${error.message}`);
+    return (((data ?? [])[0] as { gate?: Record<string, unknown> | null } | undefined)?.gate ?? {}) as Record<string, unknown>;
+  };
 
   return {
     async queuedWithoutDraft(limit, now) {
@@ -54,6 +63,23 @@ export function supabaseDraftsDb(client: Client, userId: string): DraftsDb {
         .limit(1);
       if (draftError) throw new Error(`drafts: ${draftError.message}`);
       return toIdea(data, (drafts ?? []).length > 0);
+    },
+
+    async setGate(ideaId, record) {
+      const current = await currentGate(ideaId);
+      const gate = { ...current, draft: { result: record.result, checked_at: record.checked_at } } as unknown as Json;
+      const { error } = await client.from("content_ideas").update({ gate }).eq("id", ideaId).eq("user_id", userId);
+      if (error) throw new Error(`draft gate: ${error.message}`);
+    },
+
+    async gateFail(ideaId, result, fails, final) {
+      const current = await currentGate(ideaId);
+      const draft = { result, fails, checked_at: new Date().toISOString() };
+      // A final fail is the idea's verdict now, so its reasons show on the Didn't pass list.
+      const gate = (final ? { ...gateRecord(result, false, new Date(), "queued"), draft } : { ...current, draft }) as unknown as Json;
+      const patch = final ? { gate, status: "gate_failed" as const, queue_rank: null } : { gate };
+      const { error } = await client.from("content_ideas").update(patch).eq("id", ideaId).eq("user_id", userId).eq("status", "queued");
+      if (error) throw new Error(`draft gate fail: ${error.message}`);
     },
 
     async voice() {

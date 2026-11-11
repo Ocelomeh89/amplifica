@@ -169,7 +169,7 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
 
     async patchIdea(id, patch) {
       const { data: before, error: readError } = await ideas()
-        .select("hook, hook_alt, hook_type, title, outline, status, score")
+        .select("hook, hook_alt, hook_type, title, outline, status, score, gate, pillar")
         .eq("id", id)
         .eq("user_id", userId)
         .in("status", ["inbox", "queued"])
@@ -189,7 +189,7 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
 
     async restoreIdea(id, snapshot) {
       const { error } = await ideas()
-        .update({ ...snapshot, outline: snapshot.outline as Json, status: snapshot.status as "inbox" | "queued" })
+        .update({ ...snapshot, outline: snapshot.outline as Json, gate: (snapshot.gate ?? null) as Json, status: snapshot.status as "inbox" | "queued" })
         .eq("id", id)
         .eq("user_id", userId);
       if (error) throw new Error(`today idea restore: ${error.message}`);
@@ -211,7 +211,7 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
       return id;
     },
 
-    async insertMomentIdea(idea) {
+    async insertMomentIdea(idea, gate) {
       const { data, error } = await ideas()
         .insert({
           user_id: userId,
@@ -231,6 +231,7 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
           score: idea.score,
           batch_date: idea.batch_date,
           status: "queued",
+          ...(gate ? { gate: gate as unknown as Json, pillar: gate.result.pillar ?? idea.pillar } : {}),
         })
         .select("id");
       if (error) throw new Error(`today moment idea: ${error.message}`);

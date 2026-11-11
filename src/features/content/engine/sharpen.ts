@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { CONTENT_POSITIONING, IDEAS_PROMPT } from "./prompts/ideas";
-import { CANON_MESSAGES, between } from "./recreate";
+import { BRAND_CONTEXT, IDEAS_PROMPT } from "./prompts/ideas";
+import type { GateResult } from "./brand";
+import { PILLAR_MESSAGES, between } from "./recreate";
 import { HOOK_TYPES, type HookType } from "./tags";
 
 // Sharpen: an unfinished idea becomes 3 rewrites aimed at what Miguel calls usable. Pure:
@@ -33,6 +34,8 @@ export type SharpenOption = {
   why_it_stops: string;
   outline: string[];
   what_changed: string;
+  /** The brand gate's verdict on this rewrite (passed options only). */
+  gate?: GateResult;
 };
 
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -85,7 +88,7 @@ rewrite it three different ways. A usable idea has ${SHARP_MARKS}. Aim every rew
 four marks, and fix what Miguel says is off first.
 
 Keep the idea's topic and format. This is the same idea, sharper; it is not a new idea. Name
-only numbers the idea or his positioning supports; do not invent statistics. Hooks follow the
+only numbers the idea or his verified figures support; do not invent statistics. Hooks follow the
 rules above: no return promises, no hype. Each rewrite says in one line what is sharper than
 before. Make the three rewrites different from each other: different hook types where you can.
 `.trim();
@@ -94,12 +97,12 @@ export function sharpenSystemPrompt(rules: string[]): string {
   const ideaRules = between(IDEAS_PROMPT, "## What makes an idea good here", "## Ranking and dedupe");
   const parts = [
     "You sharpen Miguel Graf's content ideas.",
-    CONTENT_POSITIONING.trim(),
+    BRAND_CONTEXT,
     ideaRules,
-    CANON_MESSAGES,
+    PILLAR_MESSAGES,
     SHARPEN_RULES,
   ];
-  if (rules.length > 0) parts.push(["## Miguel's approved rules", ...rules.map((r) => `- ${r}`)].join("\n"));
+  if (rules.length > 0) parts.push(["## Miguel's approved rules", "If a taste rule conflicts with the brand, the brand wins.", ...rules.map((r) => `- ${r}`)].join("\n"));
   return parts.join("\n\n");
 }
 

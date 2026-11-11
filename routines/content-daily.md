@@ -27,12 +27,12 @@ seen, with `status`), `requested_sources` (open these first),
 ## 2. Read the generation rules
 
 Read `src/features/content/engine/prompts/ideas.ts` from the checkout. The
-`IDEAS_PROMPT` export embeds `CONTENT_POSITIONING`: the approved audience,
-founder evidence, offer boundaries, and framing. Use the full prompt, including
-that positioning. A dated manual positioning rule in `taste_rules` supplies
-the live approved guidance when the checkout is older. Later explicitly approved
-positioning supersedes older messaging, never source permissions or verbatim
-quotes. Follow the output contract; ingest rejects anything off-shape.
+`IDEAS_PROMPT` export embeds `BRAND_CONTEXT`: the two readers (Daniel and
+Stephen), the five pillars, the voice, and `BRAND_FACTS` (founder evidence,
+offer boundaries, borrowing and risk framing, source permissions). Use the full
+prompt. Every idea is written for one reader and serves one pillar; give the
+pillar's slug. The app's brand gate checks every idea after ingest and rewrites
+or holds back what misses, but aim to pass it. Follow the output contract; ingest rejects anything off-shape.
 `routines/examples/daily-ingest.json` is an illustrative schema fixture, not
 biographical evidence or a production batch to resend.
 
@@ -132,10 +132,11 @@ ranked, spread across formats, each with provenance. Drop anything matching
 `known_titles`. If nothing allowed was new, produce zero ideas and still do
 steps 6 and 7.
 
-Before ingest, check every hook and outline against `CONTENT_POSITIONING` and
-the live dated positioning rule: choice rather than required corporate escape;
-founder figures with their cash-flow context; repayment plans rather than
-guarantees; ongoing routine time distinct from setup; proposed offers are not
+Before ingest, check every hook and outline against the readers, the pillars
+and `BRAND_FACTS`: each idea names Daniel's or Stephen's situation, says why
+before how, keeps the downside on the page, uses founder figures only with their
+cash-flow context, offers repayment plans rather than guarantees, keeps ongoing
+routine time distinct from setup, and remembers that proposed offers are not
 live benefits. Each idea should give a useful next decision, not just a warning
 or a sales pitch. Preserve source quotations, but do not endorse obsolete claims.
 
@@ -183,22 +184,16 @@ report it. On success the response lists `ideas` with their `id`s and
 
 ## 7. Post the digest to ClickUp
 
-When building the digest, match each returned idea to its own payload — match
-on `format` and `hook`, never by array position — the database does not
-guarantee returned-row order. If a returned idea matches nothing, list it
-without a deep link rather than guessing.
-
-Format labels come from `FORMAT_LABEL` in
-`src/features/content/engine/types.ts` (Reel, YouTube, Newsletter, Story, X).
+The ideas themselves are not listed here. Every idea waits for the brand gate,
+and the app posts the ideas that passed to the same channel once the gate has
+checked the whole batch. This message covers the run only.
 
 Send one message to chat channel `7-9011777568-8` with the ClickUp connector
 (`clickup_send_chat_message`, markdown), in this shape:
 
 ```
-**Content ideas for <date>** — <n> new, <m> recordings read
-
-1. [Reel] <hook> — <CONTENT_API_BASE>/content/ideas/<id>
-2. [Newsletter] <hook> — …
+**Content run for <date>**: <n> ideas sent to the brand gate, <m> recordings read
+The ideas that pass will follow in a separate message from the app.
 
 Waiting for a decision (not read): <k> — <CONTENT_API_BASE>/content/sources
 <one line per pending title>
@@ -214,7 +209,7 @@ When the run failed at any step, post instead:
 `**Content run failed** — <step> — <one-line error>` and stop.
 
 If the ClickUp post itself fails, retry once after 30 seconds; if it fails
-again, end the run — the ideas are already saved and will show in the inbox.
+again, end the run — the ideas are already saved and reach the inbox once the brand gate passes them.
 
 Do not post anything else, do not create tasks (the app does that on Like),
 and do not modify the repository.

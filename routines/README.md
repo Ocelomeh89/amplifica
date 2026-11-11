@@ -97,16 +97,15 @@ allowlist. The first backfill tags up to 100 posts per run.
 
 ## Messaging
 
-`CONTENT_POSITIONING` in `src/features/content/engine/prompts/ideas.ts` is the
-canonical audience, founder-story, evidence, and offer brief, embedded in
-`IDEAS_PROMPT`. Keep the owner's dated manual positioning rule in
-`content_taste_rules` in sync when changing it: the context API supplies that
-rule to live routines, including those running an older checkout. Updating a
-local prompt alone does not update a cloud routine's checkout.
-
-The current brief centers on employed $1,000-$2,000/month savers building the
-freedom to say no, not a requirement to quit. Proposed onboarding, refunds,
-and unconfirmed prices are not live offers.
+`BRAND_CONTEXT` in `src/features/content/engine/prompts/ideas.ts` is the brand
+every generator writes to: the two readers (Daniel and Stephen), the five
+pillars and the voice from `engine/brand.ts`, plus `BRAND_FACTS` (founder
+evidence, offer boundaries, borrowing and risk framing). It replaced the
+2026-09-20 positioning and its saver audience on 2026-11-10; the matching manual
+taste rule was turned off. The source of the brand is the `brand-writing` skill;
+change both together. A cloud routine reads the prompt from its checkout, so it
+picks up a change on merge. Proposed onboarding, refunds, and unconfirmed prices
+are not live offers. Every idea goes through the app's brand gate after ingest.
 
 Refreshing existing ideas is separate from the daily run. Back up the rows,
 review inbox/queued ideas, and update only their copy with owner and

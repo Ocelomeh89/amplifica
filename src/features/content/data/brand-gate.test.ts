@@ -1,0 +1,121 @@
+import { describe, expect, it } from "vitest";
+import type { ToolCaller, ToolCallInput } from "./claude";
+import { gateOptions, gatePiece, gateRecord } from "./brand-gate";
+import { withGatePass } from "./gate.fake";
+
+/** Returns queued responses in order; a queued Error is thrown. */
+function scripted(responses: unknown[]): ToolCaller & { calls: ToolCallInput[] } {
+  const calls: ToolCallInput[] = [];
+  return {
+    calls,
+    async call(input) {
+      calls.push(input);
+      const next = responses.shift();
+      if (next instanceof Error) throw next;
+      return next;
+    },
+  };
+}
+
+const piece = { format: "reel", fields: { title: "Old title", hook: "Old hook", outline: ["a", "b", "c"] } };
+const pass = { verdict: "pass", reader: "daniel", pillar: "w2-advantage", amplifica_pillar: "the-numbers", failed: [] };
+const rewrite = { title: "New title", hook: "New hook", outline: ["x", "y", "z"] };
+const fail = (extra: Record<string, unknown> = {}) => ({
+  verdict: "fail",
+  reader: null,
+  pillar: null,
+  amplifica_pillar: null,
+  failed: [{ item: "situation", reason: "Too vague." }],
+  ...extra,
+});
+
+describe("gatePiece", () => {
+  it("passes on the first check with one call", async () => {
+    const c = scripted([pass]);
+    const o = await gatePiece(c, piece, { rewrite: true });
+    expect(c.calls).toHaveLength(1);
+    expect(o).toMatchObject({ status: "passed", rewritten: false, fields: piece.fields });
+  });
+
+  it("rewrites a fail and passes on the re-check", async () => {
+    const c = scripted([fail({ rewrite }), pass]);
+    const o = await gatePiece(c, piece, { rewrite: true });
+    expect(c.calls).toHaveLength(2);
+    expect(c.calls[1].text).toContain("New hook");
+    expect(c.calls[1].text).toMatch(/do not rewrite/i);
+    expect(o).toMatchObject({ status: "passed", rewritten: true, fields: rewrite, original: piece.fields });
+  });
+
+  it("fails when the rewrite fails its re-check, with the second reasons", async () => {
+    const c = scripted([fail({ rewrite }), fail({ failed: [{ item: "reader", reason: "Still nobody." }] })]);
+    const o = await gatePiece(c, piece, { rewrite: true });
+    expect(o.status).toBe("failed");
+    if (o.status === "failed") expect(o.result.failed).toEqual([{ item: "reader", reason: "Still nobody." }]);
+  });
+
+  it("fails a rewrite that adds a figure the original and the verified figures do not have", async () => {
+    const invented = { ...rewrite, hook: "A $40k HELOC at 9% beats your 401k" };
+    const c = scripted([fail({ rewrite: invented }), pass]);
+    const o = await gatePiece(c, piece, { rewrite: true });
+    expect(o.status).toBe("failed");
+    if (o.status === "failed") expect(o.result.failed).toContainEqual({ item: "guardrails", reason: "The rewrite adds figures the original did not have: $40k, 9%." });
+  });
+
+  it("does not count account and form names like 401k or W-2 as figures", async () => {
+    const named = { title: "T", hook: "Your W-2 and your 401(k) are not the problem; a 401k is fine", outline: ["a", "b", "c"] };
+    expect((await gatePiece(scripted([fail({ rewrite: named }), pass]), piece, { rewrite: true })).status).toBe("passed");
+  });
+
+  it("allows a rewrite that keeps the original's figures or uses a verified one", async () => {
+    const withFigures = { format: "reel", fields: { title: "T", hook: "Paying 7% on $20,000", outline: ["a", "b", "c"] } };
+    const kept = { title: "T", hook: "$20,000 at 7%, then $100,000 in debt reduction", outline: ["a", "b", "c"] };
+    const o = await gatePiece(scripted([fail({ rewrite: kept }), pass]), withFigures, { rewrite: true });
+    expect(o.status).toBe("passed");
+  });
+
+  it("does not rewrite when told not to", async () => {
+    const c = scripted([fail()]);
+    const o = await gatePiece(c, piece, { rewrite: false });
+    expect(c.calls).toHaveLength(1);
+    expect(o.status).toBe("failed");
+  });
+
+  it("fails a model pass that uses retired words", async () => {
+    const c = scripted([pass]);
+    const o = await gatePiece(c, { format: "reel", fields: { hook: "Escape the waiting room" } }, { rewrite: false });
+    expect(o.status).toBe("failed");
+    if (o.status === "failed") expect(o.result.failed.map((f) => f.item)).toContain("retired-words");
+  });
+
+  it("checks a rewrite for retired words too", async () => {
+    const c = scripted([fail({ rewrite: { ...rewrite, hook: "Velocity banking, explained" } }), pass]);
+    const o = await gatePiece(c, piece, { rewrite: true });
+    expect(o.status).toBe("failed");
+  });
+
+  it("returns error when the caller throws or answers badly, on either call", async () => {
+    expect((await gatePiece(scripted([new Error("down")]), piece, { rewrite: true })).status).toBe("error");
+    expect((await gatePiece(scripted([{}]), piece, { rewrite: true })).status).toBe("error");
+    expect((await gatePiece(scripted([fail({ rewrite }), new Error("down")]), piece, { rewrite: true })).status).toBe("error");
+    expect((await gatePiece(scripted([fail({ rewrite }), {}]), piece, { rewrite: true })).status).toBe("error");
+  });
+});
+
+describe("gateRecord", () => {
+  it("is what an idea's gate column stores", () => {
+    const result = { verdict: "pass" as const, reader: "daniel" as const, pillar: "w2-advantage" as const, amplifica_pillar: "the-numbers" as const, failed: [] };
+    expect(gateRecord(result, true, new Date("2026-11-10T12:00:00Z"))).toEqual({ result, rewritten: true, checked_at: "2026-11-10T12:00:00.000Z" });
+    expect(gateRecord(result, false, new Date("2026-11-10T12:00:00Z"), "queued").prior_status).toBe("queued");
+  });
+});
+
+describe("gateOptions", () => {
+  const failV = { verdict: "fail", reader: null, pillar: null, amplifica_pillar: null, failed: [{ item: "reader", reason: "Nobody." }] };
+  it("keeps the options that pass with their result attached and drops fails and errors", async () => {
+    const c = withGatePass({ call: async () => ({}) }, (text) => (text.includes("bad") ? failV : text.includes("boom") ? new Error("down") : undefined));
+    const out = await gateOptions(c, [{ hook: "good" }, { hook: "bad" }, { hook: "boom" }], (o) => ({ hook: o.hook }), "reel");
+    expect(out.map((o) => o.hook)).toEqual(["good"]);
+    expect(out[0].gate).toMatchObject({ verdict: "pass", pillar: "w2-advantage" });
+    expect(c.gateCalls).toHaveLength(3);
+  });
+});

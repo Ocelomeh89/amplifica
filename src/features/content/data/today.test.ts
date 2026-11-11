@@ -15,12 +15,13 @@ import {
   swapTest,
   type RunRow,
 } from "./today";
-import { DAY, NOW, candidate, exp, fakeDb, idea } from "./today.fake";
+import { DAY, NOW, candidate, exp, fakeDb, gatePassing, idea } from "./today.fake";
+import { BRIEF_TOOL_NAME as BRIEF_TOOL } from "@/features/content/engine/today-brief";
 
-const brief = (slot: number, over: Record<string, unknown> = {}) => ({ slot, title: `T${slot}`, hook: `H${slot}`, say: ["a", "b", "c"], message: "velocity", ...over });
-const caller = (out: unknown): ToolCaller & { calls: unknown[] } => {
+const brief = (slot: number, over: Record<string, unknown> = {}) => ({ slot, title: `T${slot}`, hook: `H${slot}`, say: ["a", "b", "c"], message: "w2-advantage", ...over });
+const caller = (out: unknown) => {
   const calls: unknown[] = [];
-  return { calls, call: async (input) => (calls.push(input), out) };
+  return gatePassing({ calls, call: async (input) => (calls.push(input), out) });
 };
 
 describe("expireUnposted", () => {
@@ -241,7 +242,7 @@ describe("review fixes", () => {
 /** Answers each call with the next output in turn. */
 const seq = (...outs: unknown[]): ToolCaller & { calls: { text: string }[] } => {
   const calls: { text: string }[] = [];
-  return { calls, call: async (input) => (calls.push(input as { text: string }), outs[Math.min(calls.length - 1, outs.length - 1)]) };
+  return gatePassing({ calls, call: async (input) => (calls.push(input as { text: string }), outs[Math.min(calls.length - 1, outs.length - 1)]) });
 };
 
 describe("slice 6: the competitor brief", () => {
@@ -389,5 +390,77 @@ describe("taste rules and sharpens", () => {
     const c = caller({ briefs: [brief(3)] });
     await runMoment(f.db, c, started.runId, "Flying out at 6am", NOW);
     expect((c.calls[0] as { system: string }).system).toContain("- Take a side.");
+  });
+});
+
+describe("the brand gate on briefs", () => {
+  const fail = { verdict: "fail", reader: null, pillar: null, amplifica_pillar: null, failed: [{ item: "reader", reason: "Nobody." }] };
+  const failWithRewrite = { ...fail, rewrite: { title: "R", hook: "R hook", say: ["x", "y", "z"] } };
+
+  it("a passing brief is saved and its idea carries the gate record and pillar", async () => {
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2")] });
+    const c = caller({ briefs: [brief(1), brief(2)] });
+    expect(await generateDaily(f.db, c, NOW)).toEqual({ made: 2, error: null });
+    expect(c.gateCalls).toHaveLength(2);
+    const patched = f.ideas.get(f.experiments[0].idea_id)! as unknown as { gate: { result: { pillar: string } }; pillar: string };
+    expect(patched.gate.result.pillar).toBe("w2-advantage");
+    expect(patched.pillar).toBe("w2-advantage");
+  });
+
+  it("a brief that fails after its rewrite leaves its slot empty and its idea untouched", async () => {
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2")] });
+    const gated = gatePassing<ToolCaller>({ call: async () => ({ briefs: [brief(1), brief(2)] }) }, { H2: failWithRewrite });
+    let rewriteChecks = 0;
+    const c: ToolCaller = { call: async (input) => (input.text.includes("R hook") ? (rewriteChecks++, fail) : gated.call(input)) };
+    const r = await generateDaily(f.db, c, NOW);
+    expect(r).toEqual({ made: 1, error: null });
+    expect(rewriteChecks).toBe(1);
+    expect(f.experiments.map((e) => e.slot)).toEqual([1]);
+    const untouched = [...f.ideas.values()].find((i) => i.hook === "Hook i2" || i.hook === "Hook i1");
+    expect(untouched).toBeDefined();
+  });
+
+  it("a pillar mismatch fails the brief", async () => {
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2")] });
+    const mismatch = { verdict: "pass", reader: "daniel", pillar: "life-by-design", amplifica_pillar: "the-numbers", failed: [] };
+    const c = gatePassing<ToolCaller>({ call: async () => ({ briefs: [brief(1), brief(2)] }) }, { H1: mismatch });
+    expect(await generateDaily(f.db, c, NOW)).toEqual({ made: 1, error: null });
+    expect(f.experiments.map((e) => e.slot)).toEqual([2]);
+  });
+
+  it("gates the day's briefs in parallel, so gating costs about one slot's time", async () => {
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2")] });
+    let inFlight = 0;
+    let peak = 0;
+    const base = gatePassing<ToolCaller>({ call: async () => ({ briefs: [brief(1), brief(2)] }) });
+    const c: ToolCaller = {
+      call: async (input) => {
+        if (input.tool.name !== BRIEF_TOOL) {
+          inFlight++;
+          peak = Math.max(peak, inFlight);
+          await new Promise((r) => setTimeout(r, 5));
+          inFlight--;
+        }
+        return base.call(input);
+      },
+    };
+    expect(await generateDaily(f.db, c, NOW)).toEqual({ made: 2, error: null });
+    expect(peak).toBe(2);
+  });
+
+  it("a gate error drops only that slot", async () => {
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2")] });
+    const c = gatePassing<ToolCaller>({ call: async () => ({ briefs: [brief(1), brief(2)] }) }, { H1: new Error("down") });
+    expect(await generateDaily(f.db, c, NOW)).toEqual({ made: 1, error: null });
+    expect(f.experiments.map((e) => e.slot)).toEqual([2]);
+  });
+
+  it("when every brief fails the run fails with a brand message and nothing is patched", async () => {
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2")] });
+    const c = gatePassing<ToolCaller>({ call: async () => ({ briefs: [brief(1), brief(2)] }) }, { H1: fail, H2: fail });
+    const r = await generateDaily(f.db, c, NOW);
+    expect(r.made).toBe(0);
+    expect(r.error).toBe("None of today's briefs met the brand standard.");
+    expect(f.calls.patch).toEqual([]);
   });
 });

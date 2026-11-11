@@ -82,6 +82,13 @@ describe("content stays owner-only", () => {
     expect(queries.match(/\.neq\("kind", "comment"\)/g)?.length).toBe(1);
   });
 
+  it("idea actions never act on an idea the brand gate holds", () => {
+    const src = read("src/features/content/data/actions.ts");
+    const body = (name: string) => src.slice(src.indexOf(`export async function ${name}(`), src.indexOf("\nexport ", src.indexOf(`export async function ${name}(`) + 1));
+    for (const name of ["likeIdea", "passIdea", "markPosted"]) expect(body(name), name).toContain("GATE_HELD");
+    expect(body("archiveIdea")).toContain('.neq("status", "gating")');
+  });
+
   it("the metrics cron is bearer-protected by CRON_SECRET and scheduled once", () => {
     const route = read("src/app/api/content/cron/metrics/route.ts");
     expect(route).toContain("authorizeRoutine(req, process.env.CRON_SECRET)");
@@ -95,6 +102,43 @@ describe("content stays owner-only", () => {
     const competitors = route.indexOf("runCompetitorCron(");
     expect(competitors).toBeGreaterThan(route.indexOf("runMetricsCron("));
     expect(competitors).toBeLessThan(route.indexOf("runTodayCron("));
+  });
+
+  it("the cron's brand gate sweep runs after Today, on the time Today leaves, then the digest", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    const sweep = route.indexOf("runGateSweep(");
+    expect(sweep).toBeGreaterThan(route.indexOf("runTodayCron("));
+    expect(route.indexOf("postDigests(")).toBeGreaterThan(sweep);
+    expect(route).toContain("timeoutMs: GATE_CALL_SECONDS * 1000");
+  });
+
+  it("every new idea is swept by the brand gate right after it is written", () => {
+    const ingest = read("src/app/api/content/ingest/route.ts");
+    expect(ingest).toContain("batch: ");
+    expect(ingest).toContain("sweepInBackground(");
+    expect(read("src/features/content/data/actions.ts")).toContain("sweepInBackground(");
+    expect(read("src/features/content/data/gate-run.ts")).not.toContain('"use server"');
+    // The digest goes out as soon as the background sweep settles the batch, not at the next cron.
+    expect(read("src/features/content/data/gate-run.ts").indexOf("postDigests(")).toBeGreaterThan(read("src/features/content/data/gate-run.ts").indexOf("runGateSweep("));
+  });
+
+  it("the backfill runs only on request, dry unless asked to run", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    expect(route).toContain('params.get("backfill")');
+    expect(route).toContain('dryRun: backfill !== "run"');
+    expect(route.indexOf("runBackfill(")).toBeLessThan(route.indexOf("runMetricsCron("));
+  });
+
+  it("routes that run the brand gate allow 300 seconds and give Claude explicit timeouts", () => {
+    for (const f of ["src/app/api/content/ingest/route.ts", "src/app/api/content/drafts/route.ts"]) expect(read(f), f).toContain("export const maxDuration = 300;");
+    expect(read("src/features/content/data/gate-run.ts")).toContain("anthropicToolCaller({ timeoutMs: 60_000, maxRetries: 0 })");
+    expect(read("src/app/api/content/drafts/route.ts")).toContain("anthropicToolCaller({ timeoutMs: 40_000, maxRetries: 0 })");
+  });
+
+  it("a posted draft is checked by the brand gate without a rewrite", () => {
+    const route = read("src/app/api/content/drafts/route.ts");
+    expect(route).toContain("gatePiece(");
+    expect(route).toContain("rewrite: false");
   });
 
   it("a Pass stores its reason as a note, and background helpers stay out of the 'use server' files", () => {

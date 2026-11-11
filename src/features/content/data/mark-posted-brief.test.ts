@@ -28,7 +28,7 @@ function fakeClient(rows: { experiment?: unknown; post?: unknown }) {
   return { client: client as unknown as SupabaseClient<Database>, log };
 }
 
-const EXP = { id: "e1", recipe: { hook_type: "paradox", onscreen_text: "none", cta_type: "save", post_style: "talking-head", cover: "face", message: "velocity", topic: "t" } };
+const EXP = { id: "e1", recipe: { hook_type: "paradox", onscreen_text: "none", cta_type: "save", post_style: "talking-head", cover: "face", message: "w2-advantage", topic: "t" } };
 const POST = { id: "p1", posted_at: "2026-10-20T12:00:00Z", tagged_at: null, hook_used: "Hook" };
 const A = { ideaId: "i1", platform: "instagram" as const, externalId: "ABC", now: new Date("2026-10-27T12:00:00Z") };
 

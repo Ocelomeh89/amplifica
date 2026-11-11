@@ -21,7 +21,7 @@ function fakeClient(tables: Record<string, unknown[]>) {
 const post = (over: Record<string, unknown> = {}) => ({
   id: "p1", platform: "instagram", format: "reel", media_type: "reel", thumbnail_url: "t", pillar: "", hook_type: "question",
   hook_used: "", caption: "Cap", url: "https://instagram.com/reel/x", idea_id: null, posted_at: "2026-10-25T00:00:00Z",
-  onscreen_text: "", message: "velocity", cta_type: "", post_style: "talking-head-text", cover_face: true, cover_text: null,
+  onscreen_text: "", message: "w2-advantage", cta_type: "", post_style: "talking-head-text", cover_face: true, cover_text: null,
   cover_number: null, hook_spoken: "Spoken", hook_onscreen: "", tag_confidence: {}, tag_locks: [], tagged_at: "2026-10-26T00:00:00Z", ...over,
 });
 

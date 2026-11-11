@@ -113,7 +113,7 @@ describe("getTagQueue", () => {
 
 describe("pickLocked", () => {
   it("returns only the locked tag fields", () => {
-    expect(pickLocked({ hook_type: "paradox", message: "velocity", cover_face: true }, ["hook_type", "cover_face"])).toEqual({
+    expect(pickLocked({ hook_type: "paradox", message: "w2-advantage", cover_face: true }, ["hook_type", "cover_face"])).toEqual({
       hook_type: "paradox",
       cover_face: true,
     });

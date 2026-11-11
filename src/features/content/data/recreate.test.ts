@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MissingApiKeyError, type ToolCaller } from "./claude";
+import { withGatePass } from "./gate.fake";
 import {
   pickOption,
   regenerate,
@@ -13,13 +14,13 @@ import { recreatedIdeaSchema, type RecreateMode, type RecreateOption } from "@/f
 
 const NOW = new Date("2026-10-26T15:00:00Z"); // 10:00 in Chicago, day starts 05:00Z
 const POST = "5b9d1d1e-7c4e-4a39-9a55-0d8b3e1f2a10";
-const opt = (topic: string, message = "velocity"): RecreateOption => ({ hook: `Hook ${topic}`, angle: `Angle ${topic}`, topic, message });
+const opt = (topic: string, message = "w2-advantage"): RecreateOption => ({ hook: `Hook ${topic}`, angle: `Angle ${topic}`, topic, message });
 const OPTIONS = [opt("a"), opt("b"), opt("c")];
 
 const CTX: RecreateContext = {
   post: { id: POST, hook_type: "question", pillar: "method", tagged_at: "2026-10-20T00:00:00Z" },
   source: {
-    hook_type: "question", onscreen_text: "repeats-hook", message: "velocity", cta_type: "none", post_style: "talking-head-text",
+    hook_type: "question", onscreen_text: "repeats-hook", message: "w2-advantage", cta_type: "none", post_style: "talking-head-text",
     cover_face: true, cover_text: true, cover_number: false, hook_spoken: "Spoken hook", hook_onscreen: "", tag_confidence: {},
     tag_locks: [], tagged_at: "2026-10-20T00:00:00Z", caption: "Caption", media_type: "reel", figures: ["Views: 1"],
   },
@@ -101,12 +102,12 @@ function fakeDb(opts: { ctx?: RecreateContext | null; tagged?: boolean; insertFa
   return db;
 }
 
-const caller = (raw: unknown): ToolCaller => ({ call: async () => raw });
+const caller = (raw: unknown): ToolCaller => withGatePass({ call: async () => raw });
 const readyRow = async (db: ReturnType<typeof fakeDb>, mode: RecreateMode = "same-recipe") => {
   const s = await startRecreation(db, POST, mode, NOW);
   if (!s.ok) throw new Error("start failed");
   // Adjacent options must leave the source message (velocity), or the row would end failed instead of ready.
-  const options = mode === "adjacent" ? [opt("a", "scoreboard"), opt("b", "forced-sale"), opt("c", "credit-ladder")] : OPTIONS;
+  const options = mode === "adjacent" ? [opt("a", "physics-of-wealth"), opt("b", "expensive-tuition"), opt("c", "life-by-design")] : OPTIONS;
   await runRecreation(db, caller({ options }), s.id, NOW);
   return s.id;
 };
@@ -205,7 +206,7 @@ describe("pickOption", () => {
     const r = await pickOption(db, id, 1, NOW);
     expect(r).toEqual({ ideaId: "idea1" });
     const idea = recreatedIdeaSchema.parse(db.ideas[0]);
-    expect(idea).toMatchObject({ format: "reel", score: 1, hook: "Hook b", source_post_id: POST, batch_date: "2026-10-26", pillar: "method" });
+    expect(idea).toMatchObject({ format: "reel", score: 1, hook: "Hook b", source_post_id: POST, batch_date: "2026-10-26", pillar: "w2-advantage" });
     expect(db.rows.find((x) => x.id === id)).toMatchObject({ status: "picked", idea_id: "idea1" });
   });
 
@@ -284,5 +285,43 @@ describe("regenerate", () => {
     const s = await startRecreation(db, POST, "same-recipe", NOW);
     if (!s.ok) throw new Error("x");
     expect(await regenerate(db, s.id, NOW)).toMatchObject({ ok: false }); // still pending
+  });
+});
+
+describe("the brand gate on Recreate", () => {
+  it("refuses to pick an option from before the brand check, and inserts nothing", async () => {
+    const db = fakeDb();
+    const s = await startRecreation(db, POST, "same-recipe", NOW);
+    if (!s.ok) throw new Error("start failed");
+    Object.assign(db.rows.find((r) => r.id === s.id)!, { status: "ready", options: OPTIONS });
+    expect(await pickOption(db, s.id, 0, NOW)).toEqual({ error: "These options are from before the brand check. Press Regenerate." });
+    expect(db.ideas).toHaveLength(0);
+  });
+
+  const failV = { verdict: "fail", reader: null, pillar: null, amplifica_pillar: null, failed: [{ item: "situation", reason: "Vague." }] };
+
+  it("keeps only the options that pass", async () => {
+    const db = fakeDb();
+    const s = await startRecreation(db, POST, "same-recipe", NOW);
+    if (!s.ok) throw new Error("start failed");
+    await runRecreation(db, withGatePass({ call: async () => ({ options: OPTIONS }) }, (t) => (t.includes("Hook b") ? undefined : failV)), s.id, NOW);
+    const row = db.rows.find((r) => r.id === s.id)!;
+    expect(row.status).toBe("ready");
+    expect(row.options.map((o) => o.topic)).toEqual(["b"]);
+  });
+
+  it("fails with the exact copy when none pass", async () => {
+    const db = fakeDb();
+    const s = await startRecreation(db, POST, "same-recipe", NOW);
+    if (!s.ok) throw new Error("start failed");
+    await runRecreation(db, withGatePass({ call: async () => ({ options: OPTIONS }) }, () => failV), s.id, NOW);
+    expect(db.rows.find((r) => r.id === s.id)).toMatchObject({ status: "failed", error: "None of the options met the brand standard." });
+  });
+
+  it("a picked option inserts its idea with the gate record and pillar", async () => {
+    const db = fakeDb();
+    const id = await readyRow(db);
+    await pickOption(db, id, 0, NOW);
+    expect(db.ideas[0]).toMatchObject({ pillar: "w2-advantage", gate: { result: { verdict: "pass" } } });
   });
 });

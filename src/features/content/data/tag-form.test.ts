@@ -14,7 +14,7 @@ describe("readTagForm", () => {
       form({
         id: ID,
         hook_type: "paradox", orig_hook_type: "question",
-        message: "velocity", orig_message: "velocity",
+        message: "w2-advantage", orig_message: "w2-advantage",
         post_style: "image", orig_post_style: "",
       })
     );
@@ -41,5 +41,13 @@ describe("readTagForm", () => {
     expect(readTagForm(form({ hook_type: "paradox", orig_hook_type: "" }))).toHaveProperty("error");
     expect(readTagForm(form({ id: ID, hook_spoken: "x".repeat(501), orig_hook_spoken: "" }))).toHaveProperty("error");
     expect(readTagForm(form({ id: ID, hook_type: "paradox", orig_hook_type: "paradox" }))).toHaveProperty("error");
+  });
+
+  it("rejects an old canon message on a correction", () => {
+    const fd = new FormData();
+    fd.set("id", "p1");
+    fd.set("orig_message", "w2-advantage");
+    fd.set("message", "velocity");
+    expect(readTagForm(fd)).toHaveProperty("error");
   });
 });

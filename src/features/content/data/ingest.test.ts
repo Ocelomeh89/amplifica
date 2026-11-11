@@ -66,12 +66,20 @@ describe("ingestPayload", () => {
     expect(ideas[0].chain_id).toBeNull();
   });
 
-  it("stores ideas as inbox with the routine's batch_date and score", async () => {
+  it("holds ideas for the brand gate, with the routine's batch_date and score", async () => {
     const { db, ideas } = fakeDb();
     await ingestPayload(db, example, "owner-1");
-    expect(ideas[0].status).toBe("inbox");
+    expect(ideas[0].status).toBe("gating");
+    expect(ideas[0].ingest_batch).toBeNull();
     expect(ideas[0].batch_date).toBe("2026-09-17");
     expect(ideas[0].score).toBe(0.82);
+  });
+
+  it("tags every idea with the ingest batch when given one", async () => {
+    const { db, ideas } = fakeDb();
+    const result = await ingestPayload(db, example, "owner-1", undefined, { batch: "batch-1" });
+    expect(ideas.every((i) => i.ingest_batch === "batch-1")).toBe(true);
+    expect(Object.keys(result.ideas[0]).sort()).toEqual(["format", "hook", "id", "title"]);
   });
 
   it("stores a hook-backlog newsletter idea with a null source", async () => {

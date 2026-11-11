@@ -17,6 +17,7 @@ import { syncQueuedIdeasToClickUp } from "@/features/content/data/clickup";
 import { supabaseTasteDb } from "@/features/content/data/supabase-taste-db";
 import { recordPassNote } from "@/features/content/data/taste";
 import { startProposalInBackground } from "@/features/content/data/taste-run";
+import { sweepInBackground } from "@/features/content/data/gate-run";
 import { str } from "@/shared/forms";
 import { reviveFields } from "@/features/content/engine/unused";
 import { nextRank, ranksAfterMove, visibleQueue } from "@/features/content/engine/queue";
@@ -27,6 +28,8 @@ import { FORMATS, type Format } from "@/features/content/engine/types";
 // /content tree. Writes carry .eq("user_id", user.id) on top of RLS.
 
 const revalidate = () => revalidatePath("/content", "layout");
+// Ideas the brand gate holds (waiting for a check, or failed) take no Like, Pass or Mark posted.
+const GATE_HELD = '("gating","gate_failed")';
 
 export async function likeIdea(formData: FormData) {
   const { supabase, user } = await requireContentOwner();
@@ -38,6 +41,7 @@ export async function likeIdea(formData: FormData) {
     .select("id, format")
     .eq("id", id)
     .eq("user_id", user.id)
+    .not("status", "in", GATE_HELD)
     .single();
   if (!idea) return;
 
@@ -81,7 +85,8 @@ export async function passIdea(formData: FormData) {
       feedback_at: new Date().toISOString(),
     })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .not("status", "in", GATE_HELD);
   if (error) throw new Error(error.message);
   // The reason is a taste note too; the fifth waiting note starts a proposal. Best effort:
   // the Pass has already happened and never fails here.
@@ -101,7 +106,8 @@ export async function archiveIdea(formData: FormData) {
     .from("content_ideas")
     .update({ status: "archived", queue_rank: null })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .neq("status", "gating");
   if (error) throw new Error(error.message);
   revalidate();
 }
@@ -167,6 +173,7 @@ export async function markPosted(formData: FormData): Promise<{ error: string | 
     .select("id, format, hook, pillar, hook_type")
     .eq("id", id)
     .eq("user_id", user.id)
+    .not("status", "in", GATE_HELD)
     .single();
   if (!idea) return { error: "Idea not found." };
 
@@ -327,6 +334,8 @@ async function runFound(
   };
   const result = await mineFound(deps, userId, input);
   if (!result.ok) return { error: result.error };
+  // The ideas wait for the brand gate; they reach the Inbox once it passes them.
+  sweepInBackground(userId, result.ideaIds);
   revalidate();
   return { error: null, count: result.count };
 }
