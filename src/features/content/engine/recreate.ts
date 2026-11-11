@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { BRAND_CONTEXT, IDEAS_PROMPT } from "./prompts/ideas";
 import { ingestIdeaSchema } from "./schema";
-import { HOOK_TYPES, MESSAGES, type PostTags } from "./tags";
+import { HOOK_TYPES, LEGACY_MESSAGES, MESSAGES, type PostTags } from "./tags";
 import { PILLARS, type GateResult } from "./brand";
 import type { WinnerInsights } from "./winners";
 
@@ -28,7 +28,8 @@ export const MODE_LABEL: Record<RecreateMode, string> = {
 export type RecreateOption = { hook: string; angle: string; topic: string; message: string; gate?: GateResult };
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
-const blankOrNone = (m: string) => m === "" || m === "none";
+// An old canon message counts as no message: options can only carry the five pillars now.
+const blankOrNone = (m: string) => m === "" || m === "none" || (LEGACY_MESSAGES as readonly string[]).includes(m);
 
 const optionSchema = z.object({
   hook: z.string().trim().min(1).max(200),

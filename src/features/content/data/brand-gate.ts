@@ -1,5 +1,6 @@
 import {
   GATE_TOOL_NAME,
+  VERIFIED_FIGURES,
   gateOutputSchema,
   gateSystemPrompt,
   gateToolSchema,
@@ -51,6 +52,19 @@ async function check(caller: ToolCaller, format: string, fields: GateFields, rew
 
 const resultOf = ({ rewrite: _rewrite, ...r }: Checked): GateResult => r;
 
+const textOf = (f: GateFields) => Object.values(f).map((v) => (Array.isArray(v) ? v.join("\n") : v)).join("\n");
+// A number not glued to a word ("W-2", "401(k)" and "401k" are names, not figures).
+const FIGURE = /(?<![A-Za-z-])\$?\d(?:[\d,.]*\d)?(?:%|k\b|x\b)?(?![\d(]|k\))/gi;
+const NOT_FIGURES = new Set(["401k", "1099"]);
+const norm = (t: string) => t.toLowerCase().replace(/,/g, "");
+const figuresIn = (text: string) => (text.match(FIGURE) ?? []).map((t) => t.replace(/\.$/, "")).filter((t) => !NOT_FIGURES.has(norm(t)));
+
+/** Figures a rewrite added that neither the original nor Miguel's verified figures contain. */
+export function addedFigures(original: GateFields, rewritten: GateFields): string[] {
+  const known = new Set([...figuresIn(textOf(original)), ...figuresIn(VERIFIED_FIGURES.join("\n"))].map(norm));
+  return Array.from(new Set(figuresIn(textOf(rewritten)).filter((t) => !known.has(norm(t)))));
+}
+
 export async function gatePiece(caller: ToolCaller, piece: { format: string; fields: GateFields }, opts: { rewrite: boolean }): Promise<GateOutcome> {
   const original = piece.fields;
   try {
@@ -59,8 +73,16 @@ export async function gatePiece(caller: ToolCaller, piece: { format: string; fie
     if (!opts.rewrite || !first.rewrite) return { status: "failed", result: resultOf(first), original };
     const rewritten = first.rewrite;
     const second = await check(caller, piece.format, rewritten, false);
-    if (second.verdict === "pass") return { status: "passed", fields: rewritten, rewritten: true, result: resultOf(second), original };
-    return { status: "failed", result: resultOf(second), original };
+    // A rewrite may not invent a number: the re-check never sees the original, so this is checked here.
+    const added = addedFigures(original, rewritten);
+    if (second.verdict === "pass" && added.length === 0) return { status: "passed", fields: rewritten, rewritten: true, result: resultOf(second), original };
+    const result = resultOf(second);
+    if (added.length === 0) return { status: "failed", result, original };
+    return {
+      status: "failed",
+      result: { ...result, verdict: "fail", failed: [...result.failed, { item: "guardrails", reason: `The rewrite adds figures the original did not have: ${added.join(", ")}.` }] },
+      original,
+    };
   } catch (e) {
     return { status: "error", error: message(e) };
   }

@@ -16,6 +16,7 @@ import {
   type RunRow,
 } from "./today";
 import { DAY, NOW, candidate, exp, fakeDb, gatePassing, idea } from "./today.fake";
+import { BRIEF_TOOL_NAME as BRIEF_TOOL } from "@/features/content/engine/today-brief";
 
 const brief = (slot: number, over: Record<string, unknown> = {}) => ({ slot, title: `T${slot}`, hook: `H${slot}`, say: ["a", "b", "c"], message: "w2-advantage", ...over });
 const caller = (out: unknown) => {
@@ -425,6 +426,26 @@ describe("the brand gate on briefs", () => {
     const c = gatePassing<ToolCaller>({ call: async () => ({ briefs: [brief(1), brief(2)] }) }, { H1: mismatch });
     expect(await generateDaily(f.db, c, NOW)).toEqual({ made: 1, error: null });
     expect(f.experiments.map((e) => e.slot)).toEqual([2]);
+  });
+
+  it("gates the day's briefs in parallel, so gating costs about one slot's time", async () => {
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2")] });
+    let inFlight = 0;
+    let peak = 0;
+    const base = gatePassing<ToolCaller>({ call: async () => ({ briefs: [brief(1), brief(2)] }) });
+    const c: ToolCaller = {
+      call: async (input) => {
+        if (input.tool.name !== BRIEF_TOOL) {
+          inFlight++;
+          peak = Math.max(peak, inFlight);
+          await new Promise((r) => setTimeout(r, 5));
+          inFlight--;
+        }
+        return base.call(input);
+      },
+    };
+    expect(await generateDaily(f.db, c, NOW)).toEqual({ made: 2, error: null });
+    expect(peak).toBe(2);
   });
 
   it("a gate error drops only that slot", async () => {

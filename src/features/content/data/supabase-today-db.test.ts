@@ -63,6 +63,20 @@ describe("supabaseTodayDb", () => {
     expect(log).toContainEqual(["content_ideas.eq", "user_id", "u1"]);
   });
 
+  it("patchIdea snapshots the gate record and pillar, and restoreIdea puts them back", async () => {
+    const before = { hook: "h0", hook_alt: null, hook_type: "", title: "t0", outline: [], status: "inbox", score: 1, gate: { result: { pillar: "life-by-design" } }, pillar: "life-by-design" };
+    const { client, log } = fakeClient({ content_ideas: { data: [before] } });
+    const db = supabaseTodayDb(client, "u1");
+    const snap = await db.patchIdea("i1", { hook: "h", hook_alt: "o", hook_type: "", title: "t", outline: [], status: "queued", score: 1 });
+    expect(snap).toMatchObject({ gate: before.gate, pillar: "life-by-design" });
+    const select = log.find((c) => c[0] === "content_ideas.select")![1] as string;
+    expect(select).toContain("gate");
+    expect(select).toContain("pillar");
+    await db.restoreIdea("i1", snap!);
+    const restore = log.filter((c) => c[0] === "content_ideas.update").pop()![1] as Record<string, unknown>;
+    expect(restore).toMatchObject({ gate: before.gate, pillar: "life-by-design" });
+  });
+
   it("insertMomentIdea stores the brand gate record and its pillar", async () => {
     const { client, log } = fakeClient({ content_ideas: { data: [{ id: "m1" }] } });
     const result = { verdict: "pass" as const, reader: "stephen" as const, pillar: "expensive-tuition" as const, amplifica_pillar: "the-numbers" as const, failed: [] };

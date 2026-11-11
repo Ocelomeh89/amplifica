@@ -18,6 +18,11 @@ const opt = (topic: string, message = "w2-advantage") => ({ hook: `Hook about ${
 const three = (message?: string) => [opt("a", message), opt("b", message), opt("c", message)];
 
 describe("recreateOutputSchema", () => {
+  it("same-recipe on a post still tagged with an old canon message accepts any pillar, like a blank source", () => {
+    const s = recreateOutputSchema("same-recipe", "velocity");
+    expect(s.safeParse({ options: [opt("a", "w2-advantage"), opt("b", "life-by-design"), opt("c", "none")] }).success).toBe(true);
+  });
+
   const same = recreateOutputSchema("same-recipe", "w2-advantage");
   it("accepts exactly 3 options", () => {
     expect(same.safeParse({ options: three() }).success).toBe(true);

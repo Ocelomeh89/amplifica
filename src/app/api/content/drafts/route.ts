@@ -8,6 +8,8 @@ import { anthropicToolCaller } from "@/features/content/data/claude";
 import type { GateFields } from "@/features/content/engine/brand";
 
 export const dynamic = "force-dynamic";
+// The brand gate checks the draft before it is stored.
+export const maxDuration = 300;
 
 // /content-draft's write path. Validates the whole body, lints, and stores the
 // raw and humanized rows with obsidian_path atomically, or writes nothing.
@@ -25,7 +27,7 @@ export async function POST(req: Request) {
     // The brand gate checks the draft as posted; the Obsidian file is the final, so it never rewrites.
     const check = async (format: string, fields: GateFields): Promise<GateOutcome> => {
       try {
-        return await gatePiece(anthropicToolCaller(), { format, fields }, { rewrite: false });
+        return await gatePiece(anthropicToolCaller({ timeoutMs: 40_000, maxRetries: 0 }), { format, fields }, { rewrite: false });
       } catch (e) {
         return { status: "error", error: (e as Error).message };
       }

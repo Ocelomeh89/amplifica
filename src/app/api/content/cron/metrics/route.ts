@@ -29,6 +29,7 @@ const PLATFORMS: CronPlatform[] = ["instagram", "youtube", "beehiiv"];
 // weekly competitor pull on any day (and runs the competitor step with `?platform=`).
 const BUDGET_SECONDS = 280;
 const GATE_SWEEP_LIMIT = 20;
+const GATE_CALL_SECONDS = 30;
 const BACKFILL_LIMIT = 25;
 export async function GET(req: Request) {
   const startedAt = new Date();
@@ -68,35 +69,6 @@ export async function GET(req: Request) {
 
   try {
     const report = await runMetricsCron({ db: supabaseMetricsDb(createAdminClient(), owner), userId: owner, now: new Date(), pulls });
-    // The brand gate releases any idea still waiting (a background sweep that died, or an API
-    // outage). Before the competitor step and Today, so a released idea can be briefed today.
-    let gate: Awaited<ReturnType<typeof runGateSweep>> | { error: string } | null = null;
-    if (!only) {
-      try {
-        gate = await runGateSweep(supabaseGateDb(createAdminClient(), owner), anthropicToolCaller({ timeoutMs: 60_000, maxRetries: 0 }), {
-          limit: GATE_SWEEP_LIMIT,
-          timeLeft: () => BUDGET_SECONDS - (Date.now() - startedAt.getTime()) / 1000,
-        });
-      } catch (e) {
-        console.error("content gate sweep failed", e);
-        gate = { error: (e as Error).message };
-      }
-    }
-    // The ClickUp digest lists a routine batch's ideas once the gate has settled all of them.
-    let digests: number | { error: string } = 0;
-    if (!only) {
-      try {
-        digests = await postDigests(
-          supabaseDigestDb(createAdminClient(), owner),
-          clickUpChatPoster({ token: process.env.CLICKUP_API_TOKEN, workspaceId: process.env.CLICKUP_WORKSPACE_ID }),
-          new Date(),
-          process.env.NEXT_PUBLIC_SITE_URL ?? "https://amplificawealth.com"
-        );
-      } catch (e) {
-        console.error("content gate digest failed", e);
-        digests = { error: (e as Error).message };
-      }
-    }
     // Competitor posts are collected and tagged before Today so a fresh one can take slot 2.
     // Like Today, a failure here never fails the metrics run.
     let competitors: Awaited<ReturnType<typeof runCompetitorCron>> | { error: string } | null = null;
@@ -128,6 +100,35 @@ export async function GET(req: Request) {
     } catch (e) {
       console.error("content today cron failed", e);
       today = { error: (e as Error).message };
+    }
+    // The brand gate releases any idea still waiting (a background sweep that died, or an API
+    // outage). Last, on the time Today leaves: the background sweep after ingest does most of the work.
+    let gate: Awaited<ReturnType<typeof runGateSweep>> | { error: string } | null = null;
+    if (!only) {
+      try {
+        gate = await runGateSweep(supabaseGateDb(createAdminClient(), owner), anthropicToolCaller({ timeoutMs: GATE_CALL_SECONDS * 1000, maxRetries: 0 }), {
+          limit: GATE_SWEEP_LIMIT,
+          timeLeft: () => BUDGET_SECONDS - (Date.now() - startedAt.getTime()) / 1000,
+        });
+      } catch (e) {
+        console.error("content gate sweep failed", e);
+        gate = { error: (e as Error).message };
+      }
+    }
+    // The ClickUp digest lists a routine batch's ideas once the gate has settled all of them.
+    let digests: number | { error: string } = 0;
+    if (!only) {
+      try {
+        digests = await postDigests(
+          supabaseDigestDb(createAdminClient(), owner),
+          clickUpChatPoster({ token: process.env.CLICKUP_API_TOKEN, workspaceId: process.env.CLICKUP_WORKSPACE_ID }),
+          new Date(),
+          process.env.NEXT_PUBLIC_SITE_URL ?? "https://amplificawealth.com"
+        );
+      } catch (e) {
+        console.error("content gate digest failed", e);
+        digests = { error: (e as Error).message };
+      }
     }
     return NextResponse.json({ ...report, gate, digests, competitors, today }, { status: report.ok ? 200 : 500 });
   } catch (e) {

@@ -192,6 +192,15 @@ describe("sharpenBlock", () => {
 });
 
 describe("the brand gate on Sharpen", () => {
+  it("refuses to pick a rewrite from before the brand check, and writes nothing", async () => {
+    const f = fakeSharpenDb();
+    const t = await start(f);
+    if (!t.ok) throw new Error("start failed");
+    Object.assign(f.rows[0], { status: "ready", options: [option(1), option(2), option(3)] });
+    expect(await pickSharpen(f.db, t.id, 0)).toEqual({ error: "These rewrites are from before the brand check. Press Try again." });
+    expect(f.calls.patches).toHaveLength(0);
+  });
+
   const failV = { verdict: "fail", reader: null, pillar: null, amplifica_pillar: null, failed: [{ item: "reader", reason: "Nobody." }] };
 
   it("keeps only the rewrites that pass, each with its gate result", async () => {

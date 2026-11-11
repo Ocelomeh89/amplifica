@@ -21,6 +21,11 @@ describe("GateFailedList", () => {
     expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();
   });
 
+  it("shows a reason with no item on its own", () => {
+    render(<GateFailedList rows={[{ ...row, failed: [{ item: "", reason: "The brand check could not run (3 tries): down" }] }]} />);
+    expect(screen.getByText("The brand check could not run (3 tries): down")).toBeInTheDocument();
+  });
+
   it("renders nothing when every idea passed", () => {
     const { container } = render(<GateFailedList rows={[]} />);
     expect(container).toBeEmptyDOMElement();

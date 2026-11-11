@@ -7,6 +7,8 @@ import { supabaseIngestDb } from "@/features/content/data/supabase-db";
 import { sweepInBackground } from "@/features/content/data/gate-run";
 
 export const dynamic = "force-dynamic";
+// The brand gate sweeps the batch after the response (waitUntil lives as long as the function).
+export const maxDuration = 300;
 
 // The routines' write path. Bearer-protected, validated whole, written whole.
 export async function POST(req: Request) {

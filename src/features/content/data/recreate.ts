@@ -156,6 +156,11 @@ export async function pickOption(db: RecreateDb, id: string, index: number, now:
     const option = row.options[index];
     const post = await db.sourceBasics(row.source_post_id);
     if (!option || !post) throw new Error("missing option or post");
+    // A card made before the brand gate carries no check; its text never reaches an idea.
+    if (!option.gate) {
+      await db.unclaim(id);
+      return { error: "These options are from before the brand check. Press Regenerate." };
+    }
     const ideaId = await db.insertIdea({ ...recreatedIdea(option, post, chicagoIsoDate(now)), ...gateColumns(option.gate, now) });
     await db.linkIdea(id, ideaId);
     return { ideaId };

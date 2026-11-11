@@ -4,11 +4,11 @@ import { gateRecord } from "./brand-gate";
 import type { DigestBatch, DigestDb } from "./gate-digest";
 import type { BackfillDb, BackfillIdea } from "./gate-backfill";
 import { refreshClickUpTask } from "./clickup";
-import { ideaPatchFrom, type GateDb, type GatingIdea } from "./gate-sweep";
+import { MAX_GATE_ATTEMPTS, ideaPatchFrom, type GateDb, type GatingIdea } from "./gate-sweep";
 
 type Client = SupabaseClient<Database>;
 
-const GATING_COLUMNS = "id, format, title, hook, belief_attacked, value_to_listener, why_it_stops, outline";
+const GATING_COLUMNS = "id, format, title, hook, belief_attacked, value_to_listener, why_it_stops, outline, gate_attempts";
 
 /**
  * The brand gate's reads and writes. Every query filters by the owner: the sweep runs with the
@@ -25,7 +25,7 @@ export function supabaseGateDb(client: Client, userId: string): GateDb {
     async gatingIdeas(limit, ids) {
       let q = ideas().select(GATING_COLUMNS).eq("user_id", userId).eq("status", "gating");
       if (ids) q = q.in("id", ids);
-      const { data, error } = await q.order("created_at").limit(limit);
+      const { data, error } = await q.order("gate_attempts").order("created_at").limit(limit);
       fail("gating ideas", error);
       return (data ?? []) as unknown as GatingIdea[];
     },
@@ -60,13 +60,26 @@ export function supabaseGateDb(client: Client, userId: string): GateDb {
       fail("fail", error);
     },
 
-    async bumpAttempt(id, reason) {
-      const { data, error } = await ideas().select("gate_attempts").eq("id", id).eq("user_id", userId).eq("status", "gating");
+    async bumpAttempt(idea, reason) {
+      const { error } = await ideas()
+        .update({ gate_attempts: idea.gate_attempts + 1 })
+        .eq("id", idea.id)
+        .eq("user_id", userId)
+        .eq("status", "gating")
+        .eq("gate_attempts", idea.gate_attempts);
       fail("attempts", error);
-      const current = ((data ?? []) as { gate_attempts: number }[])[0]?.gate_attempts ?? 0;
-      const { error: e2 } = await ideas().update({ gate_attempts: current + 1 }).eq("id", id).eq("user_id", userId).eq("status", "gating");
-      fail("attempts", e2);
-      console.error("brand gate: check failed, will retry", id, reason);
+      console.error("brand gate: check failed, will retry", idea.id, reason);
+    },
+
+    async giveUp(idea, reason) {
+      const result = { verdict: "fail" as const, reader: null, pillar: null, amplifica_pillar: null, failed: [] };
+      const gate = { ...gateRecord(result, false, new Date(), "gating"), error: `The brand check could not run (${MAX_GATE_ATTEMPTS} tries): ${reason}` } as unknown as Json;
+      const { error } = await ideas()
+        .update({ status: "gate_failed", gate, gate_attempts: idea.gate_attempts + 1 })
+        .eq("id", idea.id)
+        .eq("user_id", userId)
+        .eq("status", "gating");
+      fail("give up", error);
     },
   };
 }

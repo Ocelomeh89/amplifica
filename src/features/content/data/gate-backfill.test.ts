@@ -12,6 +12,7 @@ const idea = (id: string, over: Partial<BackfillIdea> = {}): BackfillIdea => ({
   value_to_listener: "v",
   why_it_stops: "w",
   outline: [{ beat: "one", note: "" }, { beat: "two", note: "" }, { beat: "three", note: "" }],
+  gate_attempts: 0,
   status: "inbox",
   queue_rank: null,
   held: false,
@@ -43,7 +44,7 @@ function fakeDb(ideas: BackfillIdea[]) {
 
 const failV = { verdict: "fail", reader: null, pillar: null, amplifica_pillar: null, failed: [{ item: "reader", reason: "Nobody." }] };
 /** A fail that offers a rewrite which still fails its re-check (its hook keeps the original text). */
-const failHard = (id: string) => ({ ...failV, rewrite: { title: "T", hook: `Hook ${id} again`, belief_attacked: "b", value_to_listener: "v", why_it_stops: "w", outline: ["1", "2", "3"] } });
+const failHard = (id: string) => ({ ...failV, rewrite: { title: "T", hook: `Hook ${id} again`, belief_attacked: "b", value_to_listener: "v", why_it_stops: "w", outline: ["one", "two", "three"] } });
 const forever = () => 1000;
 
 describe("runBackfill", () => {
@@ -58,7 +59,7 @@ describe("runBackfill", () => {
 
   it("a real run applies passes, refreshes a queued idea's ClickUp task when its text changed, and fails others out of their list", async () => {
     const db = fakeDb([idea("a", { status: "queued", queue_rank: 2 }), idea("b", { status: "queued", queue_rank: 3 })]);
-    const rewrite = { title: "T", hook: "New hook", belief_attacked: "b", value_to_listener: "v", why_it_stops: "w", outline: ["1", "2", "3"] };
+    const rewrite = { title: "T", hook: "New hook", belief_attacked: "b", value_to_listener: "v", why_it_stops: "w", outline: ["one", "two", "three"] };
     const c = withGatePass({ call: async () => ({}) }, (t) => (t.includes("Hook a") ? { ...failV, rewrite } : t.includes("Hook b") ? failHard("b") : undefined));
     const r = await runBackfill(db, c, { dryRun: false, limit: 25, timeLeft: forever });
     expect(r).toMatchObject({ passed: 1, rewritten: 1, failed: 1 });

@@ -62,6 +62,16 @@ describe("IdeaCard", () => {
     expect(screen.getByText("optionality")).toBeInTheDocument();
   });
 
+  it("offers no Like or Pass on an idea the brand gate holds, and says why", () => {
+    const { unmount } = render(<IdeaCard idea={{ ...idea, status: "gating" }} sourceUrl={null} siblings={[]} />);
+    expect(screen.queryByRole("button", { name: /Like/ })).not.toBeInTheDocument();
+    expect(screen.getByText("Waiting for the brand check.")).toBeInTheDocument();
+    unmount();
+    render(<IdeaCard idea={{ ...idea, status: "gate_failed" }} sourceUrl={null} siblings={[]} />);
+    expect(screen.queryByRole("button", { name: /Pass/ })).not.toBeInTheDocument();
+    expect(screen.getByText("Didn't pass the brand check. Archive it from Performance.")).toBeInTheDocument();
+  });
+
   it("has Like and Pass buttons", () => {
     render(<IdeaCard idea={idea} sourceUrl={null} siblings={[]} />);
     expect(screen.getByRole("button", { name: /Like/ })).toBeInTheDocument();

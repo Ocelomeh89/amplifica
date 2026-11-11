@@ -49,7 +49,7 @@ export async function loadInboxLinks(db: Db, userId: string, sourceIds: string[]
       ? db.from("content_sources").select("id, url, kind, angle:meta->>angle").eq("user_id", userId).in("id", sourceIds)
       : Promise.resolve({ data: [] as { id: string; url: string | null; kind: string; angle: string | null }[], error: null }),
     chainIds.length
-      ? db.from("content_ideas").select("id, format, chain_id").eq("user_id", userId).in("chain_id", chainIds)
+      ? db.from("content_ideas").select("id, format, chain_id").eq("user_id", userId).in("chain_id", chainIds).neq("status", "gating")
       : Promise.resolve({ data: [] as { id: string; format: Format; chain_id: string | null }[], error: null }),
   ]);
   return { sources: must(sources) ?? [], chainMates: must(chainMates) ?? [] };
@@ -91,6 +91,7 @@ export async function loadIdeaContext(db: Db, userId: string, idea: IdeaRow) {
           .eq("chain_id", idea.chain_id)
           .eq("user_id", userId)
           .neq("id", idea.id)
+          .neq("status", "gating")
       : Promise.resolve({ data: [] as { id: string; format: Format; hook: string; status: string }[], error: null }),
     db
       .from("content_posts")
@@ -249,6 +250,13 @@ export async function loadOpenRecreations(db: Db, userId: string, now: Date): Pr
 
 export type GateFailedRow = { id: string; title: string; format: Format; source: string | null; failed: { item: string; reason: string }[] };
 
+/** The gate's failed items; a check that never ran gives its error as a reason with no item. */
+function failedOf(gate: unknown): { item: string; reason: string }[] {
+  const g = gate as { result?: { failed?: { item: string; reason: string }[] }; error?: string } | null;
+  const failed = (g?.result?.failed ?? []).map((f) => ({ item: f.item, reason: f.reason }));
+  return failed.length === 0 && g?.error ? [{ item: "", reason: g.error }] : failed;
+}
+
 /** Ideas the brand gate held back, newest first, with their source title and the failed items. */
 export async function loadGateFailed(db: Db, userId: string): Promise<GateFailedRow[]> {
   const { data, error } = await db
@@ -272,7 +280,7 @@ export async function loadGateFailed(db: Db, userId: string): Promise<GateFailed
     title: r.title,
     format: r.format,
     source: r.source_id ? titles.get(r.source_id) ?? null : null,
-    failed: ((r.gate as { result?: { failed?: { item: string; reason: string }[] } } | null)?.result?.failed ?? []).map((f) => ({ item: f.item, reason: f.reason })),
+    failed: failedOf(r.gate),
   }));
 }
 

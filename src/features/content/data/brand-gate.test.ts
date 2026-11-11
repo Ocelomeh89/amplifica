@@ -53,6 +53,26 @@ describe("gatePiece", () => {
     if (o.status === "failed") expect(o.result.failed).toEqual([{ item: "reader", reason: "Still nobody." }]);
   });
 
+  it("fails a rewrite that adds a figure the original and the verified figures do not have", async () => {
+    const invented = { ...rewrite, hook: "A $40k HELOC at 9% beats your 401k" };
+    const c = scripted([fail({ rewrite: invented }), pass]);
+    const o = await gatePiece(c, piece, { rewrite: true });
+    expect(o.status).toBe("failed");
+    if (o.status === "failed") expect(o.result.failed).toContainEqual({ item: "guardrails", reason: "The rewrite adds figures the original did not have: $40k, 9%." });
+  });
+
+  it("does not count account and form names like 401k or W-2 as figures", async () => {
+    const named = { title: "T", hook: "Your W-2 and your 401(k) are not the problem; a 401k is fine", outline: ["a", "b", "c"] };
+    expect((await gatePiece(scripted([fail({ rewrite: named }), pass]), piece, { rewrite: true })).status).toBe("passed");
+  });
+
+  it("allows a rewrite that keeps the original's figures or uses a verified one", async () => {
+    const withFigures = { format: "reel", fields: { title: "T", hook: "Paying 7% on $20,000", outline: ["a", "b", "c"] } };
+    const kept = { title: "T", hook: "$20,000 at 7%, then $100,000 in debt reduction", outline: ["a", "b", "c"] };
+    const o = await gatePiece(scripted([fail({ rewrite: kept }), pass]), withFigures, { rewrite: true });
+    expect(o.status).toBe("passed");
+  });
+
   it("does not rewrite when told not to", async () => {
     const c = scripted([fail()]);
     const o = await gatePiece(c, piece, { rewrite: false });

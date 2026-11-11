@@ -20,8 +20,8 @@ export default function GateFailedList({ rows }: { rows: GateFailedRow[] }) {
               </div>
               {r.source && <p className="text-xs text-sub mb-1">From {r.source}</p>}
               <ul className="text-xs text-sub list-disc pl-4">
-                {r.failed.map((f) => (
-                  <li key={f.item}>{`${gateItemLabel(f.item)}: ${f.reason}`}</li>
+                {r.failed.map((f, k) => (
+                  <li key={`${f.item}-${k}`}>{f.item ? `${gateItemLabel(f.item)}: ${f.reason}` : f.reason}</li>
                 ))}
               </ul>
             </div>

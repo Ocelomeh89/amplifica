@@ -3,15 +3,18 @@ import type { GateOutcome } from "./brand-gate";
 import type { ToolCaller, ToolCallInput } from "./claude";
 import type { GateDb, GatingIdea } from "./gate-sweep";
 
-type Row = GatingIdea & { status: string; gate_attempts: number; applied?: GateOutcome; lastError?: string };
+type Row = GatingIdea & { status: string; applied?: GateOutcome; lastError?: string };
 
 /** In-memory GateDb for tests. */
 export function fakeGateDb(ideas: GatingIdea[]) {
-  const rows: Row[] = ideas.map((i) => ({ ...i, status: "gating", gate_attempts: 0 }));
+  const rows: Row[] = ideas.map((i) => ({ ...i, status: "gating" }));
   const db: GateDb & { rows: Row[] } = {
     rows,
     async gatingIdeas(limit, ids) {
-      return rows.filter((r) => r.status === "gating" && (!ids || ids.includes(r.id))).slice(0, limit);
+      return rows
+        .filter((r) => r.status === "gating" && (!ids || ids.includes(r.id)))
+        .sort((a, b) => a.gate_attempts - b.gate_attempts)
+        .slice(0, limit);
     },
     async applyPass(id, o) {
       const r = rows.find((x) => x.id === id && x.status === "gating");
@@ -21,9 +24,13 @@ export function fakeGateDb(ideas: GatingIdea[]) {
       const r = rows.find((x) => x.id === id && x.status === "gating");
       if (r) Object.assign(r, { status: "gate_failed", applied: o });
     },
-    async bumpAttempt(id, error) {
-      const r = rows.find((x) => x.id === id);
+    async bumpAttempt(idea, error) {
+      const r = rows.find((x) => x.id === idea.id && x.gate_attempts === idea.gate_attempts);
       if (r) Object.assign(r, { gate_attempts: r.gate_attempts + 1, lastError: error });
+    },
+    async giveUp(idea, error) {
+      const r = rows.find((x) => x.id === idea.id && x.status === "gating");
+      if (r) Object.assign(r, { status: "gate_failed", gate_attempts: r.gate_attempts + 1, lastError: error });
     },
   };
   return db;

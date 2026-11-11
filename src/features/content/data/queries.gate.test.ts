@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/shared/supabase/database.types";
-import { loadGateFailed, loadPillarBalance } from "./queries";
+import { loadGateFailed, loadInboxLinks, loadPillarBalance } from "./queries";
 
 vi.mock("server-only", () => ({}));
 
@@ -14,7 +14,7 @@ function fakeClient(tables: Record<string, unknown[]>) {
       const b: Record<string, unknown> = {
         then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: tables[table] ?? [], error: null }).then(ok),
       };
-      for (const m of ["select", "eq", "in", "gte", "order", "limit"]) {
+      for (const m of ["select", "eq", "in", "gte", "order", "limit", "neq"]) {
         b[m] = (...args: unknown[]) => {
           log.push([`${table}.${m}`, ...args]);
           return b;
@@ -38,6 +38,13 @@ describe("loadGateFailed", () => {
   });
 });
 
+describe("loadGateFailed for a check that never ran", () => {
+  it("gives the error as the reason", async () => {
+    const { client } = fakeClient({ content_ideas: [{ id: "i2", title: "T", format: "reel", source_id: null, gate: { result: { failed: [] }, error: "The brand check could not run (3 tries): down" } }] });
+    expect((await loadGateFailed(client, "u1"))[0].failed).toEqual([{ item: "", reason: "The brand check could not run (3 tries): down" }]);
+  });
+});
+
 describe("loadPillarBalance", () => {
   it("counts this week's passed ideas and posted pieces per pillar", async () => {
     const { client } = fakeClient({
@@ -47,5 +54,13 @@ describe("loadPillarBalance", () => {
     const b = await loadPillarBalance(client, "u1", new Date("2026-11-10T15:00:00Z"));
     expect(b["w2-advantage"]).toBe(2);
     expect(b["life-by-design"]).toBe(0);
+  });
+});
+
+describe("chain badges skip ideas the brand gate still holds", () => {
+  it("loadInboxLinks leaves out gating siblings", async () => {
+    const { client, log } = fakeClient({});
+    await loadInboxLinks(client, "u1", [], ["c1"]);
+    expect(log).toContainEqual(["content_ideas.neq", "status", "gating"]);
   });
 });

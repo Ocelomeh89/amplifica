@@ -100,8 +100,13 @@ export default function IdeaCard({ idea, sourceUrl, siblings, focused, passOpen,
         </div>
       )}
 
-      <div className="flex items-start gap-2">
-        <form action={likeIdea}>
+      {idea.status === "gating" || idea.status === "gate_failed" ? (
+        <p className="text-sm text-sub">
+          {idea.status === "gating" ? "Waiting for the brand check." : "Didn't pass the brand check. Archive it from Performance."}
+        </p>
+      ) : (
+        <div className="flex items-start gap-2">
+          <form action={likeIdea}>
           <input type="hidden" name="id" value={idea.id} />
           <button
             type="submit"
@@ -131,7 +136,8 @@ export default function IdeaCard({ idea, sourceUrl, siblings, focused, passOpen,
             <button type="button" onClick={() => setOpen(false)} className="text-xs text-sub hover:underline">Cancel</button>
           </form>
         )}
-      </div>
+        </div>
+      )}
       {sharpenSlot}
     </article>
   );

@@ -16,18 +16,26 @@ export type GatingIdea = {
   value_to_listener: string;
   why_it_stops: string;
   outline: OutlineBeat[];
+  /** Checks that errored so far; at MAX_GATE_ATTEMPTS the idea goes to gate_failed. */
+  gate_attempts: number;
 };
 
 export interface GateDb {
-  /** Oldest first; `ids` narrows to those ideas. */
+  /** Fewest attempts first, then oldest; `ids` narrows to those ideas. */
   gatingIdeas(limit: number, ids?: string[]): Promise<GatingIdea[]>;
   applyPass(id: string, o: Extract<GateOutcome, { status: "passed" }>, idea: GatingIdea): Promise<void>;
   applyFail(id: string, o: Extract<GateOutcome, { status: "failed" }>): Promise<void>;
-  bumpAttempt(id: string, error: string): Promise<void>;
+  /** One more errored check; conditional on the attempts read, so two sweeps never lose a count. */
+  bumpAttempt(idea: GatingIdea, error: string): Promise<void>;
+  /** The check errored MAX_GATE_ATTEMPTS times: gate_failed, with the error as the reason. */
+  giveUp(idea: GatingIdea, error: string): Promise<void>;
 }
 
-/** Stop while this many seconds remain, so the cron's later steps keep their time. */
-export const SWEEP_RESERVE_SECONDS = 180;
+/** Stop while this many seconds remain: one idea's two 30-second calls and a margin. The cron runs the sweep last. */
+export const SWEEP_RESERVE_SECONDS = 70;
+
+/** A check that errors this many times is given up on, so the idea is findable, not stuck. */
+export const MAX_GATE_ATTEMPTS = 3;
 
 const asText = (v: string | string[] | undefined) => (Array.isArray(v) ? v.join("\n") : v ?? "");
 const asList = (v: string | string[] | undefined) => (Array.isArray(v) ? v : v ? [v] : []);
@@ -76,8 +84,11 @@ export async function runGateSweep(
       } else if (o.status === "failed") {
         await db.applyFail(idea.id, o);
         out.failed += 1;
+      } else if (idea.gate_attempts + 1 >= MAX_GATE_ATTEMPTS) {
+        await db.giveUp(idea, o.error);
+        out.failed += 1;
       } else {
-        await db.bumpAttempt(idea.id, o.error);
+        await db.bumpAttempt(idea, o.error);
         out.errors += 1;
       }
     } catch (e) {

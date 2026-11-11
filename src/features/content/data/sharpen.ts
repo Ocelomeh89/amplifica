@@ -154,6 +154,11 @@ export async function pickSharpen(db: SharpenDb, id: string, index: number): Pro
     }
     const option = row.options[index];
     if (!option) throw new Error("missing option");
+    // A card made before the brand gate carries no check; its text never reaches an idea.
+    if (!option.gate) {
+      await db.unclaim(id);
+      return { error: "These rewrites are from before the brand check. Press Try again." };
+    }
     if (!(await db.patchIdea(idea.id, { ...sharpenIdeaPatch(option, idea.hook), ...gateColumns(option.gate, new Date()) }))) throw new Error("idea not written");
     return { ideaId: idea.id, queued: idea.status === "queued" };
   } catch {

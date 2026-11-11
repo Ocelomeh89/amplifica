@@ -104,12 +104,12 @@ describe("content stays owner-only", () => {
     expect(competitors).toBeLessThan(route.indexOf("runTodayCron("));
   });
 
-  it("the brand gate sweeps after the pulls and before the competitor step", () => {
+  it("the cron's brand gate sweep runs after Today, on the time Today leaves, then the digest", () => {
     const route = read("src/app/api/content/cron/metrics/route.ts");
     const sweep = route.indexOf("runGateSweep(");
-    expect(sweep).toBeGreaterThan(route.indexOf("runMetricsCron("));
-    expect(sweep).toBeLessThan(route.indexOf("runCompetitorCron("));
+    expect(sweep).toBeGreaterThan(route.indexOf("runTodayCron("));
     expect(route.indexOf("postDigests(")).toBeGreaterThan(sweep);
+    expect(route).toContain("timeoutMs: GATE_CALL_SECONDS * 1000");
   });
 
   it("every new idea is swept by the brand gate right after it is written", () => {
@@ -127,6 +127,12 @@ describe("content stays owner-only", () => {
     expect(route).toContain('params.get("backfill")');
     expect(route).toContain('dryRun: backfill !== "run"');
     expect(route.indexOf("runBackfill(")).toBeLessThan(route.indexOf("runMetricsCron("));
+  });
+
+  it("routes that run the brand gate allow 300 seconds and give Claude explicit timeouts", () => {
+    for (const f of ["src/app/api/content/ingest/route.ts", "src/app/api/content/drafts/route.ts"]) expect(read(f), f).toContain("export const maxDuration = 300;");
+    expect(read("src/features/content/data/gate-run.ts")).toContain("anthropicToolCaller({ timeoutMs: 60_000, maxRetries: 0 })");
+    expect(read("src/app/api/content/drafts/route.ts")).toContain("anthropicToolCaller({ timeoutMs: 40_000, maxRetries: 0 })");
   });
 
   it("a posted draft is checked by the brand gate without a rewrite", () => {

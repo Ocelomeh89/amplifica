@@ -289,6 +289,15 @@ describe("regenerate", () => {
 });
 
 describe("the brand gate on Recreate", () => {
+  it("refuses to pick an option from before the brand check, and inserts nothing", async () => {
+    const db = fakeDb();
+    const s = await startRecreation(db, POST, "same-recipe", NOW);
+    if (!s.ok) throw new Error("start failed");
+    Object.assign(db.rows.find((r) => r.id === s.id)!, { status: "ready", options: OPTIONS });
+    expect(await pickOption(db, s.id, 0, NOW)).toEqual({ error: "These options are from before the brand check. Press Regenerate." });
+    expect(db.ideas).toHaveLength(0);
+  });
+
   const failV = { verdict: "fail", reader: null, pillar: null, amplifica_pillar: null, failed: [{ item: "situation", reason: "Vague." }] };
 
   it("keeps only the options that pass", async () => {

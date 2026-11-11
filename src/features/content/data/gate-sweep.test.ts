@@ -12,6 +12,7 @@ const idea = (id: string): GatingIdea => ({
   value_to_listener: "v",
   why_it_stops: "w",
   outline: [{ beat: "one", note: "n1" }, { beat: "two", note: "n2" }, { beat: "three", note: "" }],
+  gate_attempts: 0,
 });
 const pass = { verdict: "pass", reader: "stephen", pillar: "expensive-tuition", amplifica_pillar: "the-numbers", failed: [] };
 const fail = { verdict: "fail", reader: null, pillar: null, amplifica_pillar: null, failed: [{ item: "reader", reason: "Nobody." }] };
@@ -44,9 +45,15 @@ describe("runGateSweep", () => {
     expect(db.rows[0]).toMatchObject({ status: "gating", gate_attempts: 1, lastError: "down" });
   });
 
-  it("stops when less than 180 seconds remain, so the competitor step and Today keep their time", async () => {
+  it("after the third failed try the idea leaves gating for Didn't pass, with why", async () => {
+    const db = fakeGateDb([{ ...idea("a"), gate_attempts: 2 }]);
+    await runGateSweep(db, caller([new Error("still down")]), { limit: 10, timeLeft: forever });
+    expect(db.rows[0]).toMatchObject({ status: "gate_failed", lastError: "still down" });
+  });
+
+  it("stops when less than 70 seconds remain: one idea's two 30-second calls and a margin", async () => {
     const db = fakeGateDb([idea("a"), idea("b")]);
-    let left = 340;
+    let left = 200;
     const res = await runGateSweep(db, caller([pass, pass]), { limit: 10, timeLeft: () => (left -= 90) });
     expect(res.passed).toBe(1);
     expect(db.rows[1].status).toBe("gating");

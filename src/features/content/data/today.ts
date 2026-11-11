@@ -92,7 +92,8 @@ export type RunRow = {
 };
 
 export type IdeaLite = { id: string; title: string; hook: string; pillar: string; hook_alt: string | null; status: string };
-export type IdeaSnapshot = { hook: string; hook_alt: string | null; hook_type: string; title: string; outline: unknown; status: string; score: number };
+/** What a brief rewrite changes, so a failed run can put it back (gate and pillar included). */
+export type IdeaSnapshot = { hook: string; hook_alt: string | null; hook_type: string; title: string; outline: unknown; status: string; score: number; gate?: unknown; pillar?: string };
 
 export type BriefCompetitor = { username: string; url: string; multiple: number; thin: boolean; pushes_belief: string | null; format_note: string | null };
 
@@ -392,10 +393,12 @@ export async function runDaily(db: TodayDb, caller: ToolCaller, runId: string, n
     if (planned.length === 0) return await fail("No test is left to run today.");
 
     // The brand gate: a brief that does not pass leaves its slot empty and its idea untouched.
+    // In parallel, so the gate costs about one brief's two calls, not one per slot.
     const gates = new Map<number, GateRecord>();
-    for (const p of [...planned]) {
+    const checked = await Promise.all(planned.map((p) => gateBrief(caller, briefFor(p.slot), now)));
+    for (const [k, p] of [...planned].entries()) {
       const b = briefFor(p.slot);
-      const g = await gateBrief(caller, b, now);
+      const g = checked[k];
       if (g) {
         briefs.splice(briefs.indexOf(b), 1, g.brief);
         gates.set(p.slot, g.gate);

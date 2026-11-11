@@ -20,7 +20,7 @@ export function sweepInBackground(userId: string, ids: string[]): void {
   const started = Date.now();
   let caller;
   try {
-    caller = anthropicToolCaller();
+    caller = anthropicToolCaller({ timeoutMs: 60_000, maxRetries: 0 });
   } catch {
     return;
   }

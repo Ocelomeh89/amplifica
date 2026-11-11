@@ -28,7 +28,7 @@ function fakeClient(data: unknown = []) {
 }
 
 const result = { verdict: "pass" as const, reader: "daniel" as const, pillar: "w2-advantage" as const, amplifica_pillar: "the-numbers" as const, failed: [] };
-const idea = { id: "i1", format: "reel", title: "T", hook: "H", belief_attacked: "B", value_to_listener: "V", why_it_stops: "W", outline: [{ beat: "a", note: "n" }] };
+const idea = { id: "i1", format: "reel", title: "T", hook: "H", belief_attacked: "B", value_to_listener: "V", why_it_stops: "W", outline: [{ beat: "a", note: "n" }], gate_attempts: 2 };
 const updates = (log: Call[]) => log.filter((c) => c[0] === "content_ideas.update").map((c) => c[1] as Record<string, unknown>);
 
 describe("supabaseGateDb", () => {
@@ -38,9 +38,9 @@ describe("supabaseGateDb", () => {
     await db.gatingIdeas(5);
     await db.applyPass("i1", { status: "passed", fields: {}, rewritten: false, result, original: {} }, idea);
     await db.applyFail("i1", { status: "failed", result: { ...result, verdict: "fail" }, original: {} });
-    await db.bumpAttempt("i1", "down");
+    await db.bumpAttempt(idea, "down");
     expect(log.filter((c) => c[0] === "content_ideas.from").length).toBe(log.filter((c) => c[0] === "content_ideas.eq" && c[1] === "user_id" && c[2] === "u1").length);
-    expect(log.filter((c) => c[0] === "content_ideas.eq" && c[1] === "status" && c[2] === "gating").length).toBe(5);
+    expect(log.filter((c) => c[0] === "content_ideas.eq" && c[1] === "status" && c[2] === "gating").length).toBe(4);
   });
 
   it("a plain pass sets inbox, the pillar and the gate record, and no text", async () => {
@@ -64,10 +64,13 @@ describe("supabaseGateDb", () => {
     const { client, log } = fakeClient([{ gate_attempts: 2 }]);
     const db = supabaseGateDb(client, "u1");
     await db.applyFail("i1", { status: "failed", result: { ...result, verdict: "fail" }, original: {} });
-    await db.bumpAttempt("i1", "down");
-    const [f, b] = updates(log);
+    await db.bumpAttempt(idea, "down");
+    await db.giveUp(idea, "down");
+    const [f, b, g] = updates(log);
     expect(f).toMatchObject({ status: "gate_failed", gate: { prior_status: "gating" } });
     expect(b).toEqual({ gate_attempts: 3 });
+    expect(log).toContainEqual(["content_ideas.eq", "gate_attempts", 2]);
+    expect(g).toMatchObject({ status: "gate_failed", gate_attempts: 3, gate: { error: "The brand check could not run (3 tries): down" } });
   });
 });
 
