@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
 import Card from "@/shared/ui/Card";
 import { fmtCurrency, fmtMonth } from "@/shared/format";
-import { createFundMove, deleteFundMove } from "@/features/investments/data/actions";
+import { createFundMove, strandFundMove } from "@/features/investments/data/actions";
+import StrandButton from "./StrandButton";
 import { inputCls, primaryBtn } from "./labels";
 
 export interface MoveRowData {
@@ -14,6 +14,7 @@ export interface MoveRowData {
   toName: string;
   amount: number;
   capped: boolean;
+  stranded: boolean;
 }
 
 // Re-allocating the fund: "move $X from A to B in month M".
@@ -81,20 +82,21 @@ export default function MovesCard({
         <table className="w-full text-sm">
           <tbody>
             {moves.map((m) => (
-              <tr key={m.id} className="border-t border-edge">
+              <tr key={m.id} className={`border-t border-edge ${m.stranded ? "text-sub" : ""}`}>
                 <td className="py-2">{fmtMonth(m.month)}</td>
                 <td>
-                  {m.fromName} → {m.toName}
+                  {m.fromName} → {m.stranded ? "Default growth" : m.toName}
                 </td>
                 <td>{fmtCurrency(m.amount)}</td>
-                <td className="text-xs text-amber-700">{m.capped ? "More than was there; only the balance moves" : ""}</td>
+                <td className="text-xs">
+                  {m.stranded ? (
+                    <span>Deleted: moved to Default growth instead of {m.toName}</span>
+                  ) : m.capped ? (
+                    <span className="text-amber-700">More than was there; only the balance moves</span>
+                  ) : null}
+                </td>
                 <td className="text-right">
-                  <form action={deleteFundMove}>
-                    <input type="hidden" name="id" value={m.id} />
-                    <button type="submit" className="text-sub hover:text-red-600" aria-label="Delete move">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </form>
+                  {!m.stranded && <StrandButton id={m.id} action={strandFundMove} sourceName={m.fromName} label="Delete move" />}
                 </td>
               </tr>
             ))}

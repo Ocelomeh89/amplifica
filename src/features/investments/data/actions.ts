@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/shared/supabase/auth";
 import { str } from "@/shared/forms";
 import { currentYearMonth, type YearMonth } from "@/shared/finance/dates";
-import { runFundCheck, termsAt, type FundStatus } from "@/shared/finance/fund-check";
+import { isWorse, runFundCheck, termsAt, type FundStatus } from "@/shared/finance/fund-check";
 import { fmtMonth } from "@/shared/format";
 import { parseOptionForm, versionRow, monthStart, parseMoveForm, parseCheckinForm } from "./parse";
 import { loadFundCheckInput } from "./load";
@@ -38,7 +38,7 @@ export async function createInvestmentOption(fd: FormData): Promise<void> {
 // What the fund check says if this edit is saved. Writes nothing.
 export async function previewOptionEdit(
   fd: FormData
-): Promise<{ status: FundStatus; runOutMonth: YearMonth | null }> {
+): Promise<{ worse: boolean; status: FundStatus; runOutMonth: YearMonth | null }> {
   const { supabase } = await requireUser();
   const id = str(fd, "id");
   const f = parseOptionForm(fd);
@@ -55,8 +55,9 @@ export async function previewOptionEdit(
           ],
         }
   );
-  const r = runFundCheck({ ...input, options });
-  return { status: r.status, runOutMonth: r.runOutMonth };
+  const before = runFundCheck(input);
+  const after = runFundCheck({ ...input, options });
+  return { worse: isWorse(before, after), status: after.status, runOutMonth: after.runOutMonth };
 }
 
 // Forward-only: the edit is a version from this month on. A same-month edit
@@ -120,11 +121,18 @@ export async function createFundMove(fd: FormData): Promise<void> {
   refresh();
 }
 
-export async function deleteFundMove(fd: FormData): Promise<void> {
+// "Deleting" a move strands it: the money still left the source that month, but
+// it now sits in Default growth. Can't be undone (the UI says so first).
+export async function strandFundMove(fd: FormData): Promise<void> {
   const { supabase, user } = await requireUser();
   const id = str(fd, "id");
   if (!id) return;
-  const { error } = await supabase.from("fund_moves").delete().eq("id", id).eq("user_id", user.id);
+  const { error } = await supabase
+    .from("fund_moves")
+    .update({ stranded_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .is("stranded_at", null);
   if (error) throw new Error(error.message);
   refresh();
 }
@@ -137,11 +145,18 @@ export async function createCheckin(fd: FormData): Promise<void> {
   refresh();
 }
 
-export async function deleteCheckin(fd: FormData): Promise<void> {
+// "Deleting" a check-in strands it: the holding is still set to the checked-in
+// value that month, then that whole value moves to Default growth. Can't be undone.
+export async function strandCheckin(fd: FormData): Promise<void> {
   const { supabase, user } = await requireUser();
   const id = str(fd, "id");
   if (!id) return;
-  const { error } = await supabase.from("holding_checkins").delete().eq("id", id).eq("user_id", user.id);
+  const { error } = await supabase
+    .from("holding_checkins")
+    .update({ stranded_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .is("stranded_at", null);
   if (error) throw new Error(error.message);
   refresh();
 }

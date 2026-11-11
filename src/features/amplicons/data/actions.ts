@@ -5,7 +5,7 @@ import { requireUser } from "@/shared/supabase/auth";
 import { revalidatePath } from "next/cache";
 import { str } from "@/shared/forms";
 import { parseAmpliconForm, parseAllocations } from "./parse";
-import { writeAllocations } from "./allocations";
+import { readSplitHistory, saveSplit } from "./allocations";
 
 export async function createAmplicon(formData: FormData) {
   const { supabase, user } = await requireUser();
@@ -18,7 +18,7 @@ export async function createAmplicon(formData: FormData) {
     .select("id")
     .single();
   if (error || !data) throw new Error(error?.message ?? "Could not save the Amplicon.");
-  await writeAllocations(supabase, user.id, data.id, allocs);
+  await saveSplit(supabase, data.id, allocs);
 
   revalidatePath("/amplicons");
   revalidatePath("/dashboard");
@@ -26,7 +26,7 @@ export async function createAmplicon(formData: FormData) {
 }
 
 export async function editAmplicon(formData: FormData) {
-  const { supabase, user } = await requireUser();
+  const { supabase } = await requireUser();
 
   const id = str(formData, "id");
   if (!id) throw new Error("Missing amplicon id");
@@ -38,7 +38,7 @@ export async function editAmplicon(formData: FormData) {
     .update(fields)
     .eq("id", id);
   if (error) throw new Error(error.message);
-  await writeAllocations(supabase, user.id, id, allocs);
+  await saveSplit(supabase, id, allocs);
 
   revalidatePath("/amplicons");
   revalidatePath("/dashboard");
@@ -71,17 +71,32 @@ export async function duplicateAmplicon(formData: FormData) {
   }).select("id").single();
   if (error || !copy) throw new Error(error?.message ?? "Could not copy the Amplicon.");
 
-  // The copy keeps the same split.
-  const { data: split } = await supabase
-    .from("amplicon_allocations")
-    .select("investment_option_id, pct")
-    .eq("amplicon_id", id);
-  await writeAllocations(
-    supabase,
-    user.id,
-    copy.id,
-    (split ?? []).map((a) => ({ investment_option_id: a.investment_option_id, pct: Number(a.pct) }))
-  );
+  // The copy starts with the same split as the original's current version.
+  const { versions } = await readSplitHistory(supabase, id);
+  const current = versions.length > 0 ? versions[versions.length - 1].allocations : [];
+  await saveSplit(supabase, copy.id, current);
+
+  revalidatePath("/amplicons");
+  revalidatePath("/dashboard");
+  revalidatePath("/investment-options");
+}
+
+// Undo / History: make an earlier split version current again, by saving it as
+// a new version. Nothing is deleted, so a restore can itself be undone.
+export async function restoreSplit(formData: FormData) {
+  const { supabase } = await requireUser();
+  const splitId = str(formData, "split_id");
+  if (!splitId) return;
+  const { data: split, error } = await supabase
+    .from("amplicon_splits")
+    .select("amplicon_id")
+    .eq("id", splitId)
+    .single();
+  if (error || !split) throw new Error(error?.message ?? "Split version not found");
+  const { versions } = await readSplitHistory(supabase, split.amplicon_id);
+  const target = versions.find((v) => v.id === splitId);
+  if (!target) throw new Error("Split version not found");
+  await saveSplit(supabase, split.amplicon_id, target.allocations);
 
   revalidatePath("/amplicons");
   revalidatePath("/dashboard");

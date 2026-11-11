@@ -1,48 +1,72 @@
 import { describe, expect, it } from "vitest";
-import { writeAllocations } from "./allocations";
+import { saveSplit } from "./allocations";
 
-// A stand-in for the Supabase client: records calls, returns a canned error.
-function fakeClient(error: { code?: string; message: string } | null) {
-  const calls: string[] = [];
-  const result = { error };
-  const chain: Record<string, unknown> = {};
-  chain.eq = () => chain;
-  chain.then = (res: (v: typeof result) => unknown) => Promise.resolve(result).then(res);
+type Res = { data?: unknown; error: { code?: string; message: string } | null };
+
+// A stand-in for the Supabase client: every query chain resolves to the canned
+// result for its table; rpc calls are recorded.
+function fakeClient(tables: Record<string, Res>, rpcResult: Res = { error: null }) {
+  const rpcCalls: unknown[] = [];
+  const chainFor = (r: Res) => {
+    const c: Record<string, unknown> = {};
+    for (const m of ["select", "eq", "order", "limit", "in"]) c[m] = () => c;
+    c.then = (res: (v: Res) => unknown) => Promise.resolve(r).then(res);
+    return c;
+  };
   return {
-    calls,
+    rpcCalls,
     client: {
-      from: (t: string) => ({
-        delete: () => {
-          calls.push(`delete ${t}`);
-          return chain;
-        },
-        insert: () => {
-          calls.push(`insert ${t}`);
-          return Promise.resolve(result);
-        },
-      }),
+      from: (t: string) => chainFor(tables[t] ?? { data: [], error: null }),
+      rpc: (name: string, args: unknown) => {
+        rpcCalls.push({ name, args });
+        return Promise.resolve(rpcResult);
+      },
     },
   };
 }
 
-describe("writeAllocations before migration 0019", () => {
-  it("an empty split is a no-op when the table is missing", async () => {
-    const { client } = fakeClient({ code: "42P01", message: 'relation "amplicon_allocations" does not exist' });
-    await expect(writeAllocations(client as never, "u", "a", [])).resolves.toBeUndefined();
+const missing = { data: null, error: { code: "42P01", message: "relation does not exist" } };
+
+describe("saveSplit", () => {
+  it("an empty split is a no-op before migration 0019", async () => {
+    const f = fakeClient({ amplicon_splits: missing });
+    await expect(saveSplit(f.client as never, "amp", [])).resolves.toBeUndefined();
+    expect(f.rpcCalls).toEqual([]);
   });
 
-  it("PostgREST's missing-table code counts too", async () => {
-    const { client } = fakeClient({ code: "PGRST205", message: "Could not find the table" });
-    await expect(writeAllocations(client as never, "u", "a", [])).resolves.toBeUndefined();
+  it("a real split before migration 0019 fails loudly", async () => {
+    const f = fakeClient({ amplicon_splits: missing });
+    await expect(saveSplit(f.client as never, "amp", [{ investment_option_id: "o", pct: 1 }])).rejects.toThrow(
+      "migration 0019"
+    );
   });
 
-  it("a real split still fails loudly when the table is missing", async () => {
-    const { client } = fakeClient({ code: "42P01", message: "missing" });
-    await expect(writeAllocations(client as never, "u", "a", [{ investment_option_id: "o", pct: 1 }])).rejects.toThrow();
+  it("saving the current split again writes nothing", async () => {
+    const f = fakeClient({
+      amplicon_splits: { data: [{ id: "s1", seq: 1, amplicon_id: "amp", created_at: "x" }], error: null },
+      amplicon_allocations: { data: [{ split_id: "s1", investment_option_id: "o", pct: 1 }], error: null },
+    });
+    await saveSplit(f.client as never, "amp", [{ investment_option_id: "o", pct: 1 }]);
+    expect(f.rpcCalls).toEqual([]);
   });
 
-  it("other errors still throw", async () => {
-    const { client } = fakeClient({ code: "42501", message: "denied" });
-    await expect(writeAllocations(client as never, "u", "a", [])).rejects.toThrow("denied");
+  it("no history and no split writes nothing (still Default growth)", async () => {
+    const f = fakeClient({ amplicon_splits: { data: [], error: null } });
+    await saveSplit(f.client as never, "amp", []);
+    expect(f.rpcCalls).toEqual([]);
+  });
+
+  it("a changed split is saved as a new version through the database function", async () => {
+    const f = fakeClient({
+      amplicon_splits: { data: [{ id: "s1", seq: 1, amplicon_id: "amp", created_at: "x" }], error: null },
+      amplicon_allocations: { data: [{ split_id: "s1", investment_option_id: "o", pct: 1 }], error: null },
+    });
+    await saveSplit(f.client as never, "amp", []);
+    expect(f.rpcCalls).toEqual([{ name: "save_amplicon_split", args: { p_amplicon_id: "amp", p_allocations: [] } }]);
+  });
+
+  it("a database error still throws", async () => {
+    const f = fakeClient({ amplicon_splits: { data: [], error: null } }, { error: { code: "P0001", message: "Split must add up to 100%." } });
+    await expect(saveSplit(f.client as never, "amp", [{ investment_option_id: "o", pct: 1 }])).rejects.toThrow("100%");
   });
 });

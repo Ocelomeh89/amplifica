@@ -36,9 +36,10 @@ export default function OptionForm({
         return;
       }
       if (!warning) {
+        // Only an edit that makes the fund check worse needs a second click.
         const p = await previewOptionEdit(fd);
-        if (p.status === "short-now") return setWarning("With this change, your fund can't cover this month.");
-        if (p.status === "runs-out" && p.runOutMonth)
+        if (p.worse && p.status === "short-now") return setWarning("With this change, your fund can't cover this month.");
+        if (p.worse && p.runOutMonth)
           return setWarning(`With this change, your fund runs out of liquid money in ${fmtMonth(p.runOutMonth)}.`);
       }
       await editInvestmentOption(fd);

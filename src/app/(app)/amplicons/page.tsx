@@ -4,21 +4,21 @@ import { monthlyPayoutOf, isActiveAt } from "@/shared/finance/projection";
 import Card from "@/shared/ui/Card";
 import NewAmpliconForm from "@/features/amplicons/ui/NewAmpliconForm";
 import AmpliconRow from "@/features/amplicons/ui/AmpliconRow";
+import { groupSplits } from "@/shared/splits";
 
 export default async function AmpliconsPage() {
   const { supabase } = await requireUser();
 
-  const [{ data: amplicons }, { data: optionRows }, { data: allocRows }] = await Promise.all([
+  const [{ data: amplicons }, { data: optionRows }, { data: splitRows }, { data: allocRows }] = await Promise.all([
     supabase.from("amplicons").select("*").order("start_date", { ascending: false }),
     // Missing tables (migration 0019 not applied) read as empty: no split UI rows.
     supabase.from("investment_options").select("id, name").order("name"),
-    supabase.from("amplicon_allocations").select("amplicon_id, investment_option_id, pct"),
+    supabase.from("amplicon_splits").select("id, seq, amplicon_id, created_at"),
+    supabase.from("amplicon_allocations").select("split_id, investment_option_id, pct"),
   ]);
   const options = optionRows ?? [];
-  const allocationsOf = (id: string) =>
-    (allocRows ?? [])
-      .filter((r) => r.amplicon_id === id)
-      .map((r) => ({ investment_option_id: r.investment_option_id, pct: Number(r.pct) }));
+  const history = groupSplits(splitRows ?? [], allocRows ?? []);
+  const versionsOf = (id: string) => history.get(id) ?? [];
 
   const todayMonth = new Date().toISOString().slice(0, 7);
 
@@ -79,7 +79,7 @@ export default async function AmpliconsPage() {
                     endMonth={endMonth}
                     active={active}
                     options={options}
-                    allocations={allocationsOf(a.id)}
+                    versions={versionsOf(a.id)}
                   />
                 );
               })}

@@ -6,6 +6,7 @@ import { loadFundCheckInput } from "@/features/investments/data/load";
 import NewOptionButton from "@/features/investments/ui/NewOptionButton";
 import OptionRow, { type OptionRowData } from "@/features/investments/ui/OptionRow";
 import MovesCard from "@/features/investments/ui/MovesCard";
+import CheckinsCard from "@/features/investments/ui/CheckinsCard";
 
 export default async function InvestmentOptionsPage() {
   const { supabase } = await requireUser();
@@ -70,6 +71,17 @@ export default async function InvestmentOptionsPage() {
           toName: nameOf(m.toId),
           amount: m.amount,
           capped: result.cappedMoveIds.includes(m.id),
+          stranded: !!m.stranded,
+        }))}
+      />
+
+      <CheckinsCard
+        checkins={[...data.checkins].reverse().map((c) => ({
+          id: c.id as string,
+          month: c.month,
+          optionName: nameOf(c.optionId),
+          value: c.value,
+          stranded: !!c.stranded,
         }))}
       />
     </div>
