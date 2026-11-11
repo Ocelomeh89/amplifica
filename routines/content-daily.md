@@ -183,22 +183,16 @@ report it. On success the response lists `ideas` with their `id`s and
 
 ## 7. Post the digest to ClickUp
 
-When building the digest, match each returned idea to its own payload — match
-on `format` and `hook`, never by array position — the database does not
-guarantee returned-row order. If a returned idea matches nothing, list it
-without a deep link rather than guessing.
-
-Format labels come from `FORMAT_LABEL` in
-`src/features/content/engine/types.ts` (Reel, YouTube, Newsletter, Story, X).
+The ideas themselves are not listed here. Every idea waits for the brand gate,
+and the app posts the ideas that passed to the same channel once the gate has
+checked the whole batch. This message covers the run only.
 
 Send one message to chat channel `7-9011777568-8` with the ClickUp connector
 (`clickup_send_chat_message`, markdown), in this shape:
 
 ```
-**Content ideas for <date>** — <n> new, <m> recordings read
-
-1. [Reel] <hook> — <CONTENT_API_BASE>/content/ideas/<id>
-2. [Newsletter] <hook> — …
+**Content run for <date>**: <n> ideas sent to the brand gate, <m> recordings read
+The ideas that pass will follow in a separate message from the app.
 
 Waiting for a decision (not read): <k> — <CONTENT_API_BASE>/content/sources
 <one line per pending title>
@@ -214,7 +208,7 @@ When the run failed at any step, post instead:
 `**Content run failed** — <step> — <one-line error>` and stop.
 
 If the ClickUp post itself fails, retry once after 30 seconds; if it fails
-again, end the run — the ideas are already saved and will show in the inbox.
+again, end the run — the ideas are already saved and reach the inbox once the brand gate passes them.
 
 Do not post anything else, do not create tasks (the app does that on Like),
 and do not modify the repository.

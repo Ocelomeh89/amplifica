@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/shared/supabase/database.types";
 import { gateRecord } from "./brand-gate";
+import type { DigestBatch, DigestDb } from "./gate-digest";
 import { ideaPatchFrom, type GateDb, type GatingIdea } from "./gate-sweep";
 
 type Client = SupabaseClient<Database>;
@@ -64,6 +65,41 @@ export function supabaseGateDb(client: Client, userId: string): GateDb {
       const { error: e2 } = await ideas().update({ gate_attempts: current + 1 }).eq("id", id).eq("user_id", userId).eq("status", "gating");
       fail("attempts", e2);
       console.error("brand gate: check failed, will retry", id, reason);
+    },
+  };
+}
+
+/** Undigested ingest batches for the ClickUp digest. Every query filters by the owner. */
+export function supabaseDigestDb(client: Client, userId: string): DigestDb {
+  return {
+    async openBatches() {
+      const { data, error } = await client
+        .from("content_ideas")
+        .select("id, format, hook, status, ingest_batch, source_id")
+        .eq("user_id", userId)
+        .not("ingest_batch", "is", null)
+        .is("digest_posted_at", null);
+      if (error) throw new Error(`brand gate digest: ${error.message}`);
+      const rows = (data ?? []) as { id: string; format: string; hook: string; status: string; ingest_batch: string; source_id: string | null }[];
+      const sourceIds = Array.from(new Set(rows.map((r) => r.source_id).filter((x): x is string => x !== null)));
+      const kinds = new Map<string, string>();
+      if (sourceIds.length > 0) {
+        const { data: sources, error: e2 } = await client.from("content_sources").select("id, kind").eq("user_id", userId).in("id", sourceIds);
+        if (e2) throw new Error(`brand gate digest sources: ${e2.message}`);
+        for (const s of (sources ?? []) as { id: string; kind: string }[]) kinds.set(s.id, s.kind);
+      }
+      const batches = new Map<string, DigestBatch>();
+      for (const r of rows) {
+        const b = batches.get(r.ingest_batch) ?? { batch: r.ingest_batch, ideas: [] };
+        b.ideas.push({ id: r.id, format: r.format, hook: r.hook, status: r.status, source_kind: r.source_id ? kinds.get(r.source_id) ?? null : null });
+        batches.set(r.ingest_batch, b);
+      }
+      return Array.from(batches.values());
+    },
+
+    async markDigested(batch, at) {
+      const { error } = await client.from("content_ideas").update({ digest_posted_at: at }).eq("user_id", userId).eq("ingest_batch", batch).is("digest_posted_at", null);
+      if (error) throw new Error(`brand gate digest stamp: ${error.message}`);
     },
   };
 }

@@ -2,7 +2,8 @@ import { waitUntil } from "@vercel/functions";
 import { createAdminClient } from "@/shared/supabase/admin";
 import { anthropicToolCaller } from "./claude";
 import { runGateSweep } from "./gate-sweep";
-import { supabaseGateDb } from "./supabase-gate-db";
+import { clickUpChatPoster, postDigests } from "./gate-digest";
+import { supabaseDigestDb, supabaseGateDb } from "./supabase-gate-db";
 
 // Runs the brand gate on freshly written ideas after the response. A plain module, not a
 // server-action file: every export of a server-action file is a callable endpoint.
@@ -23,10 +24,16 @@ export function sweepInBackground(userId: string, ids: string[]): void {
   } catch {
     return;
   }
-  const db = supabaseGateDb(createAdminClient(), userId);
-  waitUntil(
-    runGateSweep(db, caller, { limit: ids.length, ids, timeLeft: () => BUDGET_SECONDS - (Date.now() - started) / 1000 }).catch((e) =>
-      console.error("brand gate: background sweep failed", e instanceof Error ? e.message : e)
-    )
-  );
+  const client = createAdminClient();
+  const run = async () => {
+    await runGateSweep(supabaseGateDb(client, userId), caller, { limit: ids.length, ids, timeLeft: () => BUDGET_SECONDS - (Date.now() - started) / 1000 });
+    // The batch is settled now (unless the gate errored), so its digest goes out without waiting for the cron.
+    await postDigests(
+      supabaseDigestDb(client, userId),
+      clickUpChatPoster({ token: process.env.CLICKUP_API_TOKEN, workspaceId: process.env.CLICKUP_WORKSPACE_ID }),
+      new Date(),
+      process.env.NEXT_PUBLIC_SITE_URL ?? "https://amplificawealth.com"
+    );
+  };
+  waitUntil(run().catch((e) => console.error("brand gate: background sweep failed", e instanceof Error ? e.message : e)));
 }

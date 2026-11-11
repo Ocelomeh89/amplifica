@@ -109,6 +109,7 @@ describe("content stays owner-only", () => {
     const sweep = route.indexOf("runGateSweep(");
     expect(sweep).toBeGreaterThan(route.indexOf("runMetricsCron("));
     expect(sweep).toBeLessThan(route.indexOf("runCompetitorCron("));
+    expect(route.indexOf("postDigests(")).toBeGreaterThan(sweep);
   });
 
   it("every new idea is swept by the brand gate right after it is written", () => {
@@ -117,6 +118,8 @@ describe("content stays owner-only", () => {
     expect(ingest).toContain("sweepInBackground(");
     expect(read("src/features/content/data/actions.ts")).toContain("sweepInBackground(");
     expect(read("src/features/content/data/gate-run.ts")).not.toContain('"use server"');
+    // The digest goes out as soon as the background sweep settles the batch, not at the next cron.
+    expect(read("src/features/content/data/gate-run.ts").indexOf("postDigests(")).toBeGreaterThan(read("src/features/content/data/gate-run.ts").indexOf("runGateSweep("));
   });
 
   it("a Pass stores its reason as a note, and background helpers stay out of the 'use server' files", () => {

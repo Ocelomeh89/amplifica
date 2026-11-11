@@ -5,7 +5,8 @@ import { runMetricsCron, type CronPlatform } from "@/features/content/data/metri
 import { supabaseMetricsDb } from "@/features/content/data/supabase-db";
 import { runCompetitorCron } from "@/features/content/data/competitor-cron";
 import { runGateSweep } from "@/features/content/data/gate-sweep";
-import { supabaseGateDb } from "@/features/content/data/supabase-gate-db";
+import { supabaseDigestDb, supabaseGateDb } from "@/features/content/data/supabase-gate-db";
+import { clickUpChatPoster, postDigests } from "@/features/content/data/gate-digest";
 import { supabaseCompetitorsDb } from "@/features/content/data/supabase-competitors-db";
 import { apifyClientFromEnv } from "@/features/content/data/pulls/apify";
 import { anthropicToolCaller } from "@/features/content/data/claude";
@@ -63,6 +64,21 @@ export async function GET(req: Request) {
         gate = { error: (e as Error).message };
       }
     }
+    // The ClickUp digest lists a routine batch's ideas once the gate has settled all of them.
+    let digests: number | { error: string } = 0;
+    if (!only) {
+      try {
+        digests = await postDigests(
+          supabaseDigestDb(createAdminClient(), owner),
+          clickUpChatPoster({ token: process.env.CLICKUP_API_TOKEN, workspaceId: process.env.CLICKUP_WORKSPACE_ID }),
+          new Date(),
+          process.env.NEXT_PUBLIC_SITE_URL ?? "https://amplificawealth.com"
+        );
+      } catch (e) {
+        console.error("content gate digest failed", e);
+        digests = { error: (e as Error).message };
+      }
+    }
     // Competitor posts are collected and tagged before Today so a fresh one can take slot 2.
     // Like Today, a failure here never fails the metrics run.
     let competitors: Awaited<ReturnType<typeof runCompetitorCron>> | { error: string } | null = null;
@@ -95,7 +111,7 @@ export async function GET(req: Request) {
       console.error("content today cron failed", e);
       today = { error: (e as Error).message };
     }
-    return NextResponse.json({ ...report, gate, competitors, today }, { status: report.ok ? 200 : 500 });
+    return NextResponse.json({ ...report, gate, digests, competitors, today }, { status: report.ok ? 200 : 500 });
   } catch (e) {
     console.error("content metrics cron failed", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

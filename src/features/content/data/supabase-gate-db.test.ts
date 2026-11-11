@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/shared/supabase/database.types";
-import { supabaseGateDb } from "./supabase-gate-db";
+import { supabaseDigestDb, supabaseGateDb } from "./supabase-gate-db";
 
 vi.mock("server-only", () => ({}));
 
@@ -15,7 +15,7 @@ function fakeClient(data: unknown = []) {
       const b: Record<string, unknown> = {
         then: (ok: (v: unknown) => unknown) => Promise.resolve({ data, error: null }).then(ok),
       };
-      for (const m of ["select", "eq", "in", "is", "not", "order", "limit", "update", "maybeSingle"]) {
+      for (const m of ["select", "eq", "in", "is", "not", "order", "limit", "update", "maybeSingle", "neq"]) {
         b[m] = (...args: unknown[]) => {
           log.push([`${table}.${m}`, ...args]);
           return b;
@@ -68,5 +68,32 @@ describe("supabaseGateDb", () => {
     const [f, b] = updates(log);
     expect(f).toMatchObject({ status: "gate_failed", gate: { prior_status: "gating" } });
     expect(b).toEqual({ gate_attempts: 3 });
+  });
+});
+
+describe("supabaseDigestDb", () => {
+  it("groups undigested batch ideas with their source kind, all filtered by the owner", async () => {
+    const rows = [
+      { id: "a", format: "reel", hook: "h", status: "inbox", ingest_batch: "b1", source_id: "s1" },
+      { id: "b", format: "reel", hook: "h", status: "gating", ingest_batch: "b1", source_id: null },
+    ];
+    const log: Call[] = [];
+    const client = {
+      from(table: string) {
+        log.push([`${table}.from`]);
+        const data = table === "content_sources" ? [{ id: "s1", kind: "url" }] : rows;
+        const b: Record<string, unknown> = { then: (ok: (v: unknown) => unknown) => Promise.resolve({ data, error: null }).then(ok) };
+        for (const m of ["select", "eq", "in", "is", "not", "update"]) b[m] = (...args: unknown[]) => (log.push([`${table}.${m}`, ...args]), b);
+        return b;
+      },
+    } as unknown as SupabaseClient<Database>;
+    const db = supabaseDigestDb(client, "u1");
+    expect(await db.openBatches()).toEqual([
+      { batch: "b1", ideas: [{ id: "a", format: "reel", hook: "h", status: "inbox", source_kind: "url" }, { id: "b", format: "reel", hook: "h", status: "gating", source_kind: null }] },
+    ]);
+    await db.markDigested("b1", "2026-11-11T12:00:00Z");
+    const froms = log.filter((c) => c[0].endsWith(".from")).length;
+    expect(log.filter((c) => c[0].endsWith(".eq") && c[1] === "user_id" && c[2] === "u1").length).toBe(froms);
+    expect(log).toContainEqual(["content_ideas.update", { digest_posted_at: "2026-11-11T12:00:00Z" }]);
   });
 });
