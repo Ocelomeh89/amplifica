@@ -42,6 +42,7 @@ changing behavior.** In `compare/engine/` 31 of 50 files are tests; in
 | Feature | What it is |
 |---|---|
 | `amplicons/` | CRUD for amortized investments. `data/actions.ts` + two UI files. |
+| `investments/` | Investment options, Amplicon splits, fund moves, value check-ins and the dashboard fund check (math in `shared/finance/fund-check.ts`, warning-only). `amplicons/` gets the option list as props from `app/`. |
 | `loc/` | CRUD for lines of credit. `updateUtilization` deliberately has no user check — it leans on RLS. |
 | `dashboard/` | Charts + forward projection: settings table (0012), save action, seeded projection, optionality meter. |
 | `settings/` | Profile goals + theme toggle. |

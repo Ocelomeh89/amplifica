@@ -210,6 +210,17 @@ Unique index on `(lower(email), source)` — repeat submits are idempotent (2350
 | `created_at` | timestamptz | |
 Email is **not** unique: a retake adds a row (`leads` still dedupes by email). **RLS enabled with no policies**, like `leads`; only the service-role client reads or writes it. Applied by hand in the Supabase SQL editor.
 
+### Investment options and the fund check — migration 0019
+Five user-owned tables (RLS self CRUD, `touch_updated_at`). A `null` option id in `fund_moves` / `holding_checkins` means the built-in **Default growth** holding (code constant: 10% appreciation, infinite, liquid).
+| Table | What |
+|---|---|
+| `investment_options` | `id`, `user_id`, `name` |
+| `investment_option_versions` | an option's terms from `effective_month` on: `option_type` (`amortized` / `interest_only` / `appreciation`), `rate_pct` (annual decimal), `term_months` (null = infinite), `liquid`. Unique `(option_id, effective_month)`. Edits only look forward. |
+| `amplicon_allocations` | where an Amplicon's face value went: ≤ 3 rows, `pct` sums to 1 (action-enforced). Cascades with the Amplicon; `restrict` on the option. No rows = Default growth. |
+| `fund_moves` | "move `amount` from A to B in `move_month`". `restrict` on both options. |
+| `holding_checkins` | the actual `value` of a holding in `checkin_month`; the fund check continues from it. |
+Applied by hand in the Supabase SQL editor.
+
 **Triggers/functions (0001):** `touch_updated_at()` (auto `updated_at`), `handle_new_user()` (auto-insert profile on signup, `security definer`).
 
 **TypeScript mirror:** `src/shared/supabase/database.types.ts` mirrors all tables as `Row`/`Insert`/`Update`; exported aliases `Projection`, `Amplicon`, `LoC`, `Profile`, `Lead`, `QuizSubmission`.
@@ -233,6 +244,8 @@ Email is **not** unique: a retake adds a row (`leads` still dedupes by email). *
 **Accounting convention:** nominal (undiscounted) throughout the simulator — assets are booked at the sum of their remaining nominal payouts. This is intentional and documented; it makes long-run totals optimistic, so the FI *date* is the more robust output than the dollar magnitudes.
 
 ---
+
+**Fund check (`fund-check.ts`, 2026-11):** `runFundCheck` replays the user's fund month by month from the tracked Amplicons: deposits in each launch month (start − 1) per split, dated moves (capped at the source balance; illiquid sources can't be sold), growth and income per option type (`stepLot`), value check-ins, then the month's Amplicon payments (`monthlyPayoutOf`): income first, surplus leaves to repay the LoC, shortfall sold from liquid holdings lowest-rate first. Status: `short-now` (this month uncovered), `runs-out` (first future uncovered month), else `ok`. Past shortfalls are ignored. **Warning-only: it changes no engine number.**
 
 ## 6. The flywheel simulator (`projection-sim.ts`) — model spec
 
@@ -292,6 +305,7 @@ so month 0 is the draw alone.
 **Authenticated `(app)`** (shared `Sidebar` layout):
 - `/dashboard` — net-worth & cash-flow charts over time (`ChartPair`), driven by the user's Amplicons via `projection.ts`. A "Project forward" toggle adds a dashed projection; the gear saves per-user settings (`dashboard_projection_settings`); the optionality meter shows today's cash flow as a share of the cash flow at the optionality month.
 - `/amplicons` — list + inline create/edit/delete (`AmpliconRow`, `NewAmpliconForm`, shared `AmpliconFields` with the STI/LTI dropdown; FormData contract in `data/parse.ts`).
+- `/investment-options` — the user's investment options (create, forward-only edit with a fund-check preview and "Save anyway", delete blocked while in use), "Update value" check-ins, and fund moves. The Amplicon form's "Invested in" section splits face value across up to 3 of them. The dashboard shows the fund check (`FundCheckCard`) above the charts.
 - `/loc` — list + create; `UtilizationCell` and `RateCell` for live utilization and rate edits (both feed the dashboard projection).
 - `/projections` — list + "New projection" button; `/[id]` opens `EditorForm` (the live simulator: inputs, perpetual + drawdown controls, **Expected future payments @ 5/10/15yr (accumulation)** card, **financial-optionality readout**, `SimCharts`, `FlywheelExplainer`). `EditorForm` is a thin composition over the shared simulator UI in `src/features/simulator/` (`useSimulation` hook + `SimInputsGrid` + `SimResults`); the grid's `name=` attributes carry the `updateProjection` FormData contract. The five expert inputs (perpetual yield/mix/trigger, stop-MSC, withdrawal) sit behind a collapsed **"Advanced" ribbon**; collapsed fields are CSS-hidden, not unmounted, so the save FormData still posts them. **UI copy says "financial optionality"** (renamed from "financial independence" — engine names like `projection-fi.ts` are internal and unchanged).
 - `/settings` — profile settings form + light/dark `ThemeToggle`.

@@ -19,6 +19,7 @@ detail. Read that before changing behavior.
 | `projection.ts` | The simpler net-worth / cash-flow projection used by the dashboard. |
 | `projection-fi.ts` | `earliestSustainableWithdrawal` — the "financial optionality" month. |
 | `dashboard-seed.ts` | `seedFromTracked` — tracked Amplicons + LoCs → the `seed` that starts `runSimulation` from today. Future-dated Amplicons are scheduled (funded by a draw), never booked for free. |
+| `fund-check.ts` | `runFundCheck` — can the real fund behind the Amplicons cover every payment? Option terms (versioned), lots, moves, check-ins. Reads schedules via `projection.ts`; changes no engine output. |
 | `amortization.ts` | Payment, schedule, remaining principal. Used by the loan calculator and two compare builders. |
 | `dates.ts` | Month-key helpers. |
 
