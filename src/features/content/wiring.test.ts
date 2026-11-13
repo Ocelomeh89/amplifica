@@ -104,6 +104,13 @@ describe("content stays owner-only", () => {
     expect(competitors).toBeLessThan(route.indexOf("runTodayCron("));
   });
 
+  it("the follower count is stored after the pulls and before the competitor step", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    const store = route.indexOf("storeFollowers(");
+    expect(store).toBeGreaterThan(route.indexOf("runMetricsCron("));
+    expect(store).toBeLessThan(route.indexOf("runCompetitorCron("));
+  });
+
   it("the cron's brand gate sweep runs after Today, on the time Today leaves, then the digest", () => {
     const route = read("src/app/api/content/cron/metrics/route.ts");
     const sweep = route.indexOf("runGateSweep(");

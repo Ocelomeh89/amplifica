@@ -12,9 +12,10 @@ import { supabaseCompetitorsDb } from "@/features/content/data/supabase-competit
 import { apifyClientFromEnv } from "@/features/content/data/pulls/apify";
 import { anthropicToolCaller } from "@/features/content/data/claude";
 import { supabaseTodayDb } from "@/features/content/data/supabase-today-db";
+import { storeFollowers, supabaseAccountStatsDb } from "@/features/content/data/account-stats";
 import { runTodayCron } from "@/features/content/data/today-cron";
 import { pullBeehiiv } from "@/features/content/data/pulls/beehiiv";
-import { pullInstagram } from "@/features/content/data/pulls/instagram";
+import { pullIgFollowers, pullInstagram } from "@/features/content/data/pulls/instagram";
 import { CHANNEL_HANDLE, pullYouTube } from "@/features/content/data/pulls/youtube";
 
 export const dynamic = "force-dynamic";
@@ -69,6 +70,21 @@ export async function GET(req: Request) {
 
   try {
     const report = await runMetricsCron({ db: supabaseMetricsDb(createAdminClient(), owner), userId: owner, now: new Date(), pulls });
+    // One follower reading a day, for the weekly review's follows tile. Its own try/catch: a failure here
+    // is reported in the reply and never fails the metrics run.
+    let followers: Awaited<ReturnType<typeof storeFollowers>> | null = null;
+    if (!only || only === "instagram") {
+      try {
+        followers = await storeFollowers(
+          supabaseAccountStatsDb(createAdminClient(), owner),
+          () => pullIgFollowers({ apiKey: process.env.COMPOSIO_API_KEY, connectionId: process.env.COMPOSIO_IG_CONNECTION_ID, userId: process.env.COMPOSIO_USER_ID }),
+          new Date()
+        );
+      } catch (e) {
+        console.error("content follower count failed", e);
+        followers = { followers: null, error: (e as Error).message };
+      }
+    }
     // Competitor posts are collected and tagged before Today so a fresh one can take slot 2.
     // Like Today, a failure here never fails the metrics run.
     let competitors: Awaited<ReturnType<typeof runCompetitorCron>> | { error: string } | null = null;
@@ -130,7 +146,7 @@ export async function GET(req: Request) {
         digests = { error: (e as Error).message };
       }
     }
-    return NextResponse.json({ ...report, gate, digests, competitors, today }, { status: report.ok ? 200 : 500 });
+    return NextResponse.json({ ...report, followers, gate, digests, competitors, today }, { status: report.ok ? 200 : 500 });
   } catch (e) {
     console.error("content metrics cron failed", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
