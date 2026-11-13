@@ -2,6 +2,7 @@ import { statusOf, type Multiplier, type PostScore, type Status } from "./baseli
 import type { NormalizedPost } from "./normalize";
 import { CTA_TYPES, HOOK_TYPES, LOW_CONFIDENCE, MESSAGES, ONSCREEN_TEXT, POST_STYLES, TAG_LABELS, type PostTags } from "./tags";
 import { isEligible, type WinnerPost } from "./winners";
+import type { ExtraOutcome } from "./focus";
 
 // Today: daily briefs as one-variable tests. Pure logic for the evidence counts,
 // control recipe, picker, reason and verdict lives here; nothing in this file
@@ -107,7 +108,7 @@ function tagOf(p: EvidencePost, variable: Counted): string | null {
 }
 
 /** Wins, losses and flats per value, over tagged Reels in the window whose views have settled enough to rank. */
-export function evidenceCounts(posts: EvidencePost[], scores: Map<string, PostScore>, windowStart: Date): Evidence {
+export function evidenceCounts(posts: EvidencePost[], scores: Map<string, PostScore>, windowStart: Date, extra: ExtraOutcome[] = []): Evidence {
   const ev = Object.fromEntries(
     COUNTED.map((v) => [v, valuesOf(v).map((value) => ({ value, won: 0, lost: 0, flat: 0, total: 0, share: 0 }))])
   ) as Evidence;
@@ -125,6 +126,15 @@ export function evidenceCounts(posts: EvidencePost[], scores: Map<string, PostSc
       row[outcome] += 1;
       row.total += 1;
     }
+  }
+  // A result that did not come from a normal post (a Trial Reel test) counts for its variable's row when it has one.
+  // A topic extra has no row here: Evidence has no topic rows, and focusCounts counts those.
+  for (const x of extra) {
+    if (new Date(x.at).getTime() < since || !(COUNTED as readonly string[]).includes(x.variable)) continue;
+    const row = ev[x.variable as Counted].find((r) => r.value === x.value);
+    if (!row) continue;
+    row[x.outcome] += 1;
+    row.total += 1;
   }
   for (const variable of COUNTED) for (const r of ev[variable]) r.share = r.total === 0 ? 0 : r.won / r.total;
   return ev;
