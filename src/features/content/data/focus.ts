@@ -1,4 +1,5 @@
-import { chicagoIsoDate, chicagoWeekdayHour } from "@/features/content/engine/best-times";
+import { chicagoIsoDate } from "@/features/content/engine/best-times";
+import { chicagoMidnight } from "@/features/content/engine/review";
 import {
   BRING_BACK_PROTECT_DAYS,
   addDays,
@@ -77,15 +78,6 @@ export async function loadActiveFocus(userId: string, day: string): Promise<Acti
   return activeFocus(rows, day);
 }
 
-/** The instant a Chicago calendar day begins: 05:00 UTC in daylight time, 06:00 UTC in standard time. */
-function chicagoMidnight(day: string): string {
-  for (const hour of ["05", "06"]) {
-    const at = new Date(`${day}T${hour}:00:00.000Z`);
-    if (chicagoIsoDate(at) === day && chicagoWeekdayHour(at.toISOString()).hour === 0) return at.toISOString();
-  }
-  return `${day}T06:00:00.000Z`;
-}
-
 const sameValue = (a: { dimension: FocusDimension; value: string }, b: { dimension: FocusDimension; value: string }) => a.dimension === b.dimension && a.value === b.value;
 const counts = (e: FocusEntry) => ({ won: e.won, lost: e.lost, flat: e.flat, total: e.total });
 
@@ -155,7 +147,7 @@ export async function releaseEndedSkips(db: FocusDb, day: string): Promise<numbe
   let moved = 0;
   for (const r of rows) {
     if (r.kind !== "skip" || r.lifted_at !== null || r.ends_on === null || r.ends_on > day || r.ends_on < since) continue;
-    moved += await db.restartInboxClock({ dimension: r.dimension, value: r.value, at: chicagoMidnight(r.ends_on), stillSkipped });
+    moved += await db.restartInboxClock({ dimension: r.dimension, value: r.value, at: chicagoMidnight(r.ends_on).toISOString(), stillSkipped });
   }
   return moved;
 }

@@ -18,7 +18,7 @@ export const EVERGREEN_LATE_SHARE = 0.2;
 
 const HOUR = 3_600_000;
 
-export type SeriesPoint = { at: string; views: number | null };
+export type SeriesPoint = { at: string; views: number | null; saves?: number | null; shares?: number | null };
 export type PostForBaseline = {
   id: string;
   platform: Platform;
