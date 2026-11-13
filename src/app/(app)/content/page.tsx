@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireContentOwner } from "@/features/content/data/owner";
 import { loadInbox, loadInboxLinks, loadOpenRecreations, loadSharpenStates } from "@/features/content/data/queries";
 import ContentTabs from "@/features/content/ui/ContentTabs";
@@ -10,6 +11,9 @@ import { FORMAT_LABEL, type Format } from "@/features/content/engine/types";
 import FoundContentForm from "@/features/content/ui/FoundContentForm";
 import { foundBadge } from "@/features/content/engine/angle";
 import { filterByFormat, formatCounts, parseFormatParam, rankIdeas } from "@/features/content/engine/inbox";
+import { focusTier } from "@/features/content/engine/focus";
+import { loadActiveFocus } from "@/features/content/data/focus";
+import { chicagoIsoDate } from "@/features/content/engine/best-times";
 
 export const maxDuration = 300;
 
@@ -20,12 +24,13 @@ export default async function ContentInboxPage({
 }) {
   const { supabase, user } = await requireContentOwner();
 
-  const { ideas, pending } = await loadInbox(supabase, user.id);
+  const focus = await loadActiveFocus(user.id, chicagoIsoDate(new Date()));
+  const { ideas, pending, hidden } = await loadInbox(supabase, user.id, focus);
   const recreations = await loadOpenRecreations(supabase, user.id, new Date());
 
   // Rank the whole Inbox by score, count per type from the full list, then
   // filter. The Inbox holds tens of ideas, so this stays in memory.
-  const ranked = rankIdeas(ideas);
+  const ranked = rankIdeas(ideas, (i) => (i.format === "reel" ? focusTier(focus, i) : 0));
   const active = parseFormatParam(searchParams?.format);
   const counts = formatCounts(ranked);
   const list = filterByFormat(ranked, active);
@@ -68,6 +73,13 @@ export default async function ContentInboxPage({
       {recreations.map((r) => (
         <RecreateCard key={r.id} item={r} />
       ))}
+      {hidden > 0 && (
+        <p className="text-xs text-sub mb-2">
+          <Link href="/content/review" className="text-purple hover:underline">
+            {hidden === 1 ? "1 idea" : `${hidden} ideas`} hidden by the skip list
+          </Link>
+        </p>
+      )}
       <InboxFilter active={active} counts={counts} />
       {active && list.length === 0 ? (
         <p className="text-sm text-sub">No {FORMAT_LABEL[active]} ideas in the Inbox.</p>

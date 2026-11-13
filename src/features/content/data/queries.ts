@@ -4,6 +4,8 @@ import type { Database } from "@/shared/supabase/database.types";
 import { pickSnapshots } from "@/features/content/engine/snapshots";
 import type { Format } from "@/features/content/engine/types";
 import { partitionUnused } from "@/features/content/engine/unused";
+import { splitHidden } from "@/features/content/engine/inbox";
+import type { ActiveFocus } from "@/features/content/engine/focus";
 import { summarizeDraft, type DraftState } from "@/features/content/engine/drafts";
 import type { RecreateOption } from "@/features/content/engine/recreate";
 import { STALE_PENDING_MINUTES } from "@/features/content/engine/recreate";
@@ -23,13 +25,15 @@ const must = <T>(res: { data: T }): T => res.data;
 
 // ---- Inbox ----------------------------------------------------------------
 
-export async function loadInbox(db: Db, userId: string) {
+/** The Inbox minus ideas the skip list hides (`hidden` counts them, fresh or old) and minus ideas that aged out. */
+export async function loadInbox(db: Db, userId: string, focus: ActiveFocus) {
   const [ideas, pending] = await Promise.all([
     db.from("content_ideas").select("*").eq("user_id", userId).eq("status", "inbox").order("created_at", { ascending: false }),
     loadPendingSources(db, userId),
   ]);
   // Stale inbox ideas live in the Never used view, not here.
-  return { ideas: partitionUnused(must(ideas) ?? [], new Date()).fresh, pending };
+  const { shown, hidden } = splitHidden(must(ideas) ?? [], focus);
+  return { ideas: partitionUnused(shown, new Date()).fresh, pending, hidden: hidden.length };
 }
 
 export async function loadPendingSources(db: Db, userId: string) {
@@ -144,9 +148,11 @@ export async function loadSourcesPage(db: Db, userId: string) {
 // ---- Never used and drafts ---------------------------------------------------
 
 /** Inbox and queued ideas that aged out unused, newest first, with their draft state. */
-export async function loadUnused(db: Db, userId: string) {
+export async function loadUnused(db: Db, userId: string, focus: ActiveFocus) {
   const res = await db.from("content_ideas").select("*").eq("user_id", userId).in("status", ["inbox", "queued"]);
-  const { unused } = partitionUnused(must(res) ?? [], new Date());
+  // A Reel idea the skip list hides is not listed here; queued ideas never are hidden.
+  const rows = (must(res) ?? []).filter((i) => i.status !== "inbox" || !splitHidden([i], focus).hidden.length);
+  const { unused } = partitionUnused(rows, new Date());
   const drafts = await loadDraftStates(db, userId, unused.map((i) => i.id));
   return { ideas: unused, drafts };
 }
