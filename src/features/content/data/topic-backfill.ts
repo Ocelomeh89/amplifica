@@ -14,11 +14,11 @@ export const TOPIC_CHUNK = 20;
 const SAMPLES = 10;
 const RESERVE_SECONDS = 30;
 
-export type TopicCandidate = { id: string; title: string; hook: string; pillar: string };
+export type TopicCandidate = { id: string; title: string; hook: string; pillar: string; created_at: string };
 
 export interface TopicBackfillDb {
-  /** Inbox and queued ideas with no topic and a personal pillar, oldest first. */
-  candidates(limit: number): Promise<TopicCandidate[]>;
+  /** Inbox and queued ideas with no topic and a personal pillar, oldest first. `after` (a created_at) skips what an earlier run already looked at, so ideas the model answered none for are not picked again. */
+  candidates(limit: number, after?: string | null): Promise<TopicCandidate[]>;
   topics(): Promise<Topic[]>;
   /** Writes only while the idea's topic is still empty. */
   setTopic(id: string, slug: string): Promise<void>;
@@ -30,6 +30,8 @@ export type TopicBackfillReport = {
   none: number;
   errors: number;
   samples: { id: string; title: string; topic: string | null }[];
+  /** The created_at to pass as `after` to continue where this run stopped; null when it looked at nothing. */
+  next_after: string | null;
 };
 
 const picksSchema = z.object({ picks: z.array(z.object({ id: z.string(), topic: z.string().nullable() })) });
@@ -65,10 +67,12 @@ function renderChunk(chunk: TopicCandidate[], topics: Topic[]): string {
 export async function runTopicBackfill(
   db: TopicBackfillDb,
   caller: ToolCaller,
-  a: { dryRun: boolean; limit: number; timeLeft: () => number }
+  a: { dryRun: boolean; limit: number; timeLeft: () => number; after?: string | null }
 ): Promise<TopicBackfillReport> {
-  const r: TopicBackfillReport = { checked: 0, assigned: 0, none: 0, errors: 0, samples: [] };
-  const [ideas, topics] = await Promise.all([db.candidates(a.limit), db.topics()]);
+  const r: TopicBackfillReport = { checked: 0, assigned: 0, none: 0, errors: 0, samples: [], next_after: null };
+  const [ideas, topics] = await Promise.all([db.candidates(a.limit, a.after), db.topics()]);
+  // The cursor stops advancing at the first failed chunk, so a later run tries those ideas again.
+  let stalled = false;
   for (let k = 0; k < ideas.length; k += TOPIC_CHUNK) {
     if (a.timeLeft() < RESERVE_SECONDS) break;
     const chunk = ideas.slice(k, k + TOPIC_CHUNK);
@@ -94,9 +98,11 @@ export async function runTopicBackfill(
         }
         if (r.samples.length < SAMPLES) r.samples.push({ id: idea.id, title: idea.title, topic: ok ? slug : null });
       }
+      if (!stalled) r.next_after = chunk[chunk.length - 1].created_at;
     } catch (e) {
       console.error("topic backfill: a chunk failed", e instanceof Error ? e.message : e);
       r.errors += chunk.length;
+      stalled = true;
     }
   }
   return r;
@@ -104,16 +110,16 @@ export async function runTopicBackfill(
 
 export function supabaseTopicBackfillDb(client: SupabaseClient<Database>, userId: string): TopicBackfillDb {
   return {
-    async candidates(limit) {
-      const { data, error } = await client
+    async candidates(limit, after) {
+      let q = client
         .from("content_ideas")
-        .select("id, title, hook, pillar")
+        .select("id, title, hook, pillar, created_at")
         .eq("user_id", userId)
         .in("status", ["inbox", "queued"])
         .eq("topic", "")
-        .in("pillar", [...PILLAR_SLUGS])
-        .order("created_at", { ascending: true })
-        .limit(limit);
+        .in("pillar", [...PILLAR_SLUGS]);
+      if (after) q = q.gt("created_at", after);
+      const { data, error } = await q.order("created_at", { ascending: true }).limit(limit);
       if (error) throw new Error(`topic backfill candidates: ${error.message}`);
       return data ?? [];
     },

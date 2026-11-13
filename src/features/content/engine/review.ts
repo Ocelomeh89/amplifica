@@ -73,6 +73,8 @@ export type ReviewData = {
   too_early: { id: string; title: string }[];
   pillars: { pillar: PillarSlug; posts: number; median_multiple: number | null }[];
   gate: GateWeek;
+  /** Eligible Reels in the window that were not tagged yet when the review was built; while there are any, no new skip is decided. */
+  untagged: number;
   /** Whether the why sentences were written: ok, failed (the call did not work) or none (no posts to explain). */
   why: "ok" | "failed" | "none";
 };

@@ -66,6 +66,21 @@ export function focusCounts(
   return out;
 }
 
+/**
+ * Eligible Instagram Reels in the window that are not tagged yet. They cannot be counted, so a review that finds any
+ * does not decide new skips: a 90-day skip must not rest on a half-tagged sample.
+ */
+export function untaggedEligible(posts: FocusPost[], scores: Map<string, PostScore>, windowStart: Date): number {
+  const since = windowStart.getTime();
+  let n = 0;
+  for (const p of posts) {
+    if (p.media_type !== "reel" || p.tagged_at !== null || new Date(p.posted_at).getTime() < since) continue;
+    const s = scores.get(p.id);
+    if (s && isEligible(s.multiplier) && outcomeOf(s.status)) n += 1;
+  }
+  return n;
+}
+
 export type FocusState = {
   /** Skips started by other weeks and still running on the review day. */
   activeSkips: { dimension: FocusDimension; value: string }[];

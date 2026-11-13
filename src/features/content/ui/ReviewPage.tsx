@@ -123,6 +123,11 @@ export default function ReviewPage({ review, weeks, skips, gateFailed, test, sug
       </Card>
 
       <DoubleDownList rows={doubleDown} topics={topics} />
+      {data.untagged > 0 && (
+        <p className="text-xs text-sub mb-2">
+          {count(data.untagged, "post is", "posts are")} not tagged yet, so no new skip was decided this week. Existing skips are unchanged.
+        </p>
+      )}
       <SkipList rows={skips} topics={topics} today={today} />
 
       {test && (

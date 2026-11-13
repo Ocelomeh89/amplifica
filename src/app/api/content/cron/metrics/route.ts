@@ -63,11 +63,16 @@ export async function GET(req: Request) {
   // `?topics=dry` reports which topic each idea without one would get and writes nothing; `?topics=run`
   // writes them, 100 ideas a call. Nothing else runs.
   const topics = params.get("topics");
+  const after = params.get("after");
+  if ((topics === "dry" || topics === "run") && after !== null && Number.isNaN(Date.parse(after))) {
+    return NextResponse.json({ error: "after must be a timestamp" }, { status: 400 });
+  }
   if (topics === "dry" || topics === "run") {
     try {
       const report = await runTopicBackfill(supabaseTopicBackfillDb(createAdminClient(), owner), anthropicToolCaller({ timeoutMs: 60_000, maxRetries: 0 }), {
         dryRun: topics !== "run",
         limit: 100,
+        after,
         timeLeft: () => BUDGET_SECONDS - (Date.now() - startedAt.getTime()) / 1000,
       });
       return NextResponse.json({ topics, ...report });

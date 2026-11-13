@@ -188,3 +188,56 @@ describe("buildReview", () => {
     expect(r.as_of).toBe("2026-11-16T06:00:00.000Z");
   });
 });
+
+describe("buildReview: review findings", () => {
+  const untagged = (p: PostRowForView) => ({ ...p, tagged_at: null }) as unknown as PostRowForView;
+  const promiseWorld = () => {
+    const w = world().filter((p) => !p.id.startsWith("p"));
+    const lagging = ["2026-10-13", "2026-10-14", "2026-10-15"].map((d, i) => reel(`pl${i}`, at(d), 100, { hook_type: "promise", topic: "" }));
+    const hidden = ["2026-10-16", "2026-10-17", "2026-10-18"].map((d, i) => untagged(reel(`pu${i}`, at(d), 3000, { hook_type: "promise", topic: "" })));
+    return [...w, ...lagging, ...hidden];
+  };
+
+  it("untagged eligible Reels hold new skips: a half-tagged sample never decides one", async () => {
+    const db = fakeReviewDb({ posts: promiseWorld() });
+    const r = await buildReview(db, scripted(), { now: MON });
+    expect(r).toMatchObject({ status: 200, body: { skip: 0, untagged: 3 } });
+    expect(db.focusDb.state.rows.filter((x) => x.kind === "skip")).toEqual([]);
+    expect(db.state.saved.get(W1)!.review.untagged).toBe(3);
+  });
+
+  it("a skip a full sample already decided is left alone while posts are untagged", async () => {
+    const db = fakeReviewDb({ posts: world() });
+    await buildReview(db, scripted(), { now: MON });
+    expect(db.focusDb.state.rows.filter((x) => x.kind === "skip")).toHaveLength(1);
+    db.state.posts = db.state.posts.map((p) => (p.id === "q0" || p.id === "q1" ? untagged(p) : p));
+    const r = await buildReview(db, scripted(), { now: WED });
+    expect(r).toMatchObject({ body: { untagged: 2 } });
+    expect(db.focusDb.state.rows.filter((x) => x.kind === "skip" && x.value === "promise")).toHaveLength(1);
+  });
+
+  it("with every eligible Reel tagged the review reports none untagged", async () => {
+    const db = fakeReviewDb({ posts: world() });
+    await buildReview(db, scripted(), { now: MON });
+    expect(db.state.saved.get(W1)!.review.untagged).toBe(0);
+  });
+
+  it("a build that fails before the review is saved leaves no skip rows behind", async () => {
+    const db = fakeReviewDb({ posts: world() });
+    db.followers = async () => { throw new Error("db down"); };
+    await expect(buildReview(db, scripted(), { now: MON })).rejects.toThrow("db down");
+    expect(db.focusDb.state.rows).toEqual([]);
+    expect(db.state.saveCalls).toHaveLength(0);
+  });
+
+  it("the lists are applied after the review is saved", async () => {
+    const db = fakeReviewDb({ posts: world() });
+    const order: string[] = [];
+    const save = db.save.bind(db);
+    db.save = async (row) => { order.push("save"); return save(row); };
+    const insert = db.focusDb.insert.bind(db.focusDb);
+    db.focusDb.insert = async (rows) => { order.push("insert"); return insert(rows); };
+    await buildReview(db, scripted(), { now: MON });
+    expect(order).toEqual(["save", "insert"]);
+  });
+});

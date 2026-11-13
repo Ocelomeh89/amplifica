@@ -12,7 +12,7 @@ function fakeClient(rows: Record<string, unknown>[], count: number) {
       const b: Record<string, unknown> = {
         then: (res: (v: unknown) => unknown) => Promise.resolve({ data: rows, error: null, count }).then(res),
       };
-      for (const m of ["select", "eq", "is", "gte", "in", "order", "limit", "update"]) {
+      for (const m of ["select", "eq", "is", "not", "gte", "in", "order", "limit", "update"]) {
         b[m] = (...args: unknown[]) => {
           log.push([`${table}.${m}`, ...args]);
           return b;
@@ -46,7 +46,8 @@ describe("supabaseTagsDb.untagged", () => {
       onscreen_text: "", cta_type: "", post_style: "", cover_face: null, cover_text: null, cover_number: null,
     };
     const { client } = fakeClient([row], 12);
-    const r = await supabaseTagsDb(client, "u1").untagged(7, SINCE);
+    // A limit of 1 is full after the untagged posts, so the topic-only query does not run and the total is the first count.
+    const r = await supabaseTagsDb(client, "u1").untagged(1, SINCE);
     expect(r.total).toBe(12);
     expect(r.posts[0].locked).toEqual({ hook_type: "paradox" });
     expect(r.posts[0]).not.toHaveProperty("message");
@@ -90,5 +91,30 @@ describe("igMediaUrlLookup", () => {
   });
   it("throws when Composio is not configured, so the queue falls back to cover and caption", async () => {
     await expect(igMediaUrlLookup({}, fetchImpl, NOW)(["AAA"])).rejects.toThrow(/not set/);
+  });
+});
+
+describe("supabaseTagsDb.untagged: posts that only lack a topic", () => {
+  it("also queues tagged Instagram posts with an empty topic and a personal pillar, so a Today-made post still gets one", async () => {
+    const { client, log } = fakeClient([], 0);
+    await supabaseTagsDb(client, "u1").untagged(7, SINCE);
+    expect(log).toContainEqual(["content_posts.eq", "topic", ""]);
+    expect(log).toContainEqual(["content_posts.in", "message", ["freedom-paradox", "expensive-tuition", "physics-of-wealth", "w2-advantage", "life-by-design"]]);
+  });
+
+  it("leaves out a post whose topic Miguel locked, and one already in the first list", async () => {
+    const row = (id: string, locks: string[]) => ({ id, external_id: id, url: "u", media_type: "reel", posted_at: "2026-10-20T00:00:00Z", caption: "", hook_used: "", thumbnail_url: "", tag_locks: locks });
+    const answers = [{ data: [row("first", [])], count: 1 }, { data: [row("first", []), row("a", []), row("b", ["topic"])], count: 3 }];
+    let n = 0;
+    const client = {
+      from() {
+        const b: Record<string, unknown> = { then: (res: (v: unknown) => unknown) => Promise.resolve({ ...answers[Math.min(n++, 1)], error: null }).then(res) };
+        for (const m of ["select", "eq", "is", "not", "gte", "in", "order", "limit"]) b[m] = () => b;
+        return b;
+      },
+    } as unknown as SupabaseClient<Database>;
+    const out = await supabaseTagsDb(client, "u1").untagged(10, SINCE);
+    expect(out.posts.map((p) => p.id)).toEqual(["first", "a"]);
+    expect(out.total).toBe(4);
   });
 });

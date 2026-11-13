@@ -111,6 +111,18 @@ describe("bringBack", () => {
     expect(db.state.ideas.find((i) => i.id === "b")!.inbox_since).toBe(NOW.toISOString());
   });
 
+  it("if the clock write fails the skip is not lifted, so a retry works", async () => {
+    const db = fakeFocusDb([row({})], [idea("a")]);
+    const restart = db.restartInboxClock.bind(db);
+    let fail = true;
+    db.restartInboxClock = async (a) => { if (fail) { fail = false; throw new Error("write failed"); } return restart(a); };
+    await expect(bringBack(db, "r1", NOW)).rejects.toThrow("write failed");
+    expect(db.state.rows[0].lifted_at).toBeNull();
+    expect(await bringBack(db, "r1", NOW)).toEqual({ error: null });
+    expect(db.state.rows[0].lifted_at).toBe(NOW.toISOString());
+    expect(db.state.ideas[0].inbox_since).toBe(NOW.toISOString());
+  });
+
   it("refuses a skip that is not running", async () => {
     const db = fakeFocusDb([row({ lifted_at: "2026-11-17T00:00:00Z" }), row({ id: "dd", kind: "double_down", ends_on: null })]);
     expect((await bringBack(db, "r1", NOW)).error).toMatch(/not running/i);

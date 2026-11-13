@@ -8,13 +8,13 @@ const TOPICS: Topic[] = [
   { slug: "concentration-risk", label: "The dangers of concentrating wealth", pillar: "expensive-tuition" },
 ];
 const ideas = (n: number) =>
-  Array.from({ length: n }, (_, i) => ({ id: `i${i + 1}`, title: `Title ${i + 1}`, hook: `Hook ${i + 1}`, pillar: i % 2 === 0 ? "w2-advantage" : "expensive-tuition" }));
+  Array.from({ length: n }, (_, i) => ({ id: `i${i + 1}`, title: `Title ${i + 1}`, hook: `Hook ${i + 1}`, pillar: i % 2 === 0 ? "w2-advantage" : "expensive-tuition", created_at: `2026-10-01T00:${String(i).padStart(2, "0")}:00Z` }));
 
 function fakeDb(n: number) {
   const rows = ideas(n);
   const set: { id: string; slug: string }[] = [];
   const db: TopicBackfillDb = {
-    async candidates(limit) { return rows.slice(0, limit); },
+    async candidates(limit, after) { return rows.filter((r) => !after || r.created_at > after).slice(0, limit); },
     async topics() { return TOPICS; },
     async setTopic(id, slug) { set.push({ id, slug }); },
   };
@@ -95,5 +95,21 @@ describe("runTopicBackfill", () => {
     const r = await runTopicBackfill(db, c, { dryRun: true, limit: 100, timeLeft: () => (left -= 900) });
     expect(c.calls.length).toBeLessThan(3);
     expect(r.checked).toBeLessThan(60);
+  });
+});
+
+describe("paging past ideas the model answers none for", () => {
+  it("a run reports where it stopped, and the next run starts after it", async () => {
+    const { db } = fakeDb(50);
+    const none = caller(() => null);
+    const first = await runTopicBackfill(db, none, { dryRun: false, limit: 20, timeLeft: forever });
+    expect(first).toMatchObject({ checked: 20, none: 20, next_after: "2026-10-01T00:19:00Z" });
+    const second = await runTopicBackfill(db, none, { dryRun: false, limit: 20, timeLeft: forever, after: first.next_after });
+    expect(second.checked).toBe(20);
+    expect(second.next_after).toBe("2026-10-01T00:39:00Z");
+    const third = await runTopicBackfill(db, none, { dryRun: false, limit: 20, timeLeft: forever, after: second.next_after });
+    expect(third).toMatchObject({ checked: 10, next_after: "2026-10-01T00:49:00Z" });
+    const done = await runTopicBackfill(db, none, { dryRun: false, limit: 20, timeLeft: forever, after: third.next_after });
+    expect(done).toMatchObject({ checked: 0, next_after: null });
   });
 });

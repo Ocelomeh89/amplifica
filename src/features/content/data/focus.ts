@@ -88,7 +88,7 @@ const counts = (e: FocusEntry) => ({ won: e.won, lost: e.lost, flat: e.flat, tot
  */
 export async function applyReviewFocus(
   db: FocusDb,
-  a: { weekStart: string; newest: boolean; decided: { doubleDown: FocusEntry[]; skip: FocusEntry[] } }
+  a: { weekStart: string; newest: boolean; decided: { doubleDown: FocusEntry[]; skip: FocusEntry[] }; /** Leave every skip row as it is (untagged posts make the sample unreliable). */ holdSkips?: boolean }
 ): Promise<void> {
   const reviewDay = addDays(a.weekStart, 7);
   const rows = await db.rows();
@@ -96,7 +96,7 @@ export async function applyReviewFocus(
   const base = { source: "review" as const, review_week: a.weekStart, lifted_at: null, protected_until: null };
 
   const mine = rows.filter((r) => r.source === "review" && r.kind === "skip" && r.review_week === a.weekStart);
-  for (const e of a.decided.skip) {
+  for (const e of a.holdSkips ? [] : a.decided.skip) {
     const existing = mine.find((r) => sameValue(r, e));
     // A value already under a running skip from another week, or protected after a Bring back, is not skipped again.
     const covered = rows.some((r) => r.kind === "skip" && sameValue(r, e) && (isActive(r, reviewDay) || (r.protected_until !== null && r.protected_until > reviewDay)));
@@ -104,7 +104,7 @@ export async function applyReviewFocus(
     if (!existing) inserts.push({ kind: "skip", dimension: e.dimension, value: e.value, ...counts(e), ...base, starts_on: reviewDay, ends_on: skipEnd(reviewDay) });
     else if (existing.lifted_at === null) await db.update(existing.id, counts(e));
   }
-  const withdrawn = mine.filter((r) => r.lifted_at === null && !a.decided.skip.some((e) => sameValue(r, e))).map((r) => r.id);
+  const withdrawn = a.holdSkips ? [] : mine.filter((r) => r.lifted_at === null && !a.decided.skip.some((e) => sameValue(r, e))).map((r) => r.id);
   if (withdrawn.length > 0) await db.remove(withdrawn);
 
   if (a.newest) {
@@ -128,10 +128,11 @@ export async function bringBack(db: FocusDb, id: string, now: Date): Promise<{ e
   const today = chicagoIsoDate(now);
   const row = (await db.rows()).find((r) => r.id === id);
   if (!row || row.kind !== "skip" || !isActive(row, today)) return { error: "That skip is not running." };
+  // The clock restarts first, so a failed write leaves the skip running and a retry still works. An idea carrying another
+  // skipped value stays hidden, and its clock does not restart yet.
+  const liftedRows = (await db.rows()).map((r) => (r.id === id ? { ...r, lifted_at: now.toISOString() } : r));
+  await db.restartInboxClock({ dimension: row.dimension, value: row.value, at: now.toISOString(), stillSkipped: activeFocus(liftedRows, today) });
   await db.update(id, { lifted_at: now.toISOString(), protected_until: addDays(today, BRING_BACK_PROTECT_DAYS) });
-  // An idea carrying another skipped value stays hidden, and its clock does not restart yet.
-  const stillSkipped = activeFocus(await db.rows(), today);
-  await db.restartInboxClock({ dimension: row.dimension, value: row.value, at: now.toISOString(), stillSkipped });
   return { error: null };
 }
 

@@ -19,7 +19,7 @@ const data = (over: Partial<ReviewData> = {}): ReviewData => ({
   usual: [{ id: "p3", title: "A usual one" }], too_early: [{ id: "p4", title: "Sunday's post" }],
   pillars: [{ pillar: "w2-advantage", posts: 2, median_multiple: 2.5 }, { pillar: "freedom-paradox", posts: 0, median_multiple: null }],
   gate: { checked: 14, passed: 9, rewritten: 2, failed: 3, failures: [{ id: "i1", title: "What actually happens before a foreclosure", format: "reel", reasons: ["Plain words: \"Note seller\" is never explained."] }] },
-  why: "ok", ...over,
+  untagged: 0, why: "ok", ...over,
 });
 const review = (over: Partial<ContentReview> = {}, d: ReviewData = data()): ContentReview =>
   ({ ...over, id: "r", user_id: "u", week_start: "2026-11-09", narrative_md: "A quiet week.", double_down: [], stop: [], best_times: {}, plan: [], replies_owed: [], review: d, built_at: "2026-11-16T13:30:00Z", created_at: "", updated_at: "" }) as unknown as ContentReview;
@@ -105,6 +105,16 @@ describe("ReviewPage", () => {
     expect(screen.getByRole("link", { name: "Nov 2" })).toHaveAttribute("href", "/content/review/2026-11-02");
     expect(screen.getByRole("link", { name: "Oct 26" })).toHaveAttribute("href", "/content/review/2026-10-26");
     expect(screen.queryByRole("link", { name: "Nov 9" })).toBeNull();
+  });
+
+  it("says when posts were untagged and no new skip was decided", () => {
+    render(<ReviewPage {...props({ review: review({}, data({ untagged: 2 })) })} />);
+    expect(screen.getByText(/2 posts are not tagged yet, so no new skip was decided this week/)).toBeInTheDocument();
+  });
+
+  it("says nothing about tagging when every post was tagged", () => {
+    render(<ReviewPage {...props()} />);
+    expect(screen.queryByText(/not tagged yet/)).toBeNull();
   });
 
   it("says when the explanations could not be written", () => {

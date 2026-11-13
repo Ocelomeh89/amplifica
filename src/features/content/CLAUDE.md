@@ -108,7 +108,7 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
   `supabase-review-db.ts`); `data/review-sections.ts` holds the seams the Trial Reel tests and the creator suggestions fill
   (`loadExtraOutcomes`, `loadTestSection`, `loadSuggestionsSection`: empty until those slices exist); `data/review-actions.ts`
   is Build now and Bring back. `data/topics.ts` (topic list, `resolveTopic`) and `data/topic-backfill.ts` (one-time topics for
-  existing ideas, `?topics=dry|run` on the metrics cron) give posts and ideas a topic; `PILLAR_TOPICS` in `engine/brand.ts`
+  existing ideas, `?topics=dry|run` on the metrics cron; pass `&after=<next_after>` from the last report to continue past ideas the model answered none for) give posts and ideas a topic; `PILLAR_TOPICS` in `engine/brand.ts`
   is the seed. `data/account-stats.ts` stores one follower reading a day (the metrics cron) for the follows tile. UI:
   `ReviewPage`, `ReviewLists`, `BuildNowButton`, `BringBackButton`. Pages `/content/review` and `/content/review/[weekStart]`;
   route `POST /api/content/review/build`; `routines/content-weekly.md` (Monday 07:30, after tagging).
@@ -277,6 +277,7 @@ these are all the places that know it exists:
   down: at least half won and more won than lost. Skip: none won and at least half lost. A value under a running skip is not
   re-evaluated. The lists run on settled numbers (`isEligible`, so a post counts about a week after it goes up); the page's
   section 2 is looser and labels young posts "early read".
+- While any eligible Reel in the window is untagged (`untaggedEligible`), a review decides no new skip (`holdSkips`; existing skip rows are left as they are) and the page says so: a 90-day skip must not rest on a half-tagged sample. The lists are applied after the review is saved, so a failed build leaves no skip behind. The tag queue also returns tagged posts that only lack a topic (a pillar, an unlocked topic), so Reels made from a Today brief still get one.
 - The lists act on ideas whose format is `reel` only; newsletter, YouTube, Story and X ideas are never hidden or re-ranked by
   them. Queued ideas are never hidden (in the queues or in Never used). A skipped idea in the Inbox is hidden, not deleted.
 - A skip lasts `SKIP_DAYS` (90) from the review day and its dates never move: a rebuild of the same week may add or withdraw

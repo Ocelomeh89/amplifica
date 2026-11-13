@@ -2,7 +2,7 @@ import { WINDOW_DAYS } from "@/features/content/engine/baseline";
 import { scorePosts } from "@/features/content/engine/baseline";
 import { normalizePosts } from "@/features/content/engine/normalize";
 import { PILLAR_SLUGS, pillarName, topicLabel } from "@/features/content/engine/brand";
-import { decideFocus, focusCounts, type ExtraOutcome, type FocusEntry, type FocusPost } from "@/features/content/engine/focus";
+import { decideFocus, focusCounts, untaggedEligible, type ExtraOutcome, type FocusEntry, type FocusPost } from "@/features/content/engine/focus";
 import {
   NO_REASON,
   WHY_TOOL_NAME,
@@ -71,7 +71,10 @@ export async function buildReview(db: ReviewDb, caller: ToolCaller | null, a: { 
 
   const decided = decideFocus(counts, focusState(await db.focus.rows(), weekStart));
   const newest = weekStart >= ((await db.newestWeek()) ?? weekStart);
-  await applyReviewFocus(db.focus, { weekStart, newest, decided });
+  // Untagged eligible Reels cannot be counted: while there are any, no new skip is decided, because a 90-day skip must not
+  // rest on a half-tagged sample. The lists are applied after the review is saved, so a failed build leaves no skip behind.
+  const untagged = untaggedEligible(instagram as FocusPost[], scoreMap, windowStart);
+  const held = untagged > 0;
 
   const weekFrom = chicagoMidnight(weekStart);
   const sections = weekPosts(instagram, scoreMap, normalized, weekStart, asOf);
@@ -136,8 +139,10 @@ export async function buildReview(db: ReviewDb, caller: ToolCaller | null, a: { 
     too_early: sections.too_early,
     pillars,
     gate,
+    untagged,
     why,
   };
-  await db.save({ week_start: weekStart, narrative_md: narrative, double_down: decided.doubleDown, stop: decided.skip, review, built_at: a.now.toISOString() });
-  return { status: 200, body: { ok: true, week_start: weekStart, url: `/content/review/${weekStart}`, line, double_down: decided.doubleDown.length, skip: decided.skip.length, why } };
+  await db.save({ week_start: weekStart, narrative_md: narrative, double_down: decided.doubleDown, stop: held ? [] : decided.skip, review, built_at: a.now.toISOString() });
+  await applyReviewFocus(db.focus, { weekStart, newest, decided, holdSkips: held });
+  return { status: 200, body: { ok: true, week_start: weekStart, url: `/content/review/${weekStart}`, line, double_down: decided.doubleDown.length, skip: held ? 0 : decided.skip.length, untagged, why } };
 }
