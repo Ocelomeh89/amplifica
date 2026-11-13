@@ -3,26 +3,30 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import clsx from "clsx";
+import { topicLabel } from "@/features/content/engine/brand";
+import type { Topic } from "@/features/content/data/topics";
 import {
   TAG_LABELS,
   captionLength,
   coverSummary,
   isLowConfidence,
+  type PostTagName,
   type PostTags,
-  type TagName,
 } from "@/features/content/engine/tags";
 
-type Chip = { key: string; label: string; filter: string | null; name: TagName | null };
+type Chip = { key: string; label: string; filter: string | null; name: PostTagName | null };
 
-function chipsFor(row: PostTags & { caption: string }): Chip[] {
+function chipsFor(row: PostTags & { caption: string }, topics: Topic[]): Chip[] {
   const out: Chip[] = [];
-  const add = (name: TagName, value: string) => {
+  const add = (name: PostTagName, value: string) => {
     if (value) out.push({ key: name, label: TAG_LABELS[value] ?? value, filter: `${name}:${value}`, name });
   };
   add("hook_type", row.hook_type);
   add("post_style", row.post_style);
   add("message", row.message);
   add("cta_type", row.cta_type);
+  // Topic is not a fixed list, so it has no filter link; it shows as plain text with its lock mark.
+  if (row.topic) out.push({ key: "topic", label: topicLabel(row.topic, topics), filter: null, name: "topic" });
   if (row.onscreen_text && row.onscreen_text !== "none") add("onscreen_text", row.onscreen_text);
   const cover = coverSummary(row);
   if (cover) {
@@ -44,9 +48,9 @@ function LockMark() {
 }
 
 /** `basePath` makes each chip a fresh filter on that page, for use off the Performance page. */
-export default function TagChips({ row, basePath }: { row: PostTags & { caption: string }; basePath?: string }) {
+export default function TagChips({ row, basePath, topics = [] }: { row: PostTags & { caption: string }; basePath?: string; topics?: Topic[] }) {
   const params = useSearchParams();
-  const chips = chipsFor(row);
+  const chips = chipsFor(row, topics);
   const tagged = chips.some((c) => c.key !== "caption_length");
   const hrefFor = (filter: string) => {
     if (basePath) return `${basePath}?${new URLSearchParams({ tag: filter }).toString()}`;
@@ -59,10 +63,19 @@ export default function TagChips({ row, basePath }: { row: PostTags & { caption:
       {chips.map((c) => {
         const low = c.name !== null && isLowConfidence(row, c.name);
         const locked = c.name !== null && row.tag_locks.includes(c.name);
+        if (c.filter === null) {
+          return (
+            <span key={c.key} className={clsx("text-xs px-2 py-0.5 rounded-full bg-edge/60 text-ink", low && "opacity-60")} title={low ? "Low confidence" : undefined}>
+              {c.label}
+              {low && <span aria-hidden> ?</span>}
+              {locked && <LockMark />}
+            </span>
+          );
+        }
         return (
           <Link
             key={c.key}
-            href={hrefFor(c.filter!)}
+            href={hrefFor(c.filter)}
             scroll={false}
             className={clsx("text-xs px-2 py-0.5 rounded-full bg-edge/60 text-ink hover:bg-edge", low && "opacity-60")}
             title={low ? "Low confidence" : undefined}

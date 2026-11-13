@@ -14,13 +14,14 @@ import TagFilters from "@/features/content/ui/TagFilters";
 import GateFailedList from "@/features/content/ui/GateFailedList";
 import { loadGateFailed, loadPillarBalance } from "@/features/content/data/queries";
 import { PILLARS } from "@/features/content/engine/brand";
+import { loadTopics } from "@/features/content/data/topics";
 
 export default async function ContentPerformancePage({ searchParams }: { searchParams: { window?: string; tag?: string | string[] } }) {
   const { supabase, user } = await requireContentOwner();
   const window = parseWindow(searchParams.window);
   const now = new Date();
   const posts = await loadPostsForMath(supabase, user.id);
-  const [gateFailed, balance] = await Promise.all([loadGateFailed(supabase, user.id), loadPillarBalance(supabase, user.id, now)]);
+  const [gateFailed, balance, topics] = await Promise.all([loadGateFailed(supabase, user.id), loadPillarBalance(supabase, user.id, now), loadTopics(supabase, user.id)]);
   const byId = new Map(posts.map((p) => [p.id, p]));
   const normalized = normalizePosts(posts, now);
   const { groups, doubleDown, stop } = attribute(normalized);
@@ -78,7 +79,7 @@ export default async function ContentPerformancePage({ searchParams }: { searchP
           <AttributionPanels groups={groups} doubleDown={doubleDown} stop={stop} />
           <Card title={`Posts (${rows.length})`}>
             <TagFilters filters={filters} />
-            <PerformanceTable rows={rows} />
+            <PerformanceTable rows={rows} topics={topics} />
           </Card>
         </>
       )}

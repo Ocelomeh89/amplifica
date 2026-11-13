@@ -36,6 +36,12 @@ describe("TagChips", () => {
     expect(screen.getByRole("link", { name: /Question/ }).querySelector("[aria-label='corrected']")).not.toBeNull();
   });
 
+  it("shows the topic by its label, as plain text with no filter link", () => {
+    render(<TagChips row={row({ topic: "mechanics-of-leverage", tag_locks: ["topic"] })} />);
+    expect(screen.getByText("The mechanics of leverage")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /The mechanics of leverage/ })).toBeNull();
+  });
+
   it("says tagging is next Monday on an untagged row but still shows caption length", () => {
     render(<TagChips row={row()} />);
     expect(screen.getByText("tagging next Monday")).toBeTruthy();

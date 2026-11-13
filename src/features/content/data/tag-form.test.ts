@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readTagForm } from "./tag-form";
+import type { Topic } from "./topics";
 
 const ID = "5b9d1d1e-7c4e-4a39-9a55-0d8b3e1f2a10";
 function form(entries: Record<string, string>) {
@@ -49,5 +50,30 @@ describe("readTagForm", () => {
     fd.set("orig_message", "w2-advantage");
     fd.set("message", "velocity");
     expect(readTagForm(fd)).toHaveProperty("error");
+  });
+});
+
+describe("readTagForm topic", () => {
+  const TOPICS: Topic[] = [
+    { slug: "mechanics-of-leverage", label: "The mechanics of leverage", pillar: "physics-of-wealth" },
+    { slug: "burnout-vs-ambition", label: "Burnout versus ambition", pillar: "w2-advantage" },
+  ];
+  const base = { id: ID, message: "physics-of-wealth", orig_message: "physics-of-wealth", orig_topic: "" };
+
+  it("takes a changed topic that is listed under the post's message", () => {
+    expect(readTagForm(form({ ...base, topic: "mechanics-of-leverage" }), TOPICS)).toEqual({ id: ID, patch: { topic: "mechanics-of-leverage" } });
+  });
+  it("refuses a topic under another pillar", () => {
+    const r = readTagForm(form({ ...base, topic: "burnout-vs-ambition" }), TOPICS);
+    expect("error" in r && r.error).toMatch(/topic/i);
+  });
+  it("judges the topic against a message changed in the same save", () => {
+    const r = readTagForm(form({ ...base, message: "w2-advantage", topic: "burnout-vs-ambition" }), TOPICS);
+    expect(r).toEqual({ id: ID, patch: { message: "w2-advantage", topic: "burnout-vs-ambition" } });
+  });
+  it("refuses a slug that is not in the list and ignores an unchanged or cleared topic", () => {
+    expect("error" in readTagForm(form({ ...base, topic: "made-up" }), TOPICS)).toBe(true);
+    expect(readTagForm(form({ ...base, topic: "mechanics-of-leverage", orig_topic: "mechanics-of-leverage", hook_type: "paradox", orig_hook_type: "" }), TOPICS)).toEqual({ id: ID, patch: { hook_type: "paradox" } });
+    expect(readTagForm(form({ ...base, topic: "", orig_topic: "mechanics-of-leverage", hook_type: "paradox", orig_hook_type: "" }), TOPICS)).toEqual({ id: ID, patch: { hook_type: "paradox" } });
   });
 });

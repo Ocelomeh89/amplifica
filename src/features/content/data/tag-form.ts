@@ -1,4 +1,5 @@
 import { CTA_TYPES, HOOK_TYPES, MESSAGES, ONSCREEN_TEXT, POST_STYLES, type PostTags } from "@/features/content/engine/tags";
+import type { Topic } from "./topics";
 
 // The correction form sends each field beside an `orig_<field>` twin, so only
 // what Miguel changed is written and locked.
@@ -19,7 +20,11 @@ const field = (fd: FormData, k: string) => {
   return typeof v === "string" ? v : "";
 };
 
-export function readTagForm(fd: FormData): { id: string; patch: Partial<PostTags> } | { error: string } {
+/**
+ * `topics` is the owner's list. A changed topic must be listed under the post's message: the one in this save
+ * when it changed too, else the stored one (the form's `orig_message`).
+ */
+export function readTagForm(fd: FormData, topics: Topic[] = []): { id: string; patch: Partial<PostTags> } | { error: string } {
   const id = field(fd, "id");
   if (!id) return { error: "Missing post." };
   const patch: Record<string, unknown> = {};
@@ -29,6 +34,13 @@ export function readTagForm(fd: FormData): { id: string; patch: Partial<PostTags
     if (value === field(fd, `orig_${name}`) || value === "") continue; // unchanged, or an attempt to clear
     if (!(list as readonly string[]).includes(value)) return { error: `"${value}" is not a valid ${name.replace(/_/g, " ")}.` };
     patch[name] = value;
+  }
+  const topic = field(fd, "topic");
+  if (topic !== field(fd, "orig_topic") && topic !== "") {
+    const message = typeof patch.message === "string" ? patch.message : field(fd, "orig_message");
+    const hit = topics.find((t) => t.slug === topic);
+    if (!hit || hit.pillar !== message) return { error: "Pick a topic that belongs to the post's message." };
+    patch.topic = topic;
   }
   for (const name of COVERS) {
     const value = field(fd, name);

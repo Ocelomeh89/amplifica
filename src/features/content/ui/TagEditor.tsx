@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { saveTagCorrection } from "@/features/content/data/tag-actions";
+import type { Topic } from "@/features/content/data/topics";
+import { topicLabel } from "@/features/content/engine/brand";
 import {
   CTA_TYPES,
   HOOK_TYPES,
@@ -28,8 +30,13 @@ const input = "w-full rounded-lg border border-edge bg-card px-2 py-1.5 text-sm"
 
 const yesNo = (v: boolean | null) => (v === true ? "yes" : v === false ? "no" : "");
 
-export default function TagEditor({ id, row, onDone }: { id: string; row: PostTags; onDone: () => void }) {
+export default function TagEditor({ id, row, topics = [], onDone }: { id: string; row: PostTags; topics?: Topic[]; onDone: () => void }) {
   const [error, setError] = useState<string | null>(null);
+  // The topic list follows the message select, so a message and its topic can be changed in one save.
+  const [message, setMessage] = useState(row.message);
+  // A stored topic that is not in the list at all stays visible; one listed under another pillar goes when the message changes.
+  const stale = row.topic && !topics.some((t) => t.slug === row.topic) ? [row.topic] : [];
+  const topicList: readonly string[] = [...new Set([...stale, ...topics.filter((t) => t.pillar === message).map((t) => t.slug)])];
   const [pending, start] = useTransition();
   const submit = (fd: FormData) =>
     start(async () => {
@@ -48,7 +55,7 @@ export default function TagEditor({ id, row, onDone }: { id: string; row: PostTa
           <label key={s.name} className="text-sm">
             <span className="block text-sub mb-1">{s.label}</span>
             <input type="hidden" name={`orig_${s.name}`} value={value} />
-            <select name={s.name} defaultValue={value} className={input}>
+            <select name={s.name} defaultValue={value} className={input} onChange={s.name === "message" ? (e) => setMessage(e.target.value) : undefined}>
               <option value="">Not tagged</option>
               {list.map((v) => (
                 <option key={v} value={v}>
@@ -59,6 +66,18 @@ export default function TagEditor({ id, row, onDone }: { id: string; row: PostTa
           </label>
         );
       })}
+      <label className="text-sm">
+        <span className="block text-sub mb-1">Topic</span>
+        <input type="hidden" name="orig_topic" value={row.topic} />
+        <select name="topic" defaultValue={row.topic} className={input}>
+          <option value="">Not tagged</option>
+          {topicList.map((v) => (
+            <option key={v} value={v}>
+              {topicLabel(v, topics)}
+            </option>
+          ))}
+        </select>
+      </label>
       {COVERS.map((c) => (
         <label key={c.name} className="text-sm">
           <span className="block text-sub mb-1">{c.label}</span>

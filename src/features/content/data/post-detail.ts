@@ -9,6 +9,7 @@ import { RECREATE_MODES, STALE_PENDING_MINUTES, type RecreateMode } from "@/feat
 import { winnerInsights, type WinnerInsights, type WinnerPost } from "@/features/content/engine/winners";
 import { loadPostsForMath, type PostRowForView } from "./performance";
 import { supabaseRecreateDb } from "./supabase-recreate-db";
+import { loadTopics, type Topic } from "./topics";
 
 export type PostDetail = {
   post: Omit<PostRowForView, "series">;
@@ -17,6 +18,8 @@ export type PostDetail = {
   live: Record<RecreateMode, { id: string; status: "pending" | "ready" } | null>;
   recreations: { ideaId: string; hook: string; status: string; multiplier: number | null }[];
   sourceMultiplier: number | null;
+  /** The owner's topic list, for the tag chips and the editor. */
+  topics: Topic[];
 };
 
 const DAY = 86_400_000;
@@ -67,5 +70,5 @@ export async function loadPostDetail(
 
   const { series: _series, ...post } = found;
   void _series;
-  return { post, figures, insights, live, recreations, sourceMultiplier: multiplier.n_views };
+  return { post, figures, insights, live, recreations, sourceMultiplier: multiplier.n_views, topics: await loadTopics(supabase, userId) };
 }

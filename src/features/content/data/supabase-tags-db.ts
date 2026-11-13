@@ -3,15 +3,20 @@ import type { Database } from "@/shared/supabase/database.types";
 import { externalIdFromUrl } from "@/features/content/engine/posts";
 import type { PostTags } from "@/features/content/engine/tags";
 import { DEFAULT_COMPOSIO_USER_ID, listIgMedia, type ComposioEnv } from "./pulls/instagram";
+import { topicsDb } from "./topics";
 import { TAGGABLE_MEDIA, pickLocked, type MediaUrlLookup, type QueueRow, type StoredTags, type TagsDb } from "./tags";
 
 type Client = SupabaseClient<Database>;
 
-const TAG_COLUMNS = "hook_type, onscreen_text, message, cta_type, post_style, cover_face, cover_text, cover_number";
+const TAG_COLUMNS = "hook_type, onscreen_text, message, topic, cta_type, post_style, cover_face, cover_text, cover_number";
 const QUEUE_COLUMNS = `id, external_id, url, media_type, posted_at, caption, hook_used, thumbnail_url, tag_locks, ${TAG_COLUMNS}`;
 
 export function supabaseTagsDb(client: Client, userId: string): TagsDb {
+  const topics = topicsDb(client, userId);
   return {
+    topics: () => topics.list(),
+    addTopic: (t) => topics.add(t),
+
     async untagged(limit, since) {
       const { data, error, count } = await client
         .from("content_posts")

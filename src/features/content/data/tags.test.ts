@@ -9,6 +9,7 @@ import {
   type TagsDb,
 } from "./tags";
 import type { PostTags } from "@/features/content/engine/tags";
+import type { Topic } from "./topics";
 
 const NOW = new Date("2026-10-26T12:00:00Z");
 const ID_A = "5b9d1d1e-7c4e-4a39-9a55-0d8b3e1f2a10";
@@ -22,11 +23,13 @@ type Stored = {
   version?: string;
 };
 
-function fakeDb(rows: Record<string, Stored>, queue: QueueRow[] = [], beforeWrite?: (id: string, attempt: number) => void) {
-  const calls = { untagged: [] as { limit: number; since: Date }[], writes: [] as { id: string; patch: Partial<PostTags> }[] };
+function fakeDb(rows: Record<string, Stored>, queue: QueueRow[] = [], beforeWrite?: (id: string, attempt: number) => void, topicList: Topic[] = []) {
+  const calls = { untagged: [] as { limit: number; since: Date }[], writes: [] as { id: string; patch: Partial<PostTags> }[], added: [] as Topic[] };
   let attempts = 0;
   let counter = 0;
   const db: TagsDb = {
+    async topics() { return [...topicList, ...calls.added]; },
+    async addTopic(t) { calls.added.push(t); },
     async untagged(limit, since) {
       calls.untagged.push({ limit, since });
       return { posts: queue.slice(0, limit), total: queue.length };
@@ -245,5 +248,73 @@ describe("a correction landing between the read and the write", () => {
     expect(await correctTags(a.db, ID_A, { hook_type: "paradox" })).toEqual({ error: null });
     expect(stored.tag_confidence).toEqual({ post_style: 0.8, hook_type: 1 });
     expect(stored.tag_locks).toEqual(["hook_type"]);
+  });
+});
+
+describe("topic tagging", () => {
+  const LIST: Topic[] = [{ slug: "mechanics-of-leverage", label: "The mechanics of leverage", pillar: "physics-of-wealth" }];
+  const fresh = (over: Partial<Stored> = {}): Stored => ({ tag_locks: [], tag_confidence: {}, values: {}, tagged_at: null, ...over });
+  const body = (p: Record<string, unknown>) => ({ posts: [{ id: ID_A, message: "physics-of-wealth", ...p }] });
+
+  it("the queue returns the topic list", async () => {
+    const a = fakeDb({}, [row(1)], undefined, LIST);
+    const r = await getTagQueue(a.db, async () => new Map(), null, NOW);
+    expect((r.body as { topics: Topic[] }).topics).toEqual(LIST);
+  });
+
+  it("storeTags writes a topic picked from the list", async () => {
+    const a = fakeDb({ [ID_A]: fresh() }, [], undefined, LIST);
+    const r = await storeTags(a.db, body({ topic: "mechanics-of-leverage", tag_confidence: { topic: 0.9 } }), NOW);
+    expect(a.calls.writes[0].patch).toMatchObject({ topic: "mechanics-of-leverage", message: "physics-of-wealth" });
+    expect((a.calls.writes[0].patch.tag_confidence as Record<string, number>).topic).toBe(0.9);
+    expect((r.body as { results: { written: string[] }[] }).results[0].written).toContain("topic");
+  });
+
+  it("storeTags adds a proposed topic and uses it at once", async () => {
+    const a = fakeDb({ [ID_A]: fresh() }, [], undefined, LIST);
+    await storeTags(a.db, body({ topic_label: "Popular advice broken down" }), NOW);
+    expect(a.calls.added).toEqual([{ slug: "popular-advice-broken-down", label: "Popular advice broken down", pillar: "physics-of-wealth" }]);
+    expect(a.calls.writes[0].patch.topic).toBe("popular-advice-broken-down");
+  });
+
+  it("a locked topic is skipped and reported in skipped_locked", async () => {
+    const a = fakeDb({ [ID_A]: fresh({ tag_locks: ["topic"], values: { topic: "mechanics-of-leverage" } }) }, [], undefined, LIST);
+    const r = await storeTags(a.db, body({ topic: "mechanics-of-leverage" }), NOW);
+    expect(a.calls.writes[0].patch.topic).toBeUndefined();
+    expect((r.body as { results: { skipped_locked: string[] }[] }).results[0].skipped_locked).toContain("topic");
+  });
+
+  it("a mismatch writes the other tags and reports topic_skipped", async () => {
+    const a = fakeDb({ [ID_A]: fresh() }, [], undefined, LIST);
+    const r = await storeTags(a.db, { posts: [{ id: ID_A, message: "w2-advantage", hook_type: "paradox", topic: "mechanics-of-leverage", tag_confidence: { topic: 0.9, hook_type: 0.8 } }] }, NOW);
+    expect(a.calls.writes[0].patch).toMatchObject({ hook_type: "paradox", message: "w2-advantage" });
+    expect(a.calls.writes[0].patch.topic).toBeUndefined();
+    expect((a.calls.writes[0].patch.tag_confidence as Record<string, number>).topic).toBeUndefined();
+    expect((r.body as { results: { topic_skipped: string }[] }).results[0].topic_skipped).toBe("topic_pillar_mismatch");
+  });
+
+  it("a locked message is the pillar when the body has none", async () => {
+    const a = fakeDb({ [ID_A]: fresh({ tag_locks: ["message"], values: { message: "physics-of-wealth" } }) }, [], undefined, LIST);
+    await storeTags(a.db, { posts: [{ id: ID_A, topic: "mechanics-of-leverage" }] }, NOW);
+    expect(a.calls.writes[0].patch.topic).toBe("mechanics-of-leverage");
+  });
+
+  it("a legacy message skips the topic without failing the post", async () => {
+    const a = fakeDb({ [ID_A]: fresh() }, [], undefined, LIST);
+    const r = await storeTags(a.db, { posts: [{ id: ID_A, message: "none", hook_type: "paradox", topic: "mechanics-of-leverage" }] }, NOW);
+    expect(r.status).toBe(200);
+    expect((r.body as { results: { topic_skipped: string }[] }).results[0].topic_skipped).toBe("no_pillar");
+    expect(a.calls.writes[0].patch.hook_type).toBe("paradox");
+  });
+
+  it("correctTags locks topic", async () => {
+    const a = fakeDb({ [ID_A]: fresh() }, [], undefined, LIST);
+    await correctTags(a.db, ID_A, { topic: "mechanics-of-leverage" });
+    expect(a.calls.writes[0].patch.tag_locks).toContain("topic");
+    expect((a.calls.writes[0].patch.tag_confidence as Record<string, number>).topic).toBe(1);
+  });
+
+  it("pickLocked returns a locked topic", () => {
+    expect(pickLocked({ topic: "x", message: "none" }, ["topic"])).toEqual({ topic: "x" });
   });
 });

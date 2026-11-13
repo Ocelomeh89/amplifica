@@ -5,12 +5,19 @@ import { requireContentOwner } from "@/features/content/data/owner";
 import { correctTags } from "@/features/content/data/tags";
 import { supabaseTagsDb } from "@/features/content/data/supabase-tags-db";
 import { readTagForm } from "@/features/content/data/tag-form";
+import { loadTopics } from "@/features/content/data/topics";
 
 // Miguel's correction of a post's tags. Owner gate first, then the same
 // correctTags the tests cover; every corrected tag is locked.
 export async function saveTagCorrection(formData: FormData): Promise<{ error: string | null }> {
   const { supabase, user } = await requireContentOwner();
-  const read = readTagForm(formData);
+  let topics;
+  try {
+    topics = await loadTopics(supabase, user.id);
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+  const read = readTagForm(formData, topics);
   if ("error" in read) return { error: read.error };
   try {
     const r = await correctTags(supabaseTagsDb(supabase, user.id), read.id, read.patch);
