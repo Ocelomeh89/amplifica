@@ -17,6 +17,8 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/today/page.tsx",
       "src/app/(app)/content/creators/page.tsx",
       "src/app/(app)/content/taste/page.tsx",
+      "src/app/(app)/content/review/page.tsx",
+      "src/app/(app)/content/review/[weekStart]/page.tsx",
       "src/app/(app)/content/ideas/[id]/page.tsx",
       "src/app/(app)/content/sources/page.tsx",
       "src/features/content/data/actions.ts",
@@ -26,6 +28,7 @@ describe("content stays owner-only", () => {
       "src/features/content/data/tag-actions.ts",
       "src/features/content/data/recreate-actions.ts",
       "src/features/content/data/today-actions.ts",
+      "src/features/content/data/review-actions.ts",
     ];
     for (const f of files) expect(read(f), f).toContain("requireContentOwner()");
   });
@@ -72,8 +75,19 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/today/page.tsx",
       "src/app/(app)/content/creators/page.tsx",
       "src/app/(app)/content/taste/page.tsx",
+      "src/app/(app)/content/review/page.tsx",
+      "src/app/(app)/content/review/[weekStart]/page.tsx",
     ];
     for (const f of pages) expect(read(f), f).not.toMatch(/supabase\s*\.from\(/);
+  });
+
+  it("Performance no longer renders GateFailedList; the weekly review does", () => {
+    expect(read("src/app/(app)/content/performance/page.tsx")).not.toContain("GateFailedList");
+    expect(read("src/features/content/ui/ReviewPage.tsx")).toContain("GateFailedList");
+  });
+
+  it("the review actions each open with the owner gate and the page routes set the 300 second budget", () => {
+    for (const f of ["src/app/(app)/content/review/page.tsx", "src/app/(app)/content/review/[weekStart]/page.tsx"]) expect(read(f), f).toContain("maxDuration = 300");
   });
 
   it("comments do not crowd the routine's dedup window or the Sources page", () => {

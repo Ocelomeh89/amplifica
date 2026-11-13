@@ -22,7 +22,7 @@ describe("renderDigest", () => {
         "1. [Reel] Your paycheck is an asset: https://amplificawealth.com/content/ideas/a",
         "2. [Newsletter] Net worth is the wrong scoreboard: https://amplificawealth.com/content/ideas/b",
         "",
-        "1 didn't pass: https://amplificawealth.com/content/performance",
+        "1 didn't pass: https://amplificawealth.com/content/review",
       ].join("\n")
     );
   });
