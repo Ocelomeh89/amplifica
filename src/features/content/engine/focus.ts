@@ -148,9 +148,14 @@ export function focusBrief(focus: ActiveFocus, label: (d: FocusDimension, v: str
   return lines.length ? `## From the weekly review\n${lines.join("\n")}` : "";
 }
 
+/** A calendar day (YYYY-MM-DD) plus n days. */
+export function addDays(day: string, n: number): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 /** The date a skip that starts on `startsOn` (YYYY-MM-DD) ends. */
 export function skipEnd(startsOn: string): string {
-  const d = new Date(`${startsOn}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + SKIP_DAYS);
-  return d.toISOString().slice(0, 10);
+  return addDays(startsOn, SKIP_DAYS);
 }

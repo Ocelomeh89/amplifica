@@ -112,6 +112,12 @@ describe("content stays owner-only", () => {
     expect(route.indexOf("runTopicBackfill(")).toBeLessThan(route.indexOf("runMetricsCron("));
   });
 
+  it("ended skips are released before Today picks ideas", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    expect(route.indexOf("releaseEndedSkips(")).toBeGreaterThan(route.indexOf("runMetricsCron("));
+    expect(route.indexOf("releaseEndedSkips(")).toBeLessThan(route.indexOf("runTodayCron("));
+  });
+
   it("the follower count is stored after the pulls and before the competitor step", () => {
     const route = read("src/app/api/content/cron/metrics/route.ts");
     const store = route.indexOf("storeFollowers(");

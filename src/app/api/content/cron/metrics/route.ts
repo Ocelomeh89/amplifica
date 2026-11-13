@@ -15,6 +15,9 @@ import { anthropicToolCaller } from "@/features/content/data/claude";
 import { supabaseTodayDb } from "@/features/content/data/supabase-today-db";
 import { storeFollowers, supabaseAccountStatsDb } from "@/features/content/data/account-stats";
 import { runTodayCron } from "@/features/content/data/today-cron";
+import { releaseEndedSkips } from "@/features/content/data/focus";
+import { supabaseFocusDb } from "@/features/content/data/supabase-focus-db";
+import { chicagoIsoDate } from "@/features/content/engine/best-times";
 import { pullBeehiiv } from "@/features/content/data/pulls/beehiiv";
 import { pullIgFollowers, pullInstagram } from "@/features/content/data/pulls/instagram";
 import { CHANNEL_HANDLE, pullYouTube } from "@/features/content/data/pulls/youtube";
@@ -120,6 +123,17 @@ export async function GET(req: Request) {
         competitors = { error: (e as Error).message };
       }
     }
+    // Skips that ended give their hidden ideas a fresh Inbox clock before Today picks ideas. Two cheap queries, no Claude;
+    // a failure here never fails the metrics run.
+    let released: number | { error: string } | null = null;
+    if (!only) {
+      try {
+        released = await releaseEndedSkips(supabaseFocusDb(createAdminClient(), owner), chicagoIsoDate(new Date()));
+      } catch (e) {
+        console.error("content skip release failed", e);
+        released = { error: (e as Error).message };
+      }
+    }
     // Today's briefs come after the pulls so judging sees fresh snapshots. A failure here
     // never fails the metrics run: it is reported and the page offers Make now.
     let today: Awaited<ReturnType<typeof runTodayCron>> | { error: string };
@@ -163,7 +177,7 @@ export async function GET(req: Request) {
         digests = { error: (e as Error).message };
       }
     }
-    return NextResponse.json({ ...report, followers, gate, digests, competitors, today }, { status: report.ok ? 200 : 500 });
+    return NextResponse.json({ ...report, followers, released, gate, digests, competitors, today }, { status: report.ok ? 200 : 500 });
   } catch (e) {
     console.error("content metrics cron failed", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
