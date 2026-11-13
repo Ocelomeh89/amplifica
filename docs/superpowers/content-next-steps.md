@@ -76,6 +76,22 @@ The brand gate now enforces this on every idea. Any new build that produces, rew
 must go through `gatePiece` or `gateOptions` in `data/brand-gate.ts`. When the skill changes, update
 `engine/brand.ts` in the same change.
 
+## The weekly review: what waits for Miguel
+
+Built and tested on `feat/content-weekly-review`; nothing below has run. In order:
+1. Apply migration `0021_content_weekly_review.sql` in the Supabase SQL editor, before the merge.
+2. Merge and deploy.
+3. Topic backfill for existing ideas: `GET /api/content/cron/metrics?topics=dry` with the cron secret, show the counts and
+   samples, and only on his OK `?topics=run`. Each report has a `next_after`: pass it as `&after=<next_after>` on the next call,
+   until `checked` is 0 (ideas the model answers none for are passed over, not retried forever).
+4. Re-queue posts for the tagging routine so existing posts get a topic (the SQL is in `src/features/content/CLAUDE.md`, show
+   the count first), then run `/content-tag` until `remaining` is 0. Do it on a day with no review due. A review decides no new
+   skip while any eligible Reel is still untagged.
+5. Create the cloud routine from `routines/content-weekly.md` (`CRON_TZ=America/Chicago 30 7 * * 1`, ClickUp connector,
+   network allowlist of the app host) and run it once by hand.
+6. The first real Monday run: read `/content/review`. The follows tile reads "not available" until two follower readings a
+   week apart exist.
+
 ## Next builds, in order
 
 The three designs and plans are written and approved (specs and plans dated 2026-11-13). The weekly review is built; build
