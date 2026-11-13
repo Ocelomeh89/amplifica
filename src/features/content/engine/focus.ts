@@ -1,4 +1,6 @@
 import type { PostScore } from "./baseline";
+import { topicLabel } from "./brand";
+import { TAG_LABELS } from "./tags";
 import type { Evidence, ValueCount } from "./experiments";
 import { outcomeOf } from "./experiments";
 import { isEligible, type WinnerPost } from "./winners";
@@ -146,6 +148,11 @@ export function focusBrief(focus: ActiveFocus, label: (d: FocusDimension, v: str
     lines.push(`Prefer ${sentence("prefer", d.hook_type, d.topic, " and ")}. Keep all five pillars.`);
   }
   return lines.length ? `## From the weekly review\n${lines.join("\n")}` : "";
+}
+
+/** The review block for a prompt: each list by its display label. `topics` adds labels for topics beyond the seed list. */
+export function reviewBlock(focus: ActiveFocus, topics: { slug: string; label: string }[] = []): string {
+  return focusBrief(focus, (d, v) => (d === "topic" ? topicLabel(v, topics) : (TAG_LABELS[v] ?? v)));
 }
 
 /** A calendar day (YYYY-MM-DD) plus n days. */

@@ -1,3 +1,4 @@
+import { EMPTY_FOCUS } from "@/features/content/engine/focus";
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/shared/supabase/database.types";
@@ -86,9 +87,17 @@ describe("supabaseTodayDb", () => {
     expect(insert).toMatchObject({ pillar: "expensive-tuition", gate: { result } });
   });
 
+  it("unclaimedInboxIdeas drops skipped ideas and puts a double-down topic first, before the cut", async () => {
+    const row = (id: string, hook_type: string, topic: string) => ({ id, title: "t", hook: "h", pillar: "", hook_alt: null, status: "inbox", hook_type, topic });
+    const { client } = fakeClient({ content_experiments: { data: [] }, content_ideas: { data: [row("a", "x", ""), row("b", "promise", ""), row("c", "x", "predictable-income")] } });
+    const focus = { skip: { hook_type: ["promise"], topic: [] }, doubleDown: { hook_type: [], topic: ["predictable-income"] } };
+    const out = await supabaseTodayDb(client, "u1").unclaimedInboxIdeas(2, focus);
+    expect(out.map((i) => i.id)).toEqual(["c", "a"]);
+  });
+
   it("unclaimedInboxIdeas excludes every idea that ever had an experiment, not only live ones", async () => {
     const { client, log } = fakeClient({ content_experiments: { data: [{ idea_id: "i1" }] }, content_ideas: { data: [{ id: "i1", title: "t", hook: "h", pillar: "", hook_alt: null, status: "inbox" }, { id: "i2", title: "t", hook: "h", pillar: "", hook_alt: null, status: "inbox" }] } });
-    const out = await supabaseTodayDb(client, "u1").unclaimedInboxIdeas(5);
+    const out = await supabaseTodayDb(client, "u1").unclaimedInboxIdeas(5, EMPTY_FOCUS);
     expect(out.map((i) => i.id)).toEqual(["i2"]);
     expect(log.some((c) => c[0] === "content_experiments.in" && c[1] === "status")).toBe(false);
   });

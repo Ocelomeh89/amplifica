@@ -93,7 +93,7 @@ rules above: no return promises, no hype. Each rewrite says in one line what is 
 before. Make the three rewrites different from each other: different hook types where you can.
 `.trim();
 
-export function sharpenSystemPrompt(rules: string[]): string {
+export function sharpenSystemPrompt(rules: string[], focusBlock = ""): string {
   const ideaRules = between(IDEAS_PROMPT, "## What makes an idea good here", "## Ranking and dedupe");
   const parts = [
     "You sharpen Miguel Graf's content ideas.",
@@ -103,6 +103,7 @@ export function sharpenSystemPrompt(rules: string[]): string {
     SHARPEN_RULES,
   ];
   if (rules.length > 0) parts.push(["## Miguel's approved rules", "If a taste rule conflicts with the brand, the brand wins.", ...rules.map((r) => `- ${r}`)].join("\n"));
+  if (focusBlock) parts.push(focusBlock);
   return parts.join("\n\n");
 }
 

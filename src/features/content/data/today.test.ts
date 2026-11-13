@@ -17,6 +17,8 @@ import {
 } from "./today";
 import { DAY, NOW, candidate, exp, fakeDb, gatePassing, idea } from "./today.fake";
 import { BRIEF_TOOL_NAME as BRIEF_TOOL } from "@/features/content/engine/today-brief";
+import { evidenceCounts, type Evidence } from "@/features/content/engine/experiments";
+import { EMPTY_FOCUS, type ActiveFocus } from "@/features/content/engine/focus";
 
 const brief = (slot: number, over: Record<string, unknown> = {}) => ({ slot, title: `T${slot}`, hook: `H${slot}`, say: ["a", "b", "c"], message: "w2-advantage", ...over });
 const caller = (out: unknown) => {
@@ -475,5 +477,77 @@ describe("the brand gate on briefs", () => {
     expect(r.made).toBe(0);
     expect(r.error).toBe("None of today's briefs met the brand standard.");
     expect(f.calls.patch).toEqual([]);
+  });
+});
+
+describe("the weekly review's lists in Today", () => {
+  const ideas3 = () => [idea("i1"), idea("i2"), idea("i3")];
+  const plan = (f: ReturnType<typeof fakeDb>) => f.experiments.map((e) => [e.slot, e.variable, e.value, e.idea_id]);
+
+  it("with no focus rows the day's plan is what it was", async () => {
+    const a = fakeDb({ ideas: ideas3() });
+    const b = fakeDb({ ideas: ideas3(), focus: EMPTY_FOCUS });
+    await generateDaily(a.db, caller({ briefs: [brief(1), brief(2)] }), NOW);
+    await generateDaily(b.db, caller({ briefs: [brief(1), brief(2)] }), NOW);
+    expect(plan(a)).toEqual(plan(b));
+    expect(a.experiments.map((e) => e.idea_id)).toEqual(["i1", "i2"]);
+  });
+
+  it("Today's picker never returns a skipped value", async () => {
+    // With the default evidence the day's hook test is paradox (3 posts, so still worth testing).
+    const without = fakeDb({ ideas: ideas3() });
+    await generateDaily(without.db, caller({ briefs: [brief(1), brief(2)] }), NOW);
+    expect(without.experiments.some((e) => e.variable === "hook_type" && e.value === "paradox")).toBe(true);
+
+    const f = fakeDb({ ideas: ideas3(), focus: { ...EMPTY_FOCUS, skip: { hook_type: ["paradox"], topic: [] } } });
+    await generateDaily(f.db, caller({ briefs: [brief(1), brief(2)] }), NOW);
+    expect(f.experiments.length).toBeGreaterThan(0);
+    for (const e of f.experiments) {
+      expect(e.variable === "hook_type" && e.value === "paradox").toBe(false);
+      expect((e.recipe as Record<string, string>).hook_type).not.toBe("paradox");
+    }
+  });
+
+  it("the control recipe never uses a skipped hook", async () => {
+    const ev: Evidence = evidenceCounts([], new Map(), new Date(0));
+    const set = (value: string, total: number, won: number) => {
+      const r = ev.hook_type.find((x) => x.value === value)!;
+      Object.assign(r, { total, won, lost: total - won, share: total === 0 ? 0 : won / total });
+    };
+    set("promise", 4, 0);
+    set("question", 3, 2);
+    set("paradox", 2, 1);
+    const plain = fakeDb({ ideas: ideas3(), ev });
+    await generateDaily(plain.db, caller({ briefs: [brief(1), brief(2)] }), NOW);
+    expect(plain.experiments.some((e) => (e.recipe as Record<string, string>).hook_type === "promise")).toBe(true);
+
+    const f = fakeDb({ ideas: ideas3(), ev, focus: { ...EMPTY_FOCUS, skip: { hook_type: ["promise"], topic: [] } } });
+    await generateDaily(f.db, caller({ briefs: [brief(1), brief(2)] }), NOW);
+    expect(f.experiments.length).toBeGreaterThan(0);
+    for (const e of f.experiments) expect((e.recipe as Record<string, string>).hook_type).not.toBe("promise");
+  });
+
+  it("Today does not pick an idea with a skipped hook or topic, and takes a double-down topic first", async () => {
+    const focus: ActiveFocus = { skip: { hook_type: ["promise"], topic: ["loan-mechanics"] }, doubleDown: { hook_type: [], topic: ["predictable-income"] } };
+    const f = fakeDb({
+      ideas: [{ ...idea("i1"), hook_type: "promise" }, { ...idea("i2"), topic: "loan-mechanics" }, idea("i3"), { ...idea("i4"), topic: "predictable-income" }],
+      focus,
+    });
+    await generateDaily(f.db, caller({ briefs: [brief(1), brief(2)] }), NOW);
+    expect(f.experiments.map((e) => e.idea_id)).toEqual(["i4", "i3"]);
+  });
+
+  it("the brief prompt carries the review block, and a failed focus read does not fail the run", async () => {
+    const focus: ActiveFocus = { skip: { hook_type: ["promise"], topic: [] }, doubleDown: { hook_type: [], topic: [] } };
+    const f = fakeDb({ ideas: ideas3(), focus });
+    const c = caller({ briefs: [brief(1), brief(2)] });
+    await generateDaily(f.db, c, NOW);
+    const system = (c.calls[0] as { system: string }).system;
+    expect(system).toContain("## From the weekly review");
+    expect(system).toContain("Promise");
+
+    const broken = fakeDb({ ideas: ideas3() });
+    broken.db.focus = async () => { throw new Error("db down"); };
+    expect(await generateDaily(broken.db, caller({ briefs: [brief(1), brief(2)] }), NOW)).toEqual({ made: 2, error: null });
   });
 });

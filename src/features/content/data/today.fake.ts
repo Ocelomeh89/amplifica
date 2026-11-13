@@ -1,4 +1,5 @@
 import type { Topic } from "./topics";
+import { EMPTY_FOCUS, orderForToday, type ActiveFocus } from "@/features/content/engine/focus";
 import { evidenceCounts, type Evidence, type LiveTest } from "@/features/content/engine/experiments";
 import type { Multiplier } from "@/features/content/engine/baseline";
 import type { CompetitorCandidate, ExperimentRow, IdeaLite, RunRow, TodayDb } from "./today";
@@ -27,7 +28,7 @@ function evidence(): Evidence {
 
 type Snapshot = { hook: string; hook_alt: string | null; hook_type: string; title: string; outline: unknown; status: string; score: number };
 
-export function fakeDb(opts: { updateFails?: boolean; ideas?: IdeaLite[]; patchFails?: string[]; experiments?: ExperimentRow[]; runs?: RunRow[]; posted?: { exp: ExperimentRow; posted_at: string }[]; math?: Map<string, { multiplier: Multiplier; normalized: null }>; candidate?: CompetitorCandidate | null; rules?: string[]; topics?: Topic[] } = {}) {
+export function fakeDb(opts: { updateFails?: boolean; ideas?: IdeaLite[]; patchFails?: string[]; experiments?: ExperimentRow[]; runs?: RunRow[]; posted?: { exp: ExperimentRow; posted_at: string }[]; math?: Map<string, { multiplier: Multiplier; normalized: null }>; candidate?: CompetitorCandidate | null; rules?: string[]; topics?: Topic[]; focus?: ActiveFocus; ev?: Evidence } = {}) {
   const ideas = new Map<string, IdeaLite & { hook_alt: string | null; status: string }>();
   for (const i of opts.ideas ?? []) ideas.set(i.id, { ...i, hook_alt: null, status: "inbox" });
   const experiments: ExperimentRow[] = [...(opts.experiments ?? [])];
@@ -39,7 +40,7 @@ export function fakeDb(opts: { updateFails?: boolean; ideas?: IdeaLite[]; patchF
       return opts.topics ?? [];
     },
     async evidence() {
-      return { ev: evidence(), winnerHooks: ["W"], recentHooks: ["R"] };
+      return { ev: opts.ev ?? evidence(), winnerHooks: ["W"], recentHooks: ["R"] };
     },
     async liveTests(): Promise<LiveTest[]> {
       return experiments.filter((e) => e.status === "open" || e.status === "posted").map((e) => ({ variable: e.variable, value: e.value }));
@@ -47,9 +48,12 @@ export function fakeDb(opts: { updateFails?: boolean; ideas?: IdeaLite[]; patchF
     async liveSlots(day) {
       return experiments.filter((e) => e.day === day && ["open", "posted", "judged", "unjudged"].includes(e.status));
     },
-    async unclaimedInboxIdeas(limit) {
+    async focus() {
+      return opts.focus ?? EMPTY_FOCUS;
+    },
+    async unclaimedInboxIdeas(limit, focus) {
       const briefed = new Set(experiments.map((e) => e.idea_id));
-      return [...ideas.values()].filter((i) => i.status === "inbox" && !briefed.has(i.id)).slice(0, limit);
+      return orderForToday([...ideas.values()].filter((i) => i.status === "inbox" && !briefed.has(i.id)), focus).slice(0, limit);
     },
     async idea(id) {
       return ideas.get(id) ?? null;
@@ -91,7 +95,7 @@ export function fakeDb(opts: { updateFails?: boolean; ideas?: IdeaLite[]; patchF
     async insertMomentIdea(idea) {
       calls.momentIdeas.push(idea);
       const id = `idea-m${++seq}`;
-      ideas.set(id, { id, title: idea.title, hook: idea.hook, pillar: "", hook_alt: null, status: "queued" });
+      ideas.set(id, { id, title: idea.title, hook: idea.hook, pillar: "", hook_alt: null, status: "queued", hook_type: "", topic: "" });
       return id;
     },
     async activeRules() {
@@ -144,7 +148,7 @@ export function fakeDb(opts: { updateFails?: boolean; ideas?: IdeaLite[]; patchF
   return { db, ideas, experiments, runs, calls };
 }
 
-export const idea = (id: string, title = `Idea ${id}`): IdeaLite => ({ id, title, hook: `Hook ${id}`, pillar: "method", hook_alt: null, status: "inbox" });
+export const idea = (id: string, title = `Idea ${id}`): IdeaLite => ({ id, title, hook: `Hook ${id}`, pillar: "method", hook_alt: null, status: "inbox", hook_type: "", topic: "" });
 export const exp = (over: Partial<ExperimentRow> = {}): ExperimentRow => ({
   id: "e0",
   idea_id: "i1",

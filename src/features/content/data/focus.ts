@@ -1,4 +1,3 @@
-import { createAdminClient } from "@/shared/supabase/admin";
 import { chicagoIsoDate, chicagoWeekdayHour } from "@/features/content/engine/best-times";
 import {
   BRING_BACK_PROTECT_DAYS,
@@ -73,6 +72,7 @@ export function focusState(rows: FocusRow[], weekStart: string): FocusState {
 }
 
 export async function loadActiveFocus(userId: string, day: string): Promise<ActiveFocus> {
+  const { createAdminClient } = await import("@/shared/supabase/admin");
   const rows = await supabaseFocusDb(createAdminClient(), userId).rows();
   return activeFocus(rows, day);
 }
@@ -174,6 +174,7 @@ export async function addTestDoubleDownWith(db: FocusDb, a: { dimension: FocusDi
 }
 
 export async function addTestDoubleDown(userId: string, a: { dimension: FocusDimension; value: string; day: string; minWeeks: number }): Promise<void> {
+  const { createAdminClient } = await import("@/shared/supabase/admin");
   await addTestDoubleDownWith(supabaseFocusDb(createAdminClient(), userId), a);
 }
 

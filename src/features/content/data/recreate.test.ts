@@ -1,3 +1,4 @@
+import { EMPTY_FOCUS } from "@/features/content/engine/focus";
 import { describe, expect, it } from "vitest";
 import { MissingApiKeyError, type ToolCaller } from "./claude";
 import { withGatePass } from "./gate.fake";
@@ -36,6 +37,9 @@ function fakeDb(opts: { ctx?: RecreateContext | null; tagged?: boolean; insertFa
   const db: RecreateDb & { rows: RecreationRow[]; ideas: unknown[] } = {
     async topics() {
       return [];
+    },
+    async focus() {
+      return EMPTY_FOCUS;
     },
     rows,
     ideas,

@@ -44,6 +44,7 @@ import { sharesCopiedRun } from "@/features/content/engine/competitors";
 import type { ToolCaller } from "./claude";
 import { gatePiece, gateRecord, type GateRecord } from "./brand-gate";
 import type { Topic } from "./topics";
+import { EMPTY_FOCUS, evidenceWithoutSkipped, reviewBlock, type ActiveFocus } from "@/features/content/engine/focus";
 import type { CompetitorPostRow } from "./competitors";
 import { chicagoDayStart } from "./recreate";
 
@@ -92,7 +93,7 @@ export type RunRow = {
   created_at: string;
 };
 
-export type IdeaLite = { id: string; title: string; hook: string; pillar: string; hook_alt: string | null; status: string };
+export type IdeaLite = { id: string; title: string; hook: string; pillar: string; hook_alt: string | null; status: string; hook_type: string; topic: string };
 /** What a brief rewrite changes, so a failed run can put it back (gate and pillar included). */
 export type IdeaSnapshot = { hook: string; hook_alt: string | null; hook_type: string; title: string; outline: unknown; status: string; score: number; gate?: unknown; pillar?: string; topic?: string };
 
@@ -131,7 +132,10 @@ export interface TodayDb {
   /** Today's experiments that are not skipped or discarded. */
   liveSlots(day: string): Promise<ExperimentRow[]>;
   /** Inbox Reel ideas with no live experiment, best score first. */
-  unclaimedInboxIdeas(limit: number): Promise<IdeaLite[]>;
+  /** Ideas with a skipped hook or topic are left out, and ideas with a double-down topic come first, before the cut to `limit`. */
+  unclaimedInboxIdeas(limit: number, focus: ActiveFocus): Promise<IdeaLite[]>;
+  /** The review's active skip and double-down lists on a day. */
+  focus(day: string): Promise<ActiveFocus>;
   idea(id: string): Promise<IdeaLite | null>;
   getExperiment(id: string): Promise<ExperimentRow | null>;
   insertExperiment(row: NewExperiment): Promise<string>;
@@ -241,12 +245,18 @@ export async function makeNow(db: TodayDb, now: Date): Promise<Started> {
 
 const idsOf = (slots: BriefSlotInput[]) => slots.map((s) => s.slot);
 
-type BriefContext = { winnerHooks: string[]; recentHooks: string[]; rules: string[] };
+type BriefContext = { winnerHooks: string[]; recentHooks: string[]; rules: string[]; /** The weekly review block for the system prompt, "" when the lists are empty. */ review?: string };
+
+/** The review's lists for a day and the prompt block that carries them. A failed read means no lists, never a failed run. */
+async function reviewFocus(db: TodayDb, day: string): Promise<{ focus: ActiveFocus; block: string }> {
+  const [focus, topics] = await Promise.all([db.focus(day).catch(() => EMPTY_FOCUS), db.topics().catch(() => [])]);
+  return { focus, block: reviewBlock(focus, topics) };
+}
 
 async function askClaude(caller: ToolCaller, slots: BriefSlotInput[], ctx: BriefContext, fixed: Record<number, string>): Promise<BriefOut[]> {
-  const { rules, ...hooks } = ctx;
+  const { rules, review, ...hooks } = ctx;
   const raw = await caller.call({
-    system: briefSystemPrompt(rules),
+    system: briefSystemPrompt(rules, review),
     text: renderBriefTurn({ slots, ...hooks }),
     tool: { name: BRIEF_TOOL_NAME, description: "Record one brief for each slot.", schema: briefToolSchema() },
     maxTokens: 6000,
@@ -321,8 +331,11 @@ export async function runDaily(db: TodayDb, caller: ToolCaller, runId: string, n
       return { made: 0, error: null };
     }
     const candidate = missing.includes(2) ? await db.competitorCandidate(day, now) : null;
-    const ideas = await db.unclaimedInboxIdeas(missing.length + 1);
-    const { ev, winnerHooks, recentHooks } = await db.evidence(now);
+    const { focus, block } = await reviewFocus(db, day);
+    const ideas = await db.unclaimedInboxIdeas(missing.length + 1, focus);
+    const { ev: rawEv, winnerHooks, recentHooks } = await db.evidence(now);
+    // The control recipe and every candidate test never see a skipped hook; the page's tally keeps the full evidence.
+    const ev = evidenceWithoutSkipped(rawEv, focus);
     const liveTests = await db.liveTests();
     const control = controlRecipe(ev);
     const heldVariables: string[] = live.map((e) => e.variable);
@@ -366,7 +379,7 @@ export async function runDaily(db: TodayDb, caller: ToolCaller, runId: string, n
         ...(p.competitor ? { competitor: competitorInput(p.competitor) } : {}),
       };
     };
-    const hooks: BriefContext = { winnerHooks, recentHooks, rules: await db.activeRules() };
+    const hooks: BriefContext = { winnerHooks, recentHooks, rules: await db.activeRules(), review: block };
     const briefs = await askClaude(caller, planned.map(inputFor), hooks, fixedMessages(planned));
     const briefFor = (slot: number) => briefs.find((x) => x.slot === slot)!;
 
@@ -493,14 +506,16 @@ export async function runMoment(db: TodayDb, caller: ToolCaller, runId: string, 
     }
   };
   try {
-    const { ev, winnerHooks, recentHooks } = await db.evidence(now);
+    const { focus, block } = await reviewFocus(db, day);
+    const { ev: rawEv, winnerHooks, recentHooks } = await db.evidence(now);
+    const ev = evidenceWithoutSkipped(rawEv, focus);
     const pick = pickMoment(ev, await db.liveTests(), (await db.liveSlots(day)).map((e) => e.variable));
     if (!pick) return await fail("No test is left to run today.");
     const text = moment.trim();
     const [raw] = await askClaude(
       caller,
       [{ slot: 3, test: pick.test, held: pick.control, idea: null, moment: text }],
-      { winnerHooks, recentHooks, rules: await db.activeRules() },
+      { winnerHooks, recentHooks, rules: await db.activeRules(), review: block },
       fixedMessages([{ slot: 3, test: pick.test }])
     );
     const g = await gateBrief(caller, raw, now, await db.topics().catch(() => undefined));
@@ -566,9 +581,11 @@ export async function runSwap(db: TodayDb, caller: ToolCaller, runId: string, ex
     // A competitor topic brief swaps to a fresh Inbox idea: keeping their topic under a new test would change two things.
     const fromCompetitorTopic = old.kind === "competitor" && old.variable === "source";
     const oldIdeaId = old.idea_id;
-    const idea = fromCompetitorTopic ? ((await db.unclaimedInboxIdeas(1))[0] ?? null) : await db.idea(old.idea_id);
+    const { focus, block } = await reviewFocus(db, day);
+    const idea = fromCompetitorTopic ? ((await db.unclaimedInboxIdeas(1, focus))[0] ?? null) : await db.idea(old.idea_id);
     if (!idea) return await fail(fromCompetitorTopic ? `${EMPTY_INBOX}. Add an idea, then swap.` : "The idea is gone.");
-    const { ev, winnerHooks, recentHooks } = await db.evidence(now);
+    const { ev: rawEv, winnerHooks, recentHooks } = await db.evidence(now);
+    const ev = evidenceWithoutSkipped(rawEv, focus);
     const heldVariables = new Set((await db.liveSlots(day)).map((e) => e.variable));
     const control: Control = controlRecipe(ev);
     const test = candidateTests(ev, control, await db.liveTests()).find((t) => !heldVariables.has(t.variable));
@@ -576,7 +593,7 @@ export async function runSwap(db: TodayDb, caller: ToolCaller, runId: string, ex
     const [raw] = await askClaude(
       caller,
       [{ slot: old.slot, test, held: control, idea: { title: idea.title, hook: idea.hook, pillar: idea.pillar }, moment: old.moment }],
-      { winnerHooks, recentHooks, rules: await db.activeRules() },
+      { winnerHooks, recentHooks, rules: await db.activeRules(), review: block },
       fixedMessages([{ slot: old.slot, test }])
     );
     const g = await gateBrief(caller, raw, now, await db.topics().catch(() => undefined));

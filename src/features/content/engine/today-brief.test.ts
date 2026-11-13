@@ -161,3 +161,12 @@ describe("approved taste rules", () => {
     expect(briefSystemPrompt([])).not.toContain("Miguel's approved rules");
   });
 });
+
+describe("the review block in the brief prompt", () => {
+  it("is carried when given and the prompt is unchanged when not", () => {
+    const block = "## From the weekly review\nDo not write an idea with these hook types: Promise.";
+    expect(briefSystemPrompt([], block)).toContain(block);
+    expect(briefSystemPrompt([], "")).toBe(briefSystemPrompt());
+    expect(briefSystemPrompt(["a rule"], "")).toBe(briefSystemPrompt(["a rule"]));
+  });
+});
