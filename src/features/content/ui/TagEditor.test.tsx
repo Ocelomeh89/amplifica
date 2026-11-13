@@ -9,6 +9,7 @@ const row: PostTags = {
   hook_type: "question",
   onscreen_text: "none",
   message: "velocity",
+  topic: "",
   cta_type: "save",
   post_style: "talking-head",
   cover_face: null,

@@ -7,7 +7,7 @@ import type { PostTags } from "@/features/content/engine/tags";
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams("window=30&tag=hook_type:paradox") }));
 
 const row = (over: Partial<PostTags> = {}): PostTags & { caption: string } => ({
-  hook_type: "", onscreen_text: "", message: "", cta_type: "", post_style: "",
+  hook_type: "", onscreen_text: "", message: "", topic: "", cta_type: "", post_style: "",
   cover_face: null, cover_text: null, cover_number: null, hook_spoken: "", hook_onscreen: "",
   tag_confidence: {}, tag_locks: [], tagged_at: null, caption: "short caption", ...over,
 });

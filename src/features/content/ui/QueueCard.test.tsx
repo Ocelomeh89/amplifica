@@ -10,7 +10,7 @@ const idea = {
   id: "i1", user_id: "u1", source_id: null, format: "reel", title: "Title", hook: "A hook", hook_alt: null, belief_attacked: "", value_to_listener: "",
   why_it_stops: "", outline: [], quote: "", quote_ref: "", pillar: "", hook_type: "", chain_id: null, score: 0.5, batch_date: "2026-11-01",
   status: "queued", queue_rank: 1, feedback_reason: null, feedback_at: null, clickup_task_id: null, obsidian_path: null, source_post_id: null,
-  created_at: "2026-11-01T11:00:00Z", updated_at: "2026-11-01T11:00:00Z", gate: null, gate_original: null, gate_attempts: 0, ingest_batch: null, digest_posted_at: null,
+  created_at: "2026-11-01T11:00:00Z", updated_at: "2026-11-01T11:00:00Z", gate: null, gate_original: null, gate_attempts: 0, ingest_batch: null, digest_posted_at: null, topic: "", inbox_since: null,
 } as ContentIdea;
 
 describe("QueueCard", () => {

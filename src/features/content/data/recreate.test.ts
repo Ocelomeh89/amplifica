@@ -20,7 +20,7 @@ const OPTIONS = [opt("a"), opt("b"), opt("c")];
 const CTX: RecreateContext = {
   post: { id: POST, hook_type: "question", pillar: "method", tagged_at: "2026-10-20T00:00:00Z" },
   source: {
-    hook_type: "question", onscreen_text: "repeats-hook", message: "w2-advantage", cta_type: "none", post_style: "talking-head-text",
+    hook_type: "question", onscreen_text: "repeats-hook", message: "w2-advantage", topic: "", cta_type: "none", post_style: "talking-head-text",
     cover_face: true, cover_text: true, cover_number: false, hook_spoken: "Spoken hook", hook_onscreen: "", tag_confidence: {},
     tag_locks: [], tagged_at: "2026-10-20T00:00:00Z", caption: "Caption", media_type: "reel", figures: ["Views: 1"],
   },

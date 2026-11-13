@@ -20,6 +20,7 @@ const base = (over: Partial<PostTags & { caption: string }> = {}): PostTags & { 
   hook_type: "",
   onscreen_text: "",
   message: "",
+  topic: "",
   cta_type: "",
   post_style: "",
   cover_face: null,

@@ -82,6 +82,8 @@ export type PostTags = {
   hook_type: string;
   onscreen_text: string;
   message: string;
+  /** A content_topics slug, '' until the tagging routine or Mark posted sets it. Not in TAG_NAMES (see POST_TAG_NAMES). */
+  topic: string;
   cta_type: string;
   post_style: string;
   cover_face: boolean | null;

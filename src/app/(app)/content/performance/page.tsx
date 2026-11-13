@@ -41,6 +41,7 @@ export default async function ContentPerformancePage({ searchParams }: { searchP
       idea_id: p.idea_id,
       onscreen_text: p.onscreen_text,
       message: p.message,
+      topic: p.topic,
       cta_type: p.cta_type,
       post_style: p.post_style,
       cover_face: p.cover_face,

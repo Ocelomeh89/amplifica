@@ -68,6 +68,7 @@ const source: RecreateSource = {
   hook_type: "question",
   onscreen_text: "repeats-hook",
   message: "freedom-paradox",
+  topic: "",
   cta_type: "follow",
   post_style: "talking-head-text",
   cover_face: true,
