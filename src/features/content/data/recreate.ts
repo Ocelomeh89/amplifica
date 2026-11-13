@@ -17,6 +17,7 @@ import {
 import type { WinnerInsights } from "@/features/content/engine/winners";
 import type { ToolCaller } from "./claude";
 import { gateColumns, gateOptions } from "./brand-gate";
+import type { Topic } from "./topics";
 
 export const NO_BRAND_OPTION = "None of the options met the brand standard.";
 
@@ -67,6 +68,8 @@ export interface RecreateDb {
   discard(id: string): Promise<boolean>;
   sourceBasics(postId: string): Promise<SourceBasics | null>;
   sourceContext(postId: string, now: Date): Promise<RecreateContext | null>;
+  /** The owner's topic list, for the brand gate. */
+  topics(): Promise<Topic[]>;
 }
 
 export type StartResult = { ok: true; id: string } | { ok: false; error: string; liveId?: string };
@@ -140,7 +143,7 @@ export async function runRecreation(db: RecreateDb, caller: ToolCaller, id: stri
     const parsed = recreateOutputSchema(row.mode, ctx.source.message).safeParse(raw);
     if (!parsed.success) return fail(parsed.error.issues.map((i) => i.message).join(" "));
     // The brand gate: an option that misses the standard is dropped, never shown.
-    const kept = await gateOptions(caller, parsed.data.options, (o) => ({ hook: o.hook, angle: o.angle, topic: o.topic }), "reel");
+    const kept = await gateOptions(caller, parsed.data.options, (o) => ({ hook: o.hook, angle: o.angle, topic: o.topic }), "reel", await db.topics().catch(() => undefined));
     if (kept.length === 0) return fail(NO_BRAND_OPTION);
     await db.finish(id, { status: "ready", options: kept });
   } catch (e) {

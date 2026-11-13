@@ -43,6 +43,7 @@ import {
 import { sharesCopiedRun } from "@/features/content/engine/competitors";
 import type { ToolCaller } from "./claude";
 import { gatePiece, gateRecord, type GateRecord } from "./brand-gate";
+import type { Topic } from "./topics";
 import type { CompetitorPostRow } from "./competitors";
 import { chicagoDayStart } from "./recreate";
 
@@ -93,7 +94,7 @@ export type RunRow = {
 
 export type IdeaLite = { id: string; title: string; hook: string; pillar: string; hook_alt: string | null; status: string };
 /** What a brief rewrite changes, so a failed run can put it back (gate and pillar included). */
-export type IdeaSnapshot = { hook: string; hook_alt: string | null; hook_type: string; title: string; outline: unknown; status: string; score: number; gate?: unknown; pillar?: string };
+export type IdeaSnapshot = { hook: string; hook_alt: string | null; hook_type: string; title: string; outline: unknown; status: string; score: number; gate?: unknown; pillar?: string; topic?: string };
 
 export type BriefCompetitor = { username: string; url: string; multiple: number; thin: boolean; pushes_belief: string | null; format_note: string | null };
 
@@ -122,6 +123,8 @@ export type NewExperiment = Omit<ExperimentRow, "id" | "created_at">;
 export type ExperimentPatch = Partial<Pick<NewExperiment, "status" | "verdict" | "judge_metrics" | "judged_at" | "post_id" | "judge_at" | "variable" | "value" | "recipe" | "reason" | "idea_id" | "kind" | "competitor_post_id">>;
 
 export interface TodayDb {
+  /** The owner's topic list, for the brand gate. */
+  topics(): Promise<Topic[]>;
   evidence(now: Date): Promise<{ ev: Evidence; winnerHooks: string[]; recentHooks: string[] }>;
   /** (variable, value) pairs held by an open or posted experiment. */
   liveTests(): Promise<LiveTest[]>;
@@ -254,7 +257,7 @@ async function askClaude(caller: ToolCaller, slots: BriefSlotInput[], ctx: Brief
 }
 
 /** A brief's idea rewrite, plus the brand gate's record and the pillar it confirmed. */
-export type BriefPatch = ReturnType<typeof briefIdeaPatch> & { gate?: GateRecord; pillar?: string };
+export type BriefPatch = ReturnType<typeof briefIdeaPatch> & { gate?: GateRecord; pillar?: string; topic?: string };
 
 export const NO_BRAND_BRIEF = "None of today's briefs met the brand standard.";
 
@@ -262,8 +265,8 @@ export const NO_BRAND_BRIEF = "None of today's briefs met the brand standard.";
  * The brand gate on one brief: a check, one rewrite on a fail, a re-check. The gate's pillar must
  * be the pillar the brief was built on. Null means the brief is dropped; a gate error counts as a fail.
  */
-export async function gateBrief(caller: ToolCaller, b: BriefOut, now: Date): Promise<{ brief: BriefOut; gate: GateRecord } | null> {
-  const o = await gatePiece(caller, { format: "reel", fields: { title: b.title, hook: b.hook, say: b.say } }, { rewrite: true });
+export async function gateBrief(caller: ToolCaller, b: BriefOut, now: Date, topics?: Topic[]): Promise<{ brief: BriefOut; gate: GateRecord } | null> {
+  const o = await gatePiece(caller, { format: "reel", fields: { title: b.title, hook: b.hook, say: b.say } }, { rewrite: true, topics });
   if (o.status !== "passed" || o.result.pillar !== b.message) return null;
   const say = Array.isArray(o.fields.say) ? o.fields.say : [String(o.fields.say)];
   const hook = String(o.fields.hook);
@@ -395,7 +398,9 @@ export async function runDaily(db: TodayDb, caller: ToolCaller, runId: string, n
     // The brand gate: a brief that does not pass leaves its slot empty and its idea untouched.
     // In parallel, so the gate costs about one brief's two calls, not one per slot.
     const gates = new Map<number, GateRecord>();
-    const checked = await Promise.all(planned.map((p) => gateBrief(caller, briefFor(p.slot), now)));
+    // Without the topic list the gate still checks; the ideas just keep the topic they had.
+    const topics = await db.topics().catch(() => undefined);
+    const checked = await Promise.all(planned.map((p) => gateBrief(caller, briefFor(p.slot), now, topics)));
     for (const [k, p] of [...planned].entries()) {
       const b = briefFor(p.slot);
       const g = checked[k];
@@ -414,7 +419,7 @@ export async function runDaily(db: TodayDb, caller: ToolCaller, runId: string, n
       const i = ideaOf(p.ideaId)!;
       await db.discardSharpen(p.ideaId);
       const brief = briefFor(p.slot);
-      const before = await db.patchIdea(p.ideaId, { ...briefIdeaPatch(brief, p.test, control, i.hook_alt ?? i.hook), gate: gates.get(p.slot), pillar: brief.message });
+      const before = await db.patchIdea(p.ideaId, { ...briefIdeaPatch(brief, p.test, control, i.hook_alt ?? i.hook), gate: gates.get(p.slot), pillar: brief.message, topic: gates.get(p.slot)?.result.topic ?? undefined });
       if (before === null) return await fail("An idea changed while the briefs were made. Try again.");
       patched.push({ id: p.ideaId, snapshot: before });
     }
@@ -498,7 +503,7 @@ export async function runMoment(db: TodayDb, caller: ToolCaller, runId: string, 
       { winnerHooks, recentHooks, rules: await db.activeRules() },
       fixedMessages([{ slot: 3, test: pick.test }])
     );
-    const g = await gateBrief(caller, raw, now);
+    const g = await gateBrief(caller, raw, now, await db.topics().catch(() => undefined));
     if (!g) return await fail("The brief did not meet the brand standard. Try a different moment.");
     const b = g.brief;
     const sourceId = await db.insertMomentSource(text, day);
@@ -574,11 +579,11 @@ export async function runSwap(db: TodayDb, caller: ToolCaller, runId: string, ex
       { winnerHooks, recentHooks, rules: await db.activeRules() },
       fixedMessages([{ slot: old.slot, test }])
     );
-    const g = await gateBrief(caller, raw, now);
+    const g = await gateBrief(caller, raw, now, await db.topics().catch(() => undefined));
     if (!g) return await fail("The new brief did not meet the brand standard. Try again.");
     const b = g.brief;
     await db.discardSharpen(idea.id);
-    const before = await db.patchIdea(idea.id, { ...briefIdeaPatch(b, test, control, idea.hook_alt ?? idea.hook), gate: g.gate, pillar: b.message });
+    const before = await db.patchIdea(idea.id, { ...briefIdeaPatch(b, test, control, idea.hook_alt ?? idea.hook), gate: g.gate, pillar: b.message, topic: g.gate.result.topic ?? undefined });
     if (before === null) return await fail("The idea changed while the brief was made. Try again.");
     snapshot = { id: idea.id, snapshot: before };
     // Rewritten in place: one write, so a failure leaves the old brief exactly as it was.

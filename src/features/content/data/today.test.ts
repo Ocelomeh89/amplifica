@@ -407,6 +407,19 @@ describe("the brand gate on briefs", () => {
     expect(patched.pillar).toBe("w2-advantage");
   });
 
+  it("a passing brief writes its topic to the claimed idea", async () => {
+    const topics = [{ slug: "predictable-income", label: "Why predictable income supports long-term investing", pillar: "w2-advantage" as const }];
+    const f = fakeDb({ ideas: [idea("i1"), idea("i2")], topics });
+    const withTopic = { verdict: "pass", reader: "daniel", pillar: "w2-advantage", amplifica_pillar: "the-numbers", failed: [], topic: "predictable-income" };
+    const c = gatePassing<ToolCaller>({ call: async () => ({ briefs: [brief(1), brief(2)] }) }, { H1: withTopic });
+    await generateDaily(f.db, c, NOW);
+    const first = f.ideas.get(f.experiments.find((e) => e.slot === 1)!.idea_id)! as unknown as { topic?: string };
+    const second = f.ideas.get(f.experiments.find((e) => e.slot === 2)!.idea_id)! as unknown as { topic?: string };
+    expect(first.topic).toBe("predictable-income");
+    expect(second.topic ?? "").toBe("");
+    expect(c.gateCalls[0]).toContain("predictable-income");
+  });
+
   it("a brief that fails after its rewrite leaves its slot empty and its idea untouched", async () => {
     const f = fakeDb({ ideas: [idea("i1"), idea("i2")] });
     const gated = gatePassing<ToolCaller>({ call: async () => ({ briefs: [brief(1), brief(2)] }) }, { H2: failWithRewrite });

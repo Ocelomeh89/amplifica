@@ -1,3 +1,4 @@
+import { loadTopics } from "./topics";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/shared/supabase/database.types";
 import { STALE_PENDING_MINUTES } from "@/features/content/engine/recreate";
@@ -143,6 +144,8 @@ export function supabaseSharpenDb(client: Client, userId: string): SharpenDb & {
       fail("patch idea", error);
       return (data ?? []).length > 0;
     },
+
+    topics: () => loadTopics(client, userId),
 
     async activeRules() {
       const { data, error } = await client

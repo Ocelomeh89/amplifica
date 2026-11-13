@@ -9,6 +9,7 @@ import { RECENT_HOOK_DAYS } from "@/features/content/engine/recreate";
 import type { WinnerPost } from "@/features/content/engine/winners";
 import { loadPostsForMath } from "./performance";
 import { loadQueued } from "./queries";
+import { loadTopics } from "./topics";
 import { supabaseCompetitorsDb } from "./supabase-competitors-db";
 import { STALE_RUN_MINUTES, type BriefView, type CompetitorCandidate, type ExperimentRow, type IdeaLite, type NewExperiment, type RunRow, type TodayDb } from "./today";
 
@@ -69,6 +70,7 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
 
   const db: TodayDb & { postSources: typeof postSources } = {
     postSources,
+    topics: () => loadTopics(client, userId),
 
     async evidence(now) {
       const loaded = await loadPostsForMath(client, userId);
@@ -169,7 +171,7 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
 
     async patchIdea(id, patch) {
       const { data: before, error: readError } = await ideas()
-        .select("hook, hook_alt, hook_type, title, outline, status, score, gate, pillar")
+        .select("hook, hook_alt, hook_type, title, outline, status, score, gate, pillar, topic")
         .eq("id", id)
         .eq("user_id", userId)
         .in("status", ["inbox", "queued"])
@@ -231,7 +233,7 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
           score: idea.score,
           batch_date: idea.batch_date,
           status: "queued",
-          ...(gate ? { gate: gate as unknown as Json, pillar: gate.result.pillar ?? idea.pillar } : {}),
+          ...(gate ? { gate: gate as unknown as Json, pillar: gate.result.pillar ?? idea.pillar, topic: gate.result.topic ?? "" } : {}),
         })
         .select("id");
       if (error) throw new Error(`today moment idea: ${error.message}`);

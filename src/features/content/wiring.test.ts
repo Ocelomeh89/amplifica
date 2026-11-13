@@ -104,6 +104,14 @@ describe("content stays owner-only", () => {
     expect(competitors).toBeLessThan(route.indexOf("runTodayCron("));
   });
 
+  it("the topic backfill runs only on request, dry unless asked to run", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    expect(route).toContain('params.get("topics")');
+    expect(route).toContain('dryRun: topics !== "run"');
+    expect(route.indexOf("runTopicBackfill(")).toBeGreaterThan(-1);
+    expect(route.indexOf("runTopicBackfill(")).toBeLessThan(route.indexOf("runMetricsCron("));
+  });
+
   it("the follower count is stored after the pulls and before the competitor step", () => {
     const route = read("src/app/api/content/cron/metrics/route.ts");
     const store = route.indexOf("storeFollowers(");

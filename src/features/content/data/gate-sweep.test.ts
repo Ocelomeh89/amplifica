@@ -96,3 +96,23 @@ describe("idea fields", () => {
     expect(patch.hook_alt).toBe("Hook a");
   });
 });
+
+describe("runGateSweep topic", () => {
+  it("a pass writes the gate's topic onto the idea", async () => {
+    const db = fakeGateDb([idea("a")], [{ slug: "concentration-risk", label: "The dangers of concentrating wealth", pillar: "expensive-tuition" }]);
+    await runGateSweep(db, caller([{ ...pass, topic: "concentration-risk" }]), { limit: 10, timeLeft: forever });
+    expect(db.rows[0]).toMatchObject({ status: "inbox", topic: "concentration-risk" });
+  });
+
+  it("a topic outside the gate's pillar is not written", async () => {
+    const db = fakeGateDb([idea("a")], [{ slug: "predictable-income", label: "x", pillar: "w2-advantage" }]);
+    await runGateSweep(db, caller([{ ...pass, topic: "predictable-income" }]), { limit: 10, timeLeft: forever });
+    expect(db.rows[0].topic ?? "").toBe("");
+  });
+
+  it("a topic list that cannot be read does not stop the sweep", async () => {
+    const db = fakeGateDb([idea("a")]);
+    db.topics = async () => { throw new Error("db down"); };
+    expect(await runGateSweep(db, caller([pass]), { limit: 10, timeLeft: forever })).toEqual({ passed: 1, failed: 0, errors: 0 });
+  });
+});

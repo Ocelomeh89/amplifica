@@ -12,6 +12,7 @@ import {
 import { NOTE_TEXT_MAX, SHARPEN_CHIPS, SHARPEN_DAILY_CAP, type SharpenStatus } from "@/features/content/engine/taste";
 import type { ToolCaller } from "./claude";
 import { gateColumns, gateOptions } from "./brand-gate";
+import type { Topic } from "./topics";
 
 export const NO_BRAND_REWRITE = "None of the rewrites met the brand standard.";
 
@@ -63,6 +64,8 @@ export interface SharpenDb {
   /** Rewrites the idea only while it is still inbox or queued; false when no row matched. */
   patchIdea(id: string, patch: ReturnType<typeof sharpenIdeaPatch> & ReturnType<typeof gateColumns>): Promise<boolean>;
   activeRules(): Promise<string[]>;
+  /** The owner's topic list, for the brand gate. */
+  topics(): Promise<Topic[]>;
 }
 
 export type SharpenStart = { ok: true; id: string; noteId: string | null } | { ok: false; error: string };
@@ -131,7 +134,7 @@ export async function runSharpen(db: SharpenDb, caller: ToolCaller, id: string):
     const parsed = sharpenOutputSchema.safeParse(raw);
     if (!parsed.success) return fail(parsed.error.issues.map((i) => i.message).join(" "));
     // The brand gate: a rewrite that misses the standard is dropped, never shown.
-    const kept = await gateOptions(caller, parsed.data.options, sharpenGateFields, idea.format);
+    const kept = await gateOptions(caller, parsed.data.options, sharpenGateFields, idea.format, await db.topics().catch(() => undefined));
     if (kept.length === 0) return fail(NO_BRAND_REWRITE);
     await db.finish(id, { status: "ready", options: kept });
   } catch (e) {

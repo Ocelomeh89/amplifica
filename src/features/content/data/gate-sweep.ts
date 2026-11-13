@@ -1,5 +1,6 @@
 import type { GateFields } from "@/features/content/engine/brand";
 import { gatePiece, type GateOutcome } from "./brand-gate";
+import type { Topic } from "./topics";
 import type { ToolCaller } from "./claude";
 
 // Releases ideas the brand gate holds: a pass goes to the Inbox, a fail to gate_failed, and an
@@ -21,6 +22,8 @@ export type GatingIdea = {
 };
 
 export interface GateDb {
+  /** The owner's topic list: the gate picks one under its pillar for each idea it passes. */
+  topics(): Promise<Topic[]>;
   /** Fewest attempts first, then oldest; `ids` narrows to those ideas. */
   gatingIdeas(limit: number, ids?: string[]): Promise<GatingIdea[]>;
   applyPass(id: string, o: Extract<GateOutcome, { status: "passed" }>, idea: GatingIdea): Promise<void>;
@@ -75,8 +78,13 @@ export async function runGateSweep(
   const reserve = a.reserve ?? SWEEP_RESERVE_SECONDS;
   const width = Math.max(1, a.concurrency ?? 1);
   const ideas = await db.gatingIdeas(a.limit, a.ids);
+  // Without the list the gate still checks; the ideas just get no topic until the topic backfill reaches them.
+  const topics = await db.topics().catch((e) => {
+    console.error("brand gate: could not read the topic list", e instanceof Error ? e.message : e);
+    return undefined;
+  });
   const one = async (idea: GatingIdea) => {
-    const o = await gatePiece(caller, { format: idea.format, fields: gateFieldsOf(idea) }, { rewrite: true });
+    const o = await gatePiece(caller, { format: idea.format, fields: gateFieldsOf(idea) }, { rewrite: true, topics });
     try {
       if (o.status === "passed") {
         await db.applyPass(idea.id, o, idea);

@@ -7,6 +7,7 @@ import { runCompetitorCron } from "@/features/content/data/competitor-cron";
 import { runGateSweep } from "@/features/content/data/gate-sweep";
 import { supabaseBackfillDb, supabaseDigestDb, supabaseGateDb } from "@/features/content/data/supabase-gate-db";
 import { runBackfill } from "@/features/content/data/gate-backfill";
+import { runTopicBackfill, supabaseTopicBackfillDb } from "@/features/content/data/topic-backfill";
 import { clickUpChatPoster, postDigests } from "@/features/content/data/gate-digest";
 import { supabaseCompetitorsDb } from "@/features/content/data/supabase-competitors-db";
 import { apifyClientFromEnv } from "@/features/content/data/pulls/apify";
@@ -54,6 +55,22 @@ export async function GET(req: Request) {
     } catch (e) {
       console.error("content gate backfill failed", e);
       return NextResponse.json({ backfill, error: (e as Error).message }, { status: 500 });
+    }
+  }
+  // `?topics=dry` reports which topic each idea without one would get and writes nothing; `?topics=run`
+  // writes them, 100 ideas a call. Nothing else runs.
+  const topics = params.get("topics");
+  if (topics === "dry" || topics === "run") {
+    try {
+      const report = await runTopicBackfill(supabaseTopicBackfillDb(createAdminClient(), owner), anthropicToolCaller({ timeoutMs: 60_000, maxRetries: 0 }), {
+        dryRun: topics !== "run",
+        limit: 100,
+        timeLeft: () => BUDGET_SECONDS - (Date.now() - startedAt.getTime()) / 1000,
+      });
+      return NextResponse.json({ topics, ...report });
+    } catch (e) {
+      console.error("content topic backfill failed", e);
+      return NextResponse.json({ topics, error: (e as Error).message }, { status: 500 });
     }
   }
   const wanted = PLATFORMS.filter((p) => !only || p === only);

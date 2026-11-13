@@ -4,6 +4,7 @@ import { gateRecord } from "./brand-gate";
 import type { DigestBatch, DigestDb } from "./gate-digest";
 import type { BackfillDb, BackfillIdea } from "./gate-backfill";
 import { refreshClickUpTask } from "./clickup";
+import { loadTopics } from "./topics";
 import { MAX_GATE_ATTEMPTS, ideaPatchFrom, type GateDb, type GatingIdea } from "./gate-sweep";
 
 type Client = SupabaseClient<Database>;
@@ -22,6 +23,8 @@ export function supabaseGateDb(client: Client, userId: string): GateDb {
   };
 
   return {
+    topics: () => loadTopics(client, userId),
+
     async gatingIdeas(limit, ids) {
       let q = ideas().select(GATING_COLUMNS).eq("user_id", userId).eq("status", "gating");
       if (ids) q = q.in("id", ids);
@@ -48,6 +51,7 @@ export function supabaseGateDb(client: Client, userId: string): GateDb {
           : {}),
         status: "inbox" as const,
         pillar: o.result.pillar ?? "",
+        ...(o.result.topic ? { topic: o.result.topic } : {}),
         gate: gateRecord(o.result, o.rewritten, now) as unknown as Json,
       };
       const { error } = await ideas().update(patch).eq("id", id).eq("user_id", userId).eq("status", "gating");

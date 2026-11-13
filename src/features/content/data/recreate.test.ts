@@ -34,6 +34,9 @@ function fakeDb(opts: { ctx?: RecreateContext | null; tagged?: boolean; insertFa
   const ideas: unknown[] = [];
   let seq = 0;
   const db: RecreateDb & { rows: RecreationRow[]; ideas: unknown[] } = {
+    async topics() {
+      return [];
+    },
     rows,
     ideas,
     async expireStale(postId, before) {

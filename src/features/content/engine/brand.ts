@@ -184,12 +184,17 @@ export function pillarName(slug: string): string {
 }
 
 export type GateFields = Record<string, string | string[]>;
+/** A topic as the gate sees it. data/topics.ts has the same shape (its Topic type). */
+export type GateTopic = { slug: string; label: string; pillar: string };
+
 export type GateResult = {
   verdict: "pass" | "fail";
   reader: Reader | null;
   pillar: PillarSlug | null;
   amplifica_pillar: AmplificaPillar | null;
   failed: { item: GateItem; reason: string }[];
+  /** The topic slug the gate picked under its pillar. Present only when topics were offered; null when none fits. */
+  topic?: string | null;
 };
 
 export const GATE_TOOL_NAME = "record_brand_check";
@@ -269,14 +274,20 @@ keep Miguel's voice, and return every field. Do not flatten it into a template.
 
 const renderValue = (v: string | string[]) => (Array.isArray(v) ? v.map((x) => `- ${x}`).join("\n") : v);
 
-export function renderGateTurn(a: { format: string; fields: GateFields; rewrite: boolean }): string {
+export function renderGateTurn(a: { format: string; fields: GateFields; rewrite: boolean; topics?: GateTopic[] }): string {
   const body = Object.entries(a.fields)
     .map(([k, v]) => `### ${k}\n${renderValue(v)}`)
     .join("\n\n");
   const ask = a.rewrite
     ? "Check this piece. If it fails, also rewrite it so it passes, returning every field under rewrite."
     : "Check this piece. Do not rewrite it.";
-  return `Format: ${a.format}\n\n${body}\n\n${ask}`;
+  const base = `Format: ${a.format}\n\n${body}\n\n${ask}`;
+  if (!a.topics || a.topics.length === 0) return base;
+  const byPillar = PILLAR_SLUGS.map((p) => {
+    const mine = a.topics!.filter((t) => t.pillar === p);
+    return mine.length === 0 ? "" : `${p}:\n${mine.map((t) => `- ${t.slug}: ${t.label}`).join("\n")}`;
+  }).filter(Boolean);
+  return `${base}\n\nTopics (slug: label), by pillar:\n${byPillar.join("\n")}\n\nAlso give \`topic\`: the slug under your pillar that fits best, or null.`;
 }
 
 const failedSchema = z.object({ item: z.enum(ITEM_KEYS), reason: z.string().trim().min(1).max(300) });
@@ -292,6 +303,7 @@ export function gateOutputSchema(keys: string[], rewrite: boolean) {
     pillar: z.enum(PILLAR_SLUGS).nullable(),
     amplifica_pillar: z.enum(AMPLIFICA_SLUGS).nullable(),
     failed: z.array(failedSchema),
+    topic: z.string().nullable().optional(),
     rewrite: fieldsSchema(keys).optional(),
   });
   return base.superRefine((v, ctx) => {
@@ -303,7 +315,7 @@ export function gateOutputSchema(keys: string[], rewrite: boolean) {
   });
 }
 
-export function gateToolSchema(keys: string[], rewrite: boolean): Record<string, unknown> {
+export function gateToolSchema(keys: string[], rewrite: boolean, topicSlugs?: string[]): Record<string, unknown> {
   const field = { anyOf: [{ type: "string" }, { type: "array", items: { type: "string" } }] };
   const properties: Record<string, unknown> = {
     verdict: { type: "string", enum: ["pass", "fail"] },
@@ -315,6 +327,9 @@ export function gateToolSchema(keys: string[], rewrite: boolean): Record<string,
       items: { type: "object", properties: { item: { type: "string", enum: [...ITEM_KEYS] }, reason: { type: "string" } }, required: ["item", "reason"] },
     },
   };
+  if (topicSlugs && topicSlugs.length > 0) {
+    properties.topic = { type: ["string", "null"], enum: [...topicSlugs, null], description: "The topic slug under your pillar that fits best, or null." };
+  }
   if (rewrite) {
     properties.rewrite = {
       type: "object",
