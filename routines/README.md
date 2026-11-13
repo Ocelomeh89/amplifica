@@ -8,7 +8,8 @@ variables named at its top and the connectors it lists.
 |---|---|---|
 | `content-daily.md` | 06:00 daily (`0 11 * * *` UTC) | Granola, Wispr-Flow, Plaud, ClickUp |
 | `content-found.md` | Mon 06:30 (`30 11 * * 1` UTC); also `/content-found` | none |
-| `content-tag.md` | Mon 07:00 (`0 12 * * 1` UTC); also `/content-tag` | none |
+| `content-tag.md` | Mon 06:55 (`CRON_TZ=America/Chicago 55 6 * * 1`); also `/content-tag` | none |
+| `content-weekly.md` | Mon 07:30 (`CRON_TZ=America/Chicago 30 7 * * 1`) | ClickUp |
 
 ## Setting one up
 
@@ -119,3 +120,14 @@ Ingest inserts new rows and must not be used to rewrite existing ones.
 `/content-voice` skills on Miguel's Mac, because they read and create files in his
 Obsidian vault. They are not scheduled. `/content-draft` checks the voice first and
 runs the voice refresh when it is out of date.
+
+## Weekly review run
+
+`content-weekly.md` asks the app to build last week's review (what worked, what to double down on and skip, the pillar
+spread and the brand gate's week) and posts one ClickUp line with the link. Set it up like the daily routine, with the
+ClickUp connector and the message: "Read routines/content-weekly.md in this checkout and run it."
+
+- It must run after `content-tag.md`, so last week's posts have their tags. It is scheduled at 07:30 America/Chicago all
+  year, 35 minutes after tagging.
+- Network access: the `CONTENT_API_BASE` host only (an allowlist).
+- A missed Monday is fixed with **Build now** on `/content/review`.

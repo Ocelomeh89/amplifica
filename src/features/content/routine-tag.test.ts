@@ -39,7 +39,7 @@ describe("routines/content-tag.md", () => {
 
   it("is scheduled weekly in the README and has a local skill", () => {
     const readme = read("routines/README.md");
-    expect(readme).toMatch(/content-tag\.md.*0 12 \* \* 1/);
+    expect(readme).toMatch(/content-tag\.md.*55 6 \* \* 1/);
     expect(read(".claude/skills/content-tag/SKILL.md")).toContain("routines/content-tag.md");
   });
 });
