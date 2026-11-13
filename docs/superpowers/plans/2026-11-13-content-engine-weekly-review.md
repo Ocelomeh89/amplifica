@@ -95,7 +95,7 @@ then the shared names file above.
   - **Neither works** (missing scope, no tool): skip Task 3's pull, keep the table and `loadFollowerCount` (returns
     null), the tile says "not available". Tell Miguel.
 
-**Spike result:** _(fill in: slug, arguments, response path to the number, date)_
+**Spike result (2026-11-13):** `INSTAGRAM_GET_USER_INFO` with `{"ig_user_id":"me","fields":"id,username,followers_count,media_count"}` returns a total. Response path: `data.followers_count` (122 on the day; username `amplificawealth`). A total comes back, so Task 3 uses this slug and stores the count daily. Slice C: Miguel's Instagram username is `amplificawealth`, read from the same call.
 
 ### Task 2: Migration 0021, seed topics, types
 
