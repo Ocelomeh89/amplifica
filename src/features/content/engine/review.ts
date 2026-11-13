@@ -287,10 +287,11 @@ export function whySystemPrompt(): string {
   ].join("\n");
 }
 
-const countLine = (dimension: FocusDimension, r: ValueCount) =>
-  `- ${dimension === "topic" ? topicLabel(r.value) : (TAG_LABELS[r.value] ?? r.value)}: ${r.won} of ${r.total} beat usual views`;
+type TopicLabels = { slug: string; label: string }[];
+const countLine = (dimension: FocusDimension, r: ValueCount, topics: TopicLabels) =>
+  `- ${dimension === "topic" ? topicLabel(r.value, topics) : (TAG_LABELS[r.value] ?? r.value)}: ${r.won} of ${r.total} beat usual views`;
 
-export function renderWhyTurn(a: { posts: WhyInput[]; counts: Record<FocusDimension, ValueCount[]> }): string {
+export function renderWhyTurn(a: { posts: WhyInput[]; counts: Record<FocusDimension, ValueCount[]>; topics?: TopicLabels }): string {
   const posts = a.posts
     .map((p) =>
       [`id: ${p.id}`, `post: ${p.title}`, `result: ${p.verdict === "worked" ? "beat usual views" : "far below usual views"}${p.n_views !== null ? ` (${p.n_views.toFixed(1)}x)` : ""}`, `hook type: ${p.hook_type || "not tagged"}`, `topic: ${p.topic || "not tagged"}`, `pillar: ${p.pillar || "not tagged"}`, p.second ? `second number: ${p.second}` : ""]
@@ -298,9 +299,10 @@ export function renderWhyTurn(a: { posts: WhyInput[]; counts: Record<FocusDimens
         .join("\n")
     )
     .join("\n\n");
-  const hooks = a.counts.hook_type.map((r) => countLine("hook_type", r)).join("\n") || "- none yet";
-  const topics = a.counts.topic.map((r) => countLine("topic", r)).join("\n") || "- none yet";
-  return `Posts:\n\n${posts}\n\nHow each hook type did (last 90 days):\n${hooks}\n\nHow each topic did (last 90 days):\n${topics}\n\nWrite one sentence per post and one for the week.`;
+  const labels = a.topics ?? [];
+  const hooks = a.counts.hook_type.map((r) => countLine("hook_type", r, labels)).join("\n") || "- none yet";
+  const topicRows = a.counts.topic.map((r) => countLine("topic", r, labels)).join("\n") || "- none yet";
+  return `Posts:\n\n${posts}\n\nHow each hook type did (last 90 days):\n${hooks}\n\nHow each topic did (last 90 days):\n${topicRows}\n\nWrite one sentence per post and one for the week.`;
 }
 
 export function whyToolSchema(): Record<string, unknown> {
@@ -338,7 +340,7 @@ export function groundedWhy(why: string, facts: string[]): string {
 }
 
 /** The facts a why may cite for one post. */
-export function whyFacts(p: { hook_type: string; topic: string; pillar: string }, counts: Record<FocusDimension, ValueCount[]>): string[] {
+export function whyFacts(p: { hook_type: string; topic: string; pillar: string }, counts: Record<FocusDimension, ValueCount[]>, topics: TopicLabels = []): string[] {
   const facts: string[] = [];
   if (p.hook_type) {
     facts.push(TAG_LABELS[p.hook_type] ?? p.hook_type);
@@ -346,7 +348,7 @@ export function whyFacts(p: { hook_type: string; topic: string; pillar: string }
     if (r) facts.push(`${r.won} of ${r.total}`);
   }
   if (p.topic) {
-    facts.push(topicLabel(p.topic));
+    facts.push(topicLabel(p.topic, topics));
     const r = counts.topic.find((x) => x.value === p.topic);
     if (r) facts.push(`${r.won} of ${r.total}`);
   }

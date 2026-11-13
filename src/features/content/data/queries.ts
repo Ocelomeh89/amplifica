@@ -6,6 +6,8 @@ import type { Format } from "@/features/content/engine/types";
 import { partitionUnused } from "@/features/content/engine/unused";
 import { splitHidden } from "@/features/content/engine/inbox";
 import type { ActiveFocus } from "@/features/content/engine/focus";
+import type { FocusRow } from "./focus";
+import type { ContentReview } from "@/shared/supabase/database.types";
 import { summarizeDraft, type DraftState } from "@/features/content/engine/drafts";
 import type { RecreateOption } from "@/features/content/engine/recreate";
 import { STALE_PENDING_MINUTES } from "@/features/content/engine/recreate";
@@ -306,4 +308,30 @@ export async function loadPillarBalance(db: Db, userId: string, now: Date): Prom
     ...((posts.data ?? []) as { message: string; posted_at: string }[]).map((p) => ({ pillar: p.message, at: p.posted_at })),
   ];
   return pillarBalance(rows, now);
+}
+
+// ---- The weekly review ------------------------------------------------------------------------------------------
+
+/** The given week's stored review, or the newest; `weeks` lists the stored week starts, newest first, up to 12. */
+export async function loadReview(db: Db, userId: string, weekStart: string | null): Promise<{ row: ContentReview | null; weeks: string[] }> {
+  const res = await db.from("content_reviews").select("*").eq("user_id", userId).order("week_start", { ascending: false }).limit(12);
+  const rows = (must(res) ?? []) as ContentReview[];
+  const weeks = rows.map((r) => r.week_start);
+  if (weekStart === null) return { row: rows[0] ?? null, weeks };
+  const listed = rows.find((r) => r.week_start === weekStart);
+  if (listed) return { row: listed, weeks };
+  const one = await db.from("content_reviews").select("*").eq("user_id", userId).eq("week_start", weekStart).limit(1);
+  return { row: ((must(one) ?? []) as ContentReview[])[0] ?? null, weeks };
+}
+
+/** Skips running on the review day, lifted ones included (the page offers Bring back on the rest), hooks first. */
+export async function loadReviewSkips(db: Db, userId: string, reviewDay: string): Promise<FocusRow[]> {
+  const res = await db
+    .from("content_focus")
+    .select("id, kind, dimension, value, won, lost, flat, total, source, review_week, starts_on, ends_on, lifted_at, protected_until")
+    .eq("user_id", userId)
+    .eq("kind", "skip")
+    .lte("starts_on", reviewDay)
+    .gt("ends_on", reviewDay);
+  return ((must(res) ?? []) as FocusRow[]).sort((a, b) => (a.dimension === b.dimension ? b.total - a.total || a.value.localeCompare(b.value) : a.dimension === "hook_type" ? -1 : 1));
 }

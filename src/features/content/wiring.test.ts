@@ -41,6 +41,7 @@ describe("content stays owner-only", () => {
       "src/app/api/content/tags/route.ts",
       "src/app/api/content/cron/metrics/route.ts",
       "src/app/api/content/voice/route.ts",
+      "src/app/api/content/review/build/route.ts",
     ];
     for (const f of routes) expect(read(f), f).toContain("authorizeRoutine(req, process.env.");
   });
@@ -102,6 +103,16 @@ describe("content stays owner-only", () => {
     const competitors = route.indexOf("runCompetitorCron(");
     expect(competitors).toBeGreaterThan(route.indexOf("runMetricsCron("));
     expect(competitors).toBeLessThan(route.indexOf("runTodayCron("));
+  });
+
+  it("the review route is a POST with a 300 second budget and an explicit Claude timeout", () => {
+    const route = read("src/app/api/content/review/build/route.ts");
+    expect(route).toContain("export async function POST(");
+    expect(route).not.toContain("export async function GET(");
+    expect(route).toContain("maxDuration = 300");
+    expect(route).toContain("timeoutMs: 120_000");
+    expect(route).toContain("maxRetries: 0");
+    expect(route).toContain('dynamic = "force-dynamic"');
   });
 
   it("the topic backfill runs only on request, dry unless asked to run", () => {

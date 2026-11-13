@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/shared/supabase/database.types";
 import { EMPTY_FOCUS, type ActiveFocus } from "@/features/content/engine/focus";
-import { loadInbox, loadQueued, loadUnused } from "./queries";
+import { loadInbox, loadQueued, loadReview, loadReviewSkips, loadUnused } from "./queries";
 
 vi.mock("server-only", () => ({}));
 
@@ -12,7 +12,7 @@ function fakeClient(tables: Record<string, unknown[]>) {
       const b: Record<string, unknown> = {
         then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: tables[table] ?? [], error: null }).then(ok),
       };
-      for (const m of ["select", "eq", "in", "gte", "order", "limit", "neq"]) b[m] = () => b;
+      for (const m of ["select", "eq", "in", "gte", "lte", "gt", "order", "limit", "neq"]) b[m] = () => b;
       return b;
     },
   };
@@ -61,5 +61,22 @@ describe("the skip list in the Inbox and Never used", () => {
     const r = await loadInbox(db, "u1", EMPTY_FOCUS);
     expect(r.ideas.map((i) => i.id)).toEqual(["back"]);
     expect((await loadUnused(db, "u1", EMPTY_FOCUS)).ideas).toEqual([]);
+  });
+});
+
+describe("the review loaders", () => {
+  const rev = (week: string) => ({ id: week, user_id: "u1", week_start: week });
+  it("loadReview returns the newest review and the week list, or a given week", async () => {
+    const db = fakeClient({ content_reviews: [rev("2026-11-16"), rev("2026-11-09")] });
+    const newest = await loadReview(db, "u1", null);
+    expect(newest.row?.week_start).toBe("2026-11-16");
+    expect(newest.weeks).toEqual(["2026-11-16", "2026-11-09"]);
+    expect((await loadReview(db, "u1", "2026-11-09")).row?.week_start).toBe("2026-11-09");
+    expect((await loadReview(fakeClient({}), "u1", null)).row).toBeNull();
+  });
+  it("loadReviewSkips lists hooks before topics, most posts first", async () => {
+    const row = (dimension: string, value: string, total: number) => ({ id: value, kind: "skip", dimension, value, total, won: 0, lost: total, flat: 0, source: "review", review_week: "w", starts_on: "2026-11-16", ends_on: "2027-02-14", lifted_at: null, protected_until: null });
+    const db = fakeClient({ content_focus: [row("topic", "t1", 9), row("hook_type", "a", 3), row("hook_type", "b", 5)] });
+    expect((await loadReviewSkips(db, "u1", "2026-11-20")).map((r) => r.value)).toEqual(["b", "a", "t1"]);
   });
 });
