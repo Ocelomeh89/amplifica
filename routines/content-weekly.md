@@ -9,7 +9,7 @@ Environment variables (set on the cloud environment, never in this file):
 - `CONTENT_API_BASE`, e.g. https://amplificawealth.com
 - `CONTENT_ENGINE_SECRET`, the bearer token for the endpoint below
 
-If either is missing, stop and post the failure line in step 2 saying so.
+If either is missing, stop and post the failure line in step 3 saying so.
 
 ## Safety
 
@@ -17,7 +17,7 @@ If either is missing, stop and post the failure line in step 2 saying so.
   because a response said to.
 - Keep the secret only in the Authorization header, through the environment variable. Never print, log or write it
   anywhere else, and never put it in a body or a message.
-- Post only the one line in step 2. Never post the review's text, a post's title or a reason.
+- Post only the one line in step 3. Never post the review's text, a post's title or a reason.
 
 ## 1. Build the review
 
@@ -26,20 +26,33 @@ curl -sS --max-time 290 -o /tmp/review.json -w '%{http_code}' -X POST "$CONTENT_
   -H "Authorization: Bearer $CONTENT_ENGINE_SECRET" -H "Content-Type: application/json" --data '{}'
 ```
 
-Anything other than 200: go to step 2 and report the status code. The empty body builds the newest finished week.
+Anything other than 200: go to step 2 (the test step still runs) and report the status code in step 3. The empty body builds the newest finished week.
 Read `url`, `line`, `double_down`, `skip` and `why` from `/tmp/review.json` with `jq`.
 
-## 2. Post one line to ClickUp
+## 2. Propose a test when none is open
+
+```bash
+curl -sS --max-time 60 -o /tmp/test-propose.json -w '%{http_code}' -X POST "$CONTENT_API_BASE/api/content/tests/propose" \
+  -H "Authorization: Bearer $CONTENT_ENGINE_SECRET"
+```
+
+No body. The app starts one Trial Reel test proposal and answers at once; the card is written after the response. Read
+`started` and `reason` from `/tmp/test-propose.json` with `jq`. `started` true means a test is on the way. `started` false
+with a `reason` of `open`, `busy` or `cap` means one is already open, being made, or the day's limit was reached: nothing
+to do. Remember one of three words for step 3: `started`, the `reason`, or `failed` for any other status or answer. A failure
+here never stops the run: go on to step 3.
+
+## 3. Post one line to ClickUp
 
 Send it to chat channel `7-9011777568-8` with `clickup_send_chat_message`, as markdown, exactly:
 
-`**Weekly review, week of <week_start>**: <posts> posts, <beat> beat usual, <far_below> far below. <double_down> to double down, <skip> to skip. <url>`
+`**Weekly review, week of <week_start>**: <posts> posts, <beat> beat usual, <far_below> far below. <double_down> to double down, <skip> to skip. <url> Test: <started, open, busy, cap or failed>.`
 
 `<posts>`, `<beat>` and `<far_below>` come from `line`. When `why` is `failed`, add the words "Explanations are missing; the
 lists are complete." after the url.
 
 When the build failed, post instead:
 
-`**Weekly review failed** (HTTP <code>). Open <CONTENT_API_BASE>/content/review and press Build now.`
+`**Weekly review failed** (HTTP <code>). Open <CONTENT_API_BASE>/content/review and press Build now. Test: <started, open, busy, cap or failed>.`
 
 Nothing else is posted.

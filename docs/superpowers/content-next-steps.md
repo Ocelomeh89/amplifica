@@ -1,6 +1,6 @@
 # Content engine: where we stopped and what to build next
 
-Last updated 2026-11-13, after the weekly review was built (PR open, not merged). Resume with `/content-resume` in a fresh
+Last updated 2026-11-14, after the Trial Reel tests were built on `feat/content-test-lab` (not pushed, no PR yet). The weekly review is built too. Resume with `/content-resume` in a fresh
 session. It reads this file.
 
 ## Live today
@@ -14,6 +14,7 @@ session. It reads this file.
 | Competitor Reels as Today briefs (slice 6) | `/content/creators`, Today slot 2 | `specs/2026-11-01-content-engine-competitors-design.md` |
 | Sharpen and the taste loop (4c) | idea cards, `/content/taste` | `specs/2026-11-01-content-engine-taste-sharpen-design.md` |
 | **Weekly review** (2026-11-13, PR open) | `/content/review`, Monday routine, the skip and double-down lists in Today and the Inbox | `specs/2026-11-13-content-engine-weekly-review-design.md`, plan `plans/2026-11-13-content-engine-weekly-review.md` |
+| **Trial Reel tests** (2026-11-14, built, not merged) | `/content/tests`, the Monday routine's middle step, "This week's test" on the review | `specs/2026-11-13-content-engine-test-lab-design.md`, plan `plans/2026-11-13-content-engine-test-lab.md` |
 | **Brand gate** (PR #22, 2026-11-10) | every idea; card line; idea page; Performance "Didn't pass" | `specs/2026-11-10-content-engine-brand-gate-design.md` |
 
 Migrations are applied through **0020** (0019 belongs to the investment-options branch). The feature
@@ -92,13 +93,28 @@ Built and tested on `feat/content-weekly-review`; nothing below has run. In orde
 6. The first real Monday run: read `/content/review`. The follows tile reads "not available" until two follower readings a
    week apart exist.
 
+## Trial Reel tests: what waits for Miguel
+
+Built and tested on `feat/content-test-lab` (cut from `origin/main`, which has the weekly review); nothing below has run. The spike
+outcome is **C, provisional**: his Trial Reel was not in Instagram's media list 17 minutes after posting, so the card takes typed
+numbers and there is no post picker. In order:
+1. Apply migration `0022_content_tests.sql` in the Supabase SQL editor, before the merge. It adds `content_tests`,
+   `content_test_versions` and `content_posts.is_test` (default false).
+2. Merge and deploy. The weekly routine reads its steps from `routines/content-weekly.md` in the checkout, so the new middle step
+   needs no edit to the routine, and its network allowlist (the app host) is unchanged.
+3. **Confirm the spike.** Check whether the Trial Reel posted on 2026-11-14 appears in `INSTAGRAM_GET_IG_USER_MEDIA` now. If it
+   does, send its link: the plan's outcome A or B (a post picker, a Trial flag) replaces the number boxes, and Tasks 13 and 14
+   of the plan get built. The code keeps the seams (`TestsDb`, `readingStart`, `viewsAtOrAfter`, `POSTING_NOTE_LINK`).
+4. Acceptance run: press **Propose next test** on `/content/tests`, record one cut test, post both versions as Trial Reels, and a day
+   later type each version's numbers. The verdict should show on the page at once and in "This week's test" on the next Monday
+   review.
+
 ## Next builds, in order
 
 The three designs and plans are written and approved (specs and plans dated 2026-11-13). The weekly review is built; build
 the others one at a time, each in its own worktree from `origin/main` after the previous one is merged.
 
-1. **Slice B: Trial Reel tests** (`plans/2026-11-13-content-engine-test-lab.md`, migration 0022). Needs Miguel to post one
-   Trial Reel first (the plan's spike).
+1. **Slice B: Trial Reel tests**: built (see above); merge after migration 0022.
 2. **Slice C: creator suggestions** (`plans/2026-11-13-content-engine-creator-suggestions.md`, migration 0023). Its first
    task is a discovery spike that spends a few cents of Apify credit and needs Miguel's go-ahead. The spike can reuse the
    Instagram username `amplificawealth`, read from the follower-count call.
