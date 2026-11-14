@@ -76,6 +76,20 @@ export type JudgePatch = {
   versions: { label: VersionLabel; views_24h: number; saves_24h: number | null; shares_24h: number | null; read_at: string; promote: boolean }[];
 };
 
+/**
+ * What the Tests page shows. `latest` is the newest verdict, shown as a card with its numbers (the promote line lives
+ * there); `past` is every other finished test, newest first, at most 50. `lastFailed` is today's newest run when it failed.
+ */
+export type TestsPage = {
+  open: TestView | null;
+  proposing: boolean;
+  lastFailed: { error: string } | null;
+  latest: TestView | null;
+  past: TestView[];
+  proposalsLeft: number;
+  labels: Record<string, string>;
+};
+
 export type WriterContext = {
   ideas: { title: string; hook: string; topic: string }[];
   skipReasons: string[];
@@ -115,6 +129,7 @@ export interface TestsDb {
   /** Uses an idea up: archives it when it is still `inbox` or `queued` (no post row) or, with a post, marks it posted. */
   useIdea(ideaId: string, postId: string | null): Promise<void>;
   markEffects(id: string, atIso: string): Promise<void>;
+  page(now: Date): Promise<TestsPage>;
   /** Judged tests with no conclusion yet. */
   withoutConclusion(): Promise<TestView[]>;
   setConclusion(id: string, text: string): Promise<void>;

@@ -10,7 +10,9 @@ import { median24h, outcomesOf, type TestStatus, type TestVariable, type TestVer
 import { activeFocus } from "./focus";
 import { loadPostsForMath } from "./performance";
 import { supabaseFocusDb } from "./supabase-focus-db";
-import type { Dropped, OpenPatch, TestRow, TestsDb, TestView, VersionInsert, VersionRow, WriterContext } from "./test-lab";
+import { PROPOSALS_PER_DAY } from "@/features/content/engine/test-lab-verdict";
+import type { Dropped, OpenPatch, TestRow, TestsDb, TestsPage, TestView, VersionInsert, VersionRow, WriterContext } from "./test-lab";
+import { chicagoDayStart } from "./recreate";
 import { loadTopics } from "./topics";
 
 type Client = SupabaseClient<Database>;
@@ -238,6 +240,30 @@ export function supabaseTestsDb(client: Client, userId: string): TestsDb {
       const { data: vs, error: e2 } = await versions().select("*").eq("user_id", userId).eq("test_id", id).order("label");
       fail("get versions", e2);
       return { ...row, versions: (vs ?? []) as VersionRow[] } satisfies TestView;
+    },
+
+    async page(now): Promise<TestsPage> {
+      const { data, error } = await tests().select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(60);
+      fail("page", error);
+      const rows = (data ?? []) as TestRow[];
+      const dayStart = chicagoDayStart(now).toISOString();
+      const finished = rows.filter((t) => t.status === "judged" || t.status === "skipped" || t.status === "not_run");
+      const when = (t: TestRow) => t.judged_at ?? t.closed_at ?? t.created_at;
+      const sorted = [...finished].sort((a, b) => when(b).localeCompare(when(a)));
+      const latestRow = sorted.find((t) => t.status === "judged") ?? null;
+      const open = rows.find((t) => t.status === "open") ?? null;
+      const shown = await withVersions([...(open ? [open] : []), ...(latestRow ? [latestRow] : []), ...sorted.filter((t) => t !== latestRow).slice(0, 50)]);
+      const byId = new Map(shown.map((t) => [t.id, t]));
+      const newest = rows[0];
+      return {
+        open: open ? (byId.get(open.id) ?? null) : null,
+        proposing: rows.some((t) => t.status === "proposing"),
+        lastFailed: newest && newest.status === "failed" && newest.created_at >= dayStart ? { error: newest.error } : null,
+        latest: latestRow ? (byId.get(latestRow.id) ?? null) : null,
+        past: sorted.filter((t) => t !== latestRow).slice(0, 50).map((t) => byId.get(t.id) as TestView),
+        proposalsLeft: Math.max(0, PROPOSALS_PER_DAY - rows.filter((t) => t.created_at >= dayStart).length),
+        labels: Object.fromEntries((await loadTopics(client, userId)).map((t) => [t.slug, t.label])),
+      };
     },
 
     async withoutConclusion() {

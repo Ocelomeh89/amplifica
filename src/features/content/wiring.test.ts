@@ -19,6 +19,7 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/taste/page.tsx",
       "src/app/(app)/content/review/page.tsx",
       "src/app/(app)/content/review/[weekStart]/page.tsx",
+      "src/app/(app)/content/tests/page.tsx",
       "src/app/(app)/content/ideas/[id]/page.tsx",
       "src/app/(app)/content/sources/page.tsx",
       "src/features/content/data/test-lab-actions.ts",
@@ -79,6 +80,7 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/taste/page.tsx",
       "src/app/(app)/content/review/page.tsx",
       "src/app/(app)/content/review/[weekStart]/page.tsx",
+      "src/app/(app)/content/tests/page.tsx",
     ];
     for (const f of pages) expect(read(f), f).not.toMatch(/supabase\s*\.from\(/);
   });
@@ -250,5 +252,12 @@ describe("content stays owner-only", () => {
     const route = read("src/app/api/content/cron/metrics/route.ts");
     expect(route.indexOf("writeConclusions(")).toBeGreaterThan(route.indexOf("postDigests("));
     expect(route).toContain("timeoutMs: 30_000, maxRetries: 0");
+  });
+
+  it("the Tests page has the 300 second budget and a tab after Review", () => {
+    expect(read("src/app/(app)/content/tests/page.tsx")).toContain("maxDuration = 300");
+    const tabs = read("src/features/content/ui/ContentTabs.tsx");
+    expect(tabs.indexOf('"/content/tests"')).toBeGreaterThan(tabs.indexOf('"/content/review"'));
+    expect(tabs.indexOf('"/content/tests"')).toBeLessThan(tabs.indexOf('"/content/creators"'));
   });
 });

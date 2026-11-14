@@ -57,6 +57,7 @@ describe("supabaseTestsDb", () => {
     await db.pendingEffects();
     await db.useIdea("i1", null);
     await db.markEffects("t1", NOW.toISOString());
+    await db.page(NOW);
     await db.withoutConclusion();
     await db.setConclusion("t1", "Two sentences.");
     // Every query chain is scoped to the owner: a user_id filter, or an insert that carries the owner.
@@ -113,5 +114,27 @@ describe("supabaseTestsDb", () => {
     });
     const input = await supabaseTestsDb(client, "u1").pickerInput(NOW);
     expect(input.ideas.map((i) => i.id)).toEqual(["i3"]);
+  });
+
+  it("page splits the open test, the latest verdict and the past, and counts the day's proposals", async () => {
+    const row = (id: string, status: string, over: Record<string, unknown> = {}) => ({ id, status, question: id, error: "", created_at: "2026-11-16T07:00:00Z", judged_at: null, closed_at: null, ...over });
+    const { client } = fakeClient({
+      content_tests: {
+        data: [
+          row("failed-today", "failed", { error: "Ran out of time. Try again." }),
+          row("open", "open", { created_at: "2026-11-15T07:00:00Z" }),
+          row("judged-new", "judged", { created_at: "2026-11-10T07:00:00Z", judged_at: "2026-11-12T07:00:00Z" }),
+          row("skipped", "skipped", { created_at: "2026-11-05T07:00:00Z", closed_at: "2026-11-06T07:00:00Z" }),
+          row("judged-old", "judged", { created_at: "2026-10-01T07:00:00Z", judged_at: "2026-10-03T07:00:00Z" }),
+        ],
+      },
+    });
+    const page = await supabaseTestsDb(client, "u1").page(NOW);
+    expect(page.open?.id).toBe("open");
+    expect(page.latest?.id).toBe("judged-new");
+    expect(page.past.map((t) => t.id)).toEqual(["skipped", "judged-old"]);
+    expect(page.lastFailed).toEqual({ error: "Ran out of time. Try again." });
+    expect(page.proposing).toBe(false);
+    expect(page.proposalsLeft).toBe(2);
   });
 });

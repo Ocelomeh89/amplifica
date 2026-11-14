@@ -110,6 +110,19 @@ export function fakeTestsDb(seed: FakeSeed = {}) {
     async get(id) {
       return tests.find((t) => t.id === id) ?? null;
     },
+    async page() {
+      const finished = tests.filter((t) => t.status === "judged" || t.status === "skipped" || t.status === "not_run");
+      const latest = finished.find((t) => t.status === "judged") ?? null;
+      return {
+        open: tests.find((t) => t.status === "open") ?? null,
+        proposing: tests.some((t) => t.status === "proposing"),
+        lastFailed: null,
+        latest,
+        past: finished.filter((t) => t !== latest),
+        proposalsLeft: Math.max(0, 3 - tests.length),
+        labels: Object.fromEntries(TOPICS.map((t) => [t.slug, t.label])),
+      };
+    },
     async withoutConclusion() {
       return tests.filter((t) => t.status === "judged" && t.conclusion === "");
     },
