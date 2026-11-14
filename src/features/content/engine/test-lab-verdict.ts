@@ -108,10 +108,12 @@ export function outcomesOf(t: {
  * `mode` is how a version gets its reading: "numbers" (typed from Instagram, while a Trial Reel is not in the
  * pull) or "link" (a post picked from the pull).
  */
-export function owesOf(linked: 0 | 1 | 2, mode: "numbers" | "link" = "numbers"): string[] {
-  if (linked === 2) return ["Nothing. The result arrives a day after posting."];
-  if (mode === "link") return linked === 0 ? ["Record and post both versions", "Link the two posts on the Tests page"] : ["Link the other version's post"];
-  return linked === 0
-    ? ["Record and post both versions", "Type their numbers on the Tests page a day after posting"]
-    : ["Type the other version's numbers"];
+export function owesOf(linked: 0 | 1 | 2, mode: "numbers" | "link" = "numbers", missing?: "A" | "B"): string[] {
+  if (mode === "link") {
+    if (linked === 2) return ["Nothing. The result arrives a day after posting."];
+    return linked === 0 ? ["Record and post both versions", "Link the two posts on the Tests page"] : ["Link the other version's post"];
+  }
+  if (linked === 2) return ["Both numbers are in. Check them, then read the result."];
+  if (linked === 0) return ["Record and post both versions", "Type their numbers on the Tests page a day after posting"];
+  return [`Type ${missing ? `version ${missing}` : "the other version"}'s numbers`];
 }

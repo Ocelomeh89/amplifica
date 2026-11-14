@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TestView, VersionRow } from "./test-lab";
 import { NOW, fakeTestsDb, IDEAS, testLabInput } from "./test-lab.fake";
 import { runTestsCron, judgeOpenTests } from "./test-lab-cron";
-import { saveNumbers } from "./test-lab";
+import { readResult, saveNumbers } from "./test-lab";
 
 const version = (label: "a" | "b", over: Partial<VersionRow> = {}): VersionRow => ({
   id: `v-${label}`, user_id: "u1", test_id: "t1", label, value: label === "a" ? "ranking" : "question", idea_id: "i-debt", hook: "h", card_text: "", outline: [], gate: {},
@@ -19,6 +19,7 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => undefined);
 });
 const deps = () => ({ addTestDoubleDown: vi.fn(async () => undefined) });
+const read = (db: ReturnType<typeof fakeTestsDb>, d: ReturnType<typeof deps>) => readResult(db, d, { userId: "u1", testId: "t1" }, NOW);
 const nums = (views: number) => ({ views, saves: 10, shares: 2, link: "" });
 
 describe("typing the numbers", () => {
@@ -30,7 +31,8 @@ describe("typing the numbers", () => {
     ] as const) {
       const db = fakeTestsDb({ tests: [openTest()] });
       expect(await saveNumbers(db, deps(), { userId: "u1", testId: "t1", label: "a", ...nums(a) }, NOW)).toEqual({ error: null, judged: false });
-      expect(await saveNumbers(db, deps(), { userId: "u1", testId: "t1", label: "b", ...nums(b) }, NOW)).toEqual({ error: null, judged: true });
+      expect(await saveNumbers(db, deps(), { userId: "u1", testId: "t1", label: "b", ...nums(b) }, NOW)).toEqual({ error: null, judged: false });
+      expect(await read(db, deps())).toEqual({ error: null });
       const t = await db.get("t1");
       expect(t).toMatchObject({ status: "judged", verdict, verdict_line: line, judged_at: NOW.toISOString() });
       expect(t?.versions.map((v) => v.views_24h)).toEqual([a, b]);
@@ -53,19 +55,65 @@ describe("typing the numbers", () => {
     expect(await saveNumbers(db, deps(), { ...base, testId: "t1", views: 10, saves: -3 }, NOW)).toMatchObject({ error: "Enter whole numbers, zero or more." });
   });
 
-  it("a number can be corrected until the verdict", async () => {
+  it("a number can be corrected until the result is read", async () => {
     const db = fakeTestsDb({ tests: [openTest()] });
     await saveNumbers(db, deps(), { userId: "u1", testId: "t1", label: "a", ...nums(100) }, NOW);
     await saveNumbers(db, deps(), { userId: "u1", testId: "t1", label: "a", ...nums(2000) }, NOW);
     await saveNumbers(db, deps(), { userId: "u1", testId: "t1", label: "b", ...nums(1100) }, NOW);
+    expect((await db.get("t1"))?.status).toBe("open");
+    await read(db, deps());
     expect((await db.get("t1"))?.verdict).toBe("a");
     expect(await saveNumbers(db, deps(), { userId: "u1", testId: "t1", label: "a", ...nums(1) }, NOW)).toMatchObject({ error: "This test is closed." });
+  });
+
+  it("typing B wrongly and correcting it before reading the result gives the corrected verdict", async () => {
+    const db = fakeTestsDb({ tests: [openTest()] });
+    await saveNumbers(db, deps(), { userId: "u1", testId: "t1", label: "a", ...nums(2000) }, NOW);
+    await saveNumbers(db, deps(), { userId: "u1", testId: "t1", label: "b", ...nums(20000) }, NOW);
+    await saveNumbers(db, deps(), { userId: "u1", testId: "t1", label: "b", ...nums(1100) }, NOW);
+    await read(db, deps());
+    expect(await db.get("t1")).toMatchObject({ status: "judged", verdict: "a" });
+  });
+
+  it("saving the second version does not judge", async () => {
+    const d = deps();
+    const db = fakeTestsDb({ tests: [openTest()] });
+    await saveNumbers(db, d, { userId: "u1", testId: "t1", label: "a", ...nums(2000) }, NOW);
+    expect(await saveNumbers(db, d, { userId: "u1", testId: "t1", label: "b", ...nums(1000) }, NOW)).toEqual({ error: null, judged: false });
+    expect(await db.get("t1")).toMatchObject({ status: "open", verdict: null });
+    expect(d.addTestDoubleDown).not.toHaveBeenCalled();
+  });
+
+  it("Read the result with only one version in is refused", async () => {
+    const db = fakeTestsDb({ tests: [openTest()] });
+    await saveNumbers(db, deps(), { userId: "u1", testId: "t1", label: "a", ...nums(2000) }, NOW);
+    expect(await read(db, deps())).toEqual({ error: "Add both versions' numbers first." });
+    expect((await db.get("t1"))?.status).toBe("open");
+  });
+
+  it("the result can be read once: a second read, or the cron after it, judges nothing again", async () => {
+    const d = deps();
+    const db = fakeTestsDb({ tests: [openTest()] });
+    await saveNumbers(db, d, { userId: "u1", testId: "t1", label: "a", ...nums(2000) }, NOW);
+    await saveNumbers(db, d, { userId: "u1", testId: "t1", label: "b", ...nums(1000) }, NOW);
+    expect(await read(db, d)).toEqual({ error: null });
+    expect(await read(db, d)).toEqual({ error: "This test is closed." });
+    expect(await judgeOpenTests(db, d, "u1", NOW)).toMatchObject({ judged: 0 });
+    expect(d.addTestDoubleDown).toHaveBeenCalledTimes(1);
+  });
+
+  it("the cron never judges a test whose two numbers are typed: only Read the result does", async () => {
+    const t = openTest({}, [{ typed_views: 2000 }, { typed_views: 1100 }]);
+    const db = fakeTestsDb({ tests: [t] });
+    expect(await judgeOpenTests(db, deps(), "u1", NOW)).toEqual({ judged: 0, closed: 0, effects: 0 });
+    expect((await db.get("t1"))?.status).toBe("open");
   });
 
   it("sets promote at 3,000 views against a 1,000 median, and not at 2,999", async () => {
     const db = fakeTestsDb({ tests: [openTest()], median: 1000 });
     await saveNumbers(db, deps(), { userId: "u1", testId: "t1", label: "a", ...nums(3000) }, NOW);
     await saveNumbers(db, deps(), { userId: "u1", testId: "t1", label: "b", ...nums(2999) }, NOW);
+    await read(db, deps());
     expect((await db.get("t1"))?.versions.map((v) => v.promote)).toEqual([true, false]);
   });
 
@@ -73,6 +121,7 @@ describe("typing the numbers", () => {
     const db = fakeTestsDb({ tests: [openTest()], median: null });
     await saveNumbers(db, deps(), { userId: "u1", testId: "t1", label: "a", ...nums(90000) }, NOW);
     await saveNumbers(db, deps(), { userId: "u1", testId: "t1", label: "b", ...nums(10) }, NOW);
+    await read(db, deps());
     expect((await db.get("t1"))?.versions.map((v) => v.promote)).toEqual([false, false]);
   });
 });
@@ -82,6 +131,7 @@ describe("what a verdict changes", () => {
     const db = fakeTestsDb({ tests: [t], ...extra });
     await saveNumbers(db, d, { userId: "u1", testId: "t1", label: "a", ...nums(a) }, NOW);
     await saveNumbers(db, d, { userId: "u1", testId: "t1", label: "b", ...nums(b) }, NOW);
+    await readResult(db, d, { userId: "u1", testId: "t1" }, NOW);
     return db;
   };
 
@@ -144,13 +194,6 @@ describe("what a verdict changes", () => {
 });
 
 describe("judgeOpenTests", () => {
-  it("judges an open test whose two numbers are already typed", async () => {
-    const t = openTest({}, [{ typed_views: 2000, typed_saves: 5, typed_shares: 1 }, { typed_views: 1100 }]);
-    const db = fakeTestsDb({ tests: [t] });
-    expect(await judgeOpenTests(db, deps(), "u1", NOW)).toMatchObject({ judged: 1, effects: 1 });
-    expect((await db.get("t1"))?.verdict).toBe("a");
-  });
-
   it("closes a test with no numbers after 14 days as not run and frees its ideas", async () => {
     const db = fakeTestsDb({ tests: [openTest({ opened_at: "2026-11-01T00:00:00Z" }, [{ typed_views: 500 }, {}])], ideas: IDEAS });
     expect(await judgeOpenTests(db, deps(), "u1", NOW)).toMatchObject({ judged: 0, closed: 1 });

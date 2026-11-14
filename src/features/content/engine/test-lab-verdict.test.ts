@@ -112,11 +112,16 @@ describe("outcomesOf", () => {
 describe("owesOf", () => {
   it("says what Miguel still owes, by how many versions have numbers", () => {
     expect(owesOf(0)[0]).toBe("Record and post both versions");
-    expect(owesOf(1)).toHaveLength(1);
-    expect(owesOf(2)).toEqual(["Nothing. The result arrives a day after posting."]);
+    expect(owesOf(2)).toEqual(["Both numbers are in. Check them, then read the result."]);
+  });
+  it("says which version's numbers are missing", () => {
+    expect(owesOf(1, "numbers", "B")).toEqual(["Type version B's numbers"]);
+    expect(owesOf(1, "numbers", "A")).toEqual(["Type version A's numbers"]);
+    expect(owesOf(1)).toEqual(["Type the other version's numbers"]);
   });
   it("names the post link when the post is linked rather than typed", () => {
     expect(owesOf(0, "link")).toEqual(["Record and post both versions", "Link the two posts on the Tests page"]);
     expect(owesOf(1, "link")).toEqual(["Link the other version's post"]);
+    expect(owesOf(2, "link")).toEqual(["Nothing. The result arrives a day after posting."]);
   });
 });

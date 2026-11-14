@@ -88,7 +88,9 @@ describe("the review's test section", () => {
     const none = await testSectionFor(fakeClient({ content_tests: [open()], content_test_versions: [version("a", null), version("b", null)] }), "u1", "2026-11-09", NOW);
     expect(none).toEqual({ state: "open", question: "Does Ranking beat Question?", owes: ["Record and post both versions", "Type their numbers on the Tests page a day after posting"], verdict: null, conclusion: null, href: "/content/tests" });
     const one = await testSectionFor(fakeClient({ content_tests: [open()], content_test_versions: [version("a", 500), version("b", null)] }), "u1", "2026-11-09", NOW);
-    expect(one?.owes).toEqual(["Type the other version's numbers"]);
+    expect(one?.owes).toEqual(["Type version B's numbers"]);
+    const both = await testSectionFor(fakeClient({ content_tests: [open()], content_test_versions: [version("a", 500), version("b", 600)] }), "u1", "2026-11-09", NOW);
+    expect(both?.owes).toEqual(["Both numbers are in. Check them, then read the result."]);
   });
 
   it("shows last week's verdict with its conclusion", async () => {

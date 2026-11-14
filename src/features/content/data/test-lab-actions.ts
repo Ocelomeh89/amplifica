@@ -5,7 +5,7 @@ import { z } from "zod";
 import { requireContentOwner } from "./owner";
 import { supabaseTestsDb } from "./supabase-tests-db";
 import { addTestDoubleDown } from "./focus";
-import { SKIP_REASON_MAX, saveNumbers, skipTest } from "./test-lab";
+import { SKIP_REASON_MAX, readResult, saveNumbers, skipTest } from "./test-lab";
 import { startConclusionsInBackground, startProposalInBackground } from "./test-lab-run";
 
 // The Tests page's actions. Each opens with the owner gate. Proposing starts a background job through the
@@ -50,8 +50,8 @@ const numbersSchema = z.object({
   link: z.string().trim().max(300),
 });
 
-/** Stores one version's numbers from Instagram. When both versions have views the verdict is given at once. */
-export async function saveNumbersAction(formData: FormData): Promise<TestActionResult & { judged?: boolean }> {
+/** Stores one version's numbers from Instagram. Nothing is judged: both versions stay correctable until Read the result. */
+export async function saveNumbersAction(formData: FormData): Promise<TestActionResult> {
   const { supabase, user } = await requireContentOwner();
   const input = numbersSchema.safeParse({
     testId: formData.get("testId"),
@@ -65,10 +65,27 @@ export async function saveNumbersAction(formData: FormData): Promise<TestActionR
   try {
     const r = await saveNumbers(supabaseTestsDb(supabase, user.id), { addTestDoubleDown }, { userId: user.id, ...input.data }, new Date());
     if (r.error) return { error: r.error };
-    if (r.judged) startConclusionsInBackground(user.id);
     revalidatePath("/content", "layout");
-    return { error: null, judged: r.judged, message: r.judged ? "Both versions are in. The result is below." : "Saved. Add the other version's numbers when you have them." };
+    return { error: null, message: "Saved. You can still change it until you read the result." };
   } catch {
     return { error: "Couldn't save those numbers. Try again." };
+  }
+}
+
+const readSchema = z.object({ testId: z.string().uuid() });
+
+/** Judges the open test from the two typed numbers, applies the verdict's follow-ups and starts the conclusion. */
+export async function readResultAction(formData: FormData): Promise<TestActionResult> {
+  const { supabase, user } = await requireContentOwner();
+  const input = readSchema.safeParse({ testId: formData.get("testId") });
+  if (!input.success) return { error: "That test was not found." };
+  try {
+    const r = await readResult(supabaseTestsDb(supabase, user.id), { addTestDoubleDown }, { userId: user.id, testId: input.data.testId }, new Date());
+    if (r.error) return r;
+    startConclusionsInBackground(user.id);
+    revalidatePath("/content", "layout");
+    return { error: null, message: "The result is in." };
+  } catch {
+    return { error: "Couldn't read the result. Try again." };
   }
 }

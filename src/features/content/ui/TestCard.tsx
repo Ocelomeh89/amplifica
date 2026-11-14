@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { saveNumbersAction, skipTestAction } from "@/features/content/data/test-lab-actions";
+import { readResultAction, saveNumbersAction, skipTestAction } from "@/features/content/data/test-lab-actions";
 import type { TestView, VersionRow } from "@/features/content/data/test-lab";
 import { topicLabel } from "@/features/content/engine/brand";
 import { valueLabel } from "@/features/content/engine/experiments";
@@ -105,6 +105,40 @@ function Version({ test, v, labelOf }: { test: TestView; v: VersionRow; labelOf:
   );
 }
 
+function ReadResult({ test }: { test: TestView }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData();
+    fd.set("testId", test.id);
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await readResultAction(fd);
+      if (r.error) setError(r.error);
+      else router.refresh();
+    } catch {
+      setError("Something went wrong. Nothing changed; try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <form onSubmit={submit} className="mt-4">
+      <p className="text-sm font-medium">Both numbers are in. Check them before you read the result: it cannot be undone.</p>
+      <ul className="text-sm mt-1">
+        {test.versions.map((v) => (
+          <li key={v.id}>{`${v.label.toUpperCase()}: ${(v.typed_views ?? 0).toLocaleString("en-US")} views`}</li>
+        ))}
+      </ul>
+      <button type="submit" disabled={busy} className={`${btn} mt-2`}>{busy ? "Reading…" : "Read the result"}</button>
+      {error && <p role="alert" className="text-sm text-red-600 mt-1">{error}</p>}
+    </form>
+  );
+}
+
 function SkipForm({ id }: { id: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -170,6 +204,7 @@ export default function TestCard({ test, labels }: { test: TestView; labels: Rec
         </div>
       )}
 
+      {test.status === "open" && test.versions.length === 2 && test.versions.every((v) => v.typed_views !== null) && <ReadResult test={test} />}
       {test.status === "open" && <SkipForm id={test.id} />}
     </Card>
   );

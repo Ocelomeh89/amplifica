@@ -42,8 +42,9 @@ export async function testSectionFor(client: SupabaseClient<Database>, userId: s
     if (open) {
       const { data: versions, error: e2 } = await client.from("content_test_versions").select("label, typed_views").eq("user_id", userId).eq("test_id", open.id);
       if (e2) throw new Error(`test section versions: ${e2.message}`);
-      const typed = (versions ?? []).filter((v) => v.typed_views !== null).length;
-      return { state: "open", question: open.question, owes: owesOf(Math.min(typed, 2) as 0 | 1 | 2, "numbers"), verdict: null, conclusion: null, href: HREF };
+      const have = (versions ?? []).filter((v) => v.typed_views !== null);
+      const missing = (versions ?? []).find((v) => v.typed_views === null)?.label?.toUpperCase() as "A" | "B" | undefined;
+      return { state: "open", question: open.question, owes: owesOf(Math.min(have.length, 2) as 0 | 1 | 2, "numbers", missing), verdict: null, conclusion: null, href: HREF };
     }
   }
 

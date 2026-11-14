@@ -394,22 +394,36 @@ export async function applyEffects(db: TestsDb, deps: Effects, userId: string, t
 
 const wholeNumber = (n: number | null) => n === null || (Number.isInteger(n) && n >= 0);
 
-/** Stores one version's numbers and, when both versions have views, judges the test at once. */
+/**
+ * Stores one version's numbers and nothing else: both versions stay correctable while the test is open. Reading the
+ * result is a separate step (`readResult`), so a typo cannot become a verdict. `judged` is always false.
+ */
 export async function saveNumbers(
   db: TestsDb,
-  deps: Effects,
+  _deps: Effects,
   a: { userId: string; testId: string; label: VersionLabel; views: number; saves: number | null; shares: number | null; link: string },
-  now: Date
+  _now: Date
 ): Promise<{ error: string | null; judged: boolean }> {
+  void _deps;
+  void _now;
   if (!Number.isInteger(a.views) || a.views < 0 || !wholeNumber(a.saves) || !wholeNumber(a.shares)) return { error: "Enter whole numbers, zero or more.", judged: false };
   const link = a.link.trim().slice(0, 300);
   if (!(await db.saveTyped(a.testId, a.label, { views: a.views, saves: a.saves, shares: a.shares, link }))) return { error: "This test is closed.", judged: false };
+  return { error: null, judged: false };
+}
+
+/**
+ * Judges an open test from the typed numbers, once both versions have views, then applies the follow-ups. The flip is
+ * conditional on `open`, so a second read, or two at once, judges nothing again. The cron never calls this.
+ */
+export async function readResult(db: TestsDb, deps: Effects, a: { userId: string; testId: string }, now: Date): Promise<{ error: string | null }> {
   const t = await db.get(a.testId);
-  if (!t) return { error: null, judged: false };
-  if (!(await judgeTest(db, t, now))) return { error: null, judged: false };
+  if (!t || t.status !== "open") return { error: "This test is closed." };
+  if (t.versions.length < 2 || t.versions.some((v) => v.typed_views === null)) return { error: "Add both versions' numbers first." };
+  if (!(await judgeTest(db, t, now))) return { error: "This test is closed." };
   const judged = await db.get(a.testId);
   if (judged) await applyEffects(db, deps, a.userId, judged, now);
-  return { error: null, judged: true };
+  return { error: null };
 }
 
 // ---- The two-sentence conclusion ----

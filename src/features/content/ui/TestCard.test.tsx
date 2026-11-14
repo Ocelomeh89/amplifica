@@ -6,10 +6,12 @@ import { POSTING_NOTE } from "@/features/content/engine/test-lab-card";
 import type { TestView, VersionRow } from "@/features/content/data/test-lab";
 
 const saveNumbersAction = vi.fn(async (_fd: FormData) => ({ error: null as string | null, judged: false }));
+const readResultAction = vi.fn(async (_fd: FormData) => ({ error: null as string | null }));
 const skipTestAction = vi.fn(async (_fd: FormData) => ({ error: null as string | null }));
 vi.mock("@/features/content/data/test-lab-actions", () => ({
   saveNumbersAction: (fd: FormData) => saveNumbersAction(fd),
   skipTestAction: (fd: FormData) => skipTestAction(fd),
+  readResultAction: (fd: FormData) => readResultAction(fd),
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
@@ -112,5 +114,20 @@ describe("TestCard", () => {
     const judged = test({ status: "judged", verdict: "a", verdict_line: "Ranking won: 3,000 views against 1,100 in the first day.", conclusion: "" }, [{ views_24h: 3000 }, { views_24h: 1100 }]);
     render(<TestCard test={judged} labels={labels} />);
     expect(screen.getByText("Ranking won: 3,000 views against 1,100 in the first day.")).toBeTruthy();
+  });
+
+  it("shows both numbers side by side and a Read the result button once both versions have views", async () => {
+    const both = test({}, [{ typed_views: 2000 }, { typed_views: 1100 }]);
+    render(<TestCard test={both} labels={labels} />);
+    expect(screen.getByText("A: 2,000 views")).toBeTruthy();
+    expect(screen.getByText("B: 1,100 views")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Read the result" }));
+    await waitFor(() => expect(readResultAction).toHaveBeenCalled());
+    expect(readResultAction.mock.calls.at(-1)![0].get("testId")).toBe("t1");
+  });
+
+  it("offers no Read the result with only one version in", () => {
+    render(<TestCard test={test({}, [{ typed_views: 2000 }, {}])} labels={labels} />);
+    expect(screen.queryByRole("button", { name: "Read the result" })).toBeNull();
   });
 });
