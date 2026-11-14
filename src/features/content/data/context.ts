@@ -1,5 +1,9 @@
 import type { Format } from "@/features/content/engine/types";
 import { lastRunByKind } from "@/features/content/engine/runs";
+import { chicagoIsoDate } from "@/features/content/engine/best-times";
+import { topicLabel } from "@/features/content/engine/brand";
+import type { ActiveFocus } from "@/features/content/engine/focus";
+import type { Topic } from "./topics";
 
 export type KnownSource = {
   kind: string;
@@ -29,7 +33,13 @@ export interface ContextDb {
   sourceRuns(): Promise<{ kind: string; created_at: string }[]>;
   voiceSummary(): Promise<string | null>;
   knownSources(iso: string): Promise<KnownSource[]>;
+  /** The review's active skip and double-down lists on a day. */
+  focus(day: string): Promise<ActiveFocus>;
+  topics(): Promise<Topic[]>;
 }
+
+/** One list in the context: hook types as slugs, topics with their labels. */
+export type FocusOut = { hook_type: string[]; topic: { slug: string; label: string }[] };
 
 export type ContentContext = {
   generated_at: string;
@@ -42,6 +52,8 @@ export type ContentContext = {
   voice_summary: string | null;
   known_sources: KnownSource[];
   requested_sources: KnownSource[];
+  /** The weekly review's lists. Reel ideas only: skip = do not write ideas with these; double_down = write more with these. */
+  focus: { skip: FocusOut; double_down: FocusOut };
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -58,6 +70,8 @@ export async function buildContext(db: ContextDb, now: Date): Promise<ContentCon
     runs,
     voice_summary,
     allKnownSources,
+    focus,
+    topics,
   ] = await Promise.all([
     db.tasteRules(),
     db.feedbackSince(since(14)),
@@ -68,7 +82,10 @@ export async function buildContext(db: ContextDb, now: Date): Promise<ContentCon
     db.sourceRuns(),
     db.voiceSummary(),
     db.knownSources(since(90)),
+    db.focus(chicagoIsoDate(now)),
+    db.topics(),
   ]);
+  const out = (l: { hook_type: string[]; topic: string[] }): FocusOut => ({ hook_type: l.hook_type, topic: l.topic.map((slug) => ({ slug, label: topicLabel(slug, topics) })) });
   // Found content (pasted links and uploads) is mined by routines/content-found.md,
   // never by the daily routine, whose read tools exist only for the recording kinds.
   const known_sources = allKnownSources.filter((s) => s.kind !== "url" && s.kind !== "upload");
@@ -85,5 +102,6 @@ export async function buildContext(db: ContextDb, now: Date): Promise<ContentCon
     requested_sources: known_sources.filter(
       (s) => s.status === "allowed" && s.requested_at !== null && s.mined_at === null
     ),
+    focus: { skip: out(focus.skip), double_down: out(focus.doubleDown) },
   };
 }

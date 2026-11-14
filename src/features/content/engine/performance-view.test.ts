@@ -7,7 +7,7 @@ import type { PostTags } from "./tags";
 const NOW = new Date("2026-10-26T12:00:00Z");
 
 const tags = (over: Partial<PostTags>): PostTags => ({
-  hook_type: "", onscreen_text: "", message: "", cta_type: "", post_style: "",
+  hook_type: "", onscreen_text: "", message: "", topic: "", cta_type: "", post_style: "",
   cover_face: null, cover_text: null, cover_number: null, hook_spoken: "", hook_onscreen: "",
   tag_confidence: {}, tag_locks: [], tagged_at: null, ...over,
 });

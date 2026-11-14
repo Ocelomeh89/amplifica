@@ -23,6 +23,52 @@ export const PILLAR_SLUGS = PILLARS.map((p) => p.slug) as unknown as readonly [
 ];
 export type PillarSlug = (typeof PILLARS)[number]["slug"];
 
+// The seed topics under each pillar, from "Topics" in the vault note C - Writing/Brand Content Pillars
+// (labels verbatim). A post and an idea each carry one topic slug; the tagging routine and the gate can add
+// a label (content_topics) when none fits. Migration 0021 seeds the same list.
+export type TopicSeed = { slug: string; label: string };
+export const PILLAR_TOPICS: Record<PillarSlug, TopicSeed[]> = {
+  "freedom-paradox": [
+    { slug: "leaving-a-career-path", label: "The psychological difficulty of abandoning a career path" },
+    { slug: "success-without-fulfillment", label: "Why conventional success doesn't necessarily produce fulfillment" },
+    { slug: "adaptability-over-certainty", label: "Why adaptability can be more valuable than certainty" },
+    { slug: "corporate-dependence", label: "The hidden dependencies created by corporate employment" },
+  ],
+  "expensive-tuition": [
+    { slug: "concentration-risk", label: "The dangers of concentrating wealth in a single asset, institution or job" },
+    { slug: "rebuilding-confidence", label: "Rebuilding confidence after financial setbacks" },
+    { slug: "urgency-to-recover", label: "Why urgency to recover losses leads to poor decisions" },
+  ],
+  "physics-of-wealth": [
+    { slug: "investing-capacity-vs-net-worth", label: "The difference between investing capacity and net worth" },
+    { slug: "mechanics-of-leverage", label: "The mechanics of leverage" },
+    { slug: "one-assumption-changes-the-model", label: "How changing one assumption alters an entire financial model" },
+    { slug: "capital-deployment-cycles", label: "Capital deployment cycles" },
+    { slug: "advice-by-the-numbers", label: "Popular investing advice broken down through numbers and practical examples" },
+  ],
+  "w2-advantage": [
+    { slug: "successful-but-unfulfilled", label: "A successful career can still feel unfulfilling" },
+    { slug: "burnout-vs-ambition", label: "Professional burnout versus entrepreneurial ambition" },
+    { slug: "predictable-income", label: "Why predictable income supports long-term investing" },
+    { slug: "lifestyle-inflation", label: "How lifestyle inflation affects career flexibility" },
+  ],
+  "life-by-design": [
+    { slug: "everyday-optionality", label: "Financial optionality in everyday life" },
+    { slug: "money-and-anxiety", label: "Why money doesn't automatically eliminate anxiety" },
+    { slug: "rebuilding-after-transitions", label: "Rebuilding after major personal transitions" },
+    { slug: "planning-vs-the-present", label: "Balancing long-term planning with enjoying the present" },
+  ],
+};
+
+/** A topic's label: the seed first, then the given extra list (content_topics), then the slug itself. */
+export function topicLabel(slug: string, topics: TopicSeed[] = []): string {
+  for (const list of Object.values(PILLAR_TOPICS)) {
+    const hit = list.find((t) => t.slug === slug);
+    if (hit) return hit.label;
+  }
+  return topics.find((t) => t.slug === slug)?.label ?? slug;
+}
+
 export const AMPLIFICA_PILLARS = [
   { slug: "amplifica-the-brand", name: "Amplifica the Brand" },
   { slug: "the-numbers", name: "The Numbers" },
@@ -138,12 +184,17 @@ export function pillarName(slug: string): string {
 }
 
 export type GateFields = Record<string, string | string[]>;
+/** A topic as the gate sees it. data/topics.ts has the same shape (its Topic type). */
+export type GateTopic = { slug: string; label: string; pillar: string };
+
 export type GateResult = {
   verdict: "pass" | "fail";
   reader: Reader | null;
   pillar: PillarSlug | null;
   amplifica_pillar: AmplificaPillar | null;
   failed: { item: GateItem; reason: string }[];
+  /** The topic slug the gate picked under its pillar. Present only when topics were offered; null when none fits. */
+  topic?: string | null;
 };
 
 export const GATE_TOOL_NAME = "record_brand_check";
@@ -223,14 +274,20 @@ keep Miguel's voice, and return every field. Do not flatten it into a template.
 
 const renderValue = (v: string | string[]) => (Array.isArray(v) ? v.map((x) => `- ${x}`).join("\n") : v);
 
-export function renderGateTurn(a: { format: string; fields: GateFields; rewrite: boolean }): string {
+export function renderGateTurn(a: { format: string; fields: GateFields; rewrite: boolean; topics?: GateTopic[] }): string {
   const body = Object.entries(a.fields)
     .map(([k, v]) => `### ${k}\n${renderValue(v)}`)
     .join("\n\n");
   const ask = a.rewrite
     ? "Check this piece. If it fails, also rewrite it so it passes, returning every field under rewrite."
     : "Check this piece. Do not rewrite it.";
-  return `Format: ${a.format}\n\n${body}\n\n${ask}`;
+  const base = `Format: ${a.format}\n\n${body}\n\n${ask}`;
+  if (!a.topics || a.topics.length === 0) return base;
+  const byPillar = PILLAR_SLUGS.map((p) => {
+    const mine = a.topics!.filter((t) => t.pillar === p);
+    return mine.length === 0 ? "" : `${p}:\n${mine.map((t) => `- ${t.slug}: ${t.label}`).join("\n")}`;
+  }).filter(Boolean);
+  return `${base}\n\nTopics (slug: label), by pillar:\n${byPillar.join("\n")}\n\nAlso give \`topic\`: the slug under your pillar that fits best, or null.`;
 }
 
 const failedSchema = z.object({ item: z.enum(ITEM_KEYS), reason: z.string().trim().min(1).max(300) });
@@ -246,6 +303,7 @@ export function gateOutputSchema(keys: string[], rewrite: boolean) {
     pillar: z.enum(PILLAR_SLUGS).nullable(),
     amplifica_pillar: z.enum(AMPLIFICA_SLUGS).nullable(),
     failed: z.array(failedSchema),
+    topic: z.string().nullable().optional(),
     rewrite: fieldsSchema(keys).optional(),
   });
   return base.superRefine((v, ctx) => {
@@ -257,7 +315,7 @@ export function gateOutputSchema(keys: string[], rewrite: boolean) {
   });
 }
 
-export function gateToolSchema(keys: string[], rewrite: boolean): Record<string, unknown> {
+export function gateToolSchema(keys: string[], rewrite: boolean, topicSlugs?: string[]): Record<string, unknown> {
   const field = { anyOf: [{ type: "string" }, { type: "array", items: { type: "string" } }] };
   const properties: Record<string, unknown> = {
     verdict: { type: "string", enum: ["pass", "fail"] },
@@ -269,6 +327,9 @@ export function gateToolSchema(keys: string[], rewrite: boolean): Record<string,
       items: { type: "object", properties: { item: { type: "string", enum: [...ITEM_KEYS] }, reason: { type: "string" } }, required: ["item", "reason"] },
     },
   };
+  if (topicSlugs && topicSlugs.length > 0) {
+    properties.topic = { type: ["string", "null"], enum: [...topicSlugs, null], description: "The topic slug under your pillar that fits best, or null." };
+  }
   if (rewrite) {
     properties.rewrite = {
       type: "object",

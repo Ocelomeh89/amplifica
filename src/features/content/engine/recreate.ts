@@ -111,7 +111,7 @@ differ. Never repeat the source post's hook or any recent hook you are given.
 Hooks follow the rules above; no return promises, no hype.
 `.trim();
 
-export function recreateSystemPrompt(): string {
+export function recreateSystemPrompt(focusBlock = ""): string {
   const rules = between(IDEAS_PROMPT, "## What makes an idea good here", "## Ranking and dedupe");
   return [
     "You help Miguel Graf repeat what works. Given one of his Instagram posts and what is known about why it did well, you write 3 options for a new Reel.",
@@ -119,6 +119,7 @@ export function recreateSystemPrompt(): string {
     rules,
     PILLAR_MESSAGES,
     OPTION_RULES,
+    ...(focusBlock ? [focusBlock] : []),
   ].join("\n\n");
 }
 

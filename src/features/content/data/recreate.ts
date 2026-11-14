@@ -17,6 +17,8 @@ import {
 import type { WinnerInsights } from "@/features/content/engine/winners";
 import type { ToolCaller } from "./claude";
 import { gateColumns, gateOptions } from "./brand-gate";
+import type { Topic } from "./topics";
+import { EMPTY_FOCUS, reviewBlock, type ActiveFocus } from "@/features/content/engine/focus";
 
 export const NO_BRAND_OPTION = "None of the options met the brand standard.";
 
@@ -67,6 +69,10 @@ export interface RecreateDb {
   discard(id: string): Promise<boolean>;
   sourceBasics(postId: string): Promise<SourceBasics | null>;
   sourceContext(postId: string, now: Date): Promise<RecreateContext | null>;
+  /** The owner's topic list, for the brand gate. */
+  topics(): Promise<Topic[]>;
+  /** The review's active skip and double-down lists on a day. */
+  focus(day: string): Promise<ActiveFocus>;
 }
 
 export type StartResult = { ok: true; id: string } | { ok: false; error: string; liveId?: string };
@@ -131,8 +137,9 @@ export async function runRecreation(db: RecreateDb, caller: ToolCaller, id: stri
     const ctx = await db.sourceContext(row.source_post_id, now);
     if (!ctx) return fail("The source post is gone.");
 
+    const [focus, topics] = await Promise.all([db.focus(chicagoIsoDate(now)).catch(() => EMPTY_FOCUS), db.topics().catch(() => undefined)]);
     const raw = await caller.call({
-      system: recreateSystemPrompt(),
+      system: recreateSystemPrompt(reviewBlock(focus, topics ?? [])),
       text: renderRecreateTurn({ mode: row.mode, source: ctx.source, insights: ctx.insights, winnerHooks: ctx.winnerHooks, recentHooks: ctx.recentHooks }),
       tool: { name: RECREATE_TOOL_NAME, description: "Record the 3 options for the new Reel.", schema: recreateToolSchema() },
       maxTokens: 4000,
@@ -140,7 +147,7 @@ export async function runRecreation(db: RecreateDb, caller: ToolCaller, id: stri
     const parsed = recreateOutputSchema(row.mode, ctx.source.message).safeParse(raw);
     if (!parsed.success) return fail(parsed.error.issues.map((i) => i.message).join(" "));
     // The brand gate: an option that misses the standard is dropped, never shown.
-    const kept = await gateOptions(caller, parsed.data.options, (o) => ({ hook: o.hook, angle: o.angle, topic: o.topic }), "reel");
+    const kept = await gateOptions(caller, parsed.data.options, (o) => ({ hook: o.hook, angle: o.angle, topic: o.topic }), "reel", topics);
     if (kept.length === 0) return fail(NO_BRAND_OPTION);
     await db.finish(id, { status: "ready", options: kept });
   } catch (e) {

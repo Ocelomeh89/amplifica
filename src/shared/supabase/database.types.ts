@@ -344,6 +344,8 @@ export type Database = {
           gate_attempts: number;
           ingest_batch: string | null;
           digest_posted_at: string | null;
+          topic: string;
+          inbox_since: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -362,6 +364,8 @@ export type Database = {
           quote?: string;
           quote_ref?: string;
           pillar?: string;
+          topic?: string;
+          inbox_since?: string | null;
           hook_type?: string;
           chain_id?: string | null;
           score?: number;
@@ -396,6 +400,8 @@ export type Database = {
           gate_attempts?: number;
           digest_posted_at?: string | null;
           pillar?: string;
+          topic?: string;
+          inbox_since?: string | null;
         };
         Relationships: [];
       };
@@ -600,6 +606,7 @@ export type Database = {
           tag_confidence: Json;
           tag_locks: string[];
           tagged_at: string | null;
+          topic: string;
           created_at: string;
           updated_at: string;
         };
@@ -629,6 +636,7 @@ export type Database = {
           tag_confidence?: Json;
           tag_locks?: string[];
           tagged_at?: string | null;
+          topic?: string;
         };
         Update: {
           idea_id?: string | null;
@@ -653,6 +661,7 @@ export type Database = {
           tag_confidence?: Json;
           tag_locks?: string[];
           tagged_at?: string | null;
+          topic?: string;
         };
         Relationships: [];
       };
@@ -945,6 +954,92 @@ export type Database = {
         };
         Relationships: [];
       };
+      content_topics: {
+        Row: {
+          id: string;
+          user_id: string;
+          slug: string;
+          label: string;
+          pillar: string;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          slug: string;
+          label: string;
+          pillar: string;
+        };
+        Update: {
+          label?: string;
+          pillar?: string;
+        };
+        Relationships: [];
+      };
+      content_focus: {
+        Row: {
+          id: string;
+          user_id: string;
+          kind: "double_down" | "skip";
+          dimension: "hook_type" | "topic";
+          value: string;
+          won: number;
+          lost: number;
+          flat: number;
+          total: number;
+          source: "review" | "test";
+          review_week: string | null;
+          starts_on: string;
+          ends_on: string | null;
+          lifted_at: string | null;
+          protected_until: string | null;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          kind: "double_down" | "skip";
+          dimension: "hook_type" | "topic";
+          value: string;
+          won?: number;
+          lost?: number;
+          flat?: number;
+          total?: number;
+          source?: "review" | "test";
+          review_week?: string | null;
+          starts_on: string;
+          ends_on?: string | null;
+          lifted_at?: string | null;
+          protected_until?: string | null;
+        };
+        Update: {
+          won?: number;
+          lost?: number;
+          flat?: number;
+          total?: number;
+          ends_on?: string | null;
+          lifted_at?: string | null;
+          protected_until?: string | null;
+        };
+        Relationships: [];
+      };
+      content_account_stats: {
+        Row: {
+          user_id: string;
+          platform: "instagram";
+          day: string;
+          followers: number;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          platform: "instagram";
+          day: string;
+          followers: number;
+        };
+        Update: {
+          followers?: number;
+        };
+        Relationships: [];
+      };
       content_reviews: {
         Row: {
           id: string;
@@ -956,6 +1051,8 @@ export type Database = {
           best_times: Json;
           plan: Json;
           replies_owed: Json;
+          review: Json;
+          built_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -968,6 +1065,8 @@ export type Database = {
           best_times?: Json;
           plan?: Json;
           replies_owed?: Json;
+          review?: Json;
+          built_at?: string | null;
         };
         Update: {
           narrative_md?: string;
@@ -976,6 +1075,8 @@ export type Database = {
           best_times?: Json;
           plan?: Json;
           replies_owed?: Json;
+          review?: Json;
+          built_at?: string | null;
         };
         Relationships: [];
       };
@@ -1038,5 +1139,9 @@ export type ContentPost = Database["public"]["Tables"]["content_posts"]["Row"];
 export type ContentPostInsert = Database["public"]["Tables"]["content_posts"]["Insert"];
 export type ContentMetric = Database["public"]["Tables"]["content_metrics"]["Row"];
 export type ContentReview = Database["public"]["Tables"]["content_reviews"]["Row"];
+export type ContentTopic = Database["public"]["Tables"]["content_topics"]["Row"];
+export type ContentFocus = Database["public"]["Tables"]["content_focus"]["Row"];
+export type ContentFocusInsert = Database["public"]["Tables"]["content_focus"]["Insert"];
+export type ContentAccountStat = Database["public"]["Tables"]["content_account_stats"]["Row"];
 export type DashboardProjectionSettingsRow = Database["public"]["Tables"]["dashboard_projection_settings"]["Row"];
 export type DashboardProjectionSettingsInsert = Database["public"]["Tables"]["dashboard_projection_settings"]["Insert"];

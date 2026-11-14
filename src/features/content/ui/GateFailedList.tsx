@@ -5,7 +5,7 @@ import Card from "@/shared/ui/Card";
 
 import type { GateFailedRow } from "@/features/content/data/queries";
 
-/** Ideas the brand gate held back, with why. Moves to the weekly review once that exists. */
+/** Ideas the brand gate held back, with why. Shown on the weekly review's newest week, with Archive. */
 export default function GateFailedList({ rows }: { rows: GateFailedRow[] }) {
   if (rows.length === 0) return null;
   return (

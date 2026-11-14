@@ -22,7 +22,8 @@ It contains: `taste_rules` (rules with origin `derived` are rules Miguel approve
 `queue_depth` per format, `known_titles` (do not propose these again),
 `source_rules` (allow and deny patterns), `known_sources` (recordings already
 seen, with `status`), `requested_sources` (open these first),
-`last_run_by_kind` (when each source kind was last written), `voice_summary`.
+`last_run_by_kind` (when each source kind was last written), `voice_summary`,
+`focus` (the weekly review's lists: `focus.skip` names hook types and topics not to write a Reel idea with, and `focus.double_down` names the ones to write more Reel ideas with; each topic has a `slug` and a `label`).
 
 ## 2. Read the generation rules
 
@@ -131,6 +132,8 @@ Generate ideas per the rules file: at most 10 in total across all sources,
 ranked, spread across formats, each with provenance. Drop anything matching
 `known_titles`. If nothing allowed was new, produce zero ideas and still do
 steps 6 and 7.
+
+Apply `focus` to Reel ideas only: do not write a Reel idea with a hook type in `focus.skip.hook_type` or on a topic in `focus.skip.topic`, and favor the hook types and topics in `focus.double_down` without dropping any pillar. Newsletter, YouTube, Story and X ideas are not affected.
 
 Before ingest, check every hook and outline against the readers, the pillars
 and `BRAND_FACTS`: each idea names Daniel's or Stephen's situation, says why

@@ -1,3 +1,6 @@
+import { loadTopics } from "./topics";
+import { activeFocus } from "./focus";
+import { supabaseFocusDb } from "./supabase-focus-db";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/shared/supabase/database.types";
 import { WINDOW_DAYS, scorePosts } from "@/features/content/engine/baseline";
@@ -102,6 +105,11 @@ export function supabaseRecreateDb(client: Client, userId: string): RecreateDb {
       if (error) throw new Error(`recreate link: ${error.message}`);
     },
 
+    topics: () => loadTopics(client, userId),
+    async focus(day) {
+      return activeFocus(await supabaseFocusDb(client, userId).rows(), day);
+    },
+
     async insertIdea(idea) {
       const { data, error } = await client
         .from("content_ideas")
@@ -124,6 +132,7 @@ export function supabaseRecreateDb(client: Client, userId: string): RecreateDb {
           status: "inbox",
           source_post_id: idea.source_post_id,
           ...(idea.gate ? { gate: idea.gate as unknown as Json } : {}),
+          ...(idea.topic ? { topic: idea.topic } : {}),
         })
         .select("id");
       if (error) throw new Error(`recreate idea: ${error.message}`);

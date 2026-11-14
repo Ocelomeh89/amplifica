@@ -32,7 +32,7 @@ export default async function PostPage({
   if (!z.string().uuid().safeParse(params.postId).success) notFound();
   const detail = await loadPostDetail(supabase, user.id, params.postId, new Date());
   if (!detail) notFound();
-  const { post, figures, insights, live, recreations, sourceMultiplier } = detail;
+  const { post, figures, insights, live, recreations, sourceMultiplier, topics } = detail;
   const firstLine = post.caption.split("\n")[0].slice(0, 140);
 
   return (
@@ -60,7 +60,7 @@ export default async function PostPage({
           </div>
         </div>
         <div className="mt-3">
-          <PostTags id={post.id} row={post} />
+          <PostTags id={post.id} row={post} topics={topics} />
         </div>
       </Card>
 

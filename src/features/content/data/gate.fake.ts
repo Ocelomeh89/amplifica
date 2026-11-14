@@ -2,14 +2,18 @@ import { GATE_TOOL_NAME } from "@/features/content/engine/brand";
 import type { GateOutcome } from "./brand-gate";
 import type { ToolCaller, ToolCallInput } from "./claude";
 import type { GateDb, GatingIdea } from "./gate-sweep";
+import type { Topic } from "./topics";
 
-type Row = GatingIdea & { status: string; applied?: GateOutcome; lastError?: string };
+type Row = GatingIdea & { status: string; applied?: GateOutcome; lastError?: string; topic?: string };
 
 /** In-memory GateDb for tests. */
-export function fakeGateDb(ideas: GatingIdea[]) {
+export function fakeGateDb(ideas: GatingIdea[], topicList: Topic[] = []) {
   const rows: Row[] = ideas.map((i) => ({ ...i, status: "gating" }));
   const db: GateDb & { rows: Row[] } = {
     rows,
+    async topics() {
+      return topicList;
+    },
     async gatingIdeas(limit, ids) {
       return rows
         .filter((r) => r.status === "gating" && (!ids || ids.includes(r.id)))
@@ -18,7 +22,7 @@ export function fakeGateDb(ideas: GatingIdea[]) {
     },
     async applyPass(id, o) {
       const r = rows.find((x) => x.id === id && x.status === "gating");
-      if (r) Object.assign(r, { status: "inbox", applied: o });
+      if (r) Object.assign(r, { status: "inbox", applied: o, ...(o.result.topic ? { topic: o.result.topic } : {}) });
     },
     async applyFail(id, o) {
       const r = rows.find((x) => x.id === id && x.status === "gating");

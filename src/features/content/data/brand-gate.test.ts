@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ToolCaller, ToolCallInput } from "./claude";
-import { addedFigures, gateOptions, gatePiece, gateRecord } from "./brand-gate";
+import { addedFigures, gateColumns, gateOptions, gatePiece, gateRecord } from "./brand-gate";
+import { gateToolSchema, renderGateTurn } from "@/features/content/engine/brand";
 import { withGatePass } from "./gate.fake";
 
 /** Returns queued responses in order; a queued Error is thrown. */
@@ -123,5 +124,56 @@ describe("gateOptions", () => {
     expect(out.map((o) => o.hook)).toEqual(["good"]);
     expect(out[0].gate).toMatchObject({ verdict: "pass", pillar: "w2-advantage" });
     expect(c.gateCalls).toHaveLength(3);
+  });
+});
+
+describe("the gate's topic", () => {
+  const topics = [
+    { slug: "predictable-income", label: "Why predictable income supports long-term investing", pillar: "w2-advantage" },
+    { slug: "concentration-risk", label: "The dangers of concentrating wealth", pillar: "expensive-tuition" },
+  ];
+
+  it("a pass keeps a topic listed under the gate's pillar", async () => {
+    const c = scripted([{ ...pass, topic: "predictable-income" }]);
+    const o = await gatePiece(c, piece, { rewrite: true, topics });
+    expect(o.status === "passed" && o.result.topic).toBe("predictable-income");
+    expect(c.calls[0].text).toContain("predictable-income");
+    expect(c.calls[0].text).toMatch(/also give `topic`/i);
+    const props = (c.calls[0].tool.schema as { properties: Record<string, { enum?: unknown[] }> }).properties;
+    expect(props.topic.enum).toEqual(["predictable-income", "concentration-risk", null]);
+  });
+
+  it("a topic under another pillar, or an unknown slug, becomes null", async () => {
+    const other = await gatePiece(scripted([{ ...pass, topic: "concentration-risk" }]), piece, { rewrite: true, topics });
+    expect(other.status === "passed" && other.result.topic).toBeNull();
+    const unknown = await gatePiece(scripted([{ ...pass, topic: "made-up" }]), piece, { rewrite: true, topics });
+    expect(unknown.status === "passed" && unknown.result.topic).toBeNull();
+  });
+
+  it("the rewrite's re-check also picks the topic", async () => {
+    const c = scripted([fail({ rewrite }), { ...pass, topic: "predictable-income" }]);
+    const o = await gatePiece(c, piece, { rewrite: true, topics });
+    expect(o.status === "passed" && o.result.topic).toBe("predictable-income");
+  });
+
+  it("with no topics given the turn and the tool schema are exactly as before", async () => {
+    const fields = piece.fields;
+    const keys = Object.keys(fields);
+    expect(renderGateTurn({ format: "reel", fields, rewrite: true, topics: undefined })).toBe(renderGateTurn({ format: "reel", fields, rewrite: true }));
+    expect(renderGateTurn({ format: "reel", fields, rewrite: true, topics: [] })).toBe(renderGateTurn({ format: "reel", fields, rewrite: true }));
+    expect(renderGateTurn({ format: "reel", fields, rewrite: true })).not.toMatch(/topic/i);
+    expect(gateToolSchema(keys, true)).not.toHaveProperty("properties.topic");
+    expect(gateToolSchema(keys, true, undefined)).toEqual(gateToolSchema(keys, true));
+    const c = scripted([pass]);
+    const o = await gatePiece(c, piece, { rewrite: true });
+    expect(o.status === "passed" && "topic" in o.result).toBe(false);
+  });
+
+  it("gateOptions keeps each option's topic and gateColumns writes it", async () => {
+    const c = scripted([{ ...pass, topic: "predictable-income" }]);
+    const kept = await gateOptions(c, [{ n: 1 }], () => ({ hook: "h" }), "reel", topics);
+    expect(kept[0].gate.topic).toBe("predictable-income");
+    expect(gateColumns(kept[0].gate, new Date("2026-11-16T12:00:00Z"))).toMatchObject({ pillar: "w2-advantage", topic: "predictable-income" });
+    expect(gateColumns({ ...kept[0].gate, topic: null }, new Date())).not.toHaveProperty("topic");
   });
 });

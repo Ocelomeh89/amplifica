@@ -10,6 +10,7 @@ import type { PostTags } from "@/features/content/engine/tags";
 import { EvergreenBadge, StatusBadge, ThinBadge } from "./StatusBadge";
 import TagChips from "./TagChips";
 import TagEditor from "./TagEditor";
+import type { Topic } from "@/features/content/data/topics";
 import { fmtDate } from "@/shared/format";
 
 export type TableRow = NormalizedPost & PostTags & {
@@ -43,7 +44,7 @@ const COLS: Col[] = [
 
 const x = (v: number | null) => (v == null ? "–" : `${v.toFixed(2)}×`);
 
-export default function PerformanceTable({ rows }: { rows: TableRow[] }) {
+export default function PerformanceTable({ rows, topics = [] }: { rows: TableRow[]; topics?: Topic[] }) {
   // The page keeps the current filters in `back`, so its Back link returns to the same view.
   const qs = useSearchParams().toString();
   const back = qs ? `?${qs}` : "";
@@ -100,7 +101,7 @@ export default function PerformanceTable({ rows }: { rows: TableRow[] }) {
               <td className="py-2 pr-3">{r.format || "feed"}</td>
               <td className="py-2 pr-3">{r.media_type || "–"}</td>
               <td className="py-2 pr-3">
-                <TagChips row={r} />
+                <TagChips row={r} topics={topics} />
               </td>
               <td className="py-2 pr-3 text-right tabular-nums">{r.views?.toLocaleString("en-US") ?? "–"}</td>
               <td className="py-2 pr-3 text-right tabular-nums whitespace-nowrap">
@@ -160,7 +161,7 @@ export default function PerformanceTable({ rows }: { rows: TableRow[] }) {
               <tr>
                 <td colSpan={COLS.length + 2} className="pb-3">
                   {panel.kind === "edit" ? (
-                    <TagEditor id={r.id} row={r} onDone={() => setPanel(null)} />
+                    <TagEditor id={r.id} row={r} topics={topics} onDone={() => setPanel(null)} />
                   ) : (
                     <dl className="grid gap-1 text-sm py-2 sm:grid-cols-[8rem_1fr]">
                       <dt className="text-sub">Spoken hook</dt>

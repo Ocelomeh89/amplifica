@@ -35,7 +35,7 @@ const idea: ContentIdea = {
   obsidian_path: null,
   source_post_id: null,
   created_at: "2026-09-17T11:00:00Z",
-  gate: null, gate_original: null, gate_attempts: 0, ingest_batch: null, digest_posted_at: null,
+  gate: null, gate_original: null, gate_attempts: 0, ingest_batch: null, digest_posted_at: null, topic: "", inbox_since: null,
   updated_at: "2026-09-17T11:00:00Z",
 };
 

@@ -3,15 +3,36 @@ import type { Database } from "@/shared/supabase/database.types";
 import { externalIdFromUrl } from "@/features/content/engine/posts";
 import type { PostTags } from "@/features/content/engine/tags";
 import { DEFAULT_COMPOSIO_USER_ID, listIgMedia, type ComposioEnv } from "./pulls/instagram";
+import { PILLAR_SLUGS } from "@/features/content/engine/brand";
+import { topicsDb } from "./topics";
 import { TAGGABLE_MEDIA, pickLocked, type MediaUrlLookup, type QueueRow, type StoredTags, type TagsDb } from "./tags";
 
 type Client = SupabaseClient<Database>;
 
-const TAG_COLUMNS = "hook_type, onscreen_text, message, cta_type, post_style, cover_face, cover_text, cover_number";
+const TAG_COLUMNS = "hook_type, onscreen_text, message, topic, cta_type, post_style, cover_face, cover_text, cover_number";
 const QUEUE_COLUMNS = `id, external_id, url, media_type, posted_at, caption, hook_used, thumbnail_url, tag_locks, ${TAG_COLUMNS}`;
 
-export function supabaseTagsDb(client: Client, userId: string): TagsDb {
+function toQueueRow(row: Record<string, unknown> & Pick<QueueRow, "tag_locks">): QueueRow {
   return {
+    id: row.id as string,
+    external_id: row.external_id as string,
+    url: row.url as string,
+    media_type: row.media_type as string,
+    posted_at: row.posted_at as string,
+    caption: row.caption as string,
+    hook_used: row.hook_used as string,
+    thumbnail_url: row.thumbnail_url as string,
+    tag_locks: row.tag_locks,
+    locked: pickLocked(row as Partial<PostTags>, row.tag_locks),
+  };
+}
+
+export function supabaseTagsDb(client: Client, userId: string): TagsDb {
+  const topics = topicsDb(client, userId);
+  return {
+    topics: () => topics.list(),
+    addTopic: (t) => topics.add(t),
+
     async untagged(limit, since) {
       const { data, error, count } = await client
         .from("content_posts")
@@ -24,22 +45,33 @@ export function supabaseTagsDb(client: Client, userId: string): TagsDb {
         .order("posted_at", { ascending: false })
         .limit(limit);
       if (error) throw new Error(`tag queue: ${error.message}`);
-      const posts: QueueRow[] = (data ?? []).map((r) => {
-        const row = r as unknown as Record<string, unknown> & Pick<QueueRow, "tag_locks">;
-        return {
-          id: row.id as string,
-          external_id: row.external_id as string,
-          url: row.url as string,
-          media_type: row.media_type as string,
-          posted_at: row.posted_at as string,
-          caption: row.caption as string,
-          hook_used: row.hook_used as string,
-          thumbnail_url: row.thumbnail_url as string,
-          tag_locks: row.tag_locks,
-          locked: pickLocked(row as Partial<PostTags>, row.tag_locks),
-        };
-      });
-      return { posts, total: count ?? posts.length };
+      const posts: QueueRow[] = (data ?? []).map((r) => toQueueRow(r as unknown as Record<string, unknown> & Pick<QueueRow, "tag_locks">));
+      // A post tagged at Mark posted from a Today brief has no topic when the gate gave its idea none, and the routine would never
+      // see it. Tagged posts that only lack a topic (and have a pillar to put one under) are queued after the untagged ones.
+      let total = count ?? posts.length;
+      if (posts.length < limit) {
+        const { data: more, error: moreError, count: moreCount } = await client
+          .from("content_posts")
+          .select(QUEUE_COLUMNS, { count: "exact" })
+          .eq("user_id", userId)
+          .eq("platform", "instagram")
+          .not("tagged_at", "is", null)
+          .eq("topic", "")
+          .in("message", [...PILLAR_SLUGS])
+          .gte("posted_at", since.toISOString())
+          .in("media_type", [...TAGGABLE_MEDIA])
+          .order("posted_at", { ascending: false })
+          .limit(limit - posts.length);
+        if (moreError) throw new Error(`tag queue topics: ${moreError.message}`);
+        const have = new Set(posts.map((p) => p.id));
+        for (const r of more ?? []) {
+          const row = r as unknown as Record<string, unknown> & Pick<QueueRow, "tag_locks">;
+          if (row.tag_locks.includes("topic") || have.has(row.id as string)) continue;
+          posts.push(toQueueRow(row));
+        }
+        total += moreCount ?? 0;
+      }
+      return { posts, total };
     },
 
     async locksFor(ids) {

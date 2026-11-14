@@ -7,14 +7,19 @@ import { runCompetitorCron } from "@/features/content/data/competitor-cron";
 import { runGateSweep } from "@/features/content/data/gate-sweep";
 import { supabaseBackfillDb, supabaseDigestDb, supabaseGateDb } from "@/features/content/data/supabase-gate-db";
 import { runBackfill } from "@/features/content/data/gate-backfill";
+import { runTopicBackfill, supabaseTopicBackfillDb } from "@/features/content/data/topic-backfill";
 import { clickUpChatPoster, postDigests } from "@/features/content/data/gate-digest";
 import { supabaseCompetitorsDb } from "@/features/content/data/supabase-competitors-db";
 import { apifyClientFromEnv } from "@/features/content/data/pulls/apify";
 import { anthropicToolCaller } from "@/features/content/data/claude";
 import { supabaseTodayDb } from "@/features/content/data/supabase-today-db";
+import { storeFollowers, supabaseAccountStatsDb } from "@/features/content/data/account-stats";
 import { runTodayCron } from "@/features/content/data/today-cron";
+import { releaseEndedSkips } from "@/features/content/data/focus";
+import { supabaseFocusDb } from "@/features/content/data/supabase-focus-db";
+import { chicagoIsoDate } from "@/features/content/engine/best-times";
 import { pullBeehiiv } from "@/features/content/data/pulls/beehiiv";
-import { pullInstagram } from "@/features/content/data/pulls/instagram";
+import { pullIgFollowers, pullInstagram } from "@/features/content/data/pulls/instagram";
 import { CHANNEL_HANDLE, pullYouTube } from "@/features/content/data/pulls/youtube";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +60,27 @@ export async function GET(req: Request) {
       return NextResponse.json({ backfill, error: (e as Error).message }, { status: 500 });
     }
   }
+  // `?topics=dry` reports which topic each idea without one would get and writes nothing; `?topics=run`
+  // writes them, 100 ideas a call. Nothing else runs.
+  const topics = params.get("topics");
+  const after = params.get("after");
+  if ((topics === "dry" || topics === "run") && after !== null && Number.isNaN(Date.parse(after))) {
+    return NextResponse.json({ error: "after must be a timestamp" }, { status: 400 });
+  }
+  if (topics === "dry" || topics === "run") {
+    try {
+      const report = await runTopicBackfill(supabaseTopicBackfillDb(createAdminClient(), owner), anthropicToolCaller({ timeoutMs: 60_000, maxRetries: 0 }), {
+        dryRun: topics !== "run",
+        limit: 100,
+        after,
+        timeLeft: () => BUDGET_SECONDS - (Date.now() - startedAt.getTime()) / 1000,
+      });
+      return NextResponse.json({ topics, ...report });
+    } catch (e) {
+      console.error("content topic backfill failed", e);
+      return NextResponse.json({ topics, error: (e as Error).message }, { status: 500 });
+    }
+  }
   const wanted = PLATFORMS.filter((p) => !only || p === only);
   if (wanted.length === 0) {
     return NextResponse.json({ error: `unknown platform ${only}` }, { status: 400 });
@@ -69,6 +95,21 @@ export async function GET(req: Request) {
 
   try {
     const report = await runMetricsCron({ db: supabaseMetricsDb(createAdminClient(), owner), userId: owner, now: new Date(), pulls });
+    // One follower reading a day, for the weekly review's follows tile. Its own try/catch: a failure here
+    // is reported in the reply and never fails the metrics run.
+    let followers: Awaited<ReturnType<typeof storeFollowers>> | null = null;
+    if (!only || only === "instagram") {
+      try {
+        followers = await storeFollowers(
+          supabaseAccountStatsDb(createAdminClient(), owner),
+          () => pullIgFollowers({ apiKey: process.env.COMPOSIO_API_KEY, connectionId: process.env.COMPOSIO_IG_CONNECTION_ID, userId: process.env.COMPOSIO_USER_ID }),
+          new Date()
+        );
+      } catch (e) {
+        console.error("content follower count failed", e);
+        followers = { followers: null, error: (e as Error).message };
+      }
+    }
     // Competitor posts are collected and tagged before Today so a fresh one can take slot 2.
     // Like Today, a failure here never fails the metrics run.
     let competitors: Awaited<ReturnType<typeof runCompetitorCron>> | { error: string } | null = null;
@@ -85,6 +126,17 @@ export async function GET(req: Request) {
       } catch (e) {
         console.error("content competitor cron failed", e);
         competitors = { error: (e as Error).message };
+      }
+    }
+    // Skips that ended give their hidden ideas a fresh Inbox clock before Today picks ideas. Two cheap queries, no Claude;
+    // a failure here never fails the metrics run.
+    let released: number | { error: string } | null = null;
+    if (!only) {
+      try {
+        released = await releaseEndedSkips(supabaseFocusDb(createAdminClient(), owner), chicagoIsoDate(new Date()));
+      } catch (e) {
+        console.error("content skip release failed", e);
+        released = { error: (e as Error).message };
       }
     }
     // Today's briefs come after the pulls so judging sees fresh snapshots. A failure here
@@ -130,7 +182,7 @@ export async function GET(req: Request) {
         digests = { error: (e as Error).message };
       }
     }
-    return NextResponse.json({ ...report, gate, digests, competitors, today }, { status: report.ok ? 200 : 500 });
+    return NextResponse.json({ ...report, followers, released, gate, digests, competitors, today }, { status: report.ok ? 200 : 500 });
   } catch (e) {
     console.error("content metrics cron failed", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

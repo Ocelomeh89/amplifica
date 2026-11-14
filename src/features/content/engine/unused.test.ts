@@ -60,10 +60,26 @@ describe("partitionUnused", () => {
 
 describe("reviveFields", () => {
   it("returns the idea to the inbox with today's batch date and no rank or like time", () => {
-    expect(reviveFields(NOW)).toEqual({ status: "inbox", batch_date: "2026-10-31", queue_rank: null, feedback_at: null });
+    expect(reviveFields(NOW)).toEqual({ status: "inbox", batch_date: "2026-10-31", queue_rank: null, feedback_at: null, inbox_since: null });
   });
   it("a revived idea is no longer unused", () => {
     const f = reviveFields(NOW);
     expect(unusedReason({ status: f.status, batch_date: f.batch_date, feedback_at: f.feedback_at, created_at: daysAgo(90) }, NOW)).toBeNull();
+  });
+});
+
+describe("inbox_since", () => {
+  const withSince = (days: number, since: number | null) => ({ ...inbox(days), inbox_since: since === null ? null : daysAgo(since) });
+
+  it("an idea's clock starts at inbox_since when set", () => {
+    expect(unusedReason(withSince(40, 2), NOW)).toBeNull();
+    expect(unusedReason(withSince(40, UNREVIEWED_DAYS + 1), NOW)).toBe("unreviewed");
+    expect(unusedReason(withSince(40, null), NOW)).toBe("unreviewed");
+    expect(partitionUnused([withSince(40, 2)], NOW).fresh).toHaveLength(1);
+    expect(partitionUnused([withSince(40, 15)], NOW).unused[0].age_days).toBe(15);
+  });
+
+  it("reviveFields clears inbox_since", () => {
+    expect(reviveFields(NOW)).toMatchObject({ status: "inbox", inbox_since: null });
   });
 });

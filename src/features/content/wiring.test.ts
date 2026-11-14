@@ -17,6 +17,8 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/today/page.tsx",
       "src/app/(app)/content/creators/page.tsx",
       "src/app/(app)/content/taste/page.tsx",
+      "src/app/(app)/content/review/page.tsx",
+      "src/app/(app)/content/review/[weekStart]/page.tsx",
       "src/app/(app)/content/ideas/[id]/page.tsx",
       "src/app/(app)/content/sources/page.tsx",
       "src/features/content/data/actions.ts",
@@ -26,6 +28,7 @@ describe("content stays owner-only", () => {
       "src/features/content/data/tag-actions.ts",
       "src/features/content/data/recreate-actions.ts",
       "src/features/content/data/today-actions.ts",
+      "src/features/content/data/review-actions.ts",
     ];
     for (const f of files) expect(read(f), f).toContain("requireContentOwner()");
   });
@@ -41,6 +44,7 @@ describe("content stays owner-only", () => {
       "src/app/api/content/tags/route.ts",
       "src/app/api/content/cron/metrics/route.ts",
       "src/app/api/content/voice/route.ts",
+      "src/app/api/content/review/build/route.ts",
     ];
     for (const f of routes) expect(read(f), f).toContain("authorizeRoutine(req, process.env.");
   });
@@ -71,8 +75,19 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/today/page.tsx",
       "src/app/(app)/content/creators/page.tsx",
       "src/app/(app)/content/taste/page.tsx",
+      "src/app/(app)/content/review/page.tsx",
+      "src/app/(app)/content/review/[weekStart]/page.tsx",
     ];
     for (const f of pages) expect(read(f), f).not.toMatch(/supabase\s*\.from\(/);
+  });
+
+  it("Performance no longer renders GateFailedList; the weekly review does", () => {
+    expect(read("src/app/(app)/content/performance/page.tsx")).not.toContain("GateFailedList");
+    expect(read("src/features/content/ui/ReviewPage.tsx")).toContain("GateFailedList");
+  });
+
+  it("the review actions each open with the owner gate and the page routes set the 300 second budget", () => {
+    for (const f of ["src/app/(app)/content/review/page.tsx", "src/app/(app)/content/review/[weekStart]/page.tsx"]) expect(read(f), f).toContain("maxDuration = 300");
   });
 
   it("comments do not crowd the routine's dedup window or the Sources page", () => {
@@ -102,6 +117,37 @@ describe("content stays owner-only", () => {
     const competitors = route.indexOf("runCompetitorCron(");
     expect(competitors).toBeGreaterThan(route.indexOf("runMetricsCron("));
     expect(competitors).toBeLessThan(route.indexOf("runTodayCron("));
+  });
+
+  it("the review route is a POST with a 300 second budget and an explicit Claude timeout", () => {
+    const route = read("src/app/api/content/review/build/route.ts");
+    expect(route).toContain("export async function POST(");
+    expect(route).not.toContain("export async function GET(");
+    expect(route).toContain("maxDuration = 300");
+    expect(route).toContain("timeoutMs: 120_000");
+    expect(route).toContain("maxRetries: 0");
+    expect(route).toContain('dynamic = "force-dynamic"');
+  });
+
+  it("the topic backfill runs only on request, dry unless asked to run", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    expect(route).toContain('params.get("topics")');
+    expect(route).toContain('dryRun: topics !== "run"');
+    expect(route.indexOf("runTopicBackfill(")).toBeGreaterThan(-1);
+    expect(route.indexOf("runTopicBackfill(")).toBeLessThan(route.indexOf("runMetricsCron("));
+  });
+
+  it("ended skips are released before Today picks ideas", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    expect(route.indexOf("releaseEndedSkips(")).toBeGreaterThan(route.indexOf("runMetricsCron("));
+    expect(route.indexOf("releaseEndedSkips(")).toBeLessThan(route.indexOf("runTodayCron("));
+  });
+
+  it("the follower count is stored after the pulls and before the competitor step", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    const store = route.indexOf("storeFollowers(");
+    expect(store).toBeGreaterThan(route.indexOf("runMetricsCron("));
+    expect(store).toBeLessThan(route.indexOf("runCompetitorCron("));
   });
 
   it("the cron's brand gate sweep runs after Today, on the time Today leaves, then the digest", () => {

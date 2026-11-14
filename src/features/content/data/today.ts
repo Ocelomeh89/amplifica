@@ -43,6 +43,8 @@ import {
 import { sharesCopiedRun } from "@/features/content/engine/competitors";
 import type { ToolCaller } from "./claude";
 import { gatePiece, gateRecord, type GateRecord } from "./brand-gate";
+import type { Topic } from "./topics";
+import { EMPTY_FOCUS, evidenceWithoutSkipped, reviewBlock, type ActiveFocus } from "@/features/content/engine/focus";
 import type { CompetitorPostRow } from "./competitors";
 import { chicagoDayStart } from "./recreate";
 
@@ -91,9 +93,9 @@ export type RunRow = {
   created_at: string;
 };
 
-export type IdeaLite = { id: string; title: string; hook: string; pillar: string; hook_alt: string | null; status: string };
+export type IdeaLite = { id: string; title: string; hook: string; pillar: string; hook_alt: string | null; status: string; hook_type: string; topic: string };
 /** What a brief rewrite changes, so a failed run can put it back (gate and pillar included). */
-export type IdeaSnapshot = { hook: string; hook_alt: string | null; hook_type: string; title: string; outline: unknown; status: string; score: number; gate?: unknown; pillar?: string };
+export type IdeaSnapshot = { hook: string; hook_alt: string | null; hook_type: string; title: string; outline: unknown; status: string; score: number; gate?: unknown; pillar?: string; topic?: string };
 
 export type BriefCompetitor = { username: string; url: string; multiple: number; thin: boolean; pushes_belief: string | null; format_note: string | null };
 
@@ -122,13 +124,18 @@ export type NewExperiment = Omit<ExperimentRow, "id" | "created_at">;
 export type ExperimentPatch = Partial<Pick<NewExperiment, "status" | "verdict" | "judge_metrics" | "judged_at" | "post_id" | "judge_at" | "variable" | "value" | "recipe" | "reason" | "idea_id" | "kind" | "competitor_post_id">>;
 
 export interface TodayDb {
+  /** The owner's topic list, for the brand gate. */
+  topics(): Promise<Topic[]>;
   evidence(now: Date): Promise<{ ev: Evidence; winnerHooks: string[]; recentHooks: string[] }>;
   /** (variable, value) pairs held by an open or posted experiment. */
   liveTests(): Promise<LiveTest[]>;
   /** Today's experiments that are not skipped or discarded. */
   liveSlots(day: string): Promise<ExperimentRow[]>;
   /** Inbox Reel ideas with no live experiment, best score first. */
-  unclaimedInboxIdeas(limit: number): Promise<IdeaLite[]>;
+  /** Ideas with a skipped hook or topic are left out, and ideas with a double-down topic come first, before the cut to `limit`. */
+  unclaimedInboxIdeas(limit: number, focus: ActiveFocus): Promise<IdeaLite[]>;
+  /** The review's active skip and double-down lists on a day. */
+  focus(day: string): Promise<ActiveFocus>;
   idea(id: string): Promise<IdeaLite | null>;
   getExperiment(id: string): Promise<ExperimentRow | null>;
   insertExperiment(row: NewExperiment): Promise<string>;
@@ -238,12 +245,18 @@ export async function makeNow(db: TodayDb, now: Date): Promise<Started> {
 
 const idsOf = (slots: BriefSlotInput[]) => slots.map((s) => s.slot);
 
-type BriefContext = { winnerHooks: string[]; recentHooks: string[]; rules: string[] };
+type BriefContext = { winnerHooks: string[]; recentHooks: string[]; rules: string[]; /** The weekly review block for the system prompt, "" when the lists are empty. */ review?: string };
+
+/** The review's lists for a day and the prompt block that carries them. A failed read means no lists, never a failed run. */
+async function reviewFocus(db: TodayDb, day: string): Promise<{ focus: ActiveFocus; block: string }> {
+  const [focus, topics] = await Promise.all([db.focus(day).catch(() => EMPTY_FOCUS), db.topics().catch(() => [])]);
+  return { focus, block: reviewBlock(focus, topics) };
+}
 
 async function askClaude(caller: ToolCaller, slots: BriefSlotInput[], ctx: BriefContext, fixed: Record<number, string>): Promise<BriefOut[]> {
-  const { rules, ...hooks } = ctx;
+  const { rules, review, ...hooks } = ctx;
   const raw = await caller.call({
-    system: briefSystemPrompt(rules),
+    system: briefSystemPrompt(rules, review),
     text: renderBriefTurn({ slots, ...hooks }),
     tool: { name: BRIEF_TOOL_NAME, description: "Record one brief for each slot.", schema: briefToolSchema() },
     maxTokens: 6000,
@@ -254,7 +267,7 @@ async function askClaude(caller: ToolCaller, slots: BriefSlotInput[], ctx: Brief
 }
 
 /** A brief's idea rewrite, plus the brand gate's record and the pillar it confirmed. */
-export type BriefPatch = ReturnType<typeof briefIdeaPatch> & { gate?: GateRecord; pillar?: string };
+export type BriefPatch = ReturnType<typeof briefIdeaPatch> & { gate?: GateRecord; pillar?: string; topic?: string };
 
 export const NO_BRAND_BRIEF = "None of today's briefs met the brand standard.";
 
@@ -262,8 +275,8 @@ export const NO_BRAND_BRIEF = "None of today's briefs met the brand standard.";
  * The brand gate on one brief: a check, one rewrite on a fail, a re-check. The gate's pillar must
  * be the pillar the brief was built on. Null means the brief is dropped; a gate error counts as a fail.
  */
-export async function gateBrief(caller: ToolCaller, b: BriefOut, now: Date): Promise<{ brief: BriefOut; gate: GateRecord } | null> {
-  const o = await gatePiece(caller, { format: "reel", fields: { title: b.title, hook: b.hook, say: b.say } }, { rewrite: true });
+export async function gateBrief(caller: ToolCaller, b: BriefOut, now: Date, topics?: Topic[]): Promise<{ brief: BriefOut; gate: GateRecord } | null> {
+  const o = await gatePiece(caller, { format: "reel", fields: { title: b.title, hook: b.hook, say: b.say } }, { rewrite: true, topics });
   if (o.status !== "passed" || o.result.pillar !== b.message) return null;
   const say = Array.isArray(o.fields.say) ? o.fields.say : [String(o.fields.say)];
   const hook = String(o.fields.hook);
@@ -318,8 +331,11 @@ export async function runDaily(db: TodayDb, caller: ToolCaller, runId: string, n
       return { made: 0, error: null };
     }
     const candidate = missing.includes(2) ? await db.competitorCandidate(day, now) : null;
-    const ideas = await db.unclaimedInboxIdeas(missing.length + 1);
-    const { ev, winnerHooks, recentHooks } = await db.evidence(now);
+    const { focus, block } = await reviewFocus(db, day);
+    const ideas = await db.unclaimedInboxIdeas(missing.length + 1, focus);
+    const { ev: rawEv, winnerHooks, recentHooks } = await db.evidence(now);
+    // The control recipe and every candidate test never see a skipped hook; the page's tally keeps the full evidence.
+    const ev = evidenceWithoutSkipped(rawEv, focus);
     const liveTests = await db.liveTests();
     const control = controlRecipe(ev);
     const heldVariables: string[] = live.map((e) => e.variable);
@@ -363,7 +379,7 @@ export async function runDaily(db: TodayDb, caller: ToolCaller, runId: string, n
         ...(p.competitor ? { competitor: competitorInput(p.competitor) } : {}),
       };
     };
-    const hooks: BriefContext = { winnerHooks, recentHooks, rules: await db.activeRules() };
+    const hooks: BriefContext = { winnerHooks, recentHooks, rules: await db.activeRules(), review: block };
     const briefs = await askClaude(caller, planned.map(inputFor), hooks, fixedMessages(planned));
     const briefFor = (slot: number) => briefs.find((x) => x.slot === slot)!;
 
@@ -395,7 +411,9 @@ export async function runDaily(db: TodayDb, caller: ToolCaller, runId: string, n
     // The brand gate: a brief that does not pass leaves its slot empty and its idea untouched.
     // In parallel, so the gate costs about one brief's two calls, not one per slot.
     const gates = new Map<number, GateRecord>();
-    const checked = await Promise.all(planned.map((p) => gateBrief(caller, briefFor(p.slot), now)));
+    // Without the topic list the gate still checks; the ideas just keep the topic they had.
+    const topics = await db.topics().catch(() => undefined);
+    const checked = await Promise.all(planned.map((p) => gateBrief(caller, briefFor(p.slot), now, topics)));
     for (const [k, p] of [...planned].entries()) {
       const b = briefFor(p.slot);
       const g = checked[k];
@@ -414,7 +432,7 @@ export async function runDaily(db: TodayDb, caller: ToolCaller, runId: string, n
       const i = ideaOf(p.ideaId)!;
       await db.discardSharpen(p.ideaId);
       const brief = briefFor(p.slot);
-      const before = await db.patchIdea(p.ideaId, { ...briefIdeaPatch(brief, p.test, control, i.hook_alt ?? i.hook), gate: gates.get(p.slot), pillar: brief.message });
+      const before = await db.patchIdea(p.ideaId, { ...briefIdeaPatch(brief, p.test, control, i.hook_alt ?? i.hook), gate: gates.get(p.slot), pillar: brief.message, topic: gates.get(p.slot)?.result.topic ?? undefined });
       if (before === null) return await fail("An idea changed while the briefs were made. Try again.");
       patched.push({ id: p.ideaId, snapshot: before });
     }
@@ -488,17 +506,19 @@ export async function runMoment(db: TodayDb, caller: ToolCaller, runId: string, 
     }
   };
   try {
-    const { ev, winnerHooks, recentHooks } = await db.evidence(now);
+    const { focus, block } = await reviewFocus(db, day);
+    const { ev: rawEv, winnerHooks, recentHooks } = await db.evidence(now);
+    const ev = evidenceWithoutSkipped(rawEv, focus);
     const pick = pickMoment(ev, await db.liveTests(), (await db.liveSlots(day)).map((e) => e.variable));
     if (!pick) return await fail("No test is left to run today.");
     const text = moment.trim();
     const [raw] = await askClaude(
       caller,
       [{ slot: 3, test: pick.test, held: pick.control, idea: null, moment: text }],
-      { winnerHooks, recentHooks, rules: await db.activeRules() },
+      { winnerHooks, recentHooks, rules: await db.activeRules(), review: block },
       fixedMessages([{ slot: 3, test: pick.test }])
     );
-    const g = await gateBrief(caller, raw, now);
+    const g = await gateBrief(caller, raw, now, await db.topics().catch(() => undefined));
     if (!g) return await fail("The brief did not meet the brand standard. Try a different moment.");
     const b = g.brief;
     const sourceId = await db.insertMomentSource(text, day);
@@ -561,9 +581,11 @@ export async function runSwap(db: TodayDb, caller: ToolCaller, runId: string, ex
     // A competitor topic brief swaps to a fresh Inbox idea: keeping their topic under a new test would change two things.
     const fromCompetitorTopic = old.kind === "competitor" && old.variable === "source";
     const oldIdeaId = old.idea_id;
-    const idea = fromCompetitorTopic ? ((await db.unclaimedInboxIdeas(1))[0] ?? null) : await db.idea(old.idea_id);
+    const { focus, block } = await reviewFocus(db, day);
+    const idea = fromCompetitorTopic ? ((await db.unclaimedInboxIdeas(1, focus))[0] ?? null) : await db.idea(old.idea_id);
     if (!idea) return await fail(fromCompetitorTopic ? `${EMPTY_INBOX}. Add an idea, then swap.` : "The idea is gone.");
-    const { ev, winnerHooks, recentHooks } = await db.evidence(now);
+    const { ev: rawEv, winnerHooks, recentHooks } = await db.evidence(now);
+    const ev = evidenceWithoutSkipped(rawEv, focus);
     const heldVariables = new Set((await db.liveSlots(day)).map((e) => e.variable));
     const control: Control = controlRecipe(ev);
     const test = candidateTests(ev, control, await db.liveTests()).find((t) => !heldVariables.has(t.variable));
@@ -571,14 +593,14 @@ export async function runSwap(db: TodayDb, caller: ToolCaller, runId: string, ex
     const [raw] = await askClaude(
       caller,
       [{ slot: old.slot, test, held: control, idea: { title: idea.title, hook: idea.hook, pillar: idea.pillar }, moment: old.moment }],
-      { winnerHooks, recentHooks, rules: await db.activeRules() },
+      { winnerHooks, recentHooks, rules: await db.activeRules(), review: block },
       fixedMessages([{ slot: old.slot, test }])
     );
-    const g = await gateBrief(caller, raw, now);
+    const g = await gateBrief(caller, raw, now, await db.topics().catch(() => undefined));
     if (!g) return await fail("The new brief did not meet the brand standard. Try again.");
     const b = g.brief;
     await db.discardSharpen(idea.id);
-    const before = await db.patchIdea(idea.id, { ...briefIdeaPatch(b, test, control, idea.hook_alt ?? idea.hook), gate: g.gate, pillar: b.message });
+    const before = await db.patchIdea(idea.id, { ...briefIdeaPatch(b, test, control, idea.hook_alt ?? idea.hook), gate: g.gate, pillar: b.message, topic: g.gate.result.topic ?? undefined });
     if (before === null) return await fail("The idea changed while the brief was made. Try again.");
     snapshot = { id: idea.id, snapshot: before };
     // Rewritten in place: one write, so a failure leaves the old brief exactly as it was.

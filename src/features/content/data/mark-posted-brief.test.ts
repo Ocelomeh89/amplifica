@@ -8,12 +8,12 @@ vi.mock("server-only", () => ({}));
 type Call = [string, ...unknown[]];
 
 /** Answers maybeSingle per table and logs every call. */
-function fakeClient(rows: { experiment?: unknown; post?: unknown }) {
+function fakeClient(rows: { experiment?: unknown; post?: unknown; idea?: unknown }) {
   const log: Call[] = [];
   const client = {
     from(table: string) {
       const b: Record<string, unknown> = {
-        maybeSingle: () => Promise.resolve({ data: table === "content_experiments" ? (rows.experiment ?? null) : (rows.post ?? null), error: null }),
+        maybeSingle: () => Promise.resolve({ data: table === "content_experiments" ? (rows.experiment ?? null) : table === "content_ideas" ? (rows.idea ?? null) : (rows.post ?? null), error: null }),
         then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: null, error: null }).then(ok),
       };
       for (const m of ["select", "eq", "update"]) {
@@ -40,6 +40,22 @@ describe("linkBriefExperiment", () => {
     const tagUpdate = log.find((c) => c[0] === "content_posts.update");
     expect(tagUpdate?.[1]).toMatchObject({ hook_type: "paradox", cover_face: true, hook_spoken: "Hook" });
     expect(log).toContainEqual(["content_posts.eq", "user_id", "u1"]);
+  });
+
+  it("a brief post takes its idea's topic", async () => {
+    const { client, log } = fakeClient({ experiment: EXP, post: POST, idea: { topic: "mechanics-of-leverage" } });
+    await linkBriefExperiment(client, "u1", A);
+    const tagUpdate = log.find((c) => c[0] === "content_posts.update");
+    expect(tagUpdate?.[1]).toMatchObject({ topic: "mechanics-of-leverage", tag_confidence: { topic: 0.8, hook_type: 0.8 } });
+    expect(log).toContainEqual(["content_ideas.eq", "id", "i1"]);
+  });
+
+  it("an idea with no topic leaves the post's topic empty and gives it no confidence", async () => {
+    const { client, log } = fakeClient({ experiment: EXP, post: POST, idea: { topic: "" } });
+    await linkBriefExperiment(client, "u1", A);
+    const patch = log.find((c) => c[0] === "content_posts.update")?.[1] as { topic?: string; tag_confidence: Record<string, number> };
+    expect(patch.topic ?? "").toBe("");
+    expect(patch.tag_confidence.topic).toBeUndefined();
   });
 
   it("keeps the tags of a post that is already tagged but still links the experiment", async () => {

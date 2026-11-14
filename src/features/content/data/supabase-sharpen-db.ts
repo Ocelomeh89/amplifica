@@ -1,3 +1,6 @@
+import { loadTopics } from "./topics";
+import { activeFocus } from "./focus";
+import { supabaseFocusDb } from "./supabase-focus-db";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/shared/supabase/database.types";
 import { STALE_PENDING_MINUTES } from "@/features/content/engine/recreate";
@@ -142,6 +145,11 @@ export function supabaseSharpenDb(client: Client, userId: string): SharpenDb & {
         .select("id");
       fail("patch idea", error);
       return (data ?? []).length > 0;
+    },
+
+    topics: () => loadTopics(client, userId),
+    async focus(day) {
+      return activeFocus(await supabaseFocusDb(client, userId).rows(), day);
     },
 
     async activeRules() {

@@ -23,15 +23,15 @@ export const SNAPSHOT_PAGE = 1000;
 export async function loadSnapshotRows(
   supabase: SupabaseClient<Database>,
   userId: string,
-  postIds: string[]
+  postIds: string[],
+  /** `before` reads the world as of an instant: snapshots captured at or after it are not loaded. */
+  opts?: { before?: Date }
 ): Promise<{ post_id: string; captured_at: string; metrics: unknown }[]> {
   const out: { post_id: string; captured_at: string; metrics: unknown }[] = [];
   for (let from = 0; ; from += SNAPSHOT_PAGE) {
-    const { data, error } = await supabase
-      .from("content_metrics")
-      .select("post_id, captured_at, metrics")
-      .eq("user_id", userId)
-      .in("post_id", postIds)
+    let q = supabase.from("content_metrics").select("post_id, captured_at, metrics").eq("user_id", userId).in("post_id", postIds);
+    if (opts?.before) q = q.lt("captured_at", opts.before.toISOString());
+    const { data, error } = await q
       // Every cron run stamps one captured_at on ~100 rows; without a unique tiebreaker a page boundary can skip or repeat rows.
       .order("captured_at", { ascending: true })
       .order("id", { ascending: true })
@@ -44,25 +44,28 @@ export async function loadSnapshotRows(
 }
 
 /** Every post with its first and latest snapshot. Posts without a snapshot yet have empty metrics. */
-export async function loadPostsForMath(supabase: SupabaseClient<Database>, userId: string): Promise<PostRowForView[]> {
-  const { data: posts, error } = await supabase
+/** `opts.before` reads the world as of an instant: later posts and later snapshots are not loaded (the weekly review). */
+export async function loadPostsForMath(supabase: SupabaseClient<Database>, userId: string, opts?: { before?: Date }): Promise<PostRowForView[]> {
+  let postQuery = supabase
     .from("content_posts")
     .select(
-      "id, platform, format, media_type, thumbnail_url, pillar, hook_type, hook_used, caption, url, idea_id, posted_at, onscreen_text, message, cta_type, post_style, cover_face, cover_text, cover_number, hook_spoken, hook_onscreen, tag_confidence, tag_locks, tagged_at"
+      "id, platform, format, media_type, thumbnail_url, pillar, hook_type, hook_used, caption, url, idea_id, posted_at, onscreen_text, message, topic, cta_type, post_style, cover_face, cover_text, cover_number, hook_spoken, hook_onscreen, tag_confidence, tag_locks, tagged_at"
     )
-    .eq("user_id", userId)
-    .order("posted_at", { ascending: false });
+    .eq("user_id", userId);
+  if (opts?.before) postQuery = postQuery.lt("posted_at", opts.before.toISOString());
+  const { data: posts, error } = await postQuery.order("posted_at", { ascending: false });
   if (error) throw new Error(error.message);
   const rows = posts ?? [];
   if (rows.length === 0) return [];
 
-  const metrics = await loadSnapshotRows(supabase, userId, rows.map((p) => p.id));
+  const metrics = await loadSnapshotRows(supabase, userId, rows.map((p) => p.id), opts);
   const snaps = pickSnapshots(metrics);
   const seriesOf = new Map<string, SeriesPoint[]>();
   for (const m of metrics) {
-    const views = (m.metrics as { views?: unknown } | null)?.views;
+    const raw = (m.metrics ?? {}) as { views?: unknown; saves?: unknown; shares?: unknown };
+    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
     const list = seriesOf.get(m.post_id) ?? [];
-    list.push({ at: m.captured_at, views: typeof views === "number" && Number.isFinite(views) ? views : null });
+    list.push({ at: m.captured_at, views: num(raw.views), saves: num(raw.saves), shares: num(raw.shares) });
     seriesOf.set(m.post_id, list);
   }
 
@@ -80,6 +83,7 @@ export async function loadPostsForMath(supabase: SupabaseClient<Database>, userI
       hook_used: p.hook_used,
       onscreen_text: p.onscreen_text,
       message: p.message,
+      topic: p.topic,
       cta_type: p.cta_type,
       post_style: p.post_style,
       cover_face: p.cover_face,

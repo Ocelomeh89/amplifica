@@ -9,6 +9,9 @@ import {
   coverSummary,
   filterByTags,
   parseTagFilters,
+  POST_TAG_NAMES,
+  TAG_NAMES,
+  slugifyTopic,
   tagBodySchema,
   type PostTags,
 } from "./tags";
@@ -20,6 +23,7 @@ const base = (over: Partial<PostTags & { caption: string }> = {}): PostTags & { 
   hook_type: "",
   onscreen_text: "",
   message: "",
+  topic: "",
   cta_type: "",
   post_style: "",
   cover_face: null,
@@ -141,5 +145,24 @@ describe("message is the personal pillar", () => {
     expect(TAG_LABELS["velocity"]).toBe("Velocity (old)");
     const id = "00000000-0000-4000-8000-000000000000";
     expect(tagPostSchema.safeParse({ id, message: "velocity" }).success).toBe(false);
+  });
+});
+
+describe("topic as a seventh tag", () => {
+  it("TAG_NAMES is unchanged, so competitor tagging needs no topic", () => {
+    expect(TAG_NAMES).toHaveLength(8);
+    expect(TAG_NAMES as readonly string[]).not.toContain("topic");
+    expect(POST_TAG_NAMES).toEqual([...TAG_NAMES, "topic"]);
+  });
+  it("slugifyTopic lowercases, joins words with hyphens, trims and caps at 60", () => {
+    expect(slugifyTopic("Seller financing terms")).toBe("seller-financing-terms");
+    expect(slugifyTopic("  What's a note? (really) ")).toBe("what-s-a-note-really");
+    expect(slugifyTopic("x".repeat(100))).toHaveLength(60);
+  });
+  it("the tag schema takes a topic slug, a topic label and a topic confidence, and rejects a bad slug", () => {
+    const ok = tagBodySchema.safeParse({ posts: [{ id: uuid, topic: "mechanics-of-leverage", topic_label: "A new one", tag_confidence: { topic: 0.7 } }] });
+    expect(ok.success).toBe(true);
+    expect(tagBodySchema.safeParse({ posts: [{ id: uuid, topic: "Not A Slug" }] }).success).toBe(false);
+    expect(tagBodySchema.safeParse({ posts: [{ id: uuid, topic_label: "ab" }] }).success).toBe(false);
   });
 });

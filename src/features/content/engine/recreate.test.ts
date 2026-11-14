@@ -68,6 +68,7 @@ const source: RecreateSource = {
   hook_type: "question",
   onscreen_text: "repeats-hook",
   message: "freedom-paradox",
+  topic: "",
   cta_type: "follow",
   post_style: "talking-head-text",
   cover_face: true,
@@ -163,5 +164,13 @@ describe("shared contract", () => {
   it("canRecreate needs tagged_at", () => {
     expect(canRecreate({ tagged_at: null })).toBe(false);
     expect(canRecreate({ tagged_at: "2026-10-01T00:00:00Z" })).toBe(true);
+  });
+});
+
+describe("the review block in the recreate prompt", () => {
+  it("is carried when given and the prompt is unchanged when not", () => {
+    const block = "## From the weekly review\nPrefer these topics: Predictable income.";
+    expect(recreateSystemPrompt(block)).toContain(block);
+    expect(recreateSystemPrompt("")).toBe(recreateSystemPrompt());
   });
 });

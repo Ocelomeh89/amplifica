@@ -8,6 +8,7 @@ import {
   retiredWordHits,
   type GateFields,
   type GateResult,
+  type GateTopic,
 } from "@/features/content/engine/brand";
 import type { ToolCaller } from "./claude";
 
@@ -37,12 +38,12 @@ function withRetiredWords(r: Checked, fields: GateFields): Checked {
   };
 }
 
-async function check(caller: ToolCaller, format: string, fields: GateFields, rewrite: boolean): Promise<Checked> {
+async function check(caller: ToolCaller, format: string, fields: GateFields, rewrite: boolean, topics?: GateTopic[]): Promise<Checked> {
   const keys = Object.keys(fields);
   const raw = await caller.call({
     system: gateSystemPrompt(),
-    text: renderGateTurn({ format, fields, rewrite }),
-    tool: { name: GATE_TOOL_NAME, description: "Record the brand check of this piece.", schema: gateToolSchema(keys, rewrite) },
+    text: renderGateTurn({ format, fields, rewrite, topics }),
+    tool: { name: GATE_TOOL_NAME, description: "Record the brand check of this piece.", schema: gateToolSchema(keys, rewrite, topics?.map((t) => t.slug)) },
     maxTokens: 4000,
   });
   const parsed = gateOutputSchema(keys, rewrite).safeParse(raw);
@@ -51,6 +52,16 @@ async function check(caller: ToolCaller, format: string, fields: GateFields, rew
 }
 
 const resultOf = ({ rewrite: _rewrite, ...r }: Checked): GateResult => r;
+
+/**
+ * A passing result keeps its topic only when it is one of the offered topics under the result's pillar;
+ * otherwise null. The gate never proposes a new topic for an idea. With no topics offered the result is untouched.
+ */
+function withTopic(r: GateResult, topics?: GateTopic[]): GateResult {
+  if (!topics || topics.length === 0) return r;
+  const ok = r.pillar !== null && topics.some((t) => t.slug === r.topic && t.pillar === r.pillar);
+  return { ...r, topic: ok ? (r.topic as string) : null };
+}
 
 const textOf = (f: GateFields) => Object.values(f).map((v) => (Array.isArray(v) ? v.join("\n") : v)).join("\n");
 // A number not glued to a word ("W-2", "401(k)" and "401k" are names, not figures).
@@ -74,17 +85,17 @@ export function addedFigures(original: GateFields, rewritten: GateFields): strin
   return Array.from(new Set(figuresIn(textOf(rewritten)).filter((t) => !known.has(norm(t)))));
 }
 
-export async function gatePiece(caller: ToolCaller, piece: { format: string; fields: GateFields }, opts: { rewrite: boolean }): Promise<GateOutcome> {
+export async function gatePiece(caller: ToolCaller, piece: { format: string; fields: GateFields }, opts: { rewrite: boolean; topics?: GateTopic[] }): Promise<GateOutcome> {
   const original = piece.fields;
   try {
-    const first = await check(caller, piece.format, original, opts.rewrite);
-    if (first.verdict === "pass") return { status: "passed", fields: original, rewritten: false, result: resultOf(first), original };
+    const first = await check(caller, piece.format, original, opts.rewrite, opts.topics);
+    if (first.verdict === "pass") return { status: "passed", fields: original, rewritten: false, result: withTopic(resultOf(first), opts.topics), original };
     if (!opts.rewrite || !first.rewrite) return { status: "failed", result: resultOf(first), original };
     const rewritten = first.rewrite;
-    const second = await check(caller, piece.format, rewritten, false);
+    const second = await check(caller, piece.format, rewritten, false, opts.topics);
     // A rewrite may not invent a number: the re-check never sees the original, so this is checked here.
     const added = addedFigures(original, rewritten);
-    if (second.verdict === "pass" && added.length === 0) return { status: "passed", fields: rewritten, rewritten: true, result: resultOf(second), original };
+    if (second.verdict === "pass" && added.length === 0) return { status: "passed", fields: rewritten, rewritten: true, result: withTopic(resultOf(second), opts.topics), original };
     const result = resultOf(second);
     if (added.length === 0) return { status: "failed", result, original };
     return {
@@ -108,8 +119,8 @@ export function gateRecord(result: GateResult, rewritten: boolean, now: Date, pr
  * Checks each option once (no rewrite: they already are rewrites), in parallel, and keeps the ones
  * that pass with their result attached. A fail or a gate error drops the option.
  */
-export async function gateOptions<T>(caller: ToolCaller, options: T[], fieldsOf: (o: T) => GateFields, format: string): Promise<(T & { gate: GateResult })[]> {
-  const outcomes = await Promise.all(options.map((o) => gatePiece(caller, { format, fields: fieldsOf(o) }, { rewrite: false })));
+export async function gateOptions<T>(caller: ToolCaller, options: T[], fieldsOf: (o: T) => GateFields, format: string, topics?: GateTopic[]): Promise<(T & { gate: GateResult })[]> {
+  const outcomes = await Promise.all(options.map((o) => gatePiece(caller, { format, fields: fieldsOf(o) }, { rewrite: false, topics })));
   return options.flatMap((o, k) => {
     const r = outcomes[k];
     return r.status === "passed" ? [{ ...o, gate: r.result }] : [];
@@ -117,6 +128,6 @@ export async function gateOptions<T>(caller: ToolCaller, options: T[], fieldsOf:
 }
 
 /** The idea columns a picked, gated option writes. */
-export function gateColumns(gate: GateResult | undefined, now: Date): { gate?: GateRecord; pillar?: string } {
-  return gate ? { gate: gateRecord(gate, false, now), pillar: gate.pillar ?? undefined } : {};
+export function gateColumns(gate: GateResult | undefined, now: Date): { gate?: GateRecord; pillar?: string; topic?: string } {
+  return gate ? { gate: gateRecord(gate, false, now), pillar: gate.pillar ?? undefined, ...(gate.topic ? { topic: gate.topic } : {}) } : {};
 }

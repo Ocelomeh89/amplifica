@@ -22,7 +22,7 @@ const label = (format: string) => FORMAT_LABEL[format as Format] ?? format;
 export function renderDigest(a: { date: string; passed: { id: string; format: string; hook: string }[]; failed: number; siteUrl: string }): string {
   const lines = [`**Content ideas for ${a.date}**: ${a.passed.length} passed the brand gate`, ""];
   a.passed.forEach((p, k) => lines.push(`${k + 1}. [${label(p.format)}] ${p.hook}: ${a.siteUrl}/content/ideas/${p.id}`));
-  if (a.failed > 0) lines.push("", `${a.failed} didn't pass: ${a.siteUrl}/content/performance`);
+  if (a.failed > 0) lines.push("", `${a.failed} didn't pass: ${a.siteUrl}/content/review`);
   return lines.join("\n");
 }
 

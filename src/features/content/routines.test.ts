@@ -66,3 +66,13 @@ describe("routines/content-found.md", () => {
     expect(ingestSchema.safeParse(body).success).toBe(true);
   });
 });
+
+describe("routines/content-daily.md and the weekly review", () => {
+  const routine = readFileSync("routines/content-daily.md", "utf8");
+  it("names the review's skip and double-down lists and limits them to Reel ideas", () => {
+    expect(routine).toContain("`focus.skip`");
+    expect(routine).toContain("`focus.double_down`");
+    expect(routine).toMatch(/Reel ideas only/i);
+    expect(routine).toMatch(/without dropping any pillar/i);
+  });
+});

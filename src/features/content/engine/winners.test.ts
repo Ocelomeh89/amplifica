@@ -28,6 +28,7 @@ function mk(id: string, o: Opts = {}): { post: WinnerPost; score: PostScore } {
     hook_type: "",
     onscreen_text: "",
     message: "",
+    topic: "",
     cta_type: "",
     post_style: "",
     cover_face: null,

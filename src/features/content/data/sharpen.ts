@@ -12,6 +12,9 @@ import {
 import { NOTE_TEXT_MAX, SHARPEN_CHIPS, SHARPEN_DAILY_CAP, type SharpenStatus } from "@/features/content/engine/taste";
 import type { ToolCaller } from "./claude";
 import { gateColumns, gateOptions } from "./brand-gate";
+import type { Topic } from "./topics";
+import { EMPTY_FOCUS, reviewBlock, type ActiveFocus } from "@/features/content/engine/focus";
+import { chicagoIsoDate } from "@/features/content/engine/best-times";
 
 export const NO_BRAND_REWRITE = "None of the rewrites met the brand standard.";
 
@@ -63,6 +66,10 @@ export interface SharpenDb {
   /** Rewrites the idea only while it is still inbox or queued; false when no row matched. */
   patchIdea(id: string, patch: ReturnType<typeof sharpenIdeaPatch> & ReturnType<typeof gateColumns>): Promise<boolean>;
   activeRules(): Promise<string[]>;
+  /** The owner's topic list, for the brand gate. */
+  topics(): Promise<Topic[]>;
+  /** The review's active skip and double-down lists on a day. */
+  focus(day: string): Promise<ActiveFocus>;
 }
 
 export type SharpenStart = { ok: true; id: string; noteId: string | null } | { ok: false; error: string };
@@ -122,8 +129,10 @@ export async function runSharpen(db: SharpenDb, caller: ToolCaller, id: string):
     if (!row || row.status !== "pending") return;
     const idea = await db.idea(row.idea_id);
     if (!idea) return fail("The idea is gone.");
+    // The review's lists and the topic list: a failed read means none, never a failed sharpen.
+    const [focus, topics] = await Promise.all([db.focus(chicagoIsoDate(new Date())).catch(() => EMPTY_FOCUS), db.topics().catch(() => undefined)]);
     const raw = await caller.call({
-      system: sharpenSystemPrompt(await db.activeRules()),
+      system: sharpenSystemPrompt(await db.activeRules(), reviewBlock(focus, topics ?? [])),
       text: renderSharpenTurn({ idea, chips: row.chips, text: row.text }),
       tool: { name: SHARPEN_TOOL_NAME, description: "Record the 3 rewrites of the idea.", schema: sharpenToolSchema() },
       maxTokens: 4000,
@@ -131,7 +140,7 @@ export async function runSharpen(db: SharpenDb, caller: ToolCaller, id: string):
     const parsed = sharpenOutputSchema.safeParse(raw);
     if (!parsed.success) return fail(parsed.error.issues.map((i) => i.message).join(" "));
     // The brand gate: a rewrite that misses the standard is dropped, never shown.
-    const kept = await gateOptions(caller, parsed.data.options, sharpenGateFields, idea.format);
+    const kept = await gateOptions(caller, parsed.data.options, sharpenGateFields, idea.format, topics);
     if (kept.length === 0) return fail(NO_BRAND_REWRITE);
     await db.finish(id, { status: "ready", options: kept });
   } catch (e) {

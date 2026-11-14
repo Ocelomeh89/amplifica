@@ -9,6 +9,10 @@ import { RECENT_HOOK_DAYS } from "@/features/content/engine/recreate";
 import type { WinnerPost } from "@/features/content/engine/winners";
 import { loadPostsForMath } from "./performance";
 import { loadQueued } from "./queries";
+import { loadTopics } from "./topics";
+import { orderForToday, type ActiveFocus } from "@/features/content/engine/focus";
+import { activeFocus } from "./focus";
+import { supabaseFocusDb } from "./supabase-focus-db";
 import { supabaseCompetitorsDb } from "./supabase-competitors-db";
 import { STALE_RUN_MINUTES, type BriefView, type CompetitorCandidate, type ExperimentRow, type IdeaLite, type NewExperiment, type RunRow, type TodayDb } from "./today";
 
@@ -21,7 +25,7 @@ const LIVE = ["open", "posted", "judged", "unjudged"] as const;
 const EXP_COLUMNS =
   "id, idea_id, day, slot, kind, moment, variable, value, recipe, reason, status, post_id, judge_at, verdict, judge_metrics, judged_at, competitor_post_id, created_at";
 const RUN_COLUMNS = "id, day, kind, status, experiment_id, error, created_at";
-const IDEA_COLUMNS = "id, title, hook, pillar, hook_alt, status";
+const IDEA_COLUMNS = "id, title, hook, pillar, hook_alt, status, hook_type, topic";
 
 const toExp = (r: Record<string, unknown>): ExperimentRow => r as unknown as ExperimentRow;
 const toRun = (r: Record<string, unknown>): RunRow => r as unknown as RunRow;
@@ -32,6 +36,8 @@ const toIdea = (r: Record<string, unknown>): IdeaLite => ({
   pillar: (r.pillar ?? "") as string,
   hook_alt: (r.hook_alt ?? null) as string | null,
   status: (r.status ?? "") as string,
+  hook_type: (r.hook_type ?? "") as string,
+  topic: (r.topic ?? "") as string,
 });
 
 /**
@@ -69,6 +75,7 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
 
   const db: TodayDb & { postSources: typeof postSources } = {
     postSources,
+    topics: () => loadTopics(client, userId),
 
     async evidence(now) {
       const loaded = await loadPostsForMath(client, userId);
@@ -117,7 +124,11 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
       return (data ?? []).map((r) => toExp(r as unknown as Record<string, unknown>));
     },
 
-    async unclaimedInboxIdeas(limit) {
+    async focus(day) {
+      return activeFocus(await supabaseFocusDb(client, userId).rows(), day);
+    },
+
+    async unclaimedInboxIdeas(limit, focus: ActiveFocus) {
       // Any experiment, live or not: an expired or skipped brief stays in the Inbox but is not picked again.
       const { data: claimed, error: claimedError } = await experiments().select("idea_id").eq("user_id", userId);
       if (claimedError) throw new Error(`today claimed: ${claimedError.message}`);
@@ -131,10 +142,8 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
         .order("created_at", { ascending: false })
         .limit(100);
       if (error) throw new Error(`today inbox: ${error.message}`);
-      return (data ?? [])
-        .map((r) => toIdea(r as unknown as Record<string, unknown>))
-        .filter((i) => !taken.has(i.id))
-        .slice(0, limit);
+      const free = (data ?? []).map((r) => toIdea(r as unknown as Record<string, unknown>)).filter((i) => !taken.has(i.id));
+      return orderForToday(free, focus).slice(0, limit);
     },
 
     async idea(id) {
@@ -169,7 +178,7 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
 
     async patchIdea(id, patch) {
       const { data: before, error: readError } = await ideas()
-        .select("hook, hook_alt, hook_type, title, outline, status, score, gate, pillar")
+        .select("hook, hook_alt, hook_type, title, outline, status, score, gate, pillar, topic")
         .eq("id", id)
         .eq("user_id", userId)
         .in("status", ["inbox", "queued"])
@@ -231,7 +240,7 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
           score: idea.score,
           batch_date: idea.batch_date,
           status: "queued",
-          ...(gate ? { gate: gate as unknown as Json, pillar: gate.result.pillar ?? idea.pillar } : {}),
+          ...(gate ? { gate: gate as unknown as Json, pillar: gate.result.pillar ?? idea.pillar, topic: gate.result.topic ?? "" } : {}),
         })
         .select("id");
       if (error) throw new Error(`today moment idea: ${error.message}`);

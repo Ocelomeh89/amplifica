@@ -4,12 +4,14 @@ import {
   GATE_ITEMS,
   PILLARS,
   PILLAR_SLUGS,
+  PILLAR_TOPICS,
   VERIFIED_FIGURES,
   brandBrief,
   gateOutputSchema,
   gateSystemPrompt,
   gateToolSchema,
   pillarBalance,
+  topicLabel,
   pillarName,
   renderGateTurn,
   retiredWordHits,
@@ -95,5 +97,19 @@ describe("gateLine", () => {
     expect(gateLine(gate)).toBe("Stephen · Expensive Tuition");
     expect(gateLine(null)).toBeNull();
     expect(gateLine({ result: { verdict: "fail", reader: null, pillar: null } })).toBeNull();
+  });
+});
+
+describe("PILLAR_TOPICS", () => {
+  it("has the vault's topics under every pillar", () => {
+    for (const slug of PILLAR_SLUGS) expect(PILLAR_TOPICS[slug]).toBeDefined();
+    expect(PILLAR_SLUGS.map((s) => PILLAR_TOPICS[s].length)).toEqual([4, 3, 5, 4, 4]);
+    const slugs = PILLAR_SLUGS.flatMap((s) => PILLAR_TOPICS[s].map((t) => t.slug));
+    expect(slugs).toHaveLength(20);
+    expect(new Set(slugs).size).toBe(20);
+    for (const s of slugs) expect(s).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+    expect(topicLabel("mechanics-of-leverage")).toBe("The mechanics of leverage");
+    expect(topicLabel("unknown-slug")).toBe("unknown-slug");
+    expect(topicLabel("my-topic", [{ slug: "my-topic", label: "My topic" }])).toBe("My topic");
   });
 });

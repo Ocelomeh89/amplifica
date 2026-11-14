@@ -82,7 +82,7 @@ pillars where one fits. A format test describes the format concretely enough to 
 shots, the on-screen text and the pacing.
 `.trim();
 
-export function briefSystemPrompt(approvedRules: string[] = []): string {
+export function briefSystemPrompt(approvedRules: string[] = [], focusBlock = ""): string {
   const rules = between(IDEAS_PROMPT, "## What makes an idea good here", "## Ranking and dedupe");
   const approved = approvedRules.length > 0 ? [["## Miguel's approved rules", "If a taste rule conflicts with the brand, the brand wins.", ...approvedRules.map((r) => `- ${r}`)].join("\n")] : [];
   return [
@@ -92,6 +92,7 @@ export function briefSystemPrompt(approvedRules: string[] = []): string {
     PILLAR_MESSAGES,
     BRIEF_RULES,
     ...approved,
+    ...(focusBlock ? [focusBlock] : []),
   ].join("\n\n");
 }
 

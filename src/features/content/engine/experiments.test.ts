@@ -38,6 +38,7 @@ function post(over: Partial<WinnerPost> = {}): WinnerPost {
     hook_type: "question",
     onscreen_text: "none",
     message: "w2-advantage",
+    topic: "",
     cta_type: "save",
     post_style: "talking-head",
     cover_face: true,
