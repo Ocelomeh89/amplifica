@@ -4,6 +4,13 @@ import { valueLabel } from "@/features/content/engine/experiments";
 import {
   CARD_TOOL_NAME,
   CHECK_TOOL_NAME,
+  CONCLUSION_MAX_SENTENCES,
+  CONCLUSION_TOOL_NAME,
+  conclusionSchema,
+  conclusionSystemPrompt,
+  conclusionToolSchema,
+  renderConclusionTurn,
+  sentenceCount,
   TEST_HOOK_MAX,
   OUTLINE_MAX,
   OUTLINE_MIN,
@@ -31,7 +38,7 @@ import {
   verdictLine,
   type TestVerdict,
 } from "@/features/content/engine/test-lab-verdict";
-import { gatePiece, gateRecord, type GateRecord } from "./brand-gate";
+import { addedFigures, gatePiece, gateRecord, type GateRecord } from "./brand-gate";
 import type { ToolCaller } from "./claude";
 import { chicagoDayStart } from "./recreate";
 
@@ -108,6 +115,9 @@ export interface TestsDb {
   /** Uses an idea up: archives it when it is still `inbox` or `queued` (no post row) or, with a post, marks it posted. */
   useIdea(ideaId: string, postId: string | null): Promise<void>;
   markEffects(id: string, atIso: string): Promise<void>;
+  /** Judged tests with no conclusion yet. */
+  withoutConclusion(): Promise<TestView[]>;
+  setConclusion(id: string, text: string): Promise<void>;
   /** Closes an `open` test as skipped (the reason is Miguel's) or not run (the reason is the engine's). False unless the test is open. */
   close(id: string, status: "skipped" | "not_run", reason: string): Promise<boolean>;
 }
@@ -385,4 +395,45 @@ export async function saveNumbers(
   const judged = await db.get(a.testId);
   if (judged) await applyEffects(db, deps, a.userId, judged, now);
   return { error: null, judged: true };
+}
+
+// ---- The two-sentence conclusion ----
+
+/** Seconds a conclusion needs: one short Claude call. */
+const CONCLUSION_NEEDS_SECONDS = 45;
+
+/**
+ * Writes the two-sentence conclusion for each judged test that has none. It is analysis for Miguel, not content, so
+ * it skips the brand gate (like the review's why sentences). A conclusion is kept only with at most two sentences
+ * and no figure the numbers lack; otherwise the page keeps showing the verdict line and the next run tries again.
+ * Never throws. Returns how many were stored.
+ */
+export async function writeConclusions(db: TestsDb, caller: ToolCaller, timeLeft: () => number): Promise<number> {
+  let written = 0;
+  try {
+    const [pending, labels] = await Promise.all([db.withoutConclusion(), db.labels()]);
+    for (const t of pending) {
+      if (timeLeft() < CONCLUSION_NEEDS_SECONDS) break;
+      try {
+        const turn = renderConclusionTurn(t, (v) => labelFor(labels, t.variable ?? "", v));
+        const raw = await caller.call({
+          system: conclusionSystemPrompt(),
+          text: turn,
+          tool: { name: CONCLUSION_TOOL_NAME, description: "Record the two-sentence conclusion.", schema: conclusionToolSchema() },
+          maxTokens: 500,
+        });
+        const parsed = conclusionSchema.safeParse(raw);
+        if (!parsed.success) continue;
+        const text = parsed.data.conclusion;
+        if (sentenceCount(text) > CONCLUSION_MAX_SENTENCES || addedFigures({ turn }, { conclusion: text }).length > 0) continue;
+        await db.setConclusion(t.id, text);
+        written += 1;
+      } catch {
+        /* this one stays on its verdict line and is tried again at the next cron */
+      }
+    }
+  } catch {
+    /* nothing to write this run */
+  }
+  return written;
 }

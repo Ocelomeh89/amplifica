@@ -183,3 +183,53 @@ export function renderCheckTurn(kind: TestKind, v: { hook: string; outline: stri
   const body = [`Hook: ${v.hook}`, "Outline:", ...v.outline.map((l) => `- ${l}`)];
   return kind === "topic" ? [...body, "", `Topics: ${topics.join(", ")}`].join("\n") : [...body, "", `Hook types: ${HOOK_TYPES.join(", ")}`].join("\n");
 }
+
+// ---- The two-sentence conclusion on a judged test ----
+
+export const CONCLUSION_TOOL_NAME = "record_test_conclusion";
+export const CONCLUSION_MAX = 400;
+export const CONCLUSION_MAX_SENTENCES = 2;
+
+export const conclusionSchema = z.object({ conclusion: z.string().trim().min(1).max(CONCLUSION_MAX) });
+
+export function conclusionToolSchema(): Record<string, unknown> {
+  return {
+    type: "object",
+    properties: { conclusion: { type: "string", description: `Two sentences, under ${CONCLUSION_MAX} characters: what was tested, what won, what it suggests.` } },
+    required: ["conclusion"],
+  };
+}
+
+export function conclusionSystemPrompt(): string {
+  return [
+    "You write the short conclusion under a finished Trial Reel test for Miguel Graf. He reads it to decide what to test next.",
+    "Write two sentences: what was tested and what won, then what it suggests. Plain words, no hype, no em dashes.",
+    "Use only the numbers you are given and never add one. Do not claim more than the numbers show: when the verdict is no clear winner, say the test did not separate the two.",
+    "Saves and shares may be mentioned, but never call them the reason a version won. Views decided.",
+  ].join("\n");
+}
+
+/** What the conclusion writer needs from a judged test. */
+export type ConclusionInput = {
+  question: string;
+  variable: string | null;
+  verdict: string | null;
+  verdict_line: string;
+  versions: { label: VersionLabel; value: string; views_24h: number | null; saves_24h: number | null; shares_24h: number | null }[];
+};
+
+const n = (v: number | null) => (v === null ? "not given" : v.toLocaleString("en-US"));
+
+export function renderConclusionTurn(t: ConclusionInput, labelOf: (v: string) => string): string {
+  const lines = [`Question: ${t.question}`, ""];
+  for (const v of t.versions) {
+    lines.push(`Version ${v.label}: ${labelOf(v.value)}. First-day views ${n(v.views_24h)}, saves ${n(v.saves_24h)}, shares ${n(v.shares_24h)}.`);
+  }
+  lines.push("", `Verdict: ${t.verdict_line}`);
+  return lines.join("\n");
+}
+
+/** Sentences by terminal punctuation followed by a space or the end; a decimal point does not end one. */
+export function sentenceCount(text: string): number {
+  return text.trim().split(/(?<=[.!?])\s+/).filter((s) => s.trim() !== "").length;
+}

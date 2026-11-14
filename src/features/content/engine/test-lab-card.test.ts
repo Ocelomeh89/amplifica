@@ -4,6 +4,10 @@ import {
   POSTING_NOTE,
   POSTING_NOTE_LINK,
   cardOutputSchema,
+  conclusionSchema,
+  conclusionSystemPrompt,
+  renderConclusionTurn,
+  sentenceCount,
   cardStyleOf,
   cardSystemPrompt,
   cardToolSchema,
@@ -120,5 +124,39 @@ describe("the small helpers", () => {
     expect(versionCheckSchema("opening", []).safeParse({ hook_type: "nope" }).success).toBe(false);
     expect(versionCheckSchema("topic", ["debt", "credit"]).safeParse({ topic: "debt" }).success).toBe(true);
     expect(versionCheckSchema("topic", ["debt", "credit"]).safeParse({ topic: "taxes" }).success).toBe(false);
+  });
+});
+
+describe("the conclusion", () => {
+  const t = {
+    question: "Does Ranking beat Question?",
+    variable: "hook_type" as const,
+    verdict: "a" as const,
+    verdict_line: "Ranking won: 2,000 views against 1,100 in the first day.",
+    versions: [
+      { label: "a" as const, value: "ranking", views_24h: 2000, saves_24h: 40, shares_24h: 12 },
+      { label: "b" as const, value: "question", views_24h: 1100, saves_24h: 55, shares_24h: 3 },
+    ],
+  };
+  it("the prompt asks for two sentences and keeps saves and shares from being the reason", () => {
+    const p = conclusionSystemPrompt();
+    expect(p).toMatch(/two sentences/i);
+    expect(p).toMatch(/saves and shares/i);
+    expect(p).toMatch(/never/i);
+  });
+  it("the turn carries the question, each version's value and numbers, and the verdict", () => {
+    const turn = renderConclusionTurn(t, (v) => v.toUpperCase());
+    for (const part of ["Does Ranking beat Question?", "RANKING", "2,000", "40", "12", "QUESTION", "1,100", "55", "Ranking won"]) expect(turn).toContain(part);
+  });
+  it("conclusionSchema takes one string of at most 400 characters", () => {
+    expect(conclusionSchema.safeParse({ conclusion: "Two short sentences. Here they are." }).success).toBe(true);
+    expect(conclusionSchema.safeParse({ conclusion: "x".repeat(401) }).success).toBe(false);
+    expect(conclusionSchema.safeParse({ conclusion: "" }).success).toBe(false);
+  });
+  it("counts sentences", () => {
+    expect(sentenceCount("One. Two.")).toBe(2);
+    expect(sentenceCount("One. Two. Three.")).toBe(3);
+    expect(sentenceCount("It got 2.5x the views. That is plenty.")).toBe(2);
+    expect(sentenceCount("A single sentence")).toBe(1);
   });
 });

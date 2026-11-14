@@ -3,7 +3,8 @@ import { CARD_TOOL_NAME, CHECK_TOOL_NAME } from "@/features/content/engine/test-
 import type { ToolCaller } from "./claude";
 import { withGatePass } from "./gate.fake";
 import { NOW, fakeTestsDb, testLabInput, TOPICS, IDEAS } from "./test-lab.fake";
-import { runProposal, skipTest, startProposal } from "./test-lab";
+import { runProposal, skipTest, startProposal, writeConclusions } from "./test-lab";
+import { CONCLUSION_TOOL_NAME } from "@/features/content/engine/test-lab-card";
 
 const outline = ["Open on the number", "Say why it matters", "Give the next step"];
 const card = (hookA: string, hookB: string, over: { cardA?: string; cardB?: string; outlineB?: string[] } = {}) => ({
@@ -268,5 +269,56 @@ describe("skipTest", () => {
     expect(await skipTest(db, id, "x".repeat(201))).toEqual({ error: "Say why in a few words." });
     expect(await skipTest(db, id, "Not now")).toEqual({ error: null });
     expect(await skipTest(db, id, "Again")).toEqual({ error: "Only an open test can be skipped." });
+  });
+});
+
+describe("writeConclusions", () => {
+  const judged = (): ReturnType<typeof fakeTestsDb> => {
+    const db = ideasDb();
+    db.tests.push({
+      id: "j1", user_id: "u1", kind: "opening", variable: "hook_type", value_a: "ranking", value_b: "question", held: {}, rule: 5, question: "Does Ranking beat Question?", reason: "", why: "", notes: {},
+      status: "judged", trigger: "button", dropped: [], error: "", skip_reason: "", verdict: "a", verdict_line: "Ranking won: 2,000 views against 1,100 in the first day.", conclusion: "",
+      opened_at: NOW.toISOString(), judged_at: NOW.toISOString(), effects_at: NOW.toISOString(), closed_at: null, created_at: NOW.toISOString(), updated_at: NOW.toISOString(),
+      versions: [
+        { id: "va", user_id: "u1", test_id: "j1", label: "a", value: "ranking", idea_id: null, hook: "", card_text: "", outline: [], gate: {}, post_id: null, link: "", typed_views: 2000, typed_saves: 40, typed_shares: 12, views_24h: 2000, saves_24h: 40, shares_24h: 12, read_at: null, promote: false, created_at: "", updated_at: "" },
+        { id: "vb", user_id: "u1", test_id: "j1", label: "b", value: "question", idea_id: null, hook: "", card_text: "", outline: [], gate: {}, post_id: null, link: "", typed_views: 1100, typed_saves: 55, typed_shares: 3, views_24h: 1100, saves_24h: 55, shares_24h: 3, read_at: null, promote: false, created_at: "", updated_at: "" },
+      ],
+    });
+    return db;
+  };
+  const answering = (conclusion: unknown): ToolCaller => ({
+    async call(input) {
+      expect(input.tool.name).toBe(CONCLUSION_TOOL_NAME);
+      if (conclusion instanceof Error) throw conclusion;
+      return { conclusion };
+    },
+  });
+
+  it("stores a valid conclusion", async () => {
+    const db = judged();
+    const text = "Ranking beat Question with 2,000 views against 1,100. It suggests the hook is worth using again.";
+    expect(await writeConclusions(db, answering(text), left)).toBe(1);
+    expect((await db.get("j1"))?.conclusion).toBe(text);
+  });
+
+  it("drops a conclusion with a number the input lacks, and the verdict line stays", async () => {
+    const db = judged();
+    expect(await writeConclusions(db, answering("Ranking got 3,500 views. It suggests more of the same."), left)).toBe(0);
+    expect(await db.get("j1")).toMatchObject({ conclusion: "", verdict_line: "Ranking won: 2,000 views against 1,100 in the first day." });
+  });
+
+  it("drops a three-sentence conclusion", async () => {
+    const db = judged();
+    expect(await writeConclusions(db, answering("Ranking won. It beat Question. Do it again."), left)).toBe(0);
+    expect((await db.get("j1"))?.conclusion).toBe("");
+  });
+
+  it("stops when under 45 seconds remain, and never throws", async () => {
+    const db = judged();
+    let called = 0;
+    const counting: ToolCaller = { async call() { called += 1; return { conclusion: "x." }; } };
+    expect(await writeConclusions(db, counting, () => 44)).toBe(0);
+    expect(called).toBe(0);
+    expect(await writeConclusions(db, answering(new Error("Claude is down")), left)).toBe(0);
   });
 });

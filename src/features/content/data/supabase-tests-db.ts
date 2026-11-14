@@ -240,6 +240,17 @@ export function supabaseTestsDb(client: Client, userId: string): TestsDb {
       return { ...row, versions: (vs ?? []) as VersionRow[] } satisfies TestView;
     },
 
+    async withoutConclusion() {
+      const { data, error } = await tests().select("*").eq("user_id", userId).eq("status", "judged").eq("conclusion", "").order("judged_at");
+      fail("without conclusion", error);
+      return withVersions((data ?? []) as TestRow[]);
+    },
+
+    async setConclusion(id, text) {
+      const { error } = await tests().update({ conclusion: text }).eq("id", id).eq("user_id", userId).eq("conclusion", "");
+      fail("conclusion", error);
+    },
+
     async openTests() {
       const { data, error } = await tests().select("*").eq("user_id", userId).eq("status", "open").order("created_at");
       fail("open", error);

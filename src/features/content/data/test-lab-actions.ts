@@ -6,7 +6,7 @@ import { requireContentOwner } from "./owner";
 import { supabaseTestsDb } from "./supabase-tests-db";
 import { addTestDoubleDown } from "./focus";
 import { SKIP_REASON_MAX, saveNumbers, skipTest } from "./test-lab";
-import { startProposalInBackground } from "./test-lab-run";
+import { startConclusionsInBackground, startProposalInBackground } from "./test-lab-run";
 
 // The Tests page's actions. Each opens with the owner gate. Proposing starts a background job through the
 // admin client (inside test-lab-run.ts, a plain module); skipping goes through the user's own client, so RLS applies.
@@ -65,6 +65,7 @@ export async function saveNumbersAction(formData: FormData): Promise<TestActionR
   try {
     const r = await saveNumbers(supabaseTestsDb(supabase, user.id), { addTestDoubleDown }, { userId: user.id, ...input.data }, new Date());
     if (r.error) return { error: r.error };
+    if (r.judged) startConclusionsInBackground(user.id);
     revalidatePath("/content", "layout");
     return { error: null, judged: r.judged, message: r.judged ? "Both versions are in. The result is below." : "Saved. Add the other version's numbers when you have them." };
   } catch {

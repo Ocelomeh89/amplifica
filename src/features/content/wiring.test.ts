@@ -245,4 +245,10 @@ describe("content stays owner-only", () => {
     expect(route).toMatch(/\.\.\.report, [^}]*tests/);
     expect(read("src/features/content/data/test-lab-cron.ts")).not.toContain("anthropic");
   });
+
+  it("the conclusions are written after the digest, with a 30 second Claude timeout", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    expect(route.indexOf("writeConclusions(")).toBeGreaterThan(route.indexOf("postDigests("));
+    expect(route).toContain("timeoutMs: 30_000, maxRetries: 0");
+  });
 });

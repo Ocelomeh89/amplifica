@@ -2,7 +2,7 @@ import { waitUntil } from "@vercel/functions";
 import { createAdminClient } from "@/shared/supabase/admin";
 import { MissingApiKeyError, anthropicToolCaller } from "./claude";
 import { supabaseTestsDb } from "./supabase-tests-db";
-import { runProposal, startProposal } from "./test-lab";
+import { runProposal, startProposal, writeConclusions } from "./test-lab";
 
 // Starting a Trial Reel test proposal in the background. A plain module, not a server-action file:
 // every export of a server-action file is a callable endpoint, and this one takes a user id.
@@ -34,5 +34,17 @@ export async function startProposalInBackground(userId: string, trigger: "routin
     return { started: true, error: null, id: started.id };
   } catch {
     return { started: false, error: "Couldn't start the test. Try again." };
+  }
+}
+
+/** Writes the conclusions for judged tests that have none, after the response. A missing key or a failure writes nothing: the next cron tries again. */
+export function startConclusionsInBackground(userId: string): void {
+  try {
+    const startedAt = Date.now();
+    const caller = anthropicToolCaller({ timeoutMs: 30_000, maxRetries: 0 });
+    const db = supabaseTestsDb(createAdminClient(), userId);
+    waitUntil(writeConclusions(db, caller, () => BUDGET_SECONDS - (Date.now() - startedAt) / 1000));
+  } catch {
+    /* no key, or no client: the cron writes it */
   }
 }

@@ -57,6 +57,8 @@ describe("supabaseTestsDb", () => {
     await db.pendingEffects();
     await db.useIdea("i1", null);
     await db.markEffects("t1", NOW.toISOString());
+    await db.withoutConclusion();
+    await db.setConclusion("t1", "Two sentences.");
     // Every query chain is scoped to the owner: a user_id filter, or an insert that carries the owner.
     expect(chains.length).toBeGreaterThan(10);
     for (const chain of chains) {

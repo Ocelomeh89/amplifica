@@ -5,6 +5,7 @@ import { runMetricsCron, type CronPlatform } from "@/features/content/data/metri
 import { supabaseMetricsDb } from "@/features/content/data/supabase-db";
 import { runCompetitorCron } from "@/features/content/data/competitor-cron";
 import { runTestsCron } from "@/features/content/data/test-lab-cron";
+import { writeConclusions } from "@/features/content/data/test-lab";
 import { supabaseTestsDb } from "@/features/content/data/supabase-tests-db";
 import { addTestDoubleDown } from "@/features/content/data/focus";
 import { runGateSweep } from "@/features/content/data/gate-sweep";
@@ -196,7 +197,17 @@ export async function GET(req: Request) {
         digests = { error: (e as Error).message };
       }
     }
-    return NextResponse.json({ ...report, followers, released, tests, gate, digests, competitors, today }, { status: report.ok ? 200 : 500 });
+    // The two-sentence conclusion on a judged test: last, on the time everything else leaves. A miss is tried again tomorrow.
+    let conclusions: number | { error: string } = 0;
+    if (!only && BUDGET_SECONDS - (Date.now() - startedAt.getTime()) / 1000 >= 45) {
+      try {
+        conclusions = await writeConclusions(supabaseTestsDb(createAdminClient(), owner), anthropicToolCaller({ timeoutMs: 30_000, maxRetries: 0 }), () => BUDGET_SECONDS - (Date.now() - startedAt.getTime()) / 1000);
+      } catch (e) {
+        console.error("content test conclusions failed", e);
+        conclusions = { error: (e as Error).message };
+      }
+    }
+    return NextResponse.json({ ...report, followers, released, tests, conclusions, gate, digests, competitors, today }, { status: report.ok ? 200 : 500 });
   } catch (e) {
     console.error("content metrics cron failed", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

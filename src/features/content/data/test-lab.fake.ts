@@ -110,6 +110,13 @@ export function fakeTestsDb(seed: FakeSeed = {}) {
     async get(id) {
       return tests.find((t) => t.id === id) ?? null;
     },
+    async withoutConclusion() {
+      return tests.filter((t) => t.status === "judged" && t.conclusion === "");
+    },
+    async setConclusion(id, text) {
+      const t = tests.find((x) => x.id === id);
+      if (t) t.conclusion = text;
+    },
     async openTests() {
       return tests.filter((t) => t.status === "open");
     },
