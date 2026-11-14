@@ -297,7 +297,7 @@ export async function loadPillarBalance(db: Db, userId: string, now: Date): Prom
   const since = new Date(now.getTime() - 8 * 86_400_000).toISOString();
   const [ideas, posts] = await Promise.all([
     db.from("content_ideas").select("pillar, gate").eq("user_id", userId).in("pillar", [...PILLAR_SLUGS]).gte("updated_at", since),
-    db.from("content_posts").select("message, posted_at").eq("user_id", userId).in("message", [...PILLAR_SLUGS]).gte("posted_at", since),
+    db.from("content_posts").select("message, posted_at").eq("user_id", userId).eq("is_test", false).in("message", [...PILLAR_SLUGS]).gte("posted_at", since),
   ]);
   if (ideas.error) throw new Error(`pillar balance ideas: ${ideas.error.message}`);
   if (posts.error) throw new Error(`pillar balance posts: ${posts.error.message}`);

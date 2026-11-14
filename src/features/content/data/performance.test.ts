@@ -98,3 +98,27 @@ describe("as-of reads", () => {
     expect(a.series).toEqual([{ at: "2026-11-05T00:00:00Z", views: 100, saves: 10, shares: 2 }, { at: "2026-11-14T00:00:00Z", views: 300, saves: 30, shares: 2 }]);
   });
 });
+
+describe("loadPostsForMath and test posts", () => {
+  function eqClient() {
+    const eqs: [string, unknown][] = [];
+    const b: Record<string, unknown> = {
+      select: () => b,
+      eq: (c: string, v: unknown) => {
+        eqs.push([c, v]);
+        return b;
+      },
+      order: () => b,
+      then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(ok),
+    };
+    return { client: { from: () => b } as unknown as Parameters<typeof loadPostsForMath>[0], eqs };
+  }
+  it("loadPostsForMath leaves test posts out unless asked", async () => {
+    const dflt = eqClient();
+    await loadPostsForMath(dflt.client, "u1");
+    expect(dflt.eqs).toContainEqual(["is_test", false]);
+    const all = eqClient();
+    await loadPostsForMath(all.client, "u1", { includeTests: true });
+    expect(all.eqs.map(([c]) => c)).not.toContain("is_test");
+  });
+});

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 // Source-level guards for the content feature and its routes. They read files
 // rather than import them, so the feature does not reach into app/.
@@ -195,5 +195,26 @@ describe("content stays owner-only", () => {
       expect(exports.every((e) => /export async function \w+Action\b/.test(e)), f).toBe(true);
     }
     expect(read("src/features/content/data/taste-run.ts")).not.toContain('"use server"');
+  });
+
+  it("every direct reader of content_posts is on the list", () => {
+    // A new reader fails here until it is classified: either it goes through loadPostsForMath
+    // (which leaves Trial Reel test posts out by default) or it is not a baseline, review list or winner.
+    const dir = "src/features/content/data";
+    const readers = readdirSync(dir)
+      .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && !f.endsWith(".fake.ts"))
+      .filter((f) => read(`${dir}/${f}`).includes('from("content_posts")'))
+      .sort();
+    expect(readers).toEqual([
+      "actions.ts",
+      "mark-posted-brief.ts",
+      "performance.ts",
+      "queries.ts",
+      "supabase-db.ts",
+      "supabase-recreate-db.ts",
+      "supabase-tags-db.ts",
+      "supabase-today-db.ts",
+    ]);
+    expect(read(`${dir}/queries.ts`)).toContain('.eq("is_test", false)');
   });
 });
