@@ -82,7 +82,7 @@ export async function runTopicBackfill(
         system: SYSTEM,
         text: renderChunk(chunk, topics),
         tool: { name: TOPIC_TOOL_NAME, description: "Record the topic of each idea.", schema: toolSchema },
-        maxTokens: 2000,
+        maxTokens: 4000,
       });
       const parsed = picksSchema.parse(raw);
       const picked = new Map(parsed.picks.map((p) => [p.id, p.topic]));
