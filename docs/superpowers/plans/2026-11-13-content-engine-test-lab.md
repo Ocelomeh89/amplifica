@@ -9,7 +9,7 @@ written. Three places where the spec and the code disagree are listed under "Spe
 this plan treats the names under "Slice A makes" as existing interfaces. **Task 1 is "confirm slice A is
 merged and these names exist".** Do not start Task 3 until Task 1 passes.
 
-**Spike outcome (fill in after Task 2):** `___` (A, B or C).
+**Spike outcome (fill in after Task 2):** `C` (2026-11-14: Miguel posted a Trial Reel at about 22:25 UTC; at 22:42 UTC, 17 minutes later, it was not in `INSTAGRAM_GET_IG_USER_MEDIA`. Provisional until Miguel confirms the post exists and sends its link).
 
 **Goal:** The engine proposes one Trial Reel test at a time, tells Miguel what to record, reads the
 two posts' 24-hour numbers itself, and feeds the verdict into the evidence counts, the double-down
