@@ -8,15 +8,17 @@
 
 | Question | Answer |
 |---|---|
-| Date run, total Apify spend | not run yet |
-| Miguel's Instagram username and follower count, so the band is | |
-| Source that won (`related`, `mentions`, `keywords`, or `related` + `mentions`) | |
-| Second hop needed (yes or no) | |
-| In-band candidates found (pass bar: at least 5) | |
-| Profile actor id, and the item fields for username, followers, bio, related accounts | |
-| Do related-account entries carry a follower count (yes or no) | |
-| Search actor id and input (only if `keywords` won) | |
-| Typical run time and cost of one profile run and one 10-creator Reel run | |
+| Date run, total Apify spend | 2026-11-14. About $0.22 of the $0.50 Miguel approved (7 runs; one search run was still finishing, capped at $0.10) |
+| Miguel's Instagram username and follower count, so the band is | `amplificawealth`, 122 followers (read live with `INSTAGRAM_GET_USER_INFO`; `content_account_stats` was still empty). Band: 244 to 2,440 |
+| Source that won (`related`, `mentions`, `keywords`, or `related` + `mentions`) | `keywords`, but only on the count. `related` found nothing and `mentions` found 3 accounts, 1 in band (private). See the quality note below |
+| Second hop needed (yes or no) | no: related entries are empty, so a hop finds nothing |
+| In-band candidates found (pass bar: at least 5) | source 1: 0. Source 2: 1 (`amyalberse`, 1,913, private). Source 3, three user searches: about 20 public accounts in band before any audience filter ("financial freedom" about 9, "private lending" about 10, "cash flow investing" 1) |
+| Profile actor id, and the item fields for username, followers, bio, related accounts | `apify~instagram-profile-scraper`, input `{usernames: [...]}`. Fields `username`, `followersCount`, `followsCount`, `biography`, `fullName`, `private`, `verified`, `businessCategoryName`, `latestPosts` (12 with `mentions`, `coauthorProducers`). `relatedProfiles` is absent |
+| Do related-account entries carry a follower count (yes or no) | n/a: there are no related entries |
+| Search actor id and input (only if `keywords` won) | `apify~instagram-search-scraper`, `{search, searchType: "user", searchLimit: 30}`. Results carry `username`, `fullName`, `followersCount`, `verified`, `private`, so no sizing run is needed. A long phrase ("investing cash flow leverage") returned `no_items`; 2 to 3 word phrases work. Some rows are `{error: "not_found"}` and must be skipped |
+| Typical run time and cost of one profile run and one 10-creator Reel run | Profile run: about 8 to 15 seconds, about $0.003 per profile. Search run (30 results): 1 to 6 minutes (the Composio CLI times out at 45 s, so start with `waitForFinish: 0` and poll), about $0.01 to $0.09 depending on the phrase. Reel run (`apify~instagram-post-scraper`, 2 accounts, 12 posts each): 11 seconds, $0.027 |
+
+**Quality note (spike, 2026-11-14).** The count passes, but the candidates are name matches ("financial freedom", "private lending"), not audience matches. Step 7's sample check ran the Reel scraper on two in-band accounts: both post only images and carousels (no `videoViewCount`), so neither would ever yield a Reel for slice 6. Only `omnitheinvestorguy`, a collab owner, returned Reel items (`productType`, `videoViewCount`, `timestamp`, `caption`, `mentions`, `paidPartnership` present; `videoPlayCount` is `videoViewCount` in this actor). The audience judge (Task 5) must therefore also require recent Reels, and the discovery run needs a Reel-count check before a candidate is shown. The band is narrow because the account has 122 followers: the two creators Miguel watches have 42,056 and 174,341.
 
 **Goal:** Each week the engine finds Instagram creators Miguel does not watch, keeps the ones 2 to 20 times his size whose audience looks like Daniel or Stephen, and shows up to 3 on the Creators page for him to add or decline.
 
