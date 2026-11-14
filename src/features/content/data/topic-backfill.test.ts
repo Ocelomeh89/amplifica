@@ -88,6 +88,14 @@ describe("runTopicBackfill", () => {
     expect(c.calls).toHaveLength(3);
   });
 
+  it("gives the model room for a full chunk of 20 picks (36-character ids and long slugs)", async () => {
+    const { db } = fakeDb(TOPIC_CHUNK);
+    let max = 0;
+    const c: ToolCaller = { async call(input) { max = input.maxTokens ?? 0; return { picks: [] }; } };
+    await runTopicBackfill(db, c, { dryRun: true, limit: 100, timeLeft: forever });
+    expect(max).toBeGreaterThanOrEqual(4000);
+  });
+
   it("stops between chunks when time runs out", async () => {
     const { db } = fakeDb(60);
     const c = caller();
