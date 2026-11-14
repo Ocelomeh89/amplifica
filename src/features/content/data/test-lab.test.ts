@@ -3,7 +3,7 @@ import { CARD_TOOL_NAME, CHECK_TOOL_NAME } from "@/features/content/engine/test-
 import type { ToolCaller } from "./claude";
 import { withGatePass } from "./gate.fake";
 import { NOW, fakeTestsDb, testLabInput, TOPICS, IDEAS } from "./test-lab.fake";
-import { runProposal, startProposal } from "./test-lab";
+import { runProposal, skipTest, startProposal } from "./test-lab";
 
 const outline = ["Open on the number", "Say why it matters", "Give the next step"];
 const card = (hookA: string, hookB: string, over: { cardA?: string; cardB?: string; outlineB?: string[] } = {}) => ({
@@ -243,5 +243,30 @@ describe("startProposal", () => {
     const next = await startProposal(db, "button", NOW);
     expect(next.ok).toBe(true);
     expect(db.tests[0]).toMatchObject({ status: "failed", error: "Timed out" });
+  });
+});
+
+describe("skipTest", () => {
+  it("a skipped test frees its ideas", async () => {
+    const db = ideasDb({ hook_type: ["ranking"] });
+    const t = await run(db, script([card("Ranking hook", "Question hook")]));
+    expect(t?.status).toBe("open");
+    const held = t?.versions[0].idea_id as string;
+    expect((await db.pickerInput(NOW)).ideas.map((i) => i.id)).not.toContain(held);
+    expect(await skipTest(db, t!.id, "Not this week")).toEqual({ error: null });
+    expect(await db.get(t!.id)).toMatchObject({ status: "skipped", skip_reason: "Not this week" });
+    expect((await db.pickerInput(NOW)).ideas.map((i) => i.id)).toContain(held);
+  });
+
+  it("skip needs an open test, and a reason", async () => {
+    const db = ideasDb();
+    const started = await startProposal(db, "button", NOW);
+    const id = (started as { id: string }).id;
+    expect(await skipTest(db, id, "Not now")).toEqual({ error: "Only an open test can be skipped." });
+    await runProposal(db, script([card("A hook", "B hook")]).caller, id, NOW, left);
+    expect(await skipTest(db, id, "   ")).toEqual({ error: "Say why in a few words." });
+    expect(await skipTest(db, id, "x".repeat(201))).toEqual({ error: "Say why in a few words." });
+    expect(await skipTest(db, id, "Not now")).toEqual({ error: null });
+    expect(await skipTest(db, id, "Again")).toEqual({ error: "Only an open test can be skipped." });
   });
 });

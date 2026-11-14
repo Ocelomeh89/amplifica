@@ -133,6 +133,15 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
       const { data: claimed, error: claimedError } = await experiments().select("idea_id").eq("user_id", userId);
       if (claimedError) throw new Error(`today claimed: ${claimedError.message}`);
       const taken = new Set((claimed ?? []).map((c) => (c as { idea_id: string }).idea_id));
+      // An idea a proposing or open Trial Reel test holds stays in the Inbox, but Today leaves it alone.
+      const { data: liveTests, error: liveError } = await client.from("content_tests").select("id").eq("user_id", userId).in("status", ["proposing", "open"]);
+      if (liveError) throw new Error(`today held tests: ${liveError.message}`);
+      const liveIds = (liveTests ?? []).map((t) => (t as { id: string }).id);
+      if (liveIds.length > 0) {
+        const { data: held, error: heldError } = await client.from("content_test_versions").select("idea_id").eq("user_id", userId).in("test_id", liveIds);
+        if (heldError) throw new Error(`today held ideas: ${heldError.message}`);
+        for (const h of held ?? []) if ((h as { idea_id: string | null }).idea_id) taken.add((h as { idea_id: string }).idea_id);
+      }
       const { data, error } = await ideas()
         .select(IDEA_COLUMNS)
         .eq("user_id", userId)

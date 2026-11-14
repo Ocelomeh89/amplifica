@@ -110,6 +110,12 @@ export function fakeTestsDb(seed: FakeSeed = {}) {
     async get(id) {
       return tests.find((t) => t.id === id) ?? null;
     },
+    async close(id, status, reason) {
+      const t = tests.find((x) => x.id === id);
+      if (!t || t.status !== "open") return false;
+      Object.assign(t, status === "skipped" ? { status, skip_reason: reason, closed_at: stamp } : { status, error: reason, closed_at: stamp });
+      return true;
+    },
   };
   return db;
 }

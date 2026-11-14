@@ -78,6 +78,8 @@ export interface TestsDb {
   /** Fails the row. Only a `proposing` row changes. */
   failTest(id: string, error: string, dropped: Dropped[]): Promise<void>;
   get(id: string): Promise<TestView | null>;
+  /** Closes an `open` test as skipped (the reason is Miguel's) or not run (the reason is the engine's). False unless the test is open. */
+  close(id: string, status: "skipped" | "not_run", reason: string): Promise<boolean>;
 }
 
 const MINUTE = 60_000;
@@ -261,4 +263,13 @@ export async function runProposal(db: TestsDb, caller: ToolCaller, id: string, n
   } catch (e) {
     await fail(message(e));
   }
+}
+
+export const SKIP_REASON_MAX = 200;
+
+/** Miguel skips an open test with a few words on why; the reason goes to the card writer next time. */
+export async function skipTest(db: TestsDb, id: string, reason: string): Promise<{ error: string | null }> {
+  const text = reason.trim();
+  if (text === "" || text.length > SKIP_REASON_MAX) return { error: "Say why in a few words." };
+  return (await db.close(id, "skipped", text)) ? { error: null } : { error: "Only an open test can be skipped." };
 }

@@ -21,6 +21,7 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/review/[weekStart]/page.tsx",
       "src/app/(app)/content/ideas/[id]/page.tsx",
       "src/app/(app)/content/sources/page.tsx",
+      "src/features/content/data/test-lab-actions.ts",
       "src/features/content/data/actions.ts",
       "src/features/content/data/competitor-actions.ts",
       "src/features/content/data/sharpen-actions.ts",
@@ -45,6 +46,7 @@ describe("content stays owner-only", () => {
       "src/app/api/content/cron/metrics/route.ts",
       "src/app/api/content/voice/route.ts",
       "src/app/api/content/review/build/route.ts",
+      "src/app/api/content/tests/propose/route.ts",
     ];
     for (const f of routes) expect(read(f), f).toContain("authorizeRoutine(req, process.env.");
   });
@@ -213,8 +215,25 @@ describe("content stays owner-only", () => {
       "supabase-db.ts",
       "supabase-recreate-db.ts",
       "supabase-tags-db.ts",
+      "supabase-tests-db.ts",
       "supabase-today-db.ts",
     ]);
     expect(read(`${dir}/queries.ts`)).toContain('.eq("is_test", false)');
+  });
+
+  it("the test proposal route is a POST with a 300 second budget, and its background starter is a plain module", () => {
+    const route = read("src/app/api/content/tests/propose/route.ts");
+    expect(route).toContain("export async function POST(");
+    expect(route).not.toContain("export async function GET(");
+    expect(route).toContain("maxDuration = 300");
+    expect(route).toContain('dynamic = "force-dynamic"');
+    const run = read("src/features/content/data/test-lab-run.ts");
+    expect(run).not.toContain('"use server"');
+    expect(run).toContain("anthropicToolCaller({ timeoutMs: 60_000, maxRetries: 0 })");
+    expect(run).toContain("waitUntil(");
+    // Every export of a "use server" file is a callable endpoint: only actions may live in it.
+    const exports = read("src/features/content/data/test-lab-actions.ts").match(/^export (?:async )?(?:function|const) (\w+)/gm) ?? [];
+    expect(exports.length).toBeGreaterThan(0);
+    expect(exports.every((e) => /export async function \w+Action\b/.test(e))).toBe(true);
   });
 });

@@ -102,6 +102,21 @@ describe("supabaseTodayDb", () => {
     expect(log.some((c) => c[0] === "content_experiments.in" && c[1] === "status")).toBe(false);
   });
 
+  it("Today leaves alone an idea held by an open test", async () => {
+    const idea = (id: string) => ({ id, title: "t", hook: "h", pillar: "", hook_alt: null, status: "inbox" });
+    const { client, log } = fakeClient({
+      content_experiments: { data: [] },
+      content_tests: { data: [{ id: "t1" }] },
+      content_test_versions: { data: [{ idea_id: "i1" }, { idea_id: null }] },
+      content_ideas: { data: [idea("i1"), idea("i2")] },
+    });
+    const out = await supabaseTodayDb(client, "u1").unclaimedInboxIdeas(5, EMPTY_FOCUS);
+    expect(out.map((i) => i.id)).toEqual(["i2"]);
+    expect(log).toContainEqual(["content_tests.in", "status", ["proposing", "open"]]);
+    expect(log).toContainEqual(["content_tests.eq", "user_id", "u1"]);
+    expect(log).toContainEqual(["content_test_versions.eq", "user_id", "u1"]);
+  });
+
   it("page reports today's failed swap and moment runs, newest first, and not the make-now counters", async () => {
     const run = (id: string, kind: string, status: string) => ({ id, day: "2026-10-27", kind, status, experiment_id: null, error: "boom", created_at: "2026-10-27T15:00:00Z" });
     const { client } = fakeClient({ content_today_runs: { data: [run("a", "moment", "failed"), run("b", "makenow", "failed"), run("c", "cron", "failed"), run("d", "swap", "ready")] } });
