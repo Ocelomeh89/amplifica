@@ -99,6 +99,17 @@ describe("oneDifference", () => {
     expect(oneDifference("opening", draft("a"), draft("b", { outline: ["One", "Two", "Four"] }))).toBe(false);
     expect(oneDifference("opening", draft("a"), draft("b"))).toBe(true);
   });
+  it("an opening test whose versions also differ in the card is false", () => {
+    expect(oneDifference("opening", draft("a", { hook: "H1", card_text: "" }), draft("b", { hook: "H2", card_text: "Your paycheck is the tool" }))).toBe(false);
+    expect(oneDifference("opening", draft("a", { hook: "H1", card_text: "Same line" }), draft("b", { hook: "H2", card_text: "Other line" }))).toBe(false);
+    expect(oneDifference("opening", draft("a", { hook: "H1", card_text: "Same line" }), draft("b", { hook: "H2", card_text: "Same line" }))).toBe(true);
+    expect(oneDifference("opening", draft("a", { hook: "H1", card_text: "H1" }), draft("b", { hook: "H2", card_text: "H2" }))).toBe(true);
+    expect(oneDifference("opening", draft("a", { hook: "H1" }), draft("b", { hook: "H2" }))).toBe(true);
+  });
+  it("a topic test whose versions differ in card style is false", () => {
+    expect(oneDifference("topic", draft("a", { card_text: "" }), draft("b", { hook: "Other", card_text: "Added line" }))).toBe(false);
+    expect(oneDifference("topic", draft("a", { card_text: "Added one" }), draft("b", { hook: "Other", card_text: "Added two" }))).toBe(true);
+  });
   it("a card test whose outlines or hooks differ is false, and needs different card texts", () => {
     const base = { hook: "Same" };
     expect(oneDifference("card", draft("a", { ...base, card_text: "Same" }), draft("b", { ...base, card_text: "" }))).toBe(true);

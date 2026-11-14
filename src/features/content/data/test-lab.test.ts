@@ -168,6 +168,18 @@ describe("runProposal", () => {
     expect(t?.dropped).toHaveLength(1);
   });
 
+  it("a rewrite that alters one version's card drops an opening test", async () => {
+    const db = ideasDb({ hook_type: ["ranking"] });
+    const s = script(
+      [card("Ranking hook", "Question hook", { cardA: "Your paycheck is the tool", cardB: "Your paycheck is the tool" })],
+      (text) => (text.includes("Question hook") && !text.includes("Changed card") ? fail({ hook: "Question hook", outline, card: "Changed card" }) : undefined),
+      () => ({ hook_type: "question" })
+    );
+    const t = await run(db, s);
+    expect(t?.status).toBe("failed");
+    expect(t?.dropped).toHaveLength(1);
+  });
+
   it("an invalid card drops the question", async () => {
     const db = ideasDb({ hook_type: ["ranking", "warning"] });
     const bad = { ...card("a", "b"), why: "" };
@@ -200,6 +212,14 @@ describe("runProposal", () => {
     const db = ideasDb();
     const t = await run(db, script([card("A", "B")]), () => 60);
     expect(t).toMatchObject({ status: "failed", error: "Ran out of time. Try again." });
+  });
+
+  it("does not start a second question with 200 seconds left: a question can take about 240", async () => {
+    const db = ideasDb({ hook_type: ["ranking", "warning"] });
+    const remaining = [280, 200];
+    const t = await run(db, script([card("A hook", "B hook"), card("C hook", "D hook")], () => new Error("gate down")), () => remaining.shift() ?? 200);
+    expect(t).toMatchObject({ status: "failed", error: "Ran out of time. Try again." });
+    expect(t?.dropped).toHaveLength(1);
   });
 
   it("never throws: the caller throws on the first call and the row is failed", async () => {

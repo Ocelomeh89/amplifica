@@ -316,7 +316,8 @@ these are all the places that know it exists:
   button is capped at 3 proposals per Chicago day, every status counted, and the routine is not capped.
 - Spike outcome C (2026-11-14, provisional): Instagram's media list did not show Miguel's Trial Reel 17 minutes after posting, so
   there is no post row for a test version. Miguel types each version's views, saves and shares a day after posting
-  (`saveNumbers`), and the verdict is given the moment both views are in. A judged idea is archived, linked to no post. Nothing
+  (`saveNumbers` only stores them, and both stay correctable), and only his **Read the result** (`readResult`) judges, once both
+  views are in; the cron never judges a typed test, it only closes a stale one and retries follow-ups. A judged idea is archived, linked to no post. Nothing
   reads snapshots for a test. If Instagram lists Trial Reels, a post-picker variant adds `linkable`, `linkVersion`,
   `setVersionPost` to `TestsDb`, reads snapshots with `viewsAtOrAfter` from `readingStart` (the later post, so one cron run reads
   both versions at the same age) and flags test posts (`is_test`); the judging does not change.

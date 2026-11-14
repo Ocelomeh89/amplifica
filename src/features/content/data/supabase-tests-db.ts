@@ -10,7 +10,7 @@ import { median24h, outcomesOf, type TestStatus, type TestVariable, type TestVer
 import { activeFocus } from "./focus";
 import { loadPostsForMath } from "./performance";
 import { supabaseFocusDb } from "./supabase-focus-db";
-import { PROPOSALS_PER_DAY } from "@/features/content/engine/test-lab-verdict";
+import { PROPOSALS_PER_DAY, STALE_PROPOSING_MINUTES } from "@/features/content/engine/test-lab-verdict";
 import type { Dropped, OpenPatch, TestRow, TestsDb, TestsPage, TestView, VersionInsert, VersionRow, WriterContext } from "./test-lab";
 import { chicagoDayStart } from "./recreate";
 import { loadTopics } from "./topics";
@@ -245,7 +245,9 @@ export function supabaseTestsDb(client: Client, userId: string): TestsDb {
     async page(now): Promise<TestsPage> {
       const { data, error } = await tests().select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(60);
       fail("page", error);
-      const rows = (data ?? []) as TestRow[];
+      // A proposing row older than 10 minutes is a dead job: read it as failed, as Today does, so the button comes back.
+      const staleBefore = new Date(now.getTime() - STALE_PROPOSING_MINUTES * 60_000).toISOString();
+      const rows = ((data ?? []) as TestRow[]).map((t) => (t.status === "proposing" && t.created_at < staleBefore ? ({ ...t, status: "failed", error: "Timed out" } as TestRow) : t));
       const dayStart = chicagoDayStart(now).toISOString();
       const finished = rows.filter((t) => t.status === "judged" || t.status === "skipped" || t.status === "not_run");
       const when = (t: TestRow) => t.judged_at ?? t.closed_at ?? t.created_at;

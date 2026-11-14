@@ -137,4 +137,14 @@ describe("supabaseTestsDb", () => {
     expect(page.proposing).toBe(false);
     expect(page.proposalsLeft).toBe(2);
   });
+
+  it("a proposing row older than 10 minutes reads as failed, so the page offers the button again", async () => {
+    const row = (created_at: string) => ({ id: "p1", status: "proposing", question: "", error: "", created_at, judged_at: null, closed_at: null });
+    const stale = await supabaseTestsDb(fakeClient({ content_tests: { data: [row("2026-11-16T14:49:00Z")] } }).client, "u1").page(NOW);
+    expect(stale.proposing).toBe(false);
+    expect(stale.lastFailed).toEqual({ error: "Timed out" });
+    const fresh = await supabaseTestsDb(fakeClient({ content_tests: { data: [row("2026-11-16T14:51:00Z")] } }).client, "u1").page(NOW);
+    expect(fresh.proposing).toBe(true);
+    expect(fresh.lastFailed).toBeNull();
+  });
 });

@@ -152,10 +152,21 @@ export function cardStyleOf(hook: string, cardText: string): "none" | "repeats-h
 const same = (x: string, y: string) => norm(x) === norm(y);
 const sameOutline = (x: string[], y: string[]) => x.length === y.length && x.every((l, i) => l.trim() === y[i].trim());
 
-/** The two versions differ in exactly the one thing the test names. A topic test is two ideas, so always true. */
+/** The card style must match; an adds-to-hook card must also match word for word, since an opening test changes only the hook. */
+function sameCard(a: VersionDraft, b: VersionDraft, textMustMatch: boolean): boolean {
+  const sa = cardStyleOf(a.hook, a.card_text);
+  if (sa !== cardStyleOf(b.hook, b.card_text)) return false;
+  return !textMustMatch || sa !== "adds-to-hook" || same(a.card_text, b.card_text);
+}
+
+/**
+ * The two versions differ in exactly the one thing the test names. An opening test: same outline and the same card
+ * (style, and text when it adds to the hook), different hook. A card test: same hook and outline, different card.
+ * A topic test is two ideas, so hooks, outlines and card text differ naturally; only the card style must match.
+ */
 export function oneDifference(kind: TestKind, a: VersionDraft, b: VersionDraft): boolean {
-  if (kind === "topic") return true;
-  if (kind === "opening") return sameOutline(a.outline, b.outline) && !same(a.hook, b.hook);
+  if (kind === "topic") return sameCard(a, b, false);
+  if (kind === "opening") return sameOutline(a.outline, b.outline) && !same(a.hook, b.hook) && sameCard(a, b, true);
   return same(a.hook, b.hook) && sameOutline(a.outline, b.outline) && !same(a.card_text, b.card_text);
 }
 

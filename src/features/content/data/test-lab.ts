@@ -138,8 +138,11 @@ export interface TestsDb {
 }
 
 const MINUTE = 60_000;
-/** Seconds the flow needs to write and gate one card. */
-const NEED_SECONDS = 90;
+/**
+ * Seconds one question can take at worst: the card call 60, the gate check and its re-check 120, the type check 60.
+ * Another question is not started without that much left of the 300 second budget.
+ */
+const NEED_SECONDS = 240;
 const message = (e: unknown) => (e instanceof Error && e.message ? e.message : "Something went wrong.");
 
 export async function startProposal(
