@@ -23,6 +23,14 @@ import {
 } from "@/features/content/engine/test-lab-card";
 import { pickQuestions, type Held, type PickerInput, type Question } from "@/features/content/engine/test-lab-picker";
 import { MAX_DROPPED, PROPOSALS_PER_DAY, STALE_PROPOSING_MINUTES, type VersionLabel } from "@/features/content/engine/test-lab-verdict";
+import { chicagoIsoDate } from "@/features/content/engine/best-times";
+import {
+  DOUBLE_DOWN_MIN_WEEKS,
+  shouldPromote,
+  testVerdict,
+  verdictLine,
+  type TestVerdict,
+} from "@/features/content/engine/test-lab-verdict";
 import { gatePiece, gateRecord, type GateRecord } from "./brand-gate";
 import type { ToolCaller } from "./claude";
 import { chicagoDayStart } from "./recreate";
@@ -54,6 +62,13 @@ export type OpenPatch = {
 };
 export type VersionInsert = { label: VersionLabel; value: string; idea_id: string | null; hook: string; card_text: string; outline: string[]; gate: GateRecord };
 
+export type JudgePatch = {
+  verdict: TestVerdict;
+  verdict_line: string;
+  judged_at: string;
+  versions: { label: VersionLabel; views_24h: number; saves_24h: number | null; shares_24h: number | null; read_at: string; promote: boolean }[];
+};
+
 export type WriterContext = {
   ideas: { title: string; hook: string; topic: string }[];
   skipReasons: string[];
@@ -78,6 +93,21 @@ export interface TestsDb {
   /** Fails the row. Only a `proposing` row changes. */
   failTest(id: string, error: string, dropped: Dropped[]): Promise<void>;
   get(id: string): Promise<TestView | null>;
+  /** Open tests, each with its two versions. */
+  openTests(): Promise<TestView[]>;
+  /** Stores one version's typed numbers on an open test. False unless the test is open and has that version. */
+  saveTyped(testId: string, label: VersionLabel, n: { views: number; saves: number | null; shares: number | null; link: string }): Promise<boolean>;
+  /** The median first reading at or after 24 hours of Miguel's normal Instagram Reels in the 90-day window; null when none. */
+  median24h(now: Date): Promise<number | null>;
+  /** Topic labels by slug, for the verdict line. */
+  labels(): Promise<Record<string, string>>;
+  /** Writes the versions' readings and flips the test to `judged`. False unless the test is still open. */
+  judge(id: string, patch: JudgePatch): Promise<boolean>;
+  /** Judged tests whose follow-ups (double-down list, ideas) have not all been applied. */
+  pendingEffects(): Promise<TestView[]>;
+  /** Uses an idea up: archives it when it is still `inbox` or `queued` (no post row) or, with a post, marks it posted. */
+  useIdea(ideaId: string, postId: string | null): Promise<void>;
+  markEffects(id: string, atIso: string): Promise<void>;
   /** Closes an `open` test as skipped (the reason is Miguel's) or not run (the reason is the engine's). False unless the test is open. */
   close(id: string, status: "skipped" | "not_run", reason: string): Promise<boolean>;
 }
@@ -272,4 +302,87 @@ export async function skipTest(db: TestsDb, id: string, reason: string): Promise
   const text = reason.trim();
   if (text === "" || text.length > SKIP_REASON_MAX) return { error: "Say why in a few words." };
   return (await db.close(id, "skipped", text)) ? { error: null } : { error: "Only an open test can be skipped." };
+}
+
+// ---- Reading the result ----
+// While Instagram's media list does not show Trial Reels (spike outcome C), Miguel types each version's numbers a
+// day after posting and the verdict is given the moment both are in. A post-picker variant would read the numbers
+// from snapshots instead (`viewsAtOrAfter`, `readingStart`) and add `linkVersion`, `linkable` and `setVersionPost`
+// to TestsDb; judging below would not change.
+
+export type Effects = { addTestDoubleDown: typeof import("./focus").addTestDoubleDown };
+
+const labelFor = (labels: Record<string, string>, variable: string, value: string) => (variable === "topic" ? (labels[value] ?? topicLabel(value)) : valueLabel(value));
+
+/** Judges one open test whose two versions have views. False when it was not judged (a number missing, or the test closed meanwhile). */
+export async function judgeTest(db: TestsDb, t: TestView, now: Date): Promise<boolean> {
+  const a = t.versions.find((v) => v.label === "a");
+  const b = t.versions.find((v) => v.label === "b");
+  if (!a || !b || a.typed_views === null || b.typed_views === null || !t.variable) return false;
+  const verdict = testVerdict(a.typed_views, b.typed_views);
+  const [labels, median] = await Promise.all([db.labels(), db.median24h(now)]);
+  const at = now.toISOString();
+  const reading = (v: VersionRow) => ({
+    label: v.label,
+    views_24h: v.typed_views as number,
+    saves_24h: v.typed_saves,
+    shares_24h: v.typed_shares,
+    read_at: at,
+    promote: shouldPromote(v.typed_views as number, median),
+  });
+  return db.judge(t.id, {
+    verdict,
+    verdict_line: verdictLine({ variable: t.variable, a: { label: labelFor(labels, t.variable, a.value), views: a.typed_views }, b: { label: labelFor(labels, t.variable, b.value), views: b.typed_views }, verdict }),
+    judged_at: at,
+    versions: [reading(a), reading(b)],
+  });
+}
+
+/**
+ * The follow-ups of a verdict: a winning hook or topic goes on the double-down list (a card style or a tie writes
+ * nothing, and a loss never writes a skip), and the ideas are used up. Safe to repeat: the double-down write extends
+ * and an idea is only archived while it is still in the Inbox or queue. A failure leaves `effects_at` empty so the
+ * next run tries again. Returns whether the follow-ups were applied.
+ */
+export async function applyEffects(db: TestsDb, deps: Effects, userId: string, t: TestView, now: Date): Promise<boolean> {
+  try {
+    const winnerLabel = t.verdict === "a" ? "a" : t.verdict === "b" ? "b" : null;
+    const winner = t.versions.find((v) => v.label === winnerLabel);
+    if (winner && (t.variable === "hook_type" || t.variable === "topic")) {
+      await deps.addTestDoubleDown(userId, { dimension: t.variable, value: winner.value, day: chicagoIsoDate(now), minWeeks: DOUBLE_DOWN_MIN_WEEKS });
+    }
+    // A cut test has one idea: the winner's post carries it (version A's on no winner). A topic test links each idea to its own version.
+    const cutPost = (winner ?? t.versions.find((v) => v.label === "a"))?.post_id ?? null;
+    const used = new Set<string>();
+    for (const v of t.versions) {
+      if (!v.idea_id || used.has(v.idea_id)) continue;
+      used.add(v.idea_id);
+      await db.useIdea(v.idea_id, t.kind === "topic" ? v.post_id : cutPost);
+    }
+    await db.markEffects(t.id, now.toISOString());
+    return true;
+  } catch (e) {
+    console.error(`test follow-ups failed for ${t.id}`, e);
+    return false;
+  }
+}
+
+const wholeNumber = (n: number | null) => n === null || (Number.isInteger(n) && n >= 0);
+
+/** Stores one version's numbers and, when both versions have views, judges the test at once. */
+export async function saveNumbers(
+  db: TestsDb,
+  deps: Effects,
+  a: { userId: string; testId: string; label: VersionLabel; views: number; saves: number | null; shares: number | null; link: string },
+  now: Date
+): Promise<{ error: string | null; judged: boolean }> {
+  if (!Number.isInteger(a.views) || a.views < 0 || !wholeNumber(a.saves) || !wholeNumber(a.shares)) return { error: "Enter whole numbers, zero or more.", judged: false };
+  const link = a.link.trim().slice(0, 300);
+  if (!(await db.saveTyped(a.testId, a.label, { views: a.views, saves: a.saves, shares: a.shares, link }))) return { error: "This test is closed.", judged: false };
+  const t = await db.get(a.testId);
+  if (!t) return { error: null, judged: false };
+  if (!(await judgeTest(db, t, now))) return { error: null, judged: false };
+  const judged = await db.get(a.testId);
+  if (judged) await applyEffects(db, deps, a.userId, judged, now);
+  return { error: null, judged: true };
 }

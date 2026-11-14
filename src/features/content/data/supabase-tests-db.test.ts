@@ -49,6 +49,14 @@ describe("supabaseTestsDb", () => {
     await db.failTest("t1", "boom", []);
     await db.get("t1");
     await db.close("t1", "skipped", "reason");
+    await db.openTests();
+    await db.saveTyped("t1", "a", { views: 1, saves: null, shares: null, link: "" });
+    await db.median24h(NOW);
+    await db.labels();
+    await db.judge("t1", { verdict: "a", verdict_line: "l", judged_at: NOW.toISOString(), versions: [{ label: "a", views_24h: 1, saves_24h: null, shares_24h: null, read_at: NOW.toISOString(), promote: false }] });
+    await db.pendingEffects();
+    await db.useIdea("i1", null);
+    await db.markEffects("t1", NOW.toISOString());
     // Every query chain is scoped to the owner: a user_id filter, or an insert that carries the owner.
     expect(chains.length).toBeGreaterThan(10);
     for (const chain of chains) {
@@ -72,6 +80,18 @@ describe("supabaseTestsDb", () => {
     const conditions = log.filter((c) => c[0] === "content_tests.eq" && c[1] === "status");
     expect(conditions.length).toBeGreaterThanOrEqual(2);
     expect(conditions.every((c) => c[2] === "proposing")).toBe(true);
+  });
+
+  it("judge, saveTyped and useIdea only touch what they should", async () => {
+    const { client, log } = fakeClient({ content_tests: { data: [] } });
+    const db = supabaseTestsDb(client, "u1");
+    expect(await db.saveTyped("t1", "a", { views: 1, saves: null, shares: null, link: "" })).toBe(false);
+    expect(await db.judge("t1", { verdict: "a", verdict_line: "l", judged_at: NOW.toISOString(), versions: [] })).toBe(false);
+    await db.useIdea("i1", null);
+    expect(log).toContainEqual(["content_tests.eq", "status", "open"]);
+    expect(log).toContainEqual(["content_ideas.update", { status: "archived" }]);
+    expect(log).toContainEqual(["content_ideas.in", "status", ["inbox", "queued"]]);
+    await expect(db.useIdea("i1", "p1")).rejects.toThrow(/not built/);
   });
 
   it("close only closes an open test", async () => {

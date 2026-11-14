@@ -6,7 +6,7 @@ import { controlRecipe, evidenceCounts, outcomeOf, type EvidencePost } from "@/f
 import { evidenceWithoutSkipped, focusCounts, isSkipped, type ExtraOutcome, type FocusPost } from "@/features/content/engine/focus";
 import { RECENT_HOOK_DAYS } from "@/features/content/engine/recreate";
 import type { PastTest, PickerInput, Question } from "@/features/content/engine/test-lab-picker";
-import { outcomesOf, type TestStatus, type TestVariable, type TestVerdict } from "@/features/content/engine/test-lab-verdict";
+import { median24h, outcomesOf, type TestStatus, type TestVariable, type TestVerdict } from "@/features/content/engine/test-lab-verdict";
 import { activeFocus } from "./focus";
 import { loadPostsForMath } from "./performance";
 import { supabaseFocusDb } from "./supabase-focus-db";
@@ -60,6 +60,15 @@ export function supabaseTestsDb(client: Client, userId: string): TestsDb {
     const { data, error: e2 } = await versions().select("idea_id").eq("user_id", userId).in("test_id", ids);
     fail("held ideas", e2);
     return new Set((data ?? []).map((v) => (v as { idea_id: string | null }).idea_id).filter((x): x is string => !!x));
+  };
+
+  /** Tests with their versions, in one extra read. */
+  const withVersions = async (rows: TestRow[]): Promise<TestView[]> => {
+    if (rows.length === 0) return [];
+    const { data, error } = await versions().select("*").eq("user_id", userId).in("test_id", rows.map((r) => r.id)).order("label");
+    fail("versions", error);
+    const all = (data ?? []) as VersionRow[];
+    return rows.map((r) => ({ ...r, versions: all.filter((v) => v.test_id === r.id) }));
   };
 
   const db: TestsDb = {
@@ -229,6 +238,75 @@ export function supabaseTestsDb(client: Client, userId: string): TestsDb {
       const { data: vs, error: e2 } = await versions().select("*").eq("user_id", userId).eq("test_id", id).order("label");
       fail("get versions", e2);
       return { ...row, versions: (vs ?? []) as VersionRow[] } satisfies TestView;
+    },
+
+    async openTests() {
+      const { data, error } = await tests().select("*").eq("user_id", userId).eq("status", "open").order("created_at");
+      fail("open", error);
+      return withVersions((data ?? []) as TestRow[]);
+    },
+
+    async saveTyped(testId, label, n) {
+      const { data: open, error } = await tests().select("id").eq("user_id", userId).eq("id", testId).eq("status", "open").limit(1);
+      fail("typed check", error);
+      if ((open ?? []).length === 0) return false;
+      const { data, error: e2 } = await versions()
+        .update({ typed_views: n.views, typed_saves: n.saves, typed_shares: n.shares, link: n.link })
+        .eq("user_id", userId)
+        .eq("test_id", testId)
+        .eq("label", label)
+        .select("id");
+      fail("typed save", e2);
+      return (data ?? []).length > 0;
+    },
+
+    async median24h(now) {
+      // Normal Reels only: the default read leaves test posts out.
+      const since = now.getTime() - WINDOW_DAYS * DAY;
+      const posts = await loadPostsForMath(client, userId);
+      return median24h(posts.filter((p) => p.platform === "instagram" && p.media_type === "reel" && new Date(p.posted_at).getTime() >= since));
+    },
+
+    async labels() {
+      return Object.fromEntries((await loadTopics(client, userId)).map((t) => [t.slug, t.label]));
+    },
+
+    async judge(id, patch) {
+      for (const v of patch.versions) {
+        const { error } = await versions()
+          .update({ views_24h: v.views_24h, saves_24h: v.saves_24h, shares_24h: v.shares_24h, read_at: v.read_at, promote: v.promote })
+          .eq("user_id", userId)
+          .eq("test_id", id)
+          .eq("label", v.label);
+        fail("judge version", error);
+      }
+      const { data, error } = await tests()
+        .update({ status: "judged", verdict: patch.verdict, verdict_line: patch.verdict_line, judged_at: patch.judged_at })
+        .eq("id", id)
+        .eq("user_id", userId)
+        .eq("status", "open")
+        .select("id");
+      fail("judge", error);
+      return (data ?? []).length > 0;
+    },
+
+    async pendingEffects() {
+      const { data, error } = await tests().select("*").eq("user_id", userId).eq("status", "judged").is("effects_at", null).order("judged_at");
+      fail("pending effects", error);
+      return withVersions((data ?? []) as TestRow[]);
+    },
+
+    async useIdea(ideaId, postId) {
+      // Outcome C has no post row: the idea is used up by archiving it, and only while it is still in the Inbox or queue
+      // (an idea Miguel passed meanwhile is left as it is). Linking a post is the post-picker variant, not built.
+      if (postId !== null) throw new Error("Linking an idea to a test post is not built yet.");
+      const { error } = await client.from("content_ideas").update({ status: "archived" }).eq("id", ideaId).eq("user_id", userId).in("status", ["inbox", "queued"]);
+      fail("use idea", error);
+    },
+
+    async markEffects(id, atIso) {
+      const { error } = await tests().update({ effects_at: atIso }).eq("id", id).eq("user_id", userId);
+      fail("effects", error);
     },
 
     async close(id, status, reason) {

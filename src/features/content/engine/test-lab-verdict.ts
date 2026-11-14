@@ -66,9 +66,10 @@ export function median24h(reels: { posted_at: string; series: SeriesPoint[] }[])
 }
 
 /** Why an open test should close as "not run", or null while it is still waiting. `linked` counts versions with a post or numbers. */
-export function staleReason(t: { opened_at: string; linked: number; laterPostedAt: string | null }, now: Date): string | null {
+export function staleReason(t: { opened_at: string; linked: number; laterPostedAt: string | null }, now: Date, what: "post" | "numbers" = "post"): string | null {
   if (t.linked < 2) {
-    return now.getTime() - new Date(t.opened_at).getTime() >= NOT_RUN_DAYS * DAY ? "No post was linked within 14 days." : null;
+    const text = what === "post" ? "No post was linked within 14 days." : "No numbers were entered within 14 days.";
+    return now.getTime() - new Date(t.opened_at).getTime() >= NOT_RUN_DAYS * DAY ? text : null;
   }
   if (t.laterPostedAt && now.getTime() - new Date(t.laterPostedAt).getTime() >= NO_READING_DAYS * DAY) return "No 24-hour number arrived.";
   return null;

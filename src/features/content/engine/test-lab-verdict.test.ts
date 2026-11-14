@@ -76,6 +76,14 @@ describe("staleReason", () => {
   });
 });
 
+describe("staleReason when numbers are typed", () => {
+  it("says no numbers were entered, not that no post was linked", () => {
+    const now = new Date("2026-11-15T00:00:00Z");
+    expect(staleReason({ opened_at: "2026-11-01T00:00:00Z", linked: 1, laterPostedAt: null }, now, "numbers")).toBe("No numbers were entered within 14 days.");
+    expect(staleReason({ opened_at: "2026-11-01T00:00:00Z", linked: 1, laterPostedAt: null }, new Date("2026-11-14T00:00:00Z"), "numbers")).toBeNull();
+  });
+});
+
 describe("verdictLine", () => {
   const base = { variable: "hook_type" as const, a: { label: "Question", views: 2000 }, b: { label: "Story", views: 1100 } };
   it("names the winner and both numbers", () => {

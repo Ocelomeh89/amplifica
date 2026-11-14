@@ -236,4 +236,13 @@ describe("content stays owner-only", () => {
     expect(exports.length).toBeGreaterThan(0);
     expect(exports.every((e) => /export async function \w+Action\b/.test(e))).toBe(true);
   });
+
+  it("the Trial Reel tests' cron step runs after the pulls and before the competitor step, and makes no Claude call", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    const step = route.indexOf("runTestsCron(");
+    expect(step).toBeGreaterThan(route.indexOf("runMetricsCron("));
+    expect(step).toBeLessThan(route.indexOf("runCompetitorCron("));
+    expect(route).toMatch(/\.\.\.report, [^}]*tests/);
+    expect(read("src/features/content/data/test-lab-cron.ts")).not.toContain("anthropic");
+  });
 });

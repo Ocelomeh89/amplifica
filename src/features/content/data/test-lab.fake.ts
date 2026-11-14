@@ -41,7 +41,7 @@ export function testLabInput(over: Partial<PickerInput> = {}, zero: { hook_type?
   };
 }
 
-export type FakeSeed = { input?: PickerInput; ideas?: FakeIdea[]; tests?: TestView[] };
+export type FakeSeed = { input?: PickerInput; ideas?: FakeIdea[]; tests?: TestView[]; median?: number | null; useIdeaFails?: boolean };
 
 export function fakeTestsDb(seed: FakeSeed = {}) {
   const input = seed.input ?? testLabInput({}, { hook_type: ["ranking", "warning"] });
@@ -109,6 +109,43 @@ export function fakeTestsDb(seed: FakeSeed = {}) {
     },
     async get(id) {
       return tests.find((t) => t.id === id) ?? null;
+    },
+    async openTests() {
+      return tests.filter((t) => t.status === "open");
+    },
+    async saveTyped(testId, label, n) {
+      const t = tests.find((x) => x.id === testId);
+      if (!t || t.status !== "open") return false;
+      const v = t.versions.find((x) => x.label === label);
+      if (!v) return false;
+      Object.assign(v, { typed_views: n.views, typed_saves: n.saves, typed_shares: n.shares, link: n.link });
+      return true;
+    },
+    async median24h() {
+      return seed.median ?? null;
+    },
+    async labels() {
+      return Object.fromEntries(TOPICS.map((t) => [t.slug, t.label]));
+    },
+    async judge(id, patch) {
+      const t = tests.find((x) => x.id === id);
+      if (!t || t.status !== "open") return false;
+      for (const pv of patch.versions) Object.assign(t.versions.find((v) => v.label === pv.label) ?? {}, { views_24h: pv.views_24h, saves_24h: pv.saves_24h, shares_24h: pv.shares_24h, read_at: pv.read_at, promote: pv.promote });
+      Object.assign(t, { status: "judged", verdict: patch.verdict, verdict_line: patch.verdict_line, judged_at: patch.judged_at });
+      return true;
+    },
+    async pendingEffects() {
+      return tests.filter((t) => t.status === "judged" && t.effects_at === null);
+    },
+    async useIdea(ideaId, postId) {
+      if (seed.useIdeaFails) throw new Error("idea write failed");
+      if (postId !== null) throw new Error("Linked posts are not built yet.");
+      const i = ideas.find((x) => x.id === ideaId);
+      if (i && (i.status === "inbox" || i.status === "queued")) i.status = "archived";
+    },
+    async markEffects(id, atIso) {
+      const t = tests.find((x) => x.id === id);
+      if (t) t.effects_at = atIso;
     },
     async close(id, status, reason) {
       const t = tests.find((x) => x.id === id);
