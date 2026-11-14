@@ -14,6 +14,7 @@ import { orderForToday, type ActiveFocus } from "@/features/content/engine/focus
 import { activeFocus } from "./focus";
 import { supabaseFocusDb } from "./supabase-focus-db";
 import { supabaseCompetitorsDb } from "./supabase-competitors-db";
+import { loadJudgedOutcomes } from "./supabase-tests-db";
 import { STALE_RUN_MINUTES, type BriefView, type CompetitorCandidate, type ExperimentRow, type IdeaLite, type NewExperiment, type RunRow, type TodayDb } from "./today";
 
 type Client = SupabaseClient<Database>;
@@ -84,7 +85,8 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
       const { scores } = scorePosts(posts, now);
       const scoreMap = new Map(scores.map((s) => [s.id, s]));
       const windowStart = new Date(now.getTime() - WINDOW_DAYS * DAY);
-      const ev = evidenceCounts(posts as WinnerPost[], scoreMap, windowStart);
+      // A judged Trial Reel test counts for its variable beside the normal posts.
+      const ev = evidenceCounts(posts as WinnerPost[], scoreMap, windowStart, await loadJudgedOutcomes(client, userId, windowStart));
 
       const hookOf = (p: { hook_spoken: string; hook_onscreen: string; hook_used: string }) => p.hook_spoken || p.hook_onscreen || p.hook_used;
       const winnerHooks = posts

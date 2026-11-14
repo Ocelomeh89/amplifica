@@ -134,7 +134,8 @@ export default function ReviewPage({ review, weeks, skips, gateFailed, test, sug
         <Card title="This week's test">
           <p className="text-sm">{test.question}</p>
           {test.state === "open" && test.owes.length > 0 && <p className="text-xs text-sub mt-1">Still to do: {test.owes.join(", ")}</p>}
-          {test.state === "judged" && test.conclusion && <p className="text-sm mt-1">{test.verdict ? `${test.verdict}. ` : ""}{test.conclusion}</p>}
+          {test.state === "judged" && test.verdict && <p className="text-sm mt-1">{test.verdict}</p>}
+          {test.state === "judged" && test.conclusion && <p className="text-sm mt-1">{test.conclusion}</p>}
           <Link href={test.href} className="text-xs text-purple hover:underline">Open the test</Link>
         </Card>
       )}

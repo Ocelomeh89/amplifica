@@ -149,6 +149,16 @@ describe("supabaseTodayDb", () => {
     expect(log.filter((l) => l[0] === "content_competitor_posts.eq" && l[1] === "user_id" && l[2] === "u1").length).toBeGreaterThan(0);
   });
 
+  it("evidence counts a judged Trial Reel test: its extras reach the tally", async () => {
+    const { client, log } = fakeClient({
+      content_tests: { data: [{ variable: "onscreen_text", value_a: "none", value_b: "repeats-hook", verdict: "a", judged_at: new Date().toISOString() }] },
+    });
+    const out = await supabaseTodayDb(client, "u1").evidence(new Date());
+    expect(out.ev.onscreen_text.find((r) => r.value === "none")).toMatchObject({ won: 1, total: 1 });
+    expect(log).toContainEqual(["content_tests.eq", "user_id", "u1"]);
+    expect(log).toContainEqual(["content_tests.eq", "status", "judged"]);
+  });
+
   it("evidence marks a post whose idea has a competitor source with its angle", async () => {
     const { client } = fakeClient({
       content_ideas: { data: [{ id: "i1", source_id: "s1" }] },
