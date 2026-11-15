@@ -265,7 +265,7 @@ describe("lapsing", () => {
 import type { ToolCaller } from "./claude";
 import type { Judgment } from "@/features/content/engine/discovery-judge";
 import { addCreator } from "./competitors";
-import { addSuggestion, advanceDiscovery, declineSuggestion, judgeSampled, suggestFits } from "./discovery";
+import { addSuggestion, advanceDiscovery, buildDiscoveryPage, declineSuggestion, judgeSampled, suggestFits } from "./discovery";
 
 const CAPTIONS = ["I am 38 and behind on retirement", "Max out your 401k first", "Why the 4% rule broke for me", "A day in my W-2 life", "Quit the grind? Read this"];
 const activeSample = (base = MONDAY) =>
@@ -479,5 +479,51 @@ describe("adding and declining", () => {
     const lapsed = fakeDiscoveryDb({ creators: [waiting({ suggested_at: daysAgo(40) })], candidates: [candidate({ username: "sug", outcome: "suggested" })] });
     await lapseStale(lapsed.db, MONDAY);
     expect(await addSuggestion(lapsed.db, "cr-sug", MONDAY)).toEqual({ error: "That suggestion is gone." });
+  });
+});
+
+// ---- Task 10: the page ----
+
+describe("buildDiscoveryPage", () => {
+  const dropped = (username: string, daysOld: number, outcome: CandidateRow["outcome"] = "neither") => candidate({ username, outcome, reason: `why ${username}`, looked_at: daysAgo(daysOld) });
+  const page = (creators: ReturnType<typeof creatorRow>[], candidates: CandidateRow[], over: Partial<Parameters<typeof buildDiscoveryPage>[0]> = {}) =>
+    buildDiscoveryPage({ creators, candidates, lastCall: null, buttonCallsToday: 0, ...over });
+
+  it("a dropped candidate shows in Considered and dropped, newest first, with its reason", () => {
+    const out = page([], [dropped("older", 20), dropped("newest", 1, "out_of_band"), dropped("middle", 10, "no_room"), candidate({ username: "inflight", outcome: "sampled" })]);
+    expect(out.dropped.map((d) => d.username)).toEqual(["newest", "middle", "older"]);
+    expect(out.dropped[0]).toEqual({ username: "newest", outcome: "out_of_band", reason: "why newest", lookedAt: daysAgo(1) });
+  });
+
+  it("a dropped candidate Miguel added by hand leaves the list; the list stops at 50", () => {
+    const out = page([creatorRow({ username: "mine", status: "watching" })], [dropped("mine", 1), ...Array.from({ length: 60 }, (_, i) => dropped(`c${i}`, i + 2))]);
+    expect(out.dropped.find((d) => d.username === "mine")).toBeUndefined();
+    expect(out.dropped).toHaveLength(50);
+  });
+
+  it("a card carries the follower line, the reader, the reason, the quotes and how it was found", () => {
+    const fit = candidate({ username: "sug", outcome: "suggested", reader: "stephen", reason: "Posts name an owner with money tied up in the business.", evidence: ["line one", "line two"], followers: 48000, own_followers: 8000, found_via: "search: private lending", sample: [] });
+    const out = page([creatorRow({ username: "sug", status: "suggested", suggested_at: daysAgo(1) })], [fit]);
+    expect(out.suggestions).toEqual([
+      { creatorId: "cr-sug", username: "sug", followersLine: "48k followers, 6x yours", reader: "stephen", reason: fit.reason, evidence: ["line one", "line two"], best: [], foundVia: "search: private lending" },
+    ]);
+  });
+
+  it("best Reels appear only at 1.5x or more", () => {
+    const flat = Array.from({ length: 5 }, (_, i) => ({ shortcode: `f${i}`, url: `u${i}`, posted_at: daysAgo(i + 1), views: i === 4 ? 140 : 100, caption: "" }));
+    const topped = [...flat, { shortcode: "t", url: "https://www.instagram.com/reel/t/", posted_at: daysAgo(3), views: 420, caption: "" }];
+    const make = (sample: typeof flat) => page([creatorRow({ username: "sug", status: "suggested", suggested_at: daysAgo(1) })], [candidate({ username: "sug", outcome: "suggested", reader: "daniel", followers: 16000, own_followers: 8000, sample })]);
+    expect(make(flat).suggestions[0].best).toEqual([]);
+    expect(make(topped).suggestions[0].best).toEqual([{ url: "https://www.instagram.com/reel/t/", multiple: 4.2 }]);
+  });
+
+  it("suggestions are oldest first; the button count, the last note and the left-today number come through", () => {
+    const creators = [creatorRow({ username: "b", status: "suggested", suggested_at: daysAgo(1) }), creatorRow({ username: "a", status: "suggested", suggested_at: daysAgo(5) })];
+    const cands = ["a", "b"].map((u) => candidate({ username: u, outcome: "suggested", reader: "daniel", followers: 16000, own_followers: 8000 }));
+    const out = page(creators, cands, { lastCall: { note: "Looked at 14 accounts, suggested 2.", at: daysAgo(0) }, buttonCallsToday: 2 });
+    expect(out.suggestions.map((s) => s.username)).toEqual(["a", "b"]);
+    expect(out.lastNote).toEqual({ note: "Looked at 14 accounts, suggested 2.", at: daysAgo(0) });
+    expect(out.findLeftToday).toBe(1);
+    expect(page([], [], { buttonCallsToday: 5 }).findLeftToday).toBe(0);
   });
 });

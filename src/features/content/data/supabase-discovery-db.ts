@@ -1,7 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/shared/supabase/database.types";
 import type { CandidateOutcome } from "@/features/content/engine/discovery";
-import type { CandidateRow, DiscoveryDb, DiscoveryRunRow } from "./discovery";
+import { DROPPED_OUTCOMES } from "@/features/content/engine/discovery";
+import { buildDiscoveryPage, type CandidateRow, type DiscoveryDb, type DiscoveryPage, type DiscoveryRunRow } from "./discovery";
+import { chicagoDayStart } from "./recreate";
 
 type Client = SupabaseClient<Database>;
 
@@ -28,7 +30,7 @@ const CANDIDATE_DEFAULTS = {
  * bypasses RLS, so this filter is what keeps them to Miguel's rows. `decide`, `lapse` and
  * `setCandidate` are conditional writes: they report false when the row moved first.
  */
-export function supabaseDiscoveryDb(client: Client, userId: string): DiscoveryDb {
+export function supabaseDiscoveryDb(client: Client, userId: string): DiscoveryDb & { discoveryPage(now: Date): Promise<DiscoveryPage> } {
   const creators = () => client.from("content_creators");
   const candidates = () => client.from("content_creator_candidates");
   const runs = () => client.from("content_discovery_runs");
@@ -38,7 +40,7 @@ export function supabaseDiscoveryDb(client: Client, userId: string): DiscoveryDb
   };
   const asCandidates = (rows: unknown): CandidateRow[] => ((rows ?? []) as Record<string, unknown>[]).map((r) => ({ ...r, sample: (r.sample ?? []) as CandidateRow["sample"], evidence: (r.evidence ?? []) as string[] }) as CandidateRow);
 
-  const db: DiscoveryDb = {
+  const db: DiscoveryDb & { discoveryPage(now: Date): Promise<DiscoveryPage> } = {
     async creators() {
       const { data, error } = await creators().select(CREATOR_COLUMNS).eq("user_id", userId).order("username");
       fail("creators", error);
@@ -156,6 +158,18 @@ export function supabaseDiscoveryDb(client: Client, userId: string): DiscoveryDb
       const { data, error } = await calls().select("id").eq("user_id", userId).eq("trigger", trigger).gte("created_at", since);
       fail("calls since", error);
       return (data ?? []).length;
+    },
+
+    async discoveryPage(now) {
+      const [creatorRows, candidateRows, buttonCalls, last] = await Promise.all([
+        db.creators(),
+        db.candidates(["suggested", ...DROPPED_OUTCOMES]),
+        db.callsSince("button", chicagoDayStart(now).toISOString()),
+        calls().select("note, created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(1),
+      ]);
+      fail("last call", last.error);
+      const row = ((last.data ?? [])[0] as { note: string; created_at: string } | undefined) ?? null;
+      return buildDiscoveryPage({ creators: creatorRows, candidates: candidateRows, lastCall: row ? { note: row.note, at: row.created_at } : null, buttonCallsToday: buttonCalls });
     },
   };
   return db;

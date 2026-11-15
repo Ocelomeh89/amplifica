@@ -26,6 +26,9 @@ import type { CreatorRow } from "./competitors";
 import {
   ACTIVE_WINDOW_DAYS,
   DECLINE_REASONS_IN_PROMPT,
+  DROPPED_OUTCOMES,
+  FIND_NOW_DAILY_CAP,
+  bestReels,
   JUDGE_MAX_ATTEMPTS,
   isActive,
   popularCount,
@@ -450,4 +453,66 @@ export async function declineSuggestion(db: DiscoveryDb, creatorId: string, reas
   const why = reason.trim().slice(0, 200);
   if (why === "") return { error: "Say why, so later suggestions improve." };
   return (await db.decide(creatorId, "declined", why, now.toISOString())) ? { error: null } : { error: "That suggestion is gone." };
+}
+
+// ---- The Creators page ----
+
+export type SuggestionCard = {
+  creatorId: string;
+  username: string;
+  followersLine: string;
+  reader: "daniel" | "stephen";
+  reason: string;
+  evidence: string[];
+  best: { url: string; multiple: number }[];
+  foundVia: string;
+};
+export type DroppedRow = { username: string; outcome: CandidateOutcome; reason: string; lookedAt: string };
+export type DiscoveryPage = {
+  suggestions: SuggestionCard[];
+  dropped: DroppedRow[];
+  lastNote: { note: string; at: string } | null;
+  findLeftToday: number;
+};
+
+const DROPPED_SHOWN = 50;
+
+/**
+ * One card per waiting suggestion (oldest first), joined to its candidate by username, and the
+ * accounts looked at and set aside, newest first. An account Miguel has since added by hand is
+ * a creator, so it leaves the dropped list.
+ */
+export function buildDiscoveryPage(a: {
+  creators: (CreatorRow & { suggested_at: string | null })[];
+  candidates: CandidateRow[];
+  lastCall: { note: string; at: string } | null;
+  buttonCallsToday: number;
+}): DiscoveryPage {
+  const byName = new Map(a.candidates.map((c) => [c.username, c]));
+  const known = new Set(a.creators.map((c) => c.username));
+  const suggestions = a.creators
+    .filter((c) => c.status === "suggested")
+    .sort((x, y) => (x.suggested_at ?? "").localeCompare(y.suggested_at ?? ""))
+    .flatMap((c): SuggestionCard[] => {
+      const cand = byName.get(c.username);
+      if (!cand || (cand.reader !== "daniel" && cand.reader !== "stephen")) return [];
+      return [
+        {
+          creatorId: c.id,
+          username: c.username,
+          followersLine: cand.followers !== null && cand.own_followers !== null ? followersLine(cand.followers, cand.own_followers) : "",
+          reader: cand.reader,
+          reason: cand.reason,
+          evidence: cand.evidence,
+          best: bestReels(cand.sample),
+          foundVia: cand.found_via,
+        },
+      ];
+    });
+  const dropped = a.candidates
+    .filter((c) => DROPPED_OUTCOMES.includes(c.outcome) && !known.has(c.username))
+    .sort((x, y) => y.looked_at.localeCompare(x.looked_at))
+    .slice(0, DROPPED_SHOWN)
+    .map((c) => ({ username: c.username, outcome: c.outcome, reason: c.reason, lookedAt: c.looked_at }));
+  return { suggestions, dropped, lastNote: a.lastCall, findLeftToday: Math.max(0, FIND_NOW_DAILY_CAP - a.buttonCallsToday) };
 }
