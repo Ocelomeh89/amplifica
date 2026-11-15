@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/shared/supabase/database.types";
 import { evidenceCounts } from "@/features/content/engine/experiments";
 import { focusCounts } from "@/features/content/engine/focus";
-import { loadExtraOutcomes, loadSuggestionsSection, loadTestSection, testSectionFor } from "./review-sections";
+import { loadExtraOutcomes, loadSuggestionsSection, loadTestSection, suggestionsSectionFor, testSectionFor } from "./review-sections";
 import { loadJudgedOutcomes } from "./supabase-tests-db";
 
 vi.mock("server-only", () => ({}));
@@ -124,11 +124,24 @@ describe("the review's test section", () => {
   });
 });
 
-describe("the seam that is still empty", () => {
-  it("the creator suggestions loader returns nothing until slice C", async () => {
-    expect(await loadSuggestionsSection("u1")).toBeNull();
+describe("the creator suggestions section", () => {
+  const creator = (over: Row = {}): Row => ({ user_id: "u1", username: "a", status: "suggested", ...over });
+
+  it("shows the number waiting and links to the Creators page; nothing when none wait", async () => {
+    const two = fakeClient({ content_creators: [creator(), creator({ username: "b" }), creator({ username: "c", status: "declined" }), creator({ username: "d", status: "watching" })] });
+    expect(await suggestionsSectionFor(two, "u1")).toEqual({ waiting: 2, href: "/content/creators" });
+    expect(await suggestionsSectionFor(fakeClient({ content_creators: [creator({ status: "declined" }), creator({ status: "watching" })] }), "u1")).toBeNull();
+    expect(await suggestionsSectionFor(fakeClient({ content_creators: [] }), "u1")).toBeNull();
   });
-  it("the loaders exist with their shared-names signatures", () => {
+
+  it("never counts another owner's suggestions", async () => {
+    expect(await suggestionsSectionFor(fakeClient({ content_creators: [creator({ user_id: "someone-else" })] }), "u1")).toBeNull();
+  });
+});
+
+describe("the loaders", () => {
+  it("exist with their shared-names signatures", () => {
+    expect(loadSuggestionsSection.length).toBe(1);
     expect(loadExtraOutcomes.length).toBe(2);
     expect(loadTestSection.length).toBe(2);
   });
