@@ -32,6 +32,8 @@ export async function runDiscovery(userId: string, a: { trigger: "routine" | "bu
       force: a.force,
       own: await loadFollowerCount(userId),
       trigger: a.trigger,
+      // The button's click was logged before this started (that is what the daily limit counts); its result is logged as a routine call.
+      logAs: a.trigger === "button" ? "routine" : a.trigger,
       timeLeft: () => BUDGET_SECONDS - (Date.now() - a.startedAt.getTime()) / 1000,
     });
     return keyNote ? { ...report, note: report.note + keyNote } : report;

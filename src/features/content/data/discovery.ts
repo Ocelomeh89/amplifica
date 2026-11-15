@@ -106,6 +106,8 @@ export type OwnCount = { followers: number; day: string } | null;
 
 const HOUR = 3_600_000;
 const message = (e: unknown) => (e instanceof Error && e.message ? e.message : "Something went wrong.");
+/** A claimed run row with no Apify id older than this never started. */
+const UNSTARTED_MINUTES = 15;
 export const OWN_UNKNOWN_NOTE = "Discovery did not run: your follower count could not be read.";
 export const WAITING_NOTE = "Three suggestions are waiting, so nothing was searched.";
 
@@ -145,18 +147,23 @@ type CollectOut = { collected: number; failed: number; errors: string[]; note: s
 export async function collectDiscoveryRuns(db: DiscoveryDb, apify: ApifyClient, a: { now: Date; own: OwnCount }): Promise<CollectOut> {
   const out: CollectOut = { collected: 0, failed: 0, errors: [], note: null };
   const runs = await db.pendingRuns();
-  if (runs.length === 0) return out;
   const at = a.now.toISOString();
   const failRun = async (r: DiscoveryRunRow, error: string) => {
     await db.updateRun(r.id, { status: "failed", error, finished_at: at });
     out.failed += 1;
   };
   let sizeRead = false;
+  const staleRun = (r: DiscoveryRunRow) => a.now.getTime() - new Date(r.started_at).getTime() > RUN_STALE_HOURS * HOUR;
   for (const r of runs) {
     try {
+      if (!r.apify_run_id) {
+        // Claimed, but Apify was never started (the process died between the insert and the call).
+        if (a.now.getTime() - new Date(r.started_at).getTime() > UNSTARTED_MINUTES * 60_000) await failRun(r, "never started");
+        continue;
+      }
       const state = await apify.getRun(r.apify_run_id);
       if (state.status === "pending") {
-        if (a.now.getTime() - new Date(r.started_at).getTime() > RUN_STALE_HOURS * HOUR) await failRun(r, "timed out");
+        if (staleRun(r)) await failRun(r, "timed out");
         continue;
       }
       if (state.status === "failed") {
@@ -177,14 +184,15 @@ export async function collectDiscoveryRuns(db: DiscoveryDb, apify: ApifyClient, 
       await db.updateRun(r.id, { status: "ready", finished_at: at, items: items.length, cost_usd: state.costUsd, ...(ownRead !== null ? { own_followers: ownRead } : {}) });
       out.collected += 1;
     } catch (e) {
-      // Left pending: the next call tries again, and the 48-hour rule ends it.
       console.error("content discovery run", r.apify_run_id, message(e));
-      out.errors.push(`run ${r.apify_run_id}: ${message(e)}`);
+      // Left pending for the next call, unless it has been unreadable for 48 hours: then it fails and stops blocking the week.
+      if (staleRun(r)) await failRun(r, `timed out (${message(e)})`).catch(() => undefined);
+      else out.errors.push(`run ${r.apify_run_id}: ${message(e)}`);
     }
   }
   const week = await db.runsForWeek(weekStartOf(a.now));
   const own = ownFollowers(a.own, week, a.now);
-  const attempted = sizeRead || week.some((r) => r.kind === "size" && r.status !== "pending");
+  const attempted = sizeRead || week.some((r) => r.kind === "size" && r.status === "ready");
   if (own === null) {
     if (attempted && (await db.candidates(["gathered"])).length > 0) out.note = OWN_UNKNOWN_NOTE;
   } else {
@@ -220,8 +228,8 @@ async function collectSize(db: DiscoveryDb, items: unknown[], usernames: string[
   for (const c of await db.candidatesByUsername(usernames.filter((u) => u !== OWN_INSTAGRAM_USERNAME))) {
     const p = profiles.get(c.username);
     if (!p) continue;
-    if (p.isPrivate) await db.setCandidate(c.id, "gathered", { outcome: "unreadable", reason: "Private account", followers: p.followers, bio: p.bio }, at);
-    else await db.setCandidate(c.id, "gathered", { followers: p.followers, bio: p.bio }, at);
+    if (p.isPrivate) await db.setCandidate(c.id, c.outcome, { outcome: "unreadable", reason: "Private account", followers: p.followers, bio: p.bio }, at);
+    else await db.setCandidate(c.id, c.outcome, { followers: p.followers, bio: p.bio }, at);
   }
   return mine;
 }
@@ -254,31 +262,54 @@ export async function startNextRun(db: DiscoveryDb, apify: ApifyClient, a: { now
     const own = ownFollowers(a.own, week, a.now);
     const gathered = await db.candidates(["gathered"]);
     const sizedRows = await db.candidates(["sized"]);
-    const isMonday = chicagoIsoDate(a.now) === weekStart;
-    const kind = nextRunKind({ gathered: gathered.length, sized: sizedRows.length, ranThisWeek: week.map((r) => r.kind), hops: DISCOVERY_HOPS, canGather: a.force || isMonday });
+    const canGather = a.force || chicagoIsoDate(a.now) === weekStart;
+    const plan = { gathered: gathered.length, sized: sizedRows.length, ranThisWeek: week.map((r) => r.kind), hops: DISCOVERY_HOPS, canGather };
+    const ownName = own === null ? [OWN_INSTAGRAM_USERNAME] : [];
+    let kind = nextRunKind(plan);
+    let profiles: string[] = [];
+    if (kind === "size") {
+      profiles = [...ownName, ...gathered.filter((c) => c.followers === null).map((c) => c.username).slice(0, SIZE_MAX_PROFILES - 1)];
+      // Nobody to read (every gathered row has its count and Miguel's is known): sizing needs no run, so go on.
+      if (profiles.length === 0) kind = nextRunKind({ ...plan, gathered: 0 });
+    }
+    const toSample = [...sizedRows].sort((x, y) => (x.followers ?? 0) - (y.followers ?? 0)).slice(0, SAMPLE_MAX_CANDIDATES);
+    if (kind === "sample") {
+      // The judge reads the bio, and a search row has none: profile the accounts about to be sampled first, once.
+      const profiled = new Set(week.filter((r) => r.kind === "size").flatMap((r) => r.usernames));
+      const bioless = toSample.filter((c) => c.bio === "" && !profiled.has(c.username)).map((c) => c.username);
+      if (bioless.length > 0) {
+        kind = "size";
+        profiles = [...ownName, ...bioless];
+      }
+    }
     if (!kind) return { started: null, note: null };
-    const base = { week_start: weekStart, status: "pending" as const, items: null, started_at: a.now.toISOString() };
+    const at = a.now.toISOString();
+    const base = { week_start: weekStart, status: "pending" as const, items: null, started_at: at };
+    // A run is claimed by inserting its row before Apify is called, under a unique index: of two racing starts, the second
+    // fails here and starts nothing. A start that fails after claiming marks its row failed with no cap to count.
+    const launch = async (k: DiscoveryRunKind, actorId: string, body: Record<string, unknown>, usernames: string[], cap: number) => {
+      const id = await db.insertRun({ ...base, kind: k, apify_run_id: "", usernames, cap_usd: cap });
+      try {
+        const { runId } = await apify.startActor({ actorId, body, maxTotalChargeUsd: cap });
+        await db.updateRun(id, { apify_run_id: runId });
+      } catch (e) {
+        await db.updateRun(id, { status: "failed", error: message(e), finished_at: at, cap_usd: 0 }).catch(() => undefined);
+        throw e;
+      }
+    };
 
     if (kind === "gather") {
       const n = Math.min(SEARCH_PHRASES.length, Math.floor(left / DISCOVERY_MIN_RUN_USD));
       const cap = Math.floor((left / n) * 100) / 100;
-      for (const phrase of SEARCH_PHRASES.slice(0, n)) {
-        const { runId } = await apify.startActor({ actorId: SEARCH_ACTOR, body: searchInput(phrase), maxTotalChargeUsd: cap });
-        await db.insertRun({ ...base, kind, apify_run_id: runId, usernames: [phrase], cap_usd: cap });
-      }
+      for (const phrase of SEARCH_PHRASES.slice(0, n)) await launch(kind, SEARCH_ACTOR, searchInput(phrase), [phrase], cap);
       return { started: kind, note: null };
     }
     if (kind === "size") {
-      const names = gathered.filter((c) => c.followers === null).map((c) => c.username).slice(0, SIZE_MAX_PROFILES - 1);
-      const usernames = own === null ? [OWN_INSTAGRAM_USERNAME, ...names] : names;
-      if (usernames.length === 0) return { started: null, note: null };
-      const { runId } = await apify.startActor({ actorId: PROFILE_ACTOR, body: profilesInput(usernames), maxTotalChargeUsd: left });
-      await db.insertRun({ ...base, kind, apify_run_id: runId, usernames, cap_usd: left });
+      await launch(kind, PROFILE_ACTOR, profilesInput(profiles), profiles, left);
       return { started: kind, note: null };
     }
-    const usernames = [...sizedRows].sort((x, y) => (x.followers ?? 0) - (y.followers ?? 0)).slice(0, SAMPLE_MAX_CANDIDATES).map((c) => c.username);
-    const { runId } = await apify.startActor({ actorId: APIFY_ACTOR, body: reelsInput(usernames), maxTotalChargeUsd: left });
-    await db.insertRun({ ...base, kind, apify_run_id: runId, usernames, cap_usd: left });
+    const usernames = toSample.map((c) => c.username);
+    await launch(kind, APIFY_ACTOR, reelsInput(usernames), usernames, left);
     return { started: kind, note: null };
   } catch (e) {
     console.error("content discovery start", message(e));
@@ -324,6 +355,7 @@ export async function judgeSampled(db: DiscoveryDb, caller: ToolCaller, a: { now
     }
     const captions = c.sample.map((r) => r.caption);
     let answer: ReturnType<typeof judgeSchema.safeParse> | null = null;
+    let threw = false;
     try {
       const raw = await caller.call({
         system: judgeSystemPrompt(),
@@ -334,7 +366,10 @@ export async function judgeSampled(db: DiscoveryDb, caller: ToolCaller, a: { now
       answer = judgeSchema.safeParse(raw);
     } catch (e) {
       console.error("content discovery judge", c.username, message(e));
+      threw = true;
     }
+    // An outage or a bad key is not the candidate's fault: leave it as it was and stop for this call.
+    if (threw) break;
     if (!answer || !answer.success || !quotesAreReal(answer.data.evidence, captions)) {
       const attempts = c.attempts + 1;
       if (attempts >= JUDGE_MAX_ATTEMPTS) {
@@ -404,7 +439,7 @@ export async function advanceDiscovery(
   db: DiscoveryDb,
   apify: ApifyClient,
   caller: ToolCaller | null,
-  a: { now: Date; force: boolean; own: OwnCount; trigger: "cron" | "routine" | "button"; timeLeft: () => number },
+  a: { now: Date; force: boolean; own: OwnCount; trigger: "cron" | "routine" | "button"; timeLeft: () => number; /** The trigger to log the result under; null logs nothing (the button logged its click). */ logAs?: "cron" | "routine" | "button" | null },
 ): Promise<DiscoveryReport> {
   const report: DiscoveryReport = { stage: "idle", started: null, judged: 0, suggested: 0, dropped: 0, note: "" };
   try {
@@ -437,7 +472,8 @@ export async function advanceDiscovery(
     report.note = `Discovery stopped: ${message(e)}`;
   }
   try {
-    await db.logCall(a.trigger, report.note, a.now.toISOString());
+    const logAs = a.logAs === undefined ? a.trigger : a.logAs;
+    if (logAs) await db.logCall(logAs, report.note, a.now.toISOString());
   } catch (e) {
     console.error("content discovery log", message(e));
   }

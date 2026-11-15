@@ -68,6 +68,8 @@ create table public.content_discovery_runs (
   updated_at timestamptz not null default now()
 );
 create index content_discovery_runs_user_week_idx on public.content_discovery_runs(user_id, week_start);
+-- A run is claimed by inserting its row before Apify is called: of two racing starts of the same run, the second fails here.
+create unique index content_discovery_runs_claim_idx on public.content_discovery_runs(user_id, week_start, kind, usernames);
 
 create trigger content_discovery_runs_touch_updated_at
   before update on public.content_discovery_runs

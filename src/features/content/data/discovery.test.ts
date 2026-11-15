@@ -39,7 +39,7 @@ const reelItem = (owner: string, n: number, base = MONDAY) => ({
   timestamp: daysAgo(n + 1, base),
   caption: `caption ${n}`,
 });
-const sized = (username: string, followers: number): CandidateRow => candidate({ username, outcome: "sized", followers, own_followers: 8000 });
+const sized = (username: string, followers: number): CandidateRow => candidate({ username, outcome: "sized", followers, own_followers: 8000, bio: "a bio" });
 
 describe("collecting discovery runs", () => {
   it("a candidate at 1.5x or 25x is dropped with its reason; 2x and 20x pass size", async () => {
@@ -366,12 +366,19 @@ describe("judging sampled candidates", () => {
     expect(state.candidates[0]).toMatchObject({ outcome: "unreadable", reason: "The judge gave no usable answer" });
   });
 
-  it("a thrown call or an invalid answer counts as an attempt too", async () => {
+  it("an invalid answer counts as an attempt", async () => {
     const { db, state } = fakeDiscoveryDb({ candidates: [sampledRow("a"), sampledRow("b", 17000)] });
-    let n = 0;
-    const { caller } = callerOf(() => (++n === 1 ? new Error("overloaded") : { nonsense: true }));
-    await judgeSampled(db, caller, now);
+    await judgeSampled(db, callerOf({ nonsense: true }).caller, now);
     expect(state.candidates.map((c) => c.attempts)).toEqual([1, 1]);
+  });
+
+  it("a thrown Claude call (an outage, a bad key) costs no attempt and stops judging for this call", async () => {
+    const { db, state } = fakeDiscoveryDb({ candidates: [sampledRow("a"), sampledRow("b", 17000)] });
+    const { caller, call } = callerOf(new Error("overloaded"));
+    await judgeSampled(db, caller, now);
+    await judgeSampled(db, caller, now);
+    expect(call).toHaveBeenCalledTimes(2);
+    expect(state.candidates.map((c) => [c.outcome, c.attempts])).toEqual([["sampled", 0], ["sampled", 0]]);
   });
 
   it("judging stops when time runs short and resumes on the next call", async () => {
@@ -525,5 +532,84 @@ describe("buildDiscoveryPage", () => {
     expect(out.lastNote).toEqual({ note: "Looked at 14 accounts, suggested 2.", at: daysAgo(0) });
     expect(out.findLeftToday).toBe(1);
     expect(page([], [], { buttonCallsToday: 5 }).findLeftToday).toBe(0);
+  });
+});
+
+// ---- Review fixes ----
+
+describe("review fixes", () => {
+  it("two starts racing for the same run start it once", async () => {
+    const { db, state } = fakeDiscoveryDb();
+    const f = fakeApify();
+    const [a, b] = await Promise.all([startNextRun(db, f.apify, { now: MONDAY, force: false, own: OWN }), startNextRun(db, f.apify, { now: MONDAY, force: false, own: OWN })]);
+    expect(f.actors).toHaveLength(3);
+    expect(state.runs).toHaveLength(3);
+    expect([a.started, b.started].filter(Boolean)).toEqual(["gather"]);
+    expect(state.runs.every((r) => r.apify_run_id !== "")).toBe(true);
+  });
+
+  it("a start that fails after claiming its row marks the row failed", async () => {
+    const { db, state } = fakeDiscoveryDb();
+    const apify = { ...fakeApify().apify, startActor: async () => { throw new Error("quota"); } };
+    await startNextRun(db, apify, { now: MONDAY, force: false, own: OWN });
+    expect(state.runs.every((r) => r.status === "failed" && /quota/.test(r.error))).toBe(true);
+  });
+
+  it("a claimed run that never got an Apify id is failed after 15 minutes, not read", async () => {
+    const { db, state } = fakeDiscoveryDb({ runs: [run({ apify_run_id: "" })] });
+    const out = await collectDiscoveryRuns(db, fakeApify().apify, { now: new Date(MONDAY.getTime() + 16 * 60_000), own: OWN });
+    expect(state.runs[0]).toMatchObject({ status: "failed", error: "never started" });
+    expect(out.errors).toEqual([]);
+  });
+
+  it("gathered rows are sized as soon as Miguel's count is known, even when no run is pending", async () => {
+    const { db, state } = fakeDiscoveryDb({ candidates: [candidate({ username: "x", outcome: "gathered", followers: 16000 }), candidate({ username: "y", outcome: "gathered", followers: 900000 })] });
+    await collectDiscoveryRuns(db, fakeApify().apify, { now: MONDAY, own: OWN });
+    expect(state.candidates.map((c) => c.outcome)).toEqual(["sized", "out_of_band"]);
+  });
+
+  it("a size run with nobody to read falls through to the next run instead of blocking", async () => {
+    const { db } = fakeDiscoveryDb({ candidates: [candidate({ username: "x", outcome: "gathered", followers: 16000 })] });
+    const f = fakeApify();
+    const out = await startNextRun(db, f.apify, { now: MONDAY, force: false, own: OWN });
+    expect(out.started).toBe("gather");
+  });
+
+  it("a run that keeps failing to read is failed after 48 hours", async () => {
+    const { db, state } = fakeDiscoveryDb({ runs: [run({ kind: "sample", usernames: ["keep"] })], candidates: [sized("keep", 16000)] });
+    const later = new Date(MONDAY.getTime() + 49 * 3_600_000);
+    await collectDiscoveryRuns(db, fakeApify({}).apify, { now: later, own: OWN });
+    expect(state.runs[0].status).toBe("failed");
+    expect(state.runs[0].error).toMatch(/^timed out/);
+    expect(state.candidates[0].outcome).toBe("sized");
+  });
+
+  it("a failed size run does not turn unread candidates unreadable", async () => {
+    const { db, state } = fakeDiscoveryDb({ candidates: [candidate({ username: "x", outcome: "gathered", followers: null })], runs: [run({ kind: "size", usernames: ["x"] })] });
+    await collectDiscoveryRuns(db, fakeApify({ a1: { status: "failed", datasetId: null, costUsd: null, error: "FAILED" } }).apify, { now: MONDAY, own: OWN });
+    expect(state.candidates[0].outcome).toBe("gathered");
+  });
+
+  it("candidates with no bio are profiled before they are sampled, and keep their outcome", async () => {
+    const nobio = candidate({ username: "nb", outcome: "sized", followers: 16000, own_followers: 8000, bio: "" });
+    const { db, state } = fakeDiscoveryDb({ candidates: [nobio, sized("hasbio", 17000)] });
+    const f = fakeApify();
+    expect((await startNextRun(db, f.apify, { now: MONDAY, force: false, own: OWN })).started).toBe("size");
+    expect(f.actors[0].actorId).toBe(PROFILE_ACTOR);
+    expect(f.actors[0].body.usernames).toEqual(["nb"]);
+    const g = fakeApify({ "apify-1": done([{ username: "nb", followersCount: 16000, biography: "Helping Gen Z invest" }]) });
+    await collectDiscoveryRuns(db, g.apify, { now: MONDAY, own: OWN });
+    expect(state.candidates[0]).toMatchObject({ outcome: "sized", bio: "Helping Gen Z invest" });
+    const h = fakeApify();
+    expect((await startNextRun(db, h.apify, { now: MONDAY, force: false, own: OWN })).started).toBe("sample");
+    expect(h.actors[0].body.username).toEqual(["nb", "hasbio"]);
+  });
+
+  it("no log is written when the caller says the click already logged the call", async () => {
+    const { db, state } = fakeDiscoveryDb({ runs: [settled] });
+    await advanceDiscovery(db, fakeApify().apify, null, { ...now, force: false, own: OWN, trigger: "button", logAs: null });
+    expect(state.calls).toEqual([]);
+    await advanceDiscovery(db, fakeApify().apify, null, { ...now, force: false, own: OWN, trigger: "button", logAs: "routine" });
+    expect(state.calls).toEqual([expect.objectContaining({ trigger: "routine" })]);
   });
 });

@@ -38,6 +38,10 @@ describe("0023_content_creator_suggestions.sql", () => {
     expect(candidates).toMatch(/reader in \('', 'daniel', 'stephen', 'neither'\)/);
   });
 
+  it("a run is claimed by a unique index on the week, kind and usernames", () => {
+    expect(runs + sql.slice(sql.indexOf("content_discovery_runs_claim_idx"))).toMatch(/create unique index content_discovery_runs_claim_idx on public\.content_discovery_runs\(user_id, week_start, kind, usernames\)/);
+  });
+
   it("the three tables enable RLS with the four owner policies", () => {
     expect(sql.match(/enable row level security/gi)?.length).toBe(3);
     expect(sql.match(/auth\.uid\(\) = user_id/g)?.length).toBeGreaterThanOrEqual(15);

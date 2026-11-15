@@ -71,6 +71,10 @@ export function fakeDiscoveryDb(seed: { creators?: FakeCreator[]; candidates?: C
       return state.runs.filter((r) => r.status === "pending");
     },
     async insertRun(row) {
+      // Mirrors the unique index on (user_id, week_start, kind, usernames): the second of two racing starts loses.
+      if (state.runs.some((r) => r.week_start === row.week_start && r.kind === row.kind && r.usernames.join("\u0000") === row.usernames.join("\u0000"))) {
+        throw new Error("duplicate key value violates unique constraint content_discovery_runs_claim_idx");
+      }
       const rid = id("dr");
       state.runs.push({ ...row, id: rid, error: "", cost_usd: null, own_followers: null, finished_at: null });
       return rid;

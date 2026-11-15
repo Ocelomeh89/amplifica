@@ -9,6 +9,9 @@ import FindCreatorsButton from "@/features/content/ui/FindCreatorsButton";
 import SuggestedCreators from "@/features/content/ui/SuggestedCreators";
 import Card from "@/shared/ui/Card";
 
+// "Find creators now" runs its search after the response, under this page's function limit.
+export const maxDuration = 300;
+
 export default async function CreatorsPage() {
   const { supabase, user } = await requireContentOwner();
   const now = new Date();

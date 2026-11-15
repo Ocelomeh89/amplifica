@@ -10,7 +10,7 @@ const args = (over = {}) => ({ now: MONDAY, force: false, timeLeft: () => 250, o
 describe("runDiscoveryCron", () => {
   it("the cron step collects and starts runs but never judges", async () => {
     const sampled = candidate({ username: "a", outcome: "sampled", followers: 16000 });
-    const { db, state } = fakeDiscoveryDb({ candidates: [sampled, candidate({ username: "z", outcome: "sized", followers: 16000, own_followers: 8000 })] });
+    const { db, state } = fakeDiscoveryDb({ candidates: [sampled, candidate({ username: "z", outcome: "sized", followers: 16000, own_followers: 8000, bio: "a bio" })] });
     const f = fakeApify();
     const out = await runDiscoveryCron({ db, apifyFor: () => f.apify, ...args() });
     expect(f.actors).toHaveLength(1);

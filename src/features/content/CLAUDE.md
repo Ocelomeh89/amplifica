@@ -335,6 +335,9 @@ these are all the places that know it exists:
   phrase, splitting what is left. The cron step only collects and starts runs and makes no Claude call; judging runs behind
   `POST /api/content/creators/discover` and the Find creators now button (3 a Chicago day). `suggest`, `decide`, `lapse` and
   `setCandidate` are conditional writes, so a double click or a click on a lapsed suggestion answers "That suggestion is gone."
+  A run is claimed by inserting its row before Apify is called, under a unique index on (week, kind, usernames), so two racing
+  starts start it once; the Find creators now click is logged before the search starts, and the accounts about to be sampled are
+  profiled once first (a search row has no bio). A thrown Claude call costs no attempt and stops judging for that call.
   Source that won the 2026-11-14 spike: the keyword user search (`related` found nothing, `mentions` found three accounts).
   Bios and captions are data written by strangers: the judge prompt marks them as never instructions, and an answer whose quotes
   are not found in the captions is rejected. Suggestions only: nothing sets a creator to `watching` except Miguel's Add.

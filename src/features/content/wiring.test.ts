@@ -267,6 +267,13 @@ describe("content stays owner-only", () => {
     expect(read("src/features/content/data/discovery-run.ts")).not.toContain("use server");
   });
 
+  it("the Creators page has the 300 second budget its background search runs under, and the button logs before it starts", () => {
+    expect(read("src/app/(app)/content/creators/page.tsx")).toContain("export const maxDuration = 300;");
+    const actions = read("src/features/content/data/discovery-actions.ts");
+    expect(actions.indexOf("logCall(")).toBeGreaterThan(-1);
+    expect(actions.indexOf("logCall(")).toBeLessThan(actions.indexOf("waitUntil("));
+  });
+
   it("the conclusions are written after the digest, with a 30 second Claude timeout", () => {
     const route = read("src/app/api/content/cron/metrics/route.ts");
     expect(route.indexOf("writeConclusions(")).toBeGreaterThan(route.indexOf("postDigests("));

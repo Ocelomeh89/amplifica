@@ -49,8 +49,11 @@ export async function findCreatorsNowAction(): Promise<DiscoveryActionResult> {
   const { supabase, user } = await requireContentOwner();
   const startedAt = new Date();
   try {
-    const used = await supabaseDiscoveryDb(supabase, user.id).callsSince("button", chicagoDayStart(startedAt).toISOString());
+    const db = supabaseDiscoveryDb(supabase, user.id);
+    const used = await db.callsSince("button", chicagoDayStart(startedAt).toISOString());
     if (used >= FIND_NOW_DAILY_CAP) return { error: "You've searched 3 times today. Try again tomorrow." };
+    // The click is logged now, not when the run ends, so the daily limit holds while a run is in flight.
+    await db.logCall("button", "Search started.", startedAt.toISOString());
     waitUntil(runDiscovery(user.id, { trigger: "button", force: true, startedAt }));
     revalidatePath("/content/creators");
     return { error: null };
