@@ -15,6 +15,8 @@ export type ApifyRunState = { status: "pending" | "ready" | "failed"; datasetId:
 
 export interface ApifyClient {
   startRun(a: { usernames: string[]; newerThanDays: number }): Promise<{ runId: string }>;
+  /** Any actor, with its own dollar cap. Creator discovery uses it; the weekly pull uses startRun. */
+  startActor(a: { actorId: string; body: Record<string, unknown>; maxTotalChargeUsd: number }): Promise<{ runId: string }>;
   getRun(runId: string): Promise<ApifyRunState>;
   datasetItems(datasetId: string): Promise<unknown[]>;
 }
@@ -51,10 +53,14 @@ export function apifyClientFromEnv(env: NodeJS.ProcessEnv, fetchImpl: typeof fet
   const exec = <T,>(slug: string, args: Record<string, unknown>) => composioExecute<unknown>(slug, args, auth, fetchImpl).then((d) => unwrap<T>(d));
 
   return {
-    async startRun(a) {
-      const run = await exec<Run>("APIFY_RUN_ACTOR", { ...apifyInput(a), waitForFinish: 0 });
+    async startActor(a) {
+      const run = await exec<Run>("APIFY_RUN_ACTOR", { actorId: a.actorId, body: a.body, maxTotalChargeUsd: a.maxTotalChargeUsd, waitForFinish: 0 });
       if (!run.id) throw new Error("Apify did not return a run id.");
       return { runId: run.id };
+    },
+    async startRun(a) {
+      const { actorId, body, maxTotalChargeUsd } = apifyInput(a) as { actorId: string; body: Record<string, unknown>; maxTotalChargeUsd: number };
+      return this.startActor({ actorId, body, maxTotalChargeUsd });
     },
     async getRun(runId) {
       const run = await exec<Run>("APIFY_ACTOR_RUN_GET", { runId });

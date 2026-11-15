@@ -98,10 +98,16 @@ export function competitorPost(over: Partial<CompetitorPostRow> & Pick<Competito
 
 export function fakeApify(runs: Record<string, ApifyRunState & { items?: unknown[] }> = {}) {
   const started: { usernames: string[]; newerThanDays: number }[] = [];
+  /** Every startActor call, for the creator-discovery tests. */
+  const actors: { actorId: string; body: Record<string, unknown>; maxTotalChargeUsd: number }[] = [];
   const apify: ApifyClient = {
     async startRun(a) {
       started.push(a);
-      return { runId: `apify-${started.length}` };
+      return { runId: `apify-${started.length + actors.length}` };
+    },
+    async startActor(a) {
+      actors.push(a);
+      return { runId: `apify-${started.length + actors.length}` };
     },
     async getRun(runId) {
       const r = runs[runId];
@@ -112,5 +118,5 @@ export function fakeApify(runs: Record<string, ApifyRunState & { items?: unknown
       return Object.values(runs).find((r) => r.datasetId === datasetId)?.items ?? [];
     },
   };
-  return { apify, started };
+  return { apify, started, actors };
 }
