@@ -48,6 +48,7 @@ describe("content stays owner-only", () => {
       "src/app/api/content/voice/route.ts",
       "src/app/api/content/review/build/route.ts",
       "src/app/api/content/tests/propose/route.ts",
+      "src/app/api/content/creators/discover/route.ts",
     ];
     for (const f of routes) expect(read(f), f).toContain("authorizeRoutine(req, process.env.");
   });
@@ -246,6 +247,22 @@ describe("content stays owner-only", () => {
     expect(step).toBeLessThan(route.indexOf("runCompetitorCron("));
     expect(route).toMatch(/\.\.\.report, [^}]*tests/);
     expect(read("src/features/content/data/test-lab-cron.ts")).not.toContain("anthropic");
+  });
+
+  it("creator discovery makes no Claude call on the cron", () => {
+    const cron = read("src/features/content/data/discovery-cron.ts");
+    expect(cron).not.toContain("ToolCaller");
+    expect(cron).not.toContain("anthropicToolCaller");
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    const step = route.indexOf("runDiscoveryCron(");
+    expect(step).toBeGreaterThan(route.indexOf("runCompetitorCron("));
+    expect(step).toBeLessThan(route.indexOf("runTodayCron("));
+    expect(route).toMatch(/\.\.\.report, [^}]*discovery/);
+    expect(route).toContain('params.get("creators") === "now"');
+    const discover = read("src/app/api/content/creators/discover/route.ts");
+    expect(discover).toContain("export const maxDuration = 300;");
+    expect(discover).toContain("runDiscovery(");
+    expect(read("src/features/content/data/discovery-run.ts")).not.toContain("use server");
   });
 
   it("the conclusions are written after the digest, with a 30 second Claude timeout", () => {

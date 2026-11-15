@@ -900,6 +900,7 @@ export type Database = {
           user_id: string;
           trigger: "cron" | "routine" | "button";
           note?: string;
+          created_at?: string;
         };
         Update: {
           note?: string;

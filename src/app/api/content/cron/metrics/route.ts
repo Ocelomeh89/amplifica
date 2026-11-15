@@ -4,6 +4,8 @@ import { authorizeRoutine } from "@/features/content/data/api-auth";
 import { runMetricsCron, type CronPlatform } from "@/features/content/data/metrics";
 import { supabaseMetricsDb } from "@/features/content/data/supabase-db";
 import { runCompetitorCron } from "@/features/content/data/competitor-cron";
+import { runDiscoveryCron } from "@/features/content/data/discovery-cron";
+import { supabaseDiscoveryDb } from "@/features/content/data/supabase-discovery-db";
 import { runTestsCron } from "@/features/content/data/test-lab-cron";
 import { writeConclusions } from "@/features/content/data/test-lab";
 import { supabaseTestsDb } from "@/features/content/data/supabase-tests-db";
@@ -17,7 +19,7 @@ import { supabaseCompetitorsDb } from "@/features/content/data/supabase-competit
 import { apifyClientFromEnv } from "@/features/content/data/pulls/apify";
 import { anthropicToolCaller } from "@/features/content/data/claude";
 import { supabaseTodayDb } from "@/features/content/data/supabase-today-db";
-import { storeFollowers, supabaseAccountStatsDb } from "@/features/content/data/account-stats";
+import { loadFollowerCount, storeFollowers, supabaseAccountStatsDb } from "@/features/content/data/account-stats";
 import { runTodayCron } from "@/features/content/data/today-cron";
 import { releaseEndedSkips } from "@/features/content/data/focus";
 import { supabaseFocusDb } from "@/features/content/data/supabase-focus-db";
@@ -143,6 +145,24 @@ export async function GET(req: Request) {
         competitors = { error: (e as Error).message };
       }
     }
+    // Creator discovery: collect finished Apify runs and start the next one. No Claude call here; judging runs behind
+    // the weekly routine's endpoint. Like the competitor step, a failure here never fails the metrics run.
+    let discovery: Awaited<ReturnType<typeof runDiscoveryCron>> | null = null;
+    if (!only || forceCompetitors) {
+      try {
+        discovery = await runDiscoveryCron({
+          db: supabaseDiscoveryDb(createAdminClient(), owner),
+          apifyFor: () => apifyClientFromEnv(process.env),
+          own: () => loadFollowerCount(owner),
+          now: new Date(),
+          force: params.get("creators") === "now",
+          timeLeft: () => BUDGET_SECONDS - (Date.now() - startedAt.getTime()) / 1000,
+        });
+      } catch (e) {
+        console.error("content discovery cron failed", e);
+        discovery = { error: (e as Error).message };
+      }
+    }
     // Skips that ended give their hidden ideas a fresh Inbox clock before Today picks ideas. Two cheap queries, no Claude;
     // a failure here never fails the metrics run.
     let released: number | { error: string } | null = null;
@@ -207,7 +227,7 @@ export async function GET(req: Request) {
         conclusions = { error: (e as Error).message };
       }
     }
-    return NextResponse.json({ ...report, followers, released, tests, conclusions, gate, digests, competitors, today }, { status: report.ok ? 200 : 500 });
+    return NextResponse.json({ ...report, followers, released, tests, conclusions, gate, digests, competitors, discovery, today }, { status: report.ok ? 200 : 500 });
   } catch (e) {
     console.error("content metrics cron failed", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
