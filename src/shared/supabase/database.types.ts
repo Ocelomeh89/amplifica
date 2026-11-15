@@ -756,7 +756,10 @@ export type Database = {
           user_id: string;
           platform: "instagram";
           username: string;
-          status: "watching" | "removed";
+          status: "watching" | "removed" | "suggested" | "declined";
+          decline_reason: string;
+          suggested_at: string | null;
+          decided_at: string | null;
           last_pulled_at: string | null;
           last_pull_status: "ready" | "failed" | null;
           created_at: string;
@@ -766,14 +769,140 @@ export type Database = {
           user_id: string;
           platform?: "instagram";
           username: string;
-          status?: "watching" | "removed";
+          status?: "watching" | "removed" | "suggested" | "declined";
+          decline_reason?: string;
+          suggested_at?: string | null;
+          decided_at?: string | null;
           last_pulled_at?: string | null;
           last_pull_status?: "ready" | "failed" | null;
         };
         Update: {
-          status?: "watching" | "removed";
+          status?: "watching" | "removed" | "suggested" | "declined";
+          decline_reason?: string;
+          suggested_at?: string | null;
+          decided_at?: string | null;
           last_pulled_at?: string | null;
           last_pull_status?: "ready" | "failed" | null;
+        };
+        Relationships: [];
+      };
+      content_creator_candidates: {
+        Row: {
+          id: string;
+          user_id: string;
+          username: string;
+          outcome: "gathered" | "sized" | "sampled" | "fit" | "suggested" | "out_of_band" | "unreadable" | "quiet" | "neither" | "low_confidence" | "matched_decline" | "no_room" | "lapsed";
+          reason: string;
+          found_via: string;
+          followers: number | null;
+          own_followers: number | null;
+          bio: string;
+          sample: Json;
+          reader: "" | "daniel" | "stephen" | "neither";
+          confidence: number | null;
+          evidence: string[];
+          popular_count: number;
+          attempts: number;
+          looked_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          username: string;
+          outcome: "gathered" | "sized" | "sampled" | "fit" | "suggested" | "out_of_band" | "unreadable" | "quiet" | "neither" | "low_confidence" | "matched_decline" | "no_room" | "lapsed";
+          reason?: string;
+          found_via?: string;
+          followers?: number | null;
+          own_followers?: number | null;
+          bio?: string;
+          sample?: Json;
+          reader?: "" | "daniel" | "stephen" | "neither";
+          confidence?: number | null;
+          evidence?: string[];
+          popular_count?: number;
+          attempts?: number;
+          looked_at?: string;
+        };
+        Update: {
+          outcome?: "gathered" | "sized" | "sampled" | "fit" | "suggested" | "out_of_band" | "unreadable" | "quiet" | "neither" | "low_confidence" | "matched_decline" | "no_room" | "lapsed";
+          reason?: string;
+          found_via?: string;
+          followers?: number | null;
+          own_followers?: number | null;
+          bio?: string;
+          sample?: Json;
+          reader?: "" | "daniel" | "stephen" | "neither";
+          confidence?: number | null;
+          evidence?: string[];
+          popular_count?: number;
+          attempts?: number;
+          looked_at?: string;
+        };
+        Relationships: [];
+      };
+      content_discovery_runs: {
+        Row: {
+          id: string;
+          user_id: string;
+          week_start: string;
+          kind: "gather" | "size" | "sample";
+          apify_run_id: string;
+          usernames: string[];
+          status: "pending" | "ready" | "failed";
+          error: string;
+          cap_usd: number;
+          cost_usd: number | null;
+          own_followers: number | null;
+          items: number | null;
+          started_at: string;
+          finished_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          week_start: string;
+          kind: "gather" | "size" | "sample";
+          apify_run_id?: string;
+          usernames?: string[];
+          status?: "pending" | "ready" | "failed";
+          error?: string;
+          cap_usd: number;
+          cost_usd?: number | null;
+          own_followers?: number | null;
+          items?: number | null;
+          started_at?: string;
+          finished_at?: string | null;
+        };
+        Update: {
+          apify_run_id?: string;
+          usernames?: string[];
+          status?: "pending" | "ready" | "failed";
+          error?: string;
+          cap_usd?: number;
+          cost_usd?: number | null;
+          own_followers?: number | null;
+          items?: number | null;
+          finished_at?: string | null;
+        };
+        Relationships: [];
+      };
+      content_discovery_calls: {
+        Row: {
+          id: string;
+          user_id: string;
+          trigger: "cron" | "routine" | "button";
+          note: string;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          trigger: "cron" | "routine" | "button";
+          note?: string;
+        };
+        Update: {
+          note?: string;
         };
         Relationships: [];
       };
