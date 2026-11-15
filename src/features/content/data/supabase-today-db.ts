@@ -14,6 +14,7 @@ import { orderForToday, type ActiveFocus } from "@/features/content/engine/focus
 import { activeFocus } from "./focus";
 import { supabaseFocusDb } from "./supabase-focus-db";
 import { supabaseCompetitorsDb } from "./supabase-competitors-db";
+import { loadJudgedOutcomes } from "./supabase-tests-db";
 import { STALE_RUN_MINUTES, type BriefView, type CompetitorCandidate, type ExperimentRow, type IdeaLite, type NewExperiment, type RunRow, type TodayDb } from "./today";
 
 type Client = SupabaseClient<Database>;
@@ -84,7 +85,8 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
       const { scores } = scorePosts(posts, now);
       const scoreMap = new Map(scores.map((s) => [s.id, s]));
       const windowStart = new Date(now.getTime() - WINDOW_DAYS * DAY);
-      const ev = evidenceCounts(posts as WinnerPost[], scoreMap, windowStart);
+      // A judged Trial Reel test counts for its variable beside the normal posts.
+      const ev = evidenceCounts(posts as WinnerPost[], scoreMap, windowStart, await loadJudgedOutcomes(client, userId, windowStart));
 
       const hookOf = (p: { hook_spoken: string; hook_onscreen: string; hook_used: string }) => p.hook_spoken || p.hook_onscreen || p.hook_used;
       const winnerHooks = posts
@@ -133,6 +135,15 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
       const { data: claimed, error: claimedError } = await experiments().select("idea_id").eq("user_id", userId);
       if (claimedError) throw new Error(`today claimed: ${claimedError.message}`);
       const taken = new Set((claimed ?? []).map((c) => (c as { idea_id: string }).idea_id));
+      // An idea a proposing or open Trial Reel test holds stays in the Inbox, but Today leaves it alone.
+      const { data: liveTests, error: liveError } = await client.from("content_tests").select("id").eq("user_id", userId).in("status", ["proposing", "open"]);
+      if (liveError) throw new Error(`today held tests: ${liveError.message}`);
+      const liveIds = (liveTests ?? []).map((t) => (t as { id: string }).id);
+      if (liveIds.length > 0) {
+        const { data: held, error: heldError } = await client.from("content_test_versions").select("idea_id").eq("user_id", userId).in("test_id", liveIds);
+        if (heldError) throw new Error(`today held ideas: ${heldError.message}`);
+        for (const h of held ?? []) if ((h as { idea_id: string | null }).idea_id) taken.add((h as { idea_id: string }).idea_id);
+      }
       const { data, error } = await ideas()
         .select(IDEA_COLUMNS)
         .eq("user_id", userId)

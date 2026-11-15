@@ -76,6 +76,22 @@ export function dayViews(series: SeriesPoint[], postedAt: string, day: number): 
   return best && best.dist <= DAY_TOLERANCE_HOURS * HOUR ? best.views : null;
 }
 
+/**
+ * The earliest snapshot with a number taken `hours` or more after `fromIso`. The Trial Reel tests use it for the
+ * 24-hour reading: `dayViews` matches the nearest snapshot within 18 hours, which is too loose for one day.
+ */
+export function viewsAtOrAfter(series: SeriesPoint[], fromIso: string, hours: number): { at: string; views: number } | null {
+  const from = new Date(fromIso).getTime() + hours * HOUR;
+  let best: { at: string; ms: number; views: number } | null = null;
+  for (const p of series) {
+    if (!isNum(p.views)) continue;
+    const ms = new Date(p.at).getTime();
+    if (ms < from) continue;
+    if (!best || ms < best.ms) best = { at: p.at, ms, views: p.views };
+  }
+  return best ? { at: best.at, views: best.views } : null;
+}
+
 export function ageHours(postedAt: string, now: Date): number {
   return (now.getTime() - new Date(postedAt).getTime()) / HOUR;
 }

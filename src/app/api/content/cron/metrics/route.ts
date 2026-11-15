@@ -4,6 +4,10 @@ import { authorizeRoutine } from "@/features/content/data/api-auth";
 import { runMetricsCron, type CronPlatform } from "@/features/content/data/metrics";
 import { supabaseMetricsDb } from "@/features/content/data/supabase-db";
 import { runCompetitorCron } from "@/features/content/data/competitor-cron";
+import { runTestsCron } from "@/features/content/data/test-lab-cron";
+import { writeConclusions } from "@/features/content/data/test-lab";
+import { supabaseTestsDb } from "@/features/content/data/supabase-tests-db";
+import { addTestDoubleDown } from "@/features/content/data/focus";
 import { runGateSweep } from "@/features/content/data/gate-sweep";
 import { supabaseBackfillDb, supabaseDigestDb, supabaseGateDb } from "@/features/content/data/supabase-gate-db";
 import { runBackfill } from "@/features/content/data/gate-backfill";
@@ -110,6 +114,17 @@ export async function GET(req: Request) {
         followers = { followers: null, error: (e as Error).message };
       }
     }
+    // Trial Reel tests: judge any open test whose numbers are in, close one nobody posted, retry missed follow-ups.
+    // No Claude call, and a failure here never fails the metrics run.
+    let tests: Awaited<ReturnType<typeof runTestsCron>> | null = null;
+    if (!only) {
+      try {
+        tests = await runTestsCron({ db: supabaseTestsDb(createAdminClient(), owner), deps: { addTestDoubleDown }, userId: owner, now: new Date() });
+      } catch (e) {
+        console.error("content tests cron failed", e);
+        tests = { error: (e as Error).message };
+      }
+    }
     // Competitor posts are collected and tagged before Today so a fresh one can take slot 2.
     // Like Today, a failure here never fails the metrics run.
     let competitors: Awaited<ReturnType<typeof runCompetitorCron>> | { error: string } | null = null;
@@ -182,7 +197,17 @@ export async function GET(req: Request) {
         digests = { error: (e as Error).message };
       }
     }
-    return NextResponse.json({ ...report, followers, released, gate, digests, competitors, today }, { status: report.ok ? 200 : 500 });
+    // The two-sentence conclusion on a judged test: last, on the time everything else leaves. A miss is tried again tomorrow.
+    let conclusions: number | { error: string } = 0;
+    if (!only && BUDGET_SECONDS - (Date.now() - startedAt.getTime()) / 1000 >= 45) {
+      try {
+        conclusions = await writeConclusions(supabaseTestsDb(createAdminClient(), owner), anthropicToolCaller({ timeoutMs: 30_000, maxRetries: 0 }), () => BUDGET_SECONDS - (Date.now() - startedAt.getTime()) / 1000);
+      } catch (e) {
+        console.error("content test conclusions failed", e);
+        conclusions = { error: (e as Error).message };
+      }
+    }
+    return NextResponse.json({ ...report, followers, released, tests, conclusions, gate, digests, competitors, today }, { status: report.ok ? 200 : 500 });
   } catch (e) {
     console.error("content metrics cron failed", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

@@ -1,0 +1,163 @@
+[
+  {
+    "username": "ericsfinancials",
+    "fullName": "Eric | Personal Finance",
+    "followersCount": 42056,
+    "followsCount": 192,
+    "biography": "Helping Gen Z invest their first $100k\n💸 @nerdwallet creator\nFrugality • FIRE • Investing\n📧 ericsfinancials@undercurrent.net\n📍Los Angeles",
+    "private": false,
+    "verified": true,
+    "businessCategoryName": "Digital creator",
+    "latestPosts": [
+      {
+        "shortCode": "DfsMSiHhkBS",
+        "ownerUsername": "ericsfinancials",
+        "type": "Video",
+        "mentions": [],
+        "coauthorProducers": null,
+        "timestamp": "2026-11-13T17:43:15.000Z"
+      },
+      {
+        "shortCode": "Dfm0_VQGzxi",
+        "ownerUsername": "ericsfinancials",
+        "type": "Sidecar",
+        "mentions": [],
+        "coauthorProducers": null,
+        "timestamp": "2026-11-11T15:42:05.000Z"
+      },
+      {
+        "shortCode": "Dfgjbu4h43m",
+        "ownerUsername": "ericsfinancials",
+        "type": "Video",
+        "mentions": [],
+        "coauthorProducers": null,
+        "timestamp": "2026-11-09T05:14:26.000Z"
+      }
+    ]
+  },
+  {
+    "username": "micro.investing",
+    "fullName": "Michael Alberse",
+    "followersCount": 174341,
+    "followsCount": 823,
+    "biography": "🏔️ Guiding You to Financial Freedom\n🚐 Proud Minivan Dad\n👇 Free Financial Freedom Course",
+    "private": false,
+    "verified": true,
+    "businessCategoryName": "Digital creator",
+    "latestPosts": [
+      {
+        "shortCode": "DfsVvxzsygM",
+        "ownerUsername": "micro.investing",
+        "type": "Video",
+        "mentions": [
+          "micro.investing"
+        ],
+        "coauthorProducers": null,
+        "timestamp": "2026-11-13T19:05:56.000Z"
+      },
+      {
+        "shortCode": "DfpeHfSlbge",
+        "ownerUsername": "micro.investing",
+        "type": "Video",
+        "mentions": [
+          "micro.investing"
+        ],
+        "coauthorProducers": null,
+        "timestamp": "2026-11-12T16:21:04.000Z"
+      },
+      {
+        "shortCode": "DfhmxZRFqVa",
+        "ownerUsername": "micro.investing",
+        "type": "Sidecar",
+        "mentions": [
+          "micro.investing"
+        ],
+        "coauthorProducers": null,
+        "timestamp": "2026-11-09T15:01:39.000Z"
+      }
+    ]
+  },
+  {
+    "username": "fire.by38",
+    "fullName": "fireby38",
+    "followersCount": 17610,
+    "followsCount": 66,
+    "biography": "23 yr old couple | retire by 38\n📈 15 years to go\n📩 collabs@fireby38.com\nfree guide + see when you can retire!👇",
+    "private": false,
+    "verified": true,
+    "businessCategoryName": null,
+    "latestPosts": [
+      {
+        "shortCode": "Dfu4oAfMlbE",
+        "ownerUsername": "fire.by38",
+        "type": "Video",
+        "mentions": [],
+        "coauthorProducers": null,
+        "timestamp": "2026-11-14T18:50:49.000Z"
+      },
+      {
+        "shortCode": "Dfsce7kBTwl",
+        "ownerUsername": "fire.by38",
+        "type": "Video",
+        "mentions": [],
+        "coauthorProducers": null,
+        "timestamp": "2026-11-13T20:05:58.000Z"
+      },
+      {
+        "shortCode": "DfpXxuYMFIS",
+        "ownerUsername": "fire.by38",
+        "type": "Video",
+        "mentions": [],
+        "coauthorProducers": null,
+        "timestamp": "2026-11-12T15:27:43.000Z"
+      }
+    ]
+  },
+  {
+    "username": "amyalberse",
+    "fullName": "Amy Alberse",
+    "followersCount": 1913,
+    "followsCount": 2391,
+    "biography": "🌱  growing in faith \n📍ATL w/ @micro.investing",
+    "private": true,
+    "verified": false,
+    "businessCategoryName": null,
+    "latestPosts": []
+  },
+  {
+    "username": "kendallroams",
+    "fullName": "Kendall Lorenz",
+    "followersCount": 19565,
+    "followsCount": 858,
+    "biography": "🚐 2+ years of full-time vanlife\n⛰️ Active lifestyle + financial freedom\n📥 kendallroams@gmail.com",
+    "private": false,
+    "verified": true,
+    "businessCategoryName": null,
+    "latestPosts": [
+      {
+        "shortCode": "DfoLxa7po_u",
+        "ownerUsername": "kendallroams",
+        "type": "Video",
+        "mentions": [],
+        "coauthorProducers": null,
+        "timestamp": "2026-11-12T04:23:25.000Z"
+      },
+      {
+        "shortCode": "DfgMlRBJbju",
+        "ownerUsername": "kendallroams",
+        "type": "Video",
+        "mentions": [],
+        "coauthorProducers": null,
+        "timestamp": "2026-11-09T02:00:11.000Z"
+      },
+      {
+        "shortCode": "DfVLQXcSIZZ",
+        "ownerUsername": "kendallroams",
+        "type": "Video",
+        "mentions": [],
+        "coauthorProducers": null,
+        "timestamp": "2026-11-04T19:13:09.000Z"
+      }
+    ]
+  }
+]

@@ -102,6 +102,21 @@ describe("supabaseTodayDb", () => {
     expect(log.some((c) => c[0] === "content_experiments.in" && c[1] === "status")).toBe(false);
   });
 
+  it("Today leaves alone an idea held by an open test", async () => {
+    const idea = (id: string) => ({ id, title: "t", hook: "h", pillar: "", hook_alt: null, status: "inbox" });
+    const { client, log } = fakeClient({
+      content_experiments: { data: [] },
+      content_tests: { data: [{ id: "t1" }] },
+      content_test_versions: { data: [{ idea_id: "i1" }, { idea_id: null }] },
+      content_ideas: { data: [idea("i1"), idea("i2")] },
+    });
+    const out = await supabaseTodayDb(client, "u1").unclaimedInboxIdeas(5, EMPTY_FOCUS);
+    expect(out.map((i) => i.id)).toEqual(["i2"]);
+    expect(log).toContainEqual(["content_tests.in", "status", ["proposing", "open"]]);
+    expect(log).toContainEqual(["content_tests.eq", "user_id", "u1"]);
+    expect(log).toContainEqual(["content_test_versions.eq", "user_id", "u1"]);
+  });
+
   it("page reports today's failed swap and moment runs, newest first, and not the make-now counters", async () => {
     const run = (id: string, kind: string, status: string) => ({ id, day: "2026-10-27", kind, status, experiment_id: null, error: "boom", created_at: "2026-10-27T15:00:00Z" });
     const { client } = fakeClient({ content_today_runs: { data: [run("a", "moment", "failed"), run("b", "makenow", "failed"), run("c", "cron", "failed"), run("d", "swap", "ready")] } });
@@ -132,6 +147,16 @@ describe("supabaseTodayDb", () => {
     expect(c?.post.id).toBe("d");
     expect(c).toMatchObject({ username: "micro.investing", multiple: 5, thin: false });
     expect(log.filter((l) => l[0] === "content_competitor_posts.eq" && l[1] === "user_id" && l[2] === "u1").length).toBeGreaterThan(0);
+  });
+
+  it("evidence counts a judged Trial Reel test: its extras reach the tally", async () => {
+    const { client, log } = fakeClient({
+      content_tests: { data: [{ variable: "onscreen_text", value_a: "none", value_b: "repeats-hook", verdict: "a", judged_at: new Date().toISOString() }] },
+    });
+    const out = await supabaseTodayDb(client, "u1").evidence(new Date());
+    expect(out.ev.onscreen_text.find((r) => r.value === "none")).toMatchObject({ won: 1, total: 1 });
+    expect(log).toContainEqual(["content_tests.eq", "user_id", "u1"]);
+    expect(log).toContainEqual(["content_tests.eq", "status", "judged"]);
   });
 
   it("evidence marks a post whose idea has a competitor source with its angle", async () => {

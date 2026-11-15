@@ -13,6 +13,8 @@ export type PostRowForView = PostForMath & PostTags & {
   idea_id: string | null;
   latest_at: string | null;
   thumbnail_url: string;
+  /** A Trial Reel test post. Left out of every baseline, review list and winner unless asked for. */
+  is_test: boolean;
   /** Every snapshot's views, oldest first. Server-only: strip before passing to a client component. */
   series: SeriesPoint[];
 };
@@ -45,13 +47,15 @@ export async function loadSnapshotRows(
 
 /** Every post with its first and latest snapshot. Posts without a snapshot yet have empty metrics. */
 /** `opts.before` reads the world as of an instant: later posts and later snapshots are not loaded (the weekly review). */
-export async function loadPostsForMath(supabase: SupabaseClient<Database>, userId: string, opts?: { before?: Date }): Promise<PostRowForView[]> {
+/** Trial Reel test posts reach non-followers only, so their numbers are not comparable: they are left out unless `includeTests`. */
+export async function loadPostsForMath(supabase: SupabaseClient<Database>, userId: string, opts?: { before?: Date; includeTests?: boolean }): Promise<PostRowForView[]> {
   let postQuery = supabase
     .from("content_posts")
     .select(
-      "id, platform, format, media_type, thumbnail_url, pillar, hook_type, hook_used, caption, url, idea_id, posted_at, onscreen_text, message, topic, cta_type, post_style, cover_face, cover_text, cover_number, hook_spoken, hook_onscreen, tag_confidence, tag_locks, tagged_at"
+      "id, platform, format, media_type, thumbnail_url, pillar, hook_type, hook_used, caption, url, idea_id, posted_at, onscreen_text, message, topic, cta_type, post_style, cover_face, cover_text, cover_number, hook_spoken, hook_onscreen, tag_confidence, tag_locks, tagged_at, is_test"
     )
     .eq("user_id", userId);
+  if (!opts?.includeTests) postQuery = postQuery.eq("is_test", false);
   if (opts?.before) postQuery = postQuery.lt("posted_at", opts.before.toISOString());
   const { data: posts, error } = await postQuery.order("posted_at", { ascending: false });
   if (error) throw new Error(error.message);
@@ -94,6 +98,7 @@ export async function loadPostsForMath(supabase: SupabaseClient<Database>, userI
       tag_confidence: (p.tag_confidence ?? {}) as Record<string, number>,
       tag_locks: p.tag_locks ?? [],
       tagged_at: p.tagged_at,
+      is_test: p.is_test,
       caption: p.caption,
       url: p.url,
       idea_id: p.idea_id,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 // Source-level guards for the content feature and its routes. They read files
 // rather than import them, so the feature does not reach into app/.
@@ -19,8 +19,10 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/taste/page.tsx",
       "src/app/(app)/content/review/page.tsx",
       "src/app/(app)/content/review/[weekStart]/page.tsx",
+      "src/app/(app)/content/tests/page.tsx",
       "src/app/(app)/content/ideas/[id]/page.tsx",
       "src/app/(app)/content/sources/page.tsx",
+      "src/features/content/data/test-lab-actions.ts",
       "src/features/content/data/actions.ts",
       "src/features/content/data/competitor-actions.ts",
       "src/features/content/data/sharpen-actions.ts",
@@ -45,6 +47,7 @@ describe("content stays owner-only", () => {
       "src/app/api/content/cron/metrics/route.ts",
       "src/app/api/content/voice/route.ts",
       "src/app/api/content/review/build/route.ts",
+      "src/app/api/content/tests/propose/route.ts",
     ];
     for (const f of routes) expect(read(f), f).toContain("authorizeRoutine(req, process.env.");
   });
@@ -77,6 +80,7 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/taste/page.tsx",
       "src/app/(app)/content/review/page.tsx",
       "src/app/(app)/content/review/[weekStart]/page.tsx",
+      "src/app/(app)/content/tests/page.tsx",
     ];
     for (const f of pages) expect(read(f), f).not.toMatch(/supabase\s*\.from\(/);
   });
@@ -195,5 +199,65 @@ describe("content stays owner-only", () => {
       expect(exports.every((e) => /export async function \w+Action\b/.test(e)), f).toBe(true);
     }
     expect(read("src/features/content/data/taste-run.ts")).not.toContain('"use server"');
+  });
+
+  it("every direct reader of content_posts is on the list", () => {
+    // A new reader fails here until it is classified: either it goes through loadPostsForMath
+    // (which leaves Trial Reel test posts out by default) or it is not a baseline, review list or winner.
+    const dir = "src/features/content/data";
+    const readers = readdirSync(dir)
+      .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && !f.endsWith(".fake.ts"))
+      .filter((f) => read(`${dir}/${f}`).includes('from("content_posts")'))
+      .sort();
+    expect(readers).toEqual([
+      "actions.ts",
+      "mark-posted-brief.ts",
+      "performance.ts",
+      "queries.ts",
+      "supabase-db.ts",
+      "supabase-recreate-db.ts",
+      "supabase-tags-db.ts",
+      "supabase-tests-db.ts",
+      "supabase-today-db.ts",
+    ]);
+    expect(read(`${dir}/queries.ts`)).toContain('.eq("is_test", false)');
+  });
+
+  it("the test proposal route is a POST with a 300 second budget, and its background starter is a plain module", () => {
+    const route = read("src/app/api/content/tests/propose/route.ts");
+    expect(route).toContain("export async function POST(");
+    expect(route).not.toContain("export async function GET(");
+    expect(route).toContain("maxDuration = 300");
+    expect(route).toContain('dynamic = "force-dynamic"');
+    const run = read("src/features/content/data/test-lab-run.ts");
+    expect(run).not.toContain('"use server"');
+    expect(run).toContain("anthropicToolCaller({ timeoutMs: 60_000, maxRetries: 0 })");
+    expect(run).toContain("waitUntil(");
+    // Every export of a "use server" file is a callable endpoint: only actions may live in it.
+    const exports = read("src/features/content/data/test-lab-actions.ts").match(/^export (?:async )?(?:function|const) (\w+)/gm) ?? [];
+    expect(exports.length).toBeGreaterThan(0);
+    expect(exports.every((e) => /export async function \w+Action\b/.test(e))).toBe(true);
+  });
+
+  it("the Trial Reel tests' cron step runs after the pulls and before the competitor step, and makes no Claude call", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    const step = route.indexOf("runTestsCron(");
+    expect(step).toBeGreaterThan(route.indexOf("runMetricsCron("));
+    expect(step).toBeLessThan(route.indexOf("runCompetitorCron("));
+    expect(route).toMatch(/\.\.\.report, [^}]*tests/);
+    expect(read("src/features/content/data/test-lab-cron.ts")).not.toContain("anthropic");
+  });
+
+  it("the conclusions are written after the digest, with a 30 second Claude timeout", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    expect(route.indexOf("writeConclusions(")).toBeGreaterThan(route.indexOf("postDigests("));
+    expect(route).toContain("timeoutMs: 30_000, maxRetries: 0");
+  });
+
+  it("the Tests page has the 300 second budget and a tab after Review", () => {
+    expect(read("src/app/(app)/content/tests/page.tsx")).toContain("maxDuration = 300");
+    const tabs = read("src/features/content/ui/ContentTabs.tsx");
+    expect(tabs.indexOf('"/content/tests"')).toBeGreaterThan(tabs.indexOf('"/content/review"'));
+    expect(tabs.indexOf('"/content/tests"')).toBeLessThan(tabs.indexOf('"/content/creators"'));
   });
 });

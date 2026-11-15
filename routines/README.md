@@ -129,5 +129,7 @@ ClickUp connector and the message: "Read routines/content-weekly.md in this chec
 
 - It must run after `content-tag.md`, so last week's posts have their tags. It is scheduled at 07:30 America/Chicago all
   year, 35 minutes after tagging.
+- Its middle step asks the app to propose a Trial Reel test when none is open (`POST /api/content/tests/propose`). A failure
+  there never stops the run; the ClickUp line ends with the result (`Test: started`, `open`, `busy`, `cap` or `failed`).
 - Network access: the `CONTENT_API_BASE` host only (an allowlist).
-- A missed Monday is fixed with **Build now** on `/content/review`.
+- A missed Monday is fixed with **Build now** on `/content/review`; a missed test with **Propose next test** on `/content/tests`.

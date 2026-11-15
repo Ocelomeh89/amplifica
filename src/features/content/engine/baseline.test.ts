@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { baselineGroup, dayViews, latestViews, percentile, viewsBaselines, viewsMultiplier, statusOf, isEvergreen, scorePosts, DAY_TOLERANCE_HOURS, type GroupBaseline, type PostForBaseline, type SeriesPoint } from "./baseline";
+import { baselineGroup, dayViews, latestViews, percentile, viewsBaselines, viewsMultiplier, viewsAtOrAfter, statusOf, isEvergreen, scorePosts, DAY_TOLERANCE_HOURS, type GroupBaseline, type PostForBaseline, type SeriesPoint } from "./baseline";
 
 const pt = (at: string, views: number | null): SeriesPoint => ({ at, views });
 const reel = (id: string, posted_at: string, series: SeriesPoint[]): PostForBaseline => ({
@@ -165,5 +165,26 @@ describe("scorePosts", () => {
     expect(v.status).toBe("Viral");
     expect(v.evergreen).toBe(false);
     expect(scores).toHaveLength(9);
+  });
+});
+
+describe("viewsAtOrAfter", () => {
+  const posted = "2026-11-16T00:00:00Z";
+  it("a snapshot 10 hours after posting gives no reading; the next day's does", () => {
+    const series = [pt("2026-11-16T10:00:00Z", 400), pt("2026-11-17T10:00:00Z", 2100)];
+    expect(viewsAtOrAfter(series.slice(0, 1), posted, 24)).toBeNull();
+    expect(viewsAtOrAfter(series, posted, 24)).toEqual({ at: "2026-11-17T10:00:00Z", views: 2100 });
+  });
+  it("takes a point exactly at the mark", () => {
+    expect(viewsAtOrAfter([pt("2026-11-17T00:00:00Z", 900)], posted, 24)).toEqual({ at: "2026-11-17T00:00:00Z", views: 900 });
+  });
+  it("a null-views snapshot at the mark is skipped for the next one with a number", () => {
+    const series = [pt("2026-11-17T10:00:00Z", null), pt("2026-11-18T10:00:00Z", 3000)];
+    expect(viewsAtOrAfter(series, posted, 24)).toEqual({ at: "2026-11-18T10:00:00Z", views: 3000 });
+  });
+  it("is order independent and gives null for an empty series", () => {
+    const series = [pt("2026-11-18T10:00:00Z", 3000), pt("2026-11-17T10:00:00Z", 2100)];
+    expect(viewsAtOrAfter(series, posted, 24)?.views).toBe(2100);
+    expect(viewsAtOrAfter([], posted, 24)).toBeNull();
   });
 });
