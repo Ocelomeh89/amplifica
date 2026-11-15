@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { OWN_INSTAGRAM_USERNAME } from "@/features/content/engine/discovery";
 import { PROFILE_ACTOR, SEARCH_ACTOR, SEARCH_PHRASES } from "@/features/content/engine/discovery-items";
 import { fakeApify, fakeCompetitorsDb } from "./competitors.fake";
@@ -257,5 +257,227 @@ describe("lapsing", () => {
     const kept = fakeDiscoveryDb({ creators: waiting(28), candidates: [candidate({ username: "old", outcome: "suggested" })] });
     expect(await lapseStale(kept.db, MONDAY)).toBe(0);
     expect(kept.state.creators).toHaveLength(1);
+  });
+});
+
+// ---- Task 8: judge, suggest, add and decline ----
+
+import type { ToolCaller } from "./claude";
+import type { Judgment } from "@/features/content/engine/discovery-judge";
+import { addCreator } from "./competitors";
+import { addSuggestion, advanceDiscovery, declineSuggestion, judgeSampled, suggestFits } from "./discovery";
+
+const CAPTIONS = ["I am 38 and behind on retirement", "Max out your 401k first", "Why the 4% rule broke for me", "A day in my W-2 life", "Quit the grind? Read this"];
+const activeSample = (base = MONDAY) =>
+  CAPTIONS.map((caption, i) => ({ shortcode: `s${i}`, url: `https://www.instagram.com/reel/s${i}/`, posted_at: daysAgo(i + 1, base), views: 100 * (i + 1), caption }));
+const sampledRow = (username: string, followers = 16000, over: Partial<CandidateRow> = {}) =>
+  candidate({ username, outcome: "sampled", followers, own_followers: 8000, bio: `${username} bio`, sample: activeSample(), ...over });
+const judgment = (over: Partial<Judgment> = {}): Judgment => ({
+  reader: "daniel",
+  evidence: ["i am 38 and behind on retirement", "max out your 401k first"],
+  reason: "The posts speak to a W-2 saver behind on retirement.",
+  confidence: 4,
+  matches_decline: null,
+  ...over,
+});
+const callerOf = (answer: unknown | ((text: string) => unknown)) => {
+  const call = vi.fn(async (input: { text: string }) => {
+    const out = typeof answer === "function" ? (answer as (t: string) => unknown)(input.text) : answer;
+    if (out instanceof Error) throw out;
+    return out;
+  });
+  return { caller: { call } as unknown as ToolCaller, call };
+};
+const now = { now: MONDAY, timeLeft: () => 300 };
+const settled = run({ id: "dr-done", kind: "gather", status: "ready", cost_usd: 0.1 });
+
+describe("judging sampled candidates", () => {
+  it("a candidate judged neither is not suggested, and a week with no fit suggests nobody", async () => {
+    const { db, state } = fakeDiscoveryDb({ candidates: ["a", "b", "c"].map((u) => sampledRow(u)), runs: [settled] });
+    const { caller } = callerOf(judgment({ reader: "neither", evidence: [], reason: "Posts are about crypto trading." }));
+    const report = await advanceDiscovery(db, fakeApify().apify, caller, { ...now, force: false, own: OWN, trigger: "routine" });
+    expect(state.creators).toEqual([]);
+    expect(state.candidates.map((c) => c.outcome)).toEqual(["neither", "neither", "neither"]);
+    expect(state.candidates.every((c) => c.reason !== "")).toBe(true);
+    expect(report).toMatchObject({ suggested: 0, judged: 3 });
+  });
+
+  it("confidence under 3 is dropped; 3 is suggested", async () => {
+    const { db, state } = fakeDiscoveryDb({ candidates: [sampledRow("low", 16000), sampledRow("ok", 17000)] });
+    let n = 0;
+    const { caller } = callerOf(() => judgment({ confidence: ++n === 1 ? 2 : 3 }));
+    await judgeSampled(db, caller, now);
+    expect(state.candidates.map((c) => c.outcome)).toEqual(["low_confidence", "fit"]);
+    expect((await suggestFits(db, MONDAY)).suggested).toBe(1);
+    expect(state.creators.map((c) => c.username)).toEqual(["ok"]);
+  });
+
+  it("a fit carries its reader, quotes, confidence and popular Reel count", async () => {
+    const { db, state } = fakeDiscoveryDb({ candidates: [sampledRow("a")] });
+    await judgeSampled(db, callerOf(judgment()).caller, now);
+    expect(state.candidates[0]).toMatchObject({ outcome: "fit", reader: "daniel", confidence: 4, evidence: judgment().evidence, popular_count: 0 });
+  });
+
+  it("a quiet account costs no Claude call", async () => {
+    const few = activeSample().slice(0, 3);
+    const { db, state } = fakeDiscoveryDb({ candidates: [sampledRow("slow", 16000, { sample: few })] });
+    const { caller, call } = callerOf(judgment());
+    await judgeSampled(db, caller, now);
+    expect(call).not.toHaveBeenCalled();
+    expect(state.candidates[0]).toMatchObject({ outcome: "quiet", reason: "3 Reels in the last 30 days; it takes 4" });
+  });
+
+  it("a stored decline reason appears in the next judgment's prompt", async () => {
+    const { db } = fakeDiscoveryDb({ creators: [creatorRow({ username: "salesguy", status: "suggested", suggested_at: daysAgo(1) })], candidates: [sampledRow("next")] });
+    expect(await declineSuggestion(db, "cr-salesguy", "too salesy", MONDAY)).toEqual({ error: null });
+    const { caller, call } = callerOf(judgment());
+    await judgeSampled(db, caller, now);
+    const text = (call.mock.calls[0][0] as { text: string }).text;
+    expect(text).toContain("Miguel declined these and said why");
+    expect(text).toContain("salesguy");
+    expect(text).toContain("too salesy");
+  });
+
+  it("only the last 20 decline reasons are sent", async () => {
+    const declined = Array.from({ length: 25 }, (_, i) => ({ ...creatorRow({ username: `d${String(i).padStart(2, "0")}`, status: "declined" }), decline_reason: "r", decided_at: daysAgo(30 - i) }));
+    const { db, state } = fakeDiscoveryDb({ creators: declined, candidates: [sampledRow("next")] });
+    const { caller, call } = callerOf(judgment());
+    await judgeSampled(db, caller, now);
+    expect(state.declineCalls).toEqual([20]);
+    const text = (call.mock.calls[0][0] as { text: string }).text;
+    expect(text).toContain("d24");
+    expect(text).toContain("d05");
+    expect(text).not.toContain("d04");
+  });
+
+  it("a candidate matching a decline reason is dropped and says so", async () => {
+    const { db, state } = fakeDiscoveryDb({ candidates: [sampledRow("a")] });
+    await judgeSampled(db, callerOf(judgment({ reader: "neither", evidence: [], matches_decline: "too salesy" })).caller, now);
+    expect(state.candidates[0]).toMatchObject({ outcome: "matched_decline", reason: "Matches a reason you gave: too salesy" });
+  });
+
+  it("invented quotes are retried once, then the candidate is unreadable", async () => {
+    const { db, state } = fakeDiscoveryDb({ candidates: [sampledRow("a")] });
+    const { caller, call } = callerOf(judgment({ evidence: ["a line nobody wrote", "another invented line"] }));
+    await judgeSampled(db, caller, now);
+    expect(state.candidates[0]).toMatchObject({ outcome: "sampled", attempts: 1 });
+    await judgeSampled(db, caller, now);
+    expect(call).toHaveBeenCalledTimes(2);
+    expect(state.candidates[0]).toMatchObject({ outcome: "unreadable", reason: "The judge gave no usable answer" });
+  });
+
+  it("a thrown call or an invalid answer counts as an attempt too", async () => {
+    const { db, state } = fakeDiscoveryDb({ candidates: [sampledRow("a"), sampledRow("b", 17000)] });
+    let n = 0;
+    const { caller } = callerOf(() => (++n === 1 ? new Error("overloaded") : { nonsense: true }));
+    await judgeSampled(db, caller, now);
+    expect(state.candidates.map((c) => c.attempts)).toEqual([1, 1]);
+  });
+
+  it("judging stops when time runs short and resumes on the next call", async () => {
+    const { db, state } = fakeDiscoveryDb({ candidates: [sampledRow("a", 16000), sampledRow("b", 17000)], runs: [settled] });
+    const { caller } = callerOf(judgment());
+    const times = [300, 50];
+    const first = await advanceDiscovery(db, fakeApify().apify, caller, { now: MONDAY, force: false, own: OWN, trigger: "routine", timeLeft: () => times.shift() ?? 50 });
+    expect(first).toMatchObject({ stage: "judging", judged: 1, suggested: 0 });
+    expect(state.candidates.map((c) => c.outcome)).toEqual(["fit", "sampled"]);
+    const second = await advanceDiscovery(db, fakeApify().apify, caller, { now: MONDAY, force: false, own: OWN, trigger: "routine", timeLeft: () => 300 });
+    expect(second).toMatchObject({ stage: "done", suggested: 2 });
+    expect(state.creators.map((c) => c.status)).toEqual(["suggested", "suggested"]);
+  });
+
+  it("the cron call (no caller) never judges or suggests", async () => {
+    const { db, state } = fakeDiscoveryDb({ candidates: [sampledRow("a")], runs: [settled] });
+    const report = await advanceDiscovery(db, fakeApify().apify, null, { ...now, force: false, own: OWN, trigger: "cron" });
+    expect(state.candidates[0].outcome).toBe("sampled");
+    expect(report.stage).toBe("judging");
+    expect(state.calls).toEqual([expect.objectContaining({ trigger: "cron" })]);
+  });
+});
+
+describe("suggesting fits", () => {
+  const fit = (username: string, confidence: number, popular_count = 0): CandidateRow => candidate({ username, outcome: "fit", reader: "daniel", confidence, popular_count, followers: 16000, own_followers: 8000 });
+
+  it("with 2 waiting it suggests at most 1; the rest are no_room", async () => {
+    const waiting = ["w1", "w2"].map((u) => creatorRow({ username: u, status: "suggested", suggested_at: daysAgo(1) }));
+    const { db, state } = fakeDiscoveryDb({ creators: waiting, candidates: [fit("a", 3), fit("b", 5), fit("c", 4)] });
+    expect(await suggestFits(db, MONDAY)).toEqual({ suggested: 1, dropped: 2 });
+    expect(state.creators.filter((c) => c.status === "suggested").map((c) => c.username)).toEqual(["w1", "w2", "b"]);
+    expect(state.candidates.map((c) => c.outcome)).toEqual(["no_room", "suggested", "no_room"]);
+    expect(state.candidates[0].reason).toBe("Passed, but ranked below this week's suggestions");
+  });
+
+  it("suggestions are ranked by confidence, then by popular Reels", async () => {
+    const seed = () => [fit("a", 4, 0), fit("b", 5, 0), fit("c", 4, 2)];
+    const one = fakeDiscoveryDb({ creators: ["x", "y"].map((u) => creatorRow({ username: u, status: "suggested", suggested_at: daysAgo(1) })), candidates: seed() });
+    await suggestFits(one.db, MONDAY);
+    expect(one.state.creators.filter((c) => c.status === "suggested").map((c) => c.username)).toEqual(["x", "y", "b"]);
+    const two = fakeDiscoveryDb({ creators: [creatorRow({ username: "x", status: "suggested", suggested_at: daysAgo(1) })], candidates: seed() });
+    await suggestFits(two.db, MONDAY);
+    expect(two.state.creators.filter((c) => c.status === "suggested").map((c) => c.username)).toEqual(["x", "b", "c"]);
+  });
+
+  it("waits while a candidate is still to be judged or a sample run is pending", async () => {
+    const waiting = fakeDiscoveryDb({ candidates: [fit("a", 4), sampledRow("b")] });
+    expect(await suggestFits(waiting.db, MONDAY)).toEqual({ suggested: 0, dropped: 0 });
+    const pending = fakeDiscoveryDb({ candidates: [fit("a", 4)], runs: [run({ kind: "sample", status: "pending" })] });
+    expect(await suggestFits(pending.db, MONDAY)).toEqual({ suggested: 0, dropped: 0 });
+  });
+
+  it("a creator hand-added mid-pipeline is never suggested", async () => {
+    const { db, state } = fakeDiscoveryDb({ creators: [creatorRow({ username: "a", status: "watching" })], candidates: [fit("a", 5)] });
+    expect(await suggestFits(db, MONDAY)).toEqual({ suggested: 0, dropped: 1 });
+    expect(state.creators).toHaveLength(1);
+    expect(state.creators[0].status).toBe("watching");
+    expect(state.candidates[0].outcome).toBe("no_room");
+  });
+});
+
+describe("adding and declining", () => {
+  const waiting = (over = {}) => creatorRow({ username: "sug", status: "suggested", suggested_at: daysAgo(1), ...over });
+
+  it("a decline without a reason is refused", async () => {
+    const { db, state } = fakeDiscoveryDb({ creators: [waiting()] });
+    for (const reason of ["", "   "]) expect(await declineSuggestion(db, "cr-sug", reason, MONDAY)).toEqual({ error: "Say why, so later suggestions improve." });
+    expect(state.creators[0].status).toBe("suggested");
+    expect(await declineSuggestion(db, "cr-sug", "x".repeat(300), MONDAY)).toEqual({ error: null });
+    expect((state.creators[0] as { decline_reason: string }).decline_reason).toHaveLength(200);
+    expect(state.creators[0].status).toBe("declined");
+  });
+
+  it("add moves the creator to watching and the next Monday run pulls 90 days for them", async () => {
+    const { db, state } = fakeDiscoveryDb({ creators: [waiting()] });
+    expect(await addSuggestion(db, "cr-sug", MONDAY)).toEqual({ error: null });
+    expect(state.creators[0].status).toBe("watching");
+    const comp = fakeCompetitorsDb({
+      creators: [
+        { id: "cr-sug", username: "sug", status: "watching", last_pulled_at: null, last_pull_status: null },
+        { id: "c2", username: "old", status: "watching", last_pulled_at: daysAgo(7), last_pull_status: "ready" },
+      ],
+    });
+    const f = fakeApify();
+    await startWeeklyPull(comp.db, f.apify, MONDAY, true);
+    expect(f.started[0].newerThanDays).toBe(90);
+    expect(f.started[0].usernames).toContain("sug");
+  });
+
+  it("a declined creator is never suggested again, and a hand-add overrides the decline", async () => {
+    const declined = creatorRow({ username: "nope", status: "declined" });
+    const { db, state } = fakeDiscoveryDb({ creators: [declined], runs: [run()] });
+    await collectDiscoveryRuns(db, fakeApify({ a1: done([found("nope", 16000)]) }).apify, { now: MONDAY, own: OWN });
+    expect(state.candidates).toEqual([]);
+    const comp = fakeCompetitorsDb({ creators: [{ id: "cr-nope", username: "nope", status: "declined" as never, last_pulled_at: null, last_pull_status: null }] });
+    expect(await addCreator(comp.db, "nope")).toEqual({ error: null });
+    expect(comp.state.creators[0].status).toBe("watching");
+  });
+
+  it("a second click finds the suggestion gone, also after it lapsed", async () => {
+    const { db } = fakeDiscoveryDb({ creators: [waiting()] });
+    expect(await addSuggestion(db, "cr-sug", MONDAY)).toEqual({ error: null });
+    expect(await addSuggestion(db, "cr-sug", MONDAY)).toEqual({ error: "That suggestion is gone." });
+    expect(await declineSuggestion(db, "cr-sug", "wrong audience", MONDAY)).toEqual({ error: "That suggestion is gone." });
+    const lapsed = fakeDiscoveryDb({ creators: [waiting({ suggested_at: daysAgo(40) })], candidates: [candidate({ username: "sug", outcome: "suggested" })] });
+    await lapseStale(lapsed.db, MONDAY);
+    expect(await addSuggestion(lapsed.db, "cr-sug", MONDAY)).toEqual({ error: "That suggestion is gone." });
   });
 });

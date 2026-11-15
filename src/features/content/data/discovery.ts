@@ -23,6 +23,17 @@ import { weekStartOf } from "@/features/content/engine/review";
 import { APIFY_ACTOR, type ApifyClient } from "./pulls/apify";
 import type { CreatorRow } from "./competitors";
 
+import {
+  ACTIVE_WINDOW_DAYS,
+  DECLINE_REASONS_IN_PROMPT,
+  JUDGE_MAX_ATTEMPTS,
+  isActive,
+  popularCount,
+  rankFits,
+} from "@/features/content/engine/discovery";
+import { JUDGE_TOOL, judgeOutcome, judgeSchema, judgeSystemPrompt, judgeToolSchema, quotesAreReal, renderJudgeTurn } from "@/features/content/engine/discovery-judge";
+import type { ToolCaller } from "./claude";
+
 // Slice C: the creator-discovery flow. The candidate row is the state machine: every
 // candidate carries an outcome and each call moves whatever is ready one step.
 
@@ -270,4 +281,173 @@ export async function startNextRun(db: DiscoveryDb, apify: ApifyClient, a: { now
     console.error("content discovery start", message(e));
     return { started: null, note: `Could not start a search: ${message(e)}` };
   }
+}
+
+// ---- Judging, suggesting, deciding ----
+
+
+export const JUDGE_SECONDS = 45;
+export const DISCOVERY_RESERVE_SECONDS = 20;
+const NO_ROOM_REASON = "Passed, but ranked below this week's suggestions";
+
+export type DiscoveryReport = {
+  stage: "idle" | "waiting_on_apify" | "judging" | "done";
+  started: DiscoveryRunKind | null;
+  judged: number;
+  suggested: number;
+  dropped: number;
+  note: string;
+};
+
+/**
+ * Judges `sampled` candidates, smallest first, while there is time. A quiet account (under 4 Reels
+ * in 30 days) costs no Claude call. An unusable answer or invented quote is one attempt; the second
+ * attempt (on a later call) makes the candidate unreadable.
+ */
+export async function judgeSampled(db: DiscoveryDb, caller: ToolCaller, a: { now: Date; timeLeft: () => number }): Promise<{ judged: number; dropped: number }> {
+  const at = a.now.toISOString();
+  const rows = (await db.candidates(["sampled"])).sort((x, y) => (x.followers ?? 0) - (y.followers ?? 0));
+  let judged = 0;
+  let dropped = 0;
+  for (const c of rows) {
+    if (a.timeLeft() < JUDGE_SECONDS + DISCOVERY_RESERVE_SECONDS) break;
+    if (!isActive(c.sample, a.now)) {
+      const since = a.now.getTime() - ACTIVE_WINDOW_DAYS * 86_400_000;
+      const recent = c.sample.filter((r) => Date.parse(r.posted_at) >= since).length;
+      await db.setCandidate(c.id, "sampled", { outcome: "quiet", reason: `${recent} Reels in the last 30 days; it takes 4` }, at);
+      judged += 1;
+      dropped += 1;
+      continue;
+    }
+    const captions = c.sample.map((r) => r.caption);
+    let answer: ReturnType<typeof judgeSchema.safeParse> | null = null;
+    try {
+      const raw = await caller.call({
+        system: judgeSystemPrompt(),
+        text: renderJudgeTurn({ username: c.username, bio: c.bio, captions, declines: await db.declines(DECLINE_REASONS_IN_PROMPT) }),
+        tool: { name: JUDGE_TOOL, description: "Record whether this creator's audience matches Miguel's readers.", schema: judgeToolSchema() },
+        maxTokens: 1000,
+      });
+      answer = judgeSchema.safeParse(raw);
+    } catch (e) {
+      console.error("content discovery judge", c.username, message(e));
+    }
+    if (!answer || !answer.success || !quotesAreReal(answer.data.evidence, captions)) {
+      const attempts = c.attempts + 1;
+      if (attempts >= JUDGE_MAX_ATTEMPTS) {
+        await db.setCandidate(c.id, "sampled", { outcome: "unreadable", reason: "The judge gave no usable answer", attempts }, at);
+        judged += 1;
+        dropped += 1;
+      } else await db.setCandidate(c.id, "sampled", { attempts }, at);
+      continue;
+    }
+    const j = answer.data;
+    const outcome = judgeOutcome(j);
+    await db.setCandidate(
+      c.id,
+      "sampled",
+      {
+        outcome,
+        reader: j.reader,
+        confidence: j.confidence,
+        evidence: j.evidence,
+        reason: outcome === "matched_decline" ? `Matches a reason you gave: ${j.matches_decline}` : j.reason,
+        popular_count: popularCount(c.sample),
+      },
+      at,
+    );
+    judged += 1;
+    if (outcome !== "fit") dropped += 1;
+  }
+  return { judged, dropped };
+}
+
+/**
+ * Turns the week's fits into suggestions, best first, into the free slots. Waits until every sampled
+ * candidate is judged and no sample run is pending. Whatever passed but found no slot is `no_room`.
+ */
+export async function suggestFits(db: DiscoveryDb, now: Date): Promise<{ suggested: number; dropped: number }> {
+  const none = { suggested: 0, dropped: 0 };
+  if ((await db.candidates(["sampled"])).length > 0) return none;
+  if ((await db.pendingRuns()).some((r) => r.kind === "sample")) return none;
+  const fits = await db.candidates(["fit"]);
+  if (fits.length === 0) return none;
+  const at = now.toISOString();
+  let suggested = 0;
+  let dropped = 0;
+  const open = async (c: CandidateRow, reason: string) => {
+    await db.setCandidate(c.id, "fit", { outcome: "no_room", reason }, at);
+    dropped += 1;
+  };
+  const taken = new Set((await db.creators()).map((c) => c.username));
+  const ranked = rankFits(fits.filter((c) => !taken.has(c.username)).map((c) => ({ ...c, confidence: c.confidence ?? 0 })));
+  for (const c of fits.filter((c) => taken.has(c.username))) await open(c, "You added it yourself first");
+  for (const c of ranked) {
+    const waiting = (await db.creators()).filter((x) => x.status === "suggested").length;
+    if (slotsFree(waiting) === 0) {
+      await open(c, NO_ROOM_REASON);
+      continue;
+    }
+    if (await db.suggest(c.username, at)) {
+      await db.setCandidate(c.id, "fit", { outcome: "suggested" }, at);
+      suggested += 1;
+    } else await open(c, "You added it yourself first");
+  }
+  return { suggested, dropped };
+}
+
+/** Lapse, collect, start the next run, judge, suggest. `caller` null skips judging and suggesting (the cron). */
+export async function advanceDiscovery(
+  db: DiscoveryDb,
+  apify: ApifyClient,
+  caller: ToolCaller | null,
+  a: { now: Date; force: boolean; own: OwnCount; trigger: "cron" | "routine" | "button"; timeLeft: () => number },
+): Promise<DiscoveryReport> {
+  const report: DiscoveryReport = { stage: "idle", started: null, judged: 0, suggested: 0, dropped: 0, note: "" };
+  try {
+    await lapseStale(db, a.now);
+    const collected = await collectDiscoveryRuns(db, apify, { now: a.now, own: a.own });
+    const start = await startNextRun(db, apify, { now: a.now, force: a.force, own: a.own });
+    report.started = start.started;
+    let judgedHere = false;
+    if (caller) {
+      const j = await judgeSampled(db, caller, a);
+      report.judged = j.judged;
+      judgedHere = j.judged > 0;
+      const s = await suggestFits(db, a.now);
+      report.suggested = s.suggested;
+      report.dropped = j.dropped + s.dropped;
+      if (s.suggested + s.dropped > 0) judgedHere = true;
+    }
+    const sampledLeft = (await db.candidates(["sampled"])).length;
+    if ((await db.pendingRuns()).length > 0) report.stage = "waiting_on_apify";
+    else if (sampledLeft > 0) report.stage = "judging";
+    else if (judgedHere) report.stage = "done";
+    report.note =
+      collected.note ??
+      (collected.errors.length > 0 ? `Could not read an Apify run: ${collected.errors[0]}` : null) ??
+      (report.judged > 0 || report.suggested > 0 ? `Looked at ${report.judged} accounts, suggested ${report.suggested}.` : null) ??
+      start.note ??
+      (report.started ? `Started the ${report.started} run.` : report.stage === "waiting_on_apify" ? "Waiting on Apify." : "Nothing to do.");
+  } catch (e) {
+    console.error("content discovery", message(e));
+    report.note = `Discovery stopped: ${message(e)}`;
+  }
+  try {
+    await db.logCall(a.trigger, report.note, a.now.toISOString());
+  } catch (e) {
+    console.error("content discovery log", message(e));
+  }
+  return report;
+}
+
+/** Moves a suggestion to watching. The write is conditional, so a double click or a lapse answers "gone". */
+export async function addSuggestion(db: DiscoveryDb, creatorId: string, now: Date): Promise<{ error: string | null }> {
+  return (await db.decide(creatorId, "watching", "", now.toISOString())) ? { error: null } : { error: "That suggestion is gone." };
+}
+
+export async function declineSuggestion(db: DiscoveryDb, creatorId: string, reason: string, now: Date): Promise<{ error: string | null }> {
+  const why = reason.trim().slice(0, 200);
+  if (why === "") return { error: "Say why, so later suggestions improve." };
+  return (await db.decide(creatorId, "declined", why, now.toISOString())) ? { error: null } : { error: "That suggestion is gone." };
 }
