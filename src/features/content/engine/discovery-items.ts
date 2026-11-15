@@ -23,7 +23,7 @@ export function searchInput(phrase: string): Record<string, unknown> {
   return { search: phrase, searchType: "user", searchLimit: 30 };
 }
 
-export type ProfileIn = { username: string; followers: number | null; bio: string; related: { username: string; followers: number | null }[] };
+export type ProfileIn = { username: string; followers: number | null; bio: string; isPrivate: boolean; related: { username: string; followers: number | null }[] };
 
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const obj = (v: unknown): Record<string, unknown> | null => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
@@ -41,7 +41,7 @@ export function mapProfileItems(items: unknown[]): ProfileIn[] {
           return rel && name ? [{ username: name, followers: num(rel.followersCount) }] : [];
         })
       : [];
-    out.push({ username, followers: num(it.followersCount), bio: typeof it.biography === "string" ? it.biography : "", related });
+    out.push({ username, followers: num(it.followersCount), bio: typeof it.biography === "string" ? it.biography : "", isPrivate: it.private === true, related });
   }
   return out;
 }

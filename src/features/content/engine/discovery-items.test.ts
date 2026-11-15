@@ -39,8 +39,8 @@ describe("discovery inputs", () => {
 describe("discovery mappers", () => {
   it("a profile item maps to username, followers, bio and related accounts", () => {
     const out = mapProfileItems(profiles);
-    expect(out[0]).toEqual({ username: "ericsfinancials", followers: 42056, bio: expect.stringContaining("Helping Gen Z"), related: [] });
-    expect(out.map((p) => p.username)).toContain("amyalberse");
+    expect(out[0]).toEqual({ username: "ericsfinancials", followers: 42056, bio: expect.stringContaining("Helping Gen Z"), isPrivate: false, related: [] });
+    expect(out.find((p) => p.username === "amyalberse")?.isPrivate).toBe(true);
   });
 
   it("a profile with no follower count maps to null, not 0", () => {
