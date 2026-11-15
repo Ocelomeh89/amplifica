@@ -8,9 +8,12 @@ export interface AmpliconLite {
   termMonths: number;
   startMonth: YearMonth;
   // "LTI" = Long-Term Income: interestPct is the annual cash-on-cash rate and
-  // the payout is flat (face × rate / 12) for termMonths, with no principal
-  // back at the end. Absent = "STI" (fully amortizing).
+  // the payout is flat (face × rate / 12) for termMonths, with the face value
+  // paid back in the last month. Absent = "STI" (fully amortizing).
   incomeType?: "STI" | "LTI";
+  // LTI only: paid for with the user's own money (e.g. a work bonus), not a
+  // line-of-credit draw. It starts on its date and never takes a launch slot.
+  bonus?: boolean;
 }
 
 // Global discount rate for valuing future cash flows, as an annual decimal.
@@ -47,6 +50,22 @@ export function monthlyPayoutOf(inv: AmpliconLite): number {
   return monthlyPayment(inv.faceValue, inv.interestPct, inv.termMonths);
 }
 
+// What `inv` pays in `month`: its regular payment, plus an LTI's face value
+// in its last month.
+export function payoutAtMonth(inv: AmpliconLite, month: YearMonth): number {
+  if (!isActiveAt(inv, month)) return 0;
+  const last = inv.incomeType === "LTI" && monthsBetween(inv.startMonth, month) === inv.termMonths - 1;
+  return monthlyPayoutOf(inv) + (last ? inv.faceValue : 0);
+}
+
+// The income part of `inv`'s payment in `month`: an STI's interest on its
+// unpaid principal, or an LTI's whole coupon (its face value back is capital).
+export function incomeAtMonth(inv: AmpliconLite, month: YearMonth): number {
+  if (!isActiveAt(inv, month)) return 0;
+  if (inv.incomeType === "LTI") return monthlyPayoutOf(inv);
+  return pvAtMonth(inv, month) * (inv.interestPct / 12);
+}
+
 export function isActiveAt(inv: AmpliconLite, month: YearMonth): boolean {
   const elapsed = monthsBetween(inv.startMonth, month);
   return elapsed >= 0 && elapsed < inv.termMonths;
@@ -78,9 +97,11 @@ export function remainingValueAtMonth(
   if (elapsed < 0 || elapsed >= inv.termMonths) return 0;
   const remainingPayments = inv.termMonths - elapsed;
   const payment = monthlyPayoutOf(inv);
-  if (discountRatePct === 0) return payment * remainingPayments;
+  const face = inv.incomeType === "LTI" ? inv.faceValue : 0; // paid back with the last payment
+  if (discountRatePct === 0) return payment * remainingPayments + face;
   const r = discountRatePct / 12;
-  return (payment * (1 - Math.pow(1 + r, -remainingPayments))) / r;
+  const discount = Math.pow(1 + r, -remainingPayments);
+  return (payment * (1 - discount)) / r + face * discount;
 }
 
 export function buildSeries(input: ProjectionInput): ProjectionPoint[] {
@@ -135,7 +156,7 @@ export function buildSeries(input: ProjectionInput): ProjectionPoint[] {
     let cashFlow = 0;
     let valueTotal = 0;
     for (const inv of amplicons) {
-      if (isActiveAt(inv, month)) cashFlow += monthlyPayoutOf(inv);
+      cashFlow += payoutAtMonth(inv, month);
       valueTotal += remainingValueAtMonth(inv, month, discountRatePct);
     }
     series.push({

@@ -18,7 +18,7 @@ const args = {
   settings: DEFAULT_PROJECTION_SETTINGS,
   msc: 2000,
   cashflowGoalUSD: 3000,
-  currentMonthlyCashflow: 600,
+  currentMonthlyIncome: 600,
 };
 
 describe("buildDashboardProjection", () => {
@@ -34,7 +34,7 @@ describe("buildDashboardProjection", () => {
     expect(series).toEqual(direct.series);
   });
 
-  it("finds optionality exactly as Projections does, and measures progress at that month", () => {
+  it("finds optionality on the capital measure, and measures income progress at that month", () => {
     const { optionality } = buildDashboardProjection(args);
     expect(optionality.kind).toBe("reached");
     if (optionality.kind !== "reached") return;
@@ -44,11 +44,22 @@ describe("buildDashboardProjection", () => {
       locIncrease: 1.5, locInterestPct: 0.1, totalMonths: 360,
       seed: { ...s, startDelayMonths: 0 },
     };
-    const fi = earliestSustainableWithdrawal(input, 3000, { requireGrowth: false, minStartMonth: 0 });
+    const fi = earliestSustainableWithdrawal(input, 3000, { requireGrowth: false, minStartMonth: 0, measure: "capital" });
     expect(optionality.month).toBe(addMonths(TODAY, fi.month!));
     const atSwitch = runSimulation({ ...input, mscEndMonth: fi.month!, withdrawalStartMonth: fi.month!, monthlyWithdrawal: 3000 });
-    expect(optionality.cashFlowAtOptionality).toBeCloseTo(atSwitch.series[fi.month!].distributionCashFlow, 6);
-    expect(optionality.progress).toBeCloseTo(Math.min(600 / optionality.cashFlowAtOptionality, 1), 10);
+    expect(optionality.incomeAtOptionality).toBeCloseTo(atSwitch.series[fi.month!].distributionInterest, 6);
+    expect(optionality.progress).toBeCloseTo(Math.min(600 / optionality.incomeAtOptionality, 1), 10);
+  });
+
+  it("an LTI's income counts toward the withdrawal: a Bonus LTI brings optionality forward", () => {
+    const bonus: AmpliconLite = {
+      id: "bonus", faceValue: 25000, interestPct: 0.5, termMonths: 360, startMonth: TODAY, incomeType: "LTI", bonus: true,
+    };
+    const month = (list: AmpliconLite[]) => {
+      const o = buildDashboardProjection({ ...args, amplicons: list }).optionality;
+      return o.kind === "reached" ? o.month : "never";
+    };
+    expect(month([...amps, bonus]) < month(amps)).toBe(true);
   });
 
   it("a recorded LoC balance delays optionality versus none", () => {
@@ -73,6 +84,19 @@ describe("buildDashboardProjection", () => {
     expect(r.slips[0].id).toBe("rental");
     expect(r.slips[0].actual == null || r.slips[0].actual > "2026-12").toBe(true);
     expect(r.overLimit).not.toBeNull();
+  });
+
+  it("the over-limit warning says from how much to how much the line must grow, on that date", () => {
+    const r = buildDashboardProjection({
+      ...args,
+      amplicons: [...amps, { id: "rental", faceValue: 100000, interestPct: 0.04, termMonths: 120, startMonth: "2026-12", incomeType: "LTI" }],
+      locs: [{ id: "h", size: 50000, utilization: 30000, interestPct: 0.1 }],
+    });
+    const o = r.overLimit!;
+    expect(o.fromLimit).toBe(50000);
+    const i = r.series.findIndex((p) => p.outstandingAmount - 50000 > 0.5);
+    expect(o.month).toBe(addMonths(TODAY, i));
+    expect(o.toLimit).toBeCloseTo(r.series[i].outstandingAmount, 6);
   });
 
   it("a $0 goal is the no-goal state, never 100%", () => {
@@ -105,6 +129,13 @@ describe("oversized LTI warning", () => {
 
   it("an LTI at or below the draw size is fine", () => {
     expect(buildDashboardProjection({ ...args, amplicons: [...amps, lti(15000, "2026-12")] }).oversizedLtis).toEqual([]);
+  });
+
+  it("a Bonus LTI is never flagged: no draw funds it", () => {
+    const bonus = { ...lti(100000, "2026-12"), bonus: true };
+    const r = buildDashboardProjection({ ...args, amplicons: [...amps, bonus] });
+    expect(r.oversizedLtis).toEqual([]);
+    expect(r.slips).toEqual([]);
   });
 
   it("an LTI that has already started is never flagged", () => {

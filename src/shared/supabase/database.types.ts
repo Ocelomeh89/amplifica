@@ -39,6 +39,7 @@ export type Database = {
           interest_pct: number;
           start_date: string;
           income_type: "STI" | "LTI";
+          is_bonus: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -51,6 +52,7 @@ export type Database = {
           interest_pct: number;
           start_date: string;
           income_type?: "STI" | "LTI";
+          is_bonus?: boolean;
         };
         Update: {
           name?: string;
@@ -60,6 +62,7 @@ export type Database = {
           interest_pct?: number;
           start_date?: string;
           income_type?: "STI" | "LTI";
+          is_bonus?: boolean;
         };
         Relationships: [];
       };

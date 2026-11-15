@@ -8,7 +8,8 @@
 // earlier is already paid for — its draw sits in the LoC balance — so it goes
 // straight into the book. One whose first payment is still ahead must be
 // funded by a draw: it is scheduled into the flywheel's next launch slot on or
-// after its date, never added for free.
+// after its date, never added for free. Exception: a Bonus LTI is paid for
+// with the user's own money, so it enters the book on its own date.
 
 import { monthlyPayment } from "./amortization";
 import { monthsBetween, type YearMonth } from "./dates";
@@ -80,6 +81,11 @@ export function seedFromTracked(
   const scheduled: ScheduledLaunch[] = [];
   for (const a of amplicons) {
     const startMonth = monthsBetween(today, a.startMonth);
+    // A Bonus LTI is paid for with the user's own money: no draw, no slot.
+    if (isLti(a) && a.bonus && startMonth >= 1) {
+      book.push(toInvestment(a, startMonth));
+      continue;
+    }
     if (startMonth >= 1) {
       scheduled.push({ id: a.id, investment: toInvestment(a, startMonth) });
       continue;

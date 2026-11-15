@@ -231,3 +231,17 @@ describe("isWorse", () => {
   });
 });
 
+
+describe("LTI payback", () => {
+  it("the fund must also cover the face value in the LTI's last month", () => {
+    // 12000 LTI at 12% for 3 months: 120, 120, 12120. 0% liquid holding of 12000.
+    const ltiAmp: FundAmplicon = {
+      id: "l", faceValue: 12000, interestPct: 0.12, termMonths: 3, startMonth: "2026-02",
+      incomeType: "LTI", allocations: [{ optionId: "idx0", pct: 1 }],
+    };
+    const r = runFundCheck({ amplicons: [ltiAmp], options: [idx0], moves: [], checkins: [], today: "2026-01" });
+    expect(r.months.map((m) => +m.payments.toFixed(6))).toEqual([0, 120, 120, 12120]);
+    expect(r.status).toBe("runs-out");
+    expect(r.runOutMonth).toBe("2026-04");
+  });
+});

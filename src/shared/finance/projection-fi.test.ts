@@ -43,3 +43,32 @@ describe("earliestSustainableWithdrawal", () => {
     expect(earliestSustainableWithdrawal(seeded, 4500).month).toBeNull();
   });
 });
+
+describe("measure: capital (dashboard, 2026-11-14)", () => {
+  // A $1M LTI at 12% pays $10k a month of pure income for 50 years; no flywheel.
+  const lti: ProjectionSimInput = {
+    msc: 0, investmentSizeFactor: 0, termMonths: 36, investmentInterestPct: 0.08,
+    locIncrease: 1.5, locInterestPct: 0.1, totalMonths: 120,
+    seed: {
+      book: [{ kind: "lti", monthlyPayout: 10000, termMonths: 600, startMonth: 0, faceValue: 1e6, monthlyRate: 0.01 }],
+      outstanding: 0, nextDrawSize: 0, startDelayMonths: 0,
+    },
+  };
+
+  it("income that covers the withdrawal is optionality today", () => {
+    expect(earliestSustainableWithdrawal(lti, 5000, { measure: "capital" }).month).toBe(0);
+  });
+
+  it("the book measure ignores that income: the coupon only turns book value into cash", () => {
+    expect(earliestSustainableWithdrawal(lti, 5000).month).not.toBe(0);
+  });
+
+  it("a withdrawal above the income eats capital and is never sustainable", () => {
+    expect(earliestSustainableWithdrawal(lti, 15000, { measure: "capital" }).month).toBeNull();
+  });
+
+  it("the default measure is unchanged for existing callers", () => {
+    expect(earliestSustainableWithdrawal(profitable, 4500, { measure: "book" }))
+      .toEqual(earliestSustainableWithdrawal(profitable, 4500));
+  });
+});

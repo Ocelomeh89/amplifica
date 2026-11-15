@@ -25,6 +25,12 @@ describe("fundCheckLines", () => {
     ]);
   });
 
+  it("hides the amounts while an STI is paying", () => {
+    expect(fundCheckLines(base, { showAmounts: false })).toEqual([
+      { tone: "quiet", text: "Covers every payment through Aug '29." },
+    ]);
+  });
+
   it("short this month is red", () => {
     expect(fundCheckLines({ ...base, status: "short-now" })[0]).toEqual({ tone: "red", text: "Can't cover this month." });
   });

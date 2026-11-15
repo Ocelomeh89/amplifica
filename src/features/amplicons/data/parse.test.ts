@@ -8,6 +8,19 @@ const fd = (o: Record<string, string>) => {
 };
 
 describe("parseAmpliconForm", () => {
+  it("reads the Bonus box on an LTI", () => {
+    const base = { name: "b", income_type: "LTI", face_value: "30000", term_years: "20", interest_pct: "10", start_date: "2027-03-01" };
+    expect(parseAmpliconForm(fd({ ...base, is_bonus: "on" })).is_bonus).toBe(true);
+    expect(parseAmpliconForm(fd(base)).is_bonus).toBe(false);
+  });
+
+  it("an STI is never a Bonus", () => {
+    const r = parseAmpliconForm(
+      fd({ name: "s", face_value: "25000", term_months: "36", interest_pct: "8", start_date: "2026-11-01", is_bonus: "on" })
+    );
+    expect(r.is_bonus).toBe(false);
+  });
+
   it("defaults to STI and reads term in months", () => {
     const r = parseAmpliconForm(fd({ name: "n", face_value: "25000", term_months: "36", interest_pct: "8", start_date: "2026-11-01" }));
     expect(r).toMatchObject({ income_type: "STI", term_months: 36, interest_pct: 0.08 });

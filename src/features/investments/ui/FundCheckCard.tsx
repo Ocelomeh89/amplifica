@@ -6,8 +6,8 @@ const TONE = { red: "text-red-600 font-semibold", amber: "text-amber-700 font-se
 
 // Beside the projection: can the real fund cover every Amplicon payment?
 // Warning-only; it changes no projection number.
-export default function FundCheckCard({ result }: { result: FundCheckResult }) {
-  const lines = fundCheckLines(result);
+export default function FundCheckCard({ result, showAmounts = true }: { result: FundCheckResult; showAmounts?: boolean }) {
+  const lines = fundCheckLines(result, { showAmounts });
   if (lines.length === 0) return null;
   return (
     <div className="mb-4 rounded-lg border border-edge bg-card p-3 text-xs space-y-1">

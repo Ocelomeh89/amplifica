@@ -5,6 +5,8 @@ import {
   remainingValueAtMonth,
   isActiveAt,
   buildSeries,
+  payoutAtMonth,
+  incomeAtMonth,
   type ProjectionInput,
   type AmpliconLite,
 } from "./projection";
@@ -157,5 +159,44 @@ describe("buildSeries", () => {
     expect(series).toHaveLength(1);
     expect(series[0].cashFlow).toBe(0);
     expect(series[0].expectedFuturePayments).toBe(0);
+  });
+});
+
+describe("LTI face value back at the end (2026-11-14)", () => {
+  const lti: AmpliconLite = {
+    id: "l", faceValue: 12000, interestPct: 0.1, termMonths: 12, startMonth: "2026-01", incomeType: "LTI",
+  };
+
+  it("payoutAtMonth adds the face value to the last payment only", () => {
+    expect(payoutAtMonth(lti, "2026-01")).toBeCloseTo(100, 9);
+    expect(payoutAtMonth(lti, "2026-12")).toBeCloseTo(12100, 9);
+    expect(payoutAtMonth(lti, "2027-01")).toBe(0);
+  });
+
+  it("remaining value counts the face value still to come", () => {
+    expect(remainingValueAtMonth(lti, "2026-01")).toBeCloseTo(12 * 100 + 12000, 9);
+    expect(remainingValueAtMonth(lti, "2026-12")).toBeCloseTo(100 + 12000, 9);
+  });
+
+  it("buildSeries shows the face value as cash flow in the last month", () => {
+    const s = buildSeries({ amplicons: [lti], externalNetWorth: 0, range: "inception", today: "2026-01" });
+    expect(s[11].cashFlow).toBeCloseTo(12100, 9);
+    expect(s[0].cashFlow).toBeCloseTo(100, 9);
+  });
+});
+
+describe("incomeAtMonth: the interest part of a payment", () => {
+  it("an STI earns interest on its unpaid principal", () => {
+    expect(incomeAtMonth(inv25k36mo, "2026-05")).toBeCloseTo(25000 * 0.08 / 12, 9);
+    const sixIn = pvAtMonth(inv25k36mo, "2026-11");
+    expect(incomeAtMonth(inv25k36mo, "2026-11")).toBeCloseTo(sixIn * 0.08 / 12, 9);
+    expect(incomeAtMonth(inv25k36mo, "2026-04")).toBe(0);
+  });
+
+  it("an LTI's coupon is all income; the face value back is not", () => {
+    const lti: AmpliconLite = { id: "l", faceValue: 12000, interestPct: 0.1, termMonths: 12, startMonth: "2026-01", incomeType: "LTI" };
+    expect(incomeAtMonth(lti, "2026-06")).toBeCloseTo(100, 9);
+    expect(incomeAtMonth(lti, "2026-12")).toBeCloseTo(100, 9);
+    expect(incomeAtMonth(lti, "2027-01")).toBe(0);
   });
 });

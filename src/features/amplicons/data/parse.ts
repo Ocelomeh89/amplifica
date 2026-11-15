@@ -1,6 +1,7 @@
 // The Amplicon form's FormData contract, shared by create and edit.
 // STI: term_months + interest_pct (loan rate). LTI: term_years (stored as
-// months) + interest_pct (annual cash-on-cash rate).
+// months) + interest_pct (annual cash-on-cash rate) + is_bonus (checkbox: paid
+// with the user's own money, not a line-of-credit draw; always false for STI).
 
 import { num, pct, str } from "@/shared/forms";
 
@@ -10,6 +11,7 @@ export interface AmpliconFields {
   name: string;
   ai_type: string;
   income_type: IncomeType;
+  is_bonus: boolean;
   face_value: number;
   term_months: number;
   interest_pct: number;
@@ -24,6 +26,7 @@ export function parseAmpliconForm(fd: FormData): AmpliconFields {
     name: str(fd, "name").trim(),
     ai_type: str(fd, "ai_type").trim(),
     income_type,
+    is_bonus: income_type === "LTI" && str(fd, "is_bonus") === "on",
     face_value: num(fd, "face_value"),
     term_months,
     interest_pct: pct(fd, "interest_pct"),

@@ -17,6 +17,7 @@ import {
 import {
   makeInvestment,
   isActive,
+  payoutAt,
   collectPayouts,
   valueBook,
   countActive,
@@ -232,9 +233,7 @@ function payoffPredictedWithinGate(
     const withdrawal =
       config.withdrawalStartMonth != null && future >= config.withdrawalStartMonth ? config.monthlyWithdrawal : 0;
     let inflow = effMsc - withdrawal;
-    for (const inv of state.book) {
-      if (isActive(inv, future)) inflow += inv.monthlyPayout;
-    }
+    for (const inv of state.book) inflow += payoutAt(inv, future);
     if (isActive(candidate, future)) inflow += candidate.monthlyPayout;
     balance -= inflow;
     if (balance <= 0 || balance < inflow) return true;
@@ -264,9 +263,7 @@ function payoffPredictedOnLines(
     const withdrawal =
       config.withdrawalStartMonth != null && future >= config.withdrawalStartMonth ? config.monthlyWithdrawal : 0;
     let inflow = effMsc - withdrawal;
-    for (const inv of state.book) {
-      if (isActive(inv, future)) inflow += inv.monthlyPayout;
-    }
+    for (const inv of state.book) inflow += payoutAt(inv, future);
     if (isActive(candidate, future)) inflow += candidate.monthlyPayout;
     if (inflow >= 0) payDownLines(lines, inflow);
     else borrowFromLines(lines, -inflow);

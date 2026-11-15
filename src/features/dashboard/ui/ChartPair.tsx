@@ -12,34 +12,39 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { ProjectionPoint } from "@/shared/finance/projection";
-import { fmtCurrency, fmtKUSD, fmtMUSD, fmtMonth } from "@/shared/format";
+import { fmtCurrency, fmtKUSD, fmtMonth } from "@/shared/format";
 import type { YearMonth } from "@/shared/finance/dates";
 import type { ChartRow } from "../projection";
 import { optionalityInRange } from "../projection";
+import type { FundMonth } from "@/shared/finance/fund-check";
+import { alignFundRows } from "../fund-rows";
+import FundBalanceChart from "./FundBalanceChart";
 
 interface Props {
   inceptionSeries: ProjectionPoint[];
   currentSeries: ProjectionPoint[];
   cashflowTargetUSD: number;
-  expectedFuturePaymentsTargetUSD: number;
   inceptionProjected: ChartRow[];
   currentProjected: ChartRow[];
   optionalityMonth: YearMonth | null;
   controls?: React.ReactNode;
+  fundMonths?: FundMonth[];
+  today?: YearMonth;
 }
 
 export default function ChartPair({
   inceptionSeries,
   currentSeries,
   cashflowTargetUSD,
-  expectedFuturePaymentsTargetUSD,
   inceptionProjected,
   currentProjected,
   optionalityMonth,
   controls,
+  fundMonths = [],
+  today,
 }: Props) {
   const [range, setRange] = useState<"inception" | "current">("current");
-  const [projecting, setProjecting] = useState(false);
+  const [projecting, setProjecting] = useState(true);
   const rows: ChartRow[] = projecting
     ? range === "inception" ? inceptionProjected : currentProjected
     : range === "inception" ? inceptionSeries : currentSeries;
@@ -152,18 +157,12 @@ export default function ChartPair({
                   label={{ value: `Optionality · ${fmtMonth(optionalityMonth!)}`, fontSize: 10, position: "insideTopRight" }}
                 />
               )}
-              {expectedFuturePaymentsTargetUSD > 0 && (
-                <ReferenceLine
-                  y={expectedFuturePaymentsTargetUSD}
-                  stroke="#b08020"
-                  strokeDasharray="4 4"
-                  label={{ value: `Target ${fmtMUSD(expectedFuturePaymentsTargetUSD)}`, fontSize: 10, position: "right" }}
-                />
-              )}
             </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
+
+      {today && <FundBalanceChart rows={alignFundRows(rows, fundMonths)} today={today} tickInterval={tickInterval} />}
     </div>
   );
 }

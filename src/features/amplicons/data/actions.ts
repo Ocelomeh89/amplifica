@@ -54,7 +54,7 @@ export async function duplicateAmplicon(formData: FormData) {
   // RLS scopes this read to the signed-in user, so they can only copy their own.
   const { data: src, error: fetchErr } = await supabase
     .from("amplicons")
-    .select("name, ai_type, income_type, face_value, term_months, interest_pct, start_date")
+    .select("name, ai_type, income_type, is_bonus, face_value, term_months, interest_pct, start_date")
     .eq("id", id)
     .single();
   if (fetchErr || !src) throw new Error(fetchErr?.message ?? "Amplicon not found");
@@ -64,6 +64,7 @@ export async function duplicateAmplicon(formData: FormData) {
     name: `${src.name} (copy)`,
     ai_type: src.ai_type,
     income_type: src.income_type,
+    is_bonus: src.is_bonus,
     face_value: src.face_value,
     term_months: src.term_months,
     interest_pct: src.interest_pct,

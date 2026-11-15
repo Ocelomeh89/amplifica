@@ -2,11 +2,11 @@
 // cash to cover every scheduled Amplicon payment? (Spec 2026-11-10.)
 //
 // Read-only beside the flywheel: it reads Amplicon schedules through the same
-// monthlyPayoutOf / isActiveAt the dashboard uses and changes no engine number.
+// payoutAtMonth the dashboard uses and changes no engine number.
 
 import { monthlyPayment } from "./amortization";
 import { addMonths, monthsBetween, type YearMonth } from "./dates";
-import { isActiveAt, monthlyPayoutOf, type AmpliconLite } from "./projection";
+import { payoutAtMonth, type AmpliconLite } from "./projection";
 
 export type OptionType = "amortized" | "interest_only" | "appreciation";
 
@@ -276,7 +276,7 @@ export function runFundCheck(input: FundCheckInput): FundCheckResult {
 
     // 5. Payments: income first, then sell liquid holdings, lowest rate first.
     let payments = 0;
-    for (const a of amplicons) if (isActiveAt(a, m)) payments += monthlyPayoutOf(a);
+    for (const a of amplicons) payments += payoutAtMonth(a, m);
     let shortfall = Math.max(payments - income, 0);
     let soldToCover = 0;
     if (shortfall > 0) {

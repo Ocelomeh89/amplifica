@@ -13,6 +13,7 @@ export interface AmpliconRowData {
   name: string;
   ai_type: string | null;
   income_type: "STI" | "LTI";
+  is_bonus: boolean;
   face_value: number;
   interest_pct: number;
   term_months: number;
@@ -110,6 +111,7 @@ export default function AmpliconRow({
       <td className="py-2">{a.name}{current && <span className="block text-[11px] text-sub">{describe(current)}</span>}</td>
       <td>
         <span className="text-[10px] font-semibold uppercase mr-1">{a.income_type}</span>
+        {a.is_bonus && <span className="text-[10px] font-semibold uppercase mr-1 text-sub">Bonus</span>}
         {a.ai_type || ""}
       </td>
       <td>{fmtCurrency(a.face_value)}</td>

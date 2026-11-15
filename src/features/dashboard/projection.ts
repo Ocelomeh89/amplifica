@@ -14,7 +14,7 @@ export type OptionalityStatus =
   | { kind: "no-amplicons" }
   | { kind: "no-goal" }
   | { kind: "not-reached"; horizonYears: number }
-  | { kind: "reached"; month: YearMonth; progress: number; cashFlowAtOptionality: number };
+  | { kind: "reached"; month: YearMonth; progress: number; incomeAtOptionality: number };
 
 // A future-dated Amplicon whose projected first payment lands later than the
 // date the user entered, because it waits for the flywheel's next launch slot.
@@ -26,10 +26,13 @@ export interface ScheduledSlip {
 }
 
 // Projected debt above the user's total credit limit: the first month it
-// happens and the most it goes over.
+// happens, the most it goes over, and the raise needed that month
+// (fromLimit = today's total limit, toLimit = what is owed that month).
 export interface OverLimit {
   month: YearMonth;
   peakExcess: number;
+  fromLimit: number;
+  toLimit: number;
 }
 
 // A planned (future-dated) LTI bigger than the flywheel's draw size in the
@@ -57,7 +60,7 @@ export function buildDashboardProjection(args: {
   settings: ProjectionSettings;
   msc: number;
   cashflowGoalUSD: number;
-  currentMonthlyCashflow: number;
+  currentMonthlyIncome: number; // STI interest + LTI coupons this month
   locs?: LocLite[];
 }): {
   series: ProjectionSimPoint[];
@@ -66,7 +69,7 @@ export function buildDashboardProjection(args: {
   overLimit: OverLimit | null;
   oversizedLtis: OversizedLti[];
 } {
-  const { amplicons, today, settings, msc, cashflowGoalUSD, currentMonthlyCashflow, locs } = args;
+  const { amplicons, today, settings, msc, cashflowGoalUSD, currentMonthlyIncome, locs } = args;
   const seed = seedFromTracked(amplicons, today, settings.nextDrawSize, locs);
   const input: ProjectionSimInput = {
     msc,
@@ -122,7 +125,8 @@ export function buildDashboardProjection(args: {
     series.forEach((p, i) => {
       const excess = p.outstandingAmount - limit;
       if (excess > 0.5) {
-        if (overLimit == null) overLimit = { month: addMonths(today, i), peakExcess: excess };
+        if (overLimit == null)
+          overLimit = { month: addMonths(today, i), peakExcess: excess, fromLimit: limit, toLimit: p.outstandingAmount };
         else overLimit.peakExcess = Math.max(overLimit.peakExcess, excess);
       }
     });
@@ -136,12 +140,14 @@ export function buildDashboardProjection(args: {
   const fi = earliestSustainableWithdrawal(input, cashflowGoalUSD, {
     requireGrowth: false,
     minStartMonth: 0,
+    // Optionality = income covers the withdrawal and the capital is never spent.
+    measure: "capital",
   });
   if (fi.month == null) {
     return { ...base, optionality: { kind: "not-reached", horizonYears: Math.round(settings.horizonMonths / 12) } };
   }
 
-  // Read the payout from the run that actually switches at fi.month: the
+  // Read the income from the run that actually switches at fi.month: the
   // payoff gate looks ahead at MSC and withdrawals, so launches before the
   // switch can differ from the plain projection's.
   const atSwitch = runSimulation({
@@ -150,15 +156,15 @@ export function buildDashboardProjection(args: {
     withdrawalStartMonth: fi.month,
     monthlyWithdrawal: cashflowGoalUSD,
   });
-  const cashFlowAtOptionality = atSwitch.series[fi.month].distributionCashFlow;
+  const incomeAtOptionality = atSwitch.series[fi.month].distributionInterest;
   return {
     ...base,
     optionality: {
       kind: "reached",
       month: addMonths(today, fi.month),
       // Optionality today means 100%, whatever the payout reads.
-      progress: fi.month === 0 ? 1 : optionalityProgress(currentMonthlyCashflow, cashFlowAtOptionality),
-      cashFlowAtOptionality,
+      progress: fi.month === 0 ? 1 : optionalityProgress(currentMonthlyIncome, incomeAtOptionality),
+      incomeAtOptionality,
     },
   };
 }
