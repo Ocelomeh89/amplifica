@@ -1,7 +1,7 @@
--- 0021: Bonus LTIs (2026-11-14). An LTI paid for with the user's own money
+-- 0023: Bonus LTIs (2026-11-14). An LTI paid for with the user's own money
 -- (e.g. a work bonus) instead of a line-of-credit draw. Additive only; every
--- existing row becomes false, i.e. today's behavior. Numbered 0021 because
--- main already has a 0020.
+-- existing row becomes false, i.e. today's behavior. Numbered 0023 because
+-- main already has 0020-0022 (content).
 -- Rollback:
 --   alter table public.amplicons drop column is_bonus;
 
