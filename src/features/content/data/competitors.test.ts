@@ -159,6 +159,18 @@ describe("addCreator and the Creators page", () => {
   });
 });
 
+describe("suggested and declined creators", () => {
+  it("the creators table lists only watching and removed creators", () => {
+    const page = buildCreatorsPage(
+      [creator({ id: "a", username: "aa" }), creator({ id: "b", username: "bb", status: "removed" }), creator({ id: "c", username: "cc", status: "suggested" }), creator({ id: "d", username: "dd", status: "declined" })],
+      [],
+      null,
+      TUESDAY,
+    );
+    expect(page.creators.map((c) => c.username)).toEqual(["aa", "bb"]);
+  });
+});
+
 describe("review fixes", () => {
   it("a failed first run keeps the creator never-pulled, so the next pull still asks for 90 days", async () => {
     const { db, state } = fakeCompetitorsDb({ creators: [creator()], runs: [run()] });

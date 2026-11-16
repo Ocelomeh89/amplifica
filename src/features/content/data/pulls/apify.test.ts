@@ -47,6 +47,19 @@ describe("apifyClientFromEnv", () => {
     expect((f.calls[0].body.arguments as Record<string, unknown>).waitForFinish).toBe(0);
   });
 
+  it("startActor sends the actor, the body and its own cap with waitForFinish 0", async () => {
+    const f = fakeFetch({ APIFY_RUN_ACTOR: { data: { id: "run2", status: "READY", defaultDatasetId: "ds2" } } });
+    const c = apifyClientFromEnv(env, f.impl);
+    expect(await c.startActor({ actorId: "apify~instagram-profile-scraper", body: { usernames: ["a"] }, maxTotalChargeUsd: 0.42 })).toEqual({ runId: "run2" });
+    expect(f.calls[0].body.arguments).toEqual({ actorId: "apify~instagram-profile-scraper", body: { usernames: ["a"] }, maxTotalChargeUsd: 0.42, waitForFinish: 0 });
+  });
+
+  it("startRun still sends the weekly cap and the post scraper", async () => {
+    const f = fakeFetch({ APIFY_RUN_ACTOR: { data: { id: "run3" } } });
+    await apifyClientFromEnv(env, f.impl).startRun({ usernames: ["a"], newerThanDays: 21 });
+    expect(f.calls[0].body.arguments).toMatchObject({ actorId: APIFY_ACTOR, maxTotalChargeUsd: 1, waitForFinish: 0 });
+  });
+
   it("maps run statuses to pending, ready and failed", async () => {
     const run = (status: string) => ({ data: { id: "r", status, defaultDatasetId: "ds", usageTotalUsd: 0.05, statusMessage: "msg" } });
     const state = async (status: string) => apifyClientFromEnv(env, fakeFetch({ APIFY_ACTOR_RUN_GET: run(status) }).impl).getRun("r");

@@ -31,6 +31,7 @@ describe("content stays owner-only", () => {
       "src/features/content/data/recreate-actions.ts",
       "src/features/content/data/today-actions.ts",
       "src/features/content/data/review-actions.ts",
+      "src/features/content/data/discovery-actions.ts",
     ];
     for (const f of files) expect(read(f), f).toContain("requireContentOwner()");
   });
@@ -48,6 +49,7 @@ describe("content stays owner-only", () => {
       "src/app/api/content/voice/route.ts",
       "src/app/api/content/review/build/route.ts",
       "src/app/api/content/tests/propose/route.ts",
+      "src/app/api/content/creators/discover/route.ts",
     ];
     for (const f of routes) expect(read(f), f).toContain("authorizeRoutine(req, process.env.");
   });
@@ -194,11 +196,12 @@ describe("content stays owner-only", () => {
   it("a Pass stores its reason as a note, and background helpers stay out of the 'use server' files", () => {
     expect(read("src/features/content/data/actions.ts")).toContain("recordPassNote(");
     // Every export of a "use server" file is a callable endpoint; the helper lives in a plain module.
-    for (const f of ["src/features/content/data/sharpen-actions.ts", "src/features/content/data/taste-actions.ts"]) {
+    for (const f of ["src/features/content/data/sharpen-actions.ts", "src/features/content/data/taste-actions.ts", "src/features/content/data/discovery-actions.ts"]) {
       const exports = read(f).match(/^export (?:async )?(?:function|const) (\w+)/gm) ?? [];
       expect(exports.every((e) => /export async function \w+Action\b/.test(e)), f).toBe(true);
     }
     expect(read("src/features/content/data/taste-run.ts")).not.toContain('"use server"');
+    expect(read("src/features/content/data/discovery-run.ts")).not.toContain('"use server"');
   });
 
   it("every direct reader of content_posts is on the list", () => {
@@ -246,6 +249,29 @@ describe("content stays owner-only", () => {
     expect(step).toBeLessThan(route.indexOf("runCompetitorCron("));
     expect(route).toMatch(/\.\.\.report, [^}]*tests/);
     expect(read("src/features/content/data/test-lab-cron.ts")).not.toContain("anthropic");
+  });
+
+  it("creator discovery makes no Claude call on the cron", () => {
+    const cron = read("src/features/content/data/discovery-cron.ts");
+    expect(cron).not.toContain("ToolCaller");
+    expect(cron).not.toContain("anthropicToolCaller");
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    const step = route.indexOf("runDiscoveryCron(");
+    expect(step).toBeGreaterThan(route.indexOf("runCompetitorCron("));
+    expect(step).toBeLessThan(route.indexOf("runTodayCron("));
+    expect(route).toMatch(/\.\.\.report, [^}]*discovery/);
+    expect(route).toContain('params.get("creators") === "now"');
+    const discover = read("src/app/api/content/creators/discover/route.ts");
+    expect(discover).toContain("export const maxDuration = 300;");
+    expect(discover).toContain("runDiscovery(");
+    expect(read("src/features/content/data/discovery-run.ts")).not.toContain("use server");
+  });
+
+  it("the Creators page has the 300 second budget its background search runs under, and the button logs before it starts", () => {
+    expect(read("src/app/(app)/content/creators/page.tsx")).toContain("export const maxDuration = 300;");
+    const actions = read("src/features/content/data/discovery-actions.ts");
+    expect(actions.indexOf("logCall(")).toBeGreaterThan(-1);
+    expect(actions.indexOf("logCall(")).toBeLessThan(actions.indexOf("waitUntil("));
   });
 
   it("the conclusions are written after the digest, with a 30 second Claude timeout", () => {

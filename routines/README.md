@@ -131,5 +131,9 @@ ClickUp connector and the message: "Read routines/content-weekly.md in this chec
   year, 35 minutes after tagging.
 - Its middle step asks the app to propose a Trial Reel test when none is open (`POST /api/content/tests/propose`). A failure
   there never stops the run; the ClickUp line ends with the result (`Test: started`, `open`, `busy`, `cap` or `failed`).
+- Its next step advances creator discovery (`POST /api/content/creators/discover`): each call collects a finished Apify run, starts
+  the next, judges and suggests, and the routine calls again every 90 seconds while the reply's `stage` is `waiting_on_apify` or
+  `judging`, at most 6 calls. A failure there never stops the run; the reply's `note` goes in the run's final report, not in ClickUp.
 - Network access: the `CONTENT_API_BASE` host only (an allowlist).
-- A missed Monday is fixed with **Build now** on `/content/review`; a missed test with **Propose next test** on `/content/tests`.
+- A missed Monday is fixed with **Build now** on `/content/review`; a missed test with **Propose next test** on `/content/tests`;
+  missed discovery with **Find creators now** on `/content/creators`.

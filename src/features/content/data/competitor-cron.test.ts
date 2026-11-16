@@ -15,6 +15,7 @@ describe("runCompetitorCron", () => {
     const apify = {
       getRun: base.getRun,
       datasetItems: base.datasetItems,
+      startActor: base.startActor,
       startRun: async (a: { usernames: string[]; newerThanDays: number }) => (order.push("start"), base.startRun(a)),
     };
     const spied = { ...db, pendingRuns: async () => (order.push("collect"), db.pendingRuns()), postsForMedians: async (s: string) => (order.push("tag"), db.postsForMedians(s)) };

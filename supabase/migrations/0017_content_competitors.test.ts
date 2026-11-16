@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { EXPERIMENT_KINDS, VARIABLES } from "@/features/content/engine/experiments";
-import { COMPETITOR_RUN_STATUSES, CREATOR_STATUSES } from "@/features/content/engine/competitors";
+import { COMPETITOR_RUN_STATUSES } from "@/features/content/engine/competitors";
 import { SOURCE_KINDS } from "@/features/content/engine/types";
 
 describe("0017_content_competitors.sql", () => {
@@ -17,7 +17,7 @@ describe("0017_content_competitors.sql", () => {
   const after = (marker: string) => sql.slice(sql.indexOf(`add constraint ${marker}`));
 
   it("check lists equal the engine constants", () => {
-    expect(listFor(creators, "status")).toEqual([...CREATOR_STATUSES].sort());
+    expect(listFor(creators, "status")).toEqual(["removed", "watching"]);
     expect(listFor(runs, "status")).toEqual([...COMPETITOR_RUN_STATUSES].sort());
     expect(listFor(after("content_experiments_kind_check"), "kind")).toEqual([...EXPERIMENT_KINDS].sort());
     expect(listFor(after("content_experiments_variable_check"), "variable")).toEqual([...VARIABLES].sort());

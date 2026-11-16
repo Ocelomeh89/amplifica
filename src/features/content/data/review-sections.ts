@@ -7,7 +7,7 @@ import { owesOf } from "@/features/content/engine/test-lab-verdict";
 import { createAdminClient } from "@/shared/supabase/admin";
 import { loadJudgedOutcomes } from "./supabase-tests-db";
 
-// The seams the Trial Reel tests and the creator suggestions fill. The review page hides a section whose loader
+// The seams the Trial Reel tests and the creator suggestions fill (both filled now). The review page hides a section whose loader
 // returns nothing. Loaders with no client parameter build the admin client inside and filter by the owner.
 
 /** Results that did not come from a normal post (a judged Trial Reel test). Counted with the week's posts. */
@@ -57,7 +57,14 @@ export async function testSectionFor(client: SupabaseClient<Database>, userId: s
   return { state: "judged", question: verdict.question, owes: [], verdict: verdict.verdict_line, conclusion: verdict.conclusion || null, href: HREF };
 }
 
-/** How many creator suggestions wait for an answer. Null until creator suggestions exist. */
-export async function loadSuggestionsSection(_userId: string): Promise<{ waiting: number; href: string } | null> {
-  return null;
+/** How many creator suggestions wait for an answer. Null when none do. */
+export async function loadSuggestionsSection(userId: string): Promise<{ waiting: number; href: string } | null> {
+  return suggestionsSectionFor(createAdminClient(), userId);
+}
+
+export async function suggestionsSectionFor(client: SupabaseClient<Database>, userId: string): Promise<{ waiting: number; href: string } | null> {
+  const { data, error } = await client.from("content_creators").select("id").eq("user_id", userId).eq("status", "suggested");
+  if (error) throw new Error(`suggestions section: ${error.message}`);
+  const waiting = (data ?? []).length;
+  return waiting > 0 ? { waiting, href: "/content/creators" } : null;
 }
