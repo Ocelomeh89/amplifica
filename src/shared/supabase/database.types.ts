@@ -39,6 +39,7 @@ export type Database = {
           interest_pct: number;
           start_date: string;
           income_type: "STI" | "LTI";
+          is_bonus: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -51,6 +52,7 @@ export type Database = {
           interest_pct: number;
           start_date: string;
           income_type?: "STI" | "LTI";
+          is_bonus?: boolean;
         };
         Update: {
           name?: string;
@@ -60,6 +62,7 @@ export type Database = {
           interest_pct?: number;
           start_date?: string;
           income_type?: "STI" | "LTI";
+          is_bonus?: boolean;
         };
         Relationships: [];
       };
@@ -185,6 +188,99 @@ export type Database = {
           horizon_months?: number;
           start_delay_months?: number;
         };
+        Relationships: [];
+      };
+      investment_options: {
+        Row: { id: string; user_id: string; name: string; created_at: string; updated_at: string };
+        Insert: { user_id: string; name: string };
+        Update: { name?: string };
+        Relationships: [];
+      };
+      investment_option_versions: {
+        Row: {
+          id: string;
+          user_id: string;
+          option_id: string;
+          effective_month: string;
+          option_type: "amortized" | "interest_only" | "appreciation";
+          rate_pct: number;
+          term_months: number | null;
+          liquid: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          option_id: string;
+          effective_month: string;
+          option_type: "amortized" | "interest_only" | "appreciation";
+          rate_pct: number;
+          term_months?: number | null;
+          liquid: boolean;
+        };
+        Update: {
+          effective_month?: string;
+          option_type?: "amortized" | "interest_only" | "appreciation";
+          rate_pct?: number;
+          term_months?: number | null;
+          liquid?: boolean;
+        };
+        Relationships: [];
+      };
+      amplicon_splits: {
+        Row: { id: string; seq: number; user_id: string; amplicon_id: string; created_at: string };
+        Insert: { user_id: string; amplicon_id: string };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      amplicon_allocations: {
+        Row: {
+          id: string;
+          user_id: string;
+          split_id: string;
+          investment_option_id: string;
+          pct: number;
+          created_at: string;
+        };
+        Insert: { user_id: string; split_id: string; investment_option_id: string; pct: number };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      fund_moves: {
+        Row: {
+          id: string;
+          user_id: string;
+          from_option_id: string | null;
+          to_option_id: string | null;
+          amount: number;
+          move_month: string;
+          stranded_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          from_option_id?: string | null;
+          to_option_id?: string | null;
+          amount: number;
+          move_month: string;
+        };
+        Update: { stranded_at?: string | null };
+        Relationships: [];
+      };
+      holding_checkins: {
+        Row: {
+          id: string;
+          user_id: string;
+          investment_option_id: string | null;
+          value: number;
+          checkin_month: string;
+          stranded_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: { user_id: string; investment_option_id?: string | null; value: number; checkin_month: string };
+        Update: { stranded_at?: string | null };
         Relationships: [];
       };
       leads: {
@@ -1361,6 +1457,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      save_amplicon_split: {
+        Args: { p_amplicon_id: string; p_allocations: Json };
+        Returns: string;
+      };
       content_store_draft: {
         Args: {
           p_user_id: string;
@@ -1423,3 +1523,9 @@ export type ContentFocusInsert = Database["public"]["Tables"]["content_focus"]["
 export type ContentAccountStat = Database["public"]["Tables"]["content_account_stats"]["Row"];
 export type DashboardProjectionSettingsRow = Database["public"]["Tables"]["dashboard_projection_settings"]["Row"];
 export type DashboardProjectionSettingsInsert = Database["public"]["Tables"]["dashboard_projection_settings"]["Insert"];
+export type InvestmentOptionRow = Database["public"]["Tables"]["investment_options"]["Row"];
+export type InvestmentOptionVersionRow = Database["public"]["Tables"]["investment_option_versions"]["Row"];
+export type AmpliconSplitRow = Database["public"]["Tables"]["amplicon_splits"]["Row"];
+export type AmpliconAllocationRow = Database["public"]["Tables"]["amplicon_allocations"]["Row"];
+export type FundMoveRow = Database["public"]["Tables"]["fund_moves"]["Row"];
+export type HoldingCheckinRow = Database["public"]["Tables"]["holding_checkins"]["Row"];

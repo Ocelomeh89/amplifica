@@ -2,12 +2,17 @@
 
 import { useState } from "react";
 import Field from "@/shared/ui/Field";
+import InfoBox from "@/shared/ui/InfoBox";
 import { fmtCurrency } from "@/shared/format";
 import type { IncomeType } from "@/features/amplicons/data/parse";
+import AllocationFields, { type AllocationOption } from "./AllocationFields";
 
 // The Amplicon form body, shared by create and edit. The STI/LTI dropdown
 // switches the term and rate fields; the FormData contract lives in
 // data/parse.ts.
+
+const BONUS_INFO =
+  "Tick this if you pay for this LTI with your own money, like a work bonus, instead of your line of credit. The projection adds it on its first-payment date without borrowing, so it never waits for or delays the next STI.";
 
 const input = "w-full border border-edge rounded px-2 py-1.5 text-sm";
 
@@ -15,16 +20,27 @@ export interface AmpliconFieldDefaults {
   name?: string;
   ai_type?: string | null;
   income_type?: IncomeType;
+  is_bonus?: boolean;
   face_value?: number;
   term_months?: number;
   interest_pct?: number; // decimal
   start_date?: string;
 }
 
-export default function AmpliconFields({ d = {}, cols = 2 }: { d?: AmpliconFieldDefaults; cols?: 2 | 3 }) {
+export default function AmpliconFields({
+  d = {},
+  cols = 2,
+  options = [],
+  allocations = [],
+}: {
+  d?: AmpliconFieldDefaults;
+  cols?: 2 | 3;
+  options?: AllocationOption[];
+  allocations?: { investment_option_id: string; pct: number }[];
+}) {
   const [type, setType] = useState<IncomeType>(d.income_type ?? "STI");
   const [face, setFace] = useState(String(d.face_value ?? 25000));
-  const [ratePct, setRatePct] = useState(String(d.interest_pct != null ? +(d.interest_pct * 100).toFixed(4) : type === "LTI" ? 4 : 8));
+  const [ratePct, setRatePct] = useState(String(d.interest_pct != null ? +(d.interest_pct * 100).toFixed(4) : type === "LTI" ? 4 : 10));
   const lti = type === "LTI";
   const monthly = (Number(face) || 0) * ((Number(ratePct) || 0) / 100 / 12);
 
@@ -33,7 +49,7 @@ export default function AmpliconFields({ d = {}, cols = 2 }: { d?: AmpliconField
       <Field label="Name">
         <input name="name" defaultValue={d.name} required className={input} />
       </Field>
-      <Field label="Income type" info="STI pays back in full over its term, like a loan. LTI pays a flat yearly cash-on-cash return, monthly, and returns nothing at the end.">
+      <Field label="Income type" info="STI pays back in full over its term, like a loan. LTI pays a flat yearly cash-on-cash return, monthly, and pays the amount invested back with the last payment.">
         <select name="income_type" value={type} onChange={(e) => setType(e.target.value as IncomeType)} className={input}>
           <option value="STI">Short-term income (STI)</option>
           <option value="LTI">Long-term income (LTI)</option>
@@ -60,7 +76,7 @@ export default function AmpliconFields({ d = {}, cols = 2 }: { d?: AmpliconField
         </Field>
       ) : (
         <Field label="Term (months)">
-          <input key="term_months" name="term_months" type="number" min={1} step={1} required defaultValue={d.term_months ?? 36} className={input} />
+          <input key="term_months" name="term_months" type="number" min={1} step={1} required defaultValue={d.term_months ?? 30} className={input} />
         </Field>
       )}
       <Field
@@ -73,9 +89,18 @@ export default function AmpliconFields({ d = {}, cols = 2 }: { d?: AmpliconField
         <input name="start_date" type="date" required defaultValue={d.start_date?.slice(0, 10)} className={input} />
       </Field>
       {lti && (
+        <label className="sm:col-span-full flex items-center gap-2 text-sm">
+          <input type="checkbox" name="is_bonus" defaultChecked={d.is_bonus ?? false} />
+          Bonus
+          <InfoBox message={BONUS_INFO} />
+        </label>
+      )}
+      <AllocationFields options={options} initial={allocations} />
+      {lti && (
         <p className="sm:col-span-full text-[11px] text-sub -mt-1">
-          The projection treats this cash flow as steady for the whole term and assumes no sale value at the end. A
-          future start date is paid for from your line of credit at the next launch, so it delays the next STI.
+          The projection treats this cash flow as steady for the whole term and pays the amount invested back with
+          the last payment. A future start date is paid for from your line of credit at the next launch, so it delays
+          the next STI, unless you tick Bonus.
         </p>
       )}
     </div>

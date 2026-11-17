@@ -1,5 +1,6 @@
-// Optionality meter math. Progress = today's monthly cash flow as a share of
-// the cash flow projected for the optionality month (the spec's option A).
+// Optionality meter math. Progress = today's monthly income (STI interest +
+// LTI coupons) as a share of the income projected for the optionality month
+// (2026-11-14; was total cash flow).
 
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
 

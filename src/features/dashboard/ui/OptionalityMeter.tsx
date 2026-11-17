@@ -1,25 +1,25 @@
 import Link from "next/link";
 import InfoBox from "@/shared/ui/InfoBox";
-import { fmtKUSD, fmtMonth, fmtUSD0 } from "@/shared/format";
+import { fmtKUSD, fmtMonth } from "@/shared/format";
 import { meterColor } from "../meter";
 import type { OptionalityStatus } from "../projection";
 
 // The Target box's second cell. Server-renderable: no state, no effects.
-export default function OptionalityMeter({ status, goalUSD, currentMonthlyCashflowUSD }: { status: OptionalityStatus; goalUSD: number; currentMonthlyCashflowUSD: number }) {
+export default function OptionalityMeter({ status, currentMonthlyIncomeUSD }: { status: OptionalityStatus; goalUSD: number; currentMonthlyIncomeUSD: number }) {
   return (
     <div className="p-4 flex flex-col">
       <div className="text-[10px] text-sub uppercase tracking-wide">
         Optionality
         <InfoBox
-          message={`Optionality is the first month your Amplicons could pay you ${fmtUSD0(goalUSD)}/mo without shrinking your expected future payments. The bar shows today's monthly cash flow as a share of the cash flow projected for that month. You hit 100% on the date marked on the charts.`}
+          message="Target Date and Income to sustain monthly withdrawal from system"
         />
       </div>
-      <MeterBody status={status} currentMonthlyCashflowUSD={currentMonthlyCashflowUSD} />
+      <MeterBody status={status} currentMonthlyIncomeUSD={currentMonthlyIncomeUSD} />
     </div>
   );
 }
 
-function MeterBody({ status, currentMonthlyCashflowUSD }: { status: OptionalityStatus; currentMonthlyCashflowUSD: number }) {
+function MeterBody({ status, currentMonthlyIncomeUSD }: { status: OptionalityStatus; currentMonthlyIncomeUSD: number }) {
   if (status.kind === "no-amplicons") {
     return (
       <Link href="/amplicons" className="text-xs text-purple mt-auto pt-3">
@@ -30,7 +30,7 @@ function MeterBody({ status, currentMonthlyCashflowUSD }: { status: OptionalityS
   if (status.kind === "no-goal") {
     return (
       <Link href="/settings" className="text-xs text-purple mt-auto pt-3">
-        Set a monthly cash flow goal in Settings
+        Set a monthly withdrawal goal in Settings
       </Link>
     );
   }
@@ -55,7 +55,7 @@ function MeterBody({ status, currentMonthlyCashflowUSD }: { status: OptionalityS
         <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
       </div>
       <div className="text-[10px] text-sub mt-1">
-        {fmtKUSD(currentMonthlyCashflowUSD)} of {fmtKUSD(status.cashFlowAtOptionality)}/mo
+        {fmtKUSD(currentMonthlyIncomeUSD)} of {fmtKUSD(status.incomeAtOptionality)}/mo income
       </div>
     </div>
   );

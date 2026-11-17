@@ -33,10 +33,10 @@ export const DEFAULT_SPECS: OptionSpec[] = [
     id: "flywheel",
     label: "Amplification flywheel",
     investmentSizeFactor: 5,
-    termMonths: 36,
-    investmentInterestPct: 0.08,
+    termMonths: 30,
+    investmentInterestPct: 0.1,
     locIncrease: 1.5,
-    locInterestPct: 0.1,
+    locInterestPct: 0.07,
     exitDiscountPct: 0.08,
   },
   {

@@ -6,8 +6,9 @@ import { monthlyPayment } from "./amortization";
 import type { SimConfig } from "./sim-input";
 
 // "lti" is a user-recorded Long-Term Income position (dashboard only): a flat
-// cash-on-cash coupon for its term, no principal back at the end. It pays like
-// a perpetual but is reported apart from the simulator's own perpetual mix.
+// cash-on-cash coupon for its term, with the face value paid back alongside
+// the last coupon (2026-11-14). Reported apart from the simulator's own
+// perpetual mix.
 export type InvestmentKind = "term" | "perpetual" | "lti";
 
 export interface ActiveInvestment {
@@ -23,7 +24,7 @@ export interface ActiveInvestment {
 }
 
 // A Long-Term Income position: face × cash-on-cash / 12 every month for
-// `termMonths`, then nothing (no sale value in the first-pass model).
+// `termMonths`, plus the face value back in the last month (see payoutAt).
 export function makeLti(faceValue: number, cocPct: number, termMonths: number, startMonth: number): ActiveInvestment {
   return {
     kind: "lti",
@@ -82,6 +83,14 @@ export function interestAt(inv: ActiveInvestment, month: number): number {
   return Math.min(Math.max(opening * r, 0), inv.monthlyPayout);
 }
 
+// What `inv` pays in `month`: its flat payout, plus an LTI's face value in its
+// last month. Every aggregate reads payouts through this.
+export function payoutAt(inv: ActiveInvestment, month: number): number {
+  if (!isActive(inv, month)) return 0;
+  const last = inv.kind === "lti" && month - inv.startMonth === inv.termMonths - 1;
+  return last ? inv.monthlyPayout + inv.faceValue : inv.monthlyPayout;
+}
+
 export function isActive(inv: ActiveInvestment, month: number): boolean {
   const elapsed = month - inv.startMonth;
   return elapsed >= 0 && elapsed < inv.termMonths;
@@ -91,12 +100,33 @@ export function isExpired(inv: ActiveInvestment, month: number): boolean {
   return month - inv.startMonth >= inv.termMonths;
 }
 
-// Nominal remaining value: the sum of the payouts still owed after `month`'s
-// payment (the product's intentional undiscounted accounting convention).
+// Nominal remaining value: the sum of the payouts still owed from `month` on
+// (the product's intentional undiscounted accounting convention). An LTI's
+// face value counts until the month it is paid back.
 export function remainingBalanceAt(inv: ActiveInvestment, month: number): number {
   const elapsed = month - inv.startMonth;
   if (elapsed < 0 || elapsed >= inv.termMonths) return 0;
-  return inv.monthlyPayout * (inv.termMonths - elapsed);
+  return inv.monthlyPayout * (inv.termMonths - elapsed) + (inv.kind === "lti" ? inv.faceValue : 0);
+}
+
+// The money still invested in `inv` at `month` (before that month's payment):
+// an STI's unpaid principal, or an LTI's (or perpetual's) amount invested
+// until its last payment. 0 before it starts and after it ends. The dashboard's
+// optionality test measures this, so only income can pay for a withdrawal.
+export function capitalAt(inv: ActiveInvestment, month: number): number {
+  const k = month - inv.startMonth; // payments already made
+  if (k < 0 || k >= inv.termMonths) return 0;
+  if (inv.kind !== "term") return inv.faceValue;
+  const r = inv.monthlyRate;
+  if (r <= 0) return Math.max(inv.faceValue - inv.monthlyPayout * k, 0);
+  const g = Math.pow(1 + r, k);
+  return Math.max(inv.faceValue * g - (inv.monthlyPayout * (g - 1)) / r, 0);
+}
+
+export function capitalOfBook(book: ActiveInvestment[], month: number): number {
+  let total = 0;
+  for (const inv of book) total += capitalAt(inv, month);
+  return total;
 }
 
 export interface BookPayout {
@@ -111,7 +141,7 @@ export function collectPayouts(book: ActiveInvestment[], month: number): BookPay
   let interest = 0;
   for (const inv of book) {
     if (!isActive(inv, month)) continue;
-    total += inv.monthlyPayout;
+    total += payoutAt(inv, month);
     if (inv.kind === "perpetual") perpetual += inv.monthlyPayout;
     interest += interestAt(inv, month);
   }

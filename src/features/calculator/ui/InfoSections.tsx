@@ -8,7 +8,7 @@ const LAST_UPDATED = "July 2026";
 const faqs = [
   {
     q: "What is financial optionality?",
-    a: "Financial optionality is the point where the monthly cash flow from your investments can cover your target monthly income without eroding the value of your remaining future payments. Work becomes a choice rather than a requirement. This calculator estimates the date that happens for your numbers.",
+    a: "Financial optionality is the point where the interest your investments pay covers your target monthly income, so you never spend the money you have invested. Work becomes a choice rather than a requirement. This calculator estimates the date that happens for your numbers.",
   },
   {
     q: "How is this different from a FIRE or 4% rule calculator?",

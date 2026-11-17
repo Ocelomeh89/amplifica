@@ -17,8 +17,9 @@ detail. Read that before changing behavior.
 | `sim-book.ts` | The book of launches the simulation carries month to month (term, perpetual, LTI). |
 | `sim-ledger.ts` | Multi-line LoC ledger for the seeded dashboard run (per-line rates; highest-rate paydown, cheapest draw). |
 | `projection.ts` | The simpler net-worth / cash-flow projection used by the dashboard. |
-| `projection-fi.ts` | `earliestSustainableWithdrawal` — the "financial optionality" month. |
+| `projection-fi.ts` | `earliestSustainableWithdrawal` — the "financial optionality" month, on the capital rule everywhere: capital still invested + cash − LoC never shrinks after the switch, so only income pays the withdrawal. |
 | `dashboard-seed.ts` | `seedFromTracked` — tracked Amplicons + LoCs → the `seed` that starts `runSimulation` from today. Future-dated Amplicons are scheduled (funded by a draw), never booked for free. |
+| `fund-check.ts` | `runFundCheck` — can the real fund behind the Amplicons cover every payment? Option terms (versioned), lots, moves, check-ins. Reads schedules via `projection.ts`; changes no engine output. |
 | `amortization.ts` | Payment, schedule, remaining principal. Used by the loan calculator and two compare builders. |
 | `dates.ts` | Month-key helpers. |
 

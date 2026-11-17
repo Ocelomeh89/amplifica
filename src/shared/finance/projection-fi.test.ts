@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { earliestSustainableWithdrawal } from "./projection-fi";
 import { runSimulation, type ProjectionSimInput } from "./projection-sim";
+import { capitalOfBook } from "./sim-book";
 
 // Profitable continuous config that should reach a sustainable $4,500 draw.
 const profitable: ProjectionSimInput = {
@@ -10,12 +11,14 @@ const profitable: ProjectionSimInput = {
 };
 
 describe("earliestSustainableWithdrawal", () => {
-  it("income FI: at the switch, expected future payments never erodes afterward", () => {
+  it("income FI: after the switch, capital + cash − LoC never erodes", () => {
     const fi = earliestSustainableWithdrawal(profitable, 4500, { requireGrowth: false });
     expect(fi.month).not.toBeNull();
     const r = runSimulation({ ...profitable, mscEndMonth: fi.month!, withdrawalStartMonth: fi.month!, monthlyWithdrawal: 4500 });
-    const start = r.series[fi.month!].expectedFuturePayments;
-    expect(r.series.slice(fi.month!).every((s) => s.expectedFuturePayments >= start - 1e-6 * Math.max(1, start))).toBe(true);
+    const cap = r.series.map((s, m) => capitalOfBook(r.bookByMonth[m], m + 1) + s.cash - s.outstandingAmount);
+    const start = cap[fi.month!];
+    expect(start).toBeCloseTo(fi.capitalAtSwitch!, 6);
+    expect(cap.slice(fi.month!).every((v) => v >= start - 1e-6 * Math.max(1, Math.abs(start)))).toBe(true);
   });
   it("income FI is never later than wealth FI", () => {
     const wealth = earliestSustainableWithdrawal(profitable, 4500, { requireGrowth: true });
@@ -41,5 +44,25 @@ describe("earliestSustainableWithdrawal", () => {
     const seeded = { ...profitable, seed: { book: [], outstanding: 0, nextDrawSize: 0, startDelayMonths: 0 } };
     // No book and no draws: nothing pays, so any positive draw erodes from month 0.
     expect(earliestSustainableWithdrawal(seeded, 4500).month).toBeNull();
+  });
+});
+
+describe("the capital rule: income pays the withdrawal", () => {
+  // A $1M LTI at 12% pays $10k a month of pure income for 50 years; no flywheel.
+  const lti: ProjectionSimInput = {
+    msc: 0, investmentSizeFactor: 0, termMonths: 36, investmentInterestPct: 0.08,
+    locIncrease: 1.5, locInterestPct: 0.1, totalMonths: 120,
+    seed: {
+      book: [{ kind: "lti", monthlyPayout: 10000, termMonths: 600, startMonth: 0, faceValue: 1e6, monthlyRate: 0.01 }],
+      outstanding: 0, nextDrawSize: 0, startDelayMonths: 0,
+    },
+  };
+
+  it("income that covers the withdrawal is optionality today", () => {
+    expect(earliestSustainableWithdrawal(lti, 5000).month).toBe(0);
+  });
+
+  it("a withdrawal above the income eats capital and is never sustainable", () => {
+    expect(earliestSustainableWithdrawal(lti, 15000).month).toBeNull();
   });
 });

@@ -4,6 +4,7 @@ import Field from "@/shared/ui/Field";
 import NumberInput from "@/shared/ui/NumberInput";
 import ThemeToggle from "@/features/settings/ui/ThemeToggle";
 import { saveSettings } from "@/features/settings/data/actions";
+import { storedGoalToDollars } from "@/features/settings/data/parse";
 
 export default async function SettingsPage({
   searchParams,
@@ -39,20 +40,12 @@ export default async function SettingsPage({
                 step={100}
               />
             </Field>
-            <Field label="Expected future payments goal ($M)" hint="Total target, in millions of USD.">
+            <Field label="Monthly withdrawal goal ($)" hint="What you want to withdraw from the system each month, in USD.">
               <NumberInput
-                name="net_worth_goal"
-                defaultValue={profile?.net_worth_goal ?? 0}
+                name="monthly_withdrawal_goal"
+                defaultValue={storedGoalToDollars(profile?.monthly_cashflow_goal)}
                 min={0}
-                step={0.01}
-              />
-            </Field>
-            <Field label="Monthly cash flow goal ($k)" hint="Target monthly cash flow from Amplicons, in thousands of USD.">
-              <NumberInput
-                name="monthly_cashflow_goal"
-                defaultValue={profile?.monthly_cashflow_goal ?? 0}
-                min={0}
-                step={0.1}
+                step={100}
               />
             </Field>
           </div>

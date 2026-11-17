@@ -1,8 +1,8 @@
 // Scheduled Amplicons (STI or LTI) and the multi-line LoC ledger on the
 // seeded path. Decisions of 2026-11-01: a future Amplicon is funded by a draw
 // in the next launch slot on or after its date, bypasses the payoff gate,
-// leaves the flywheel's draw size alone; LTIs pay a flat coupon and return no
-// principal; lines pay highest-rate first and draw cheapest-with-room first.
+// leaves the flywheel's draw size alone; LTIs pay a flat coupon and (since
+// 2026-11-14) return their face value with the last payment; lines pay highest-rate first and draw cheapest-with-room first.
 
 import { describe, it, expect } from "vitest";
 import { runSimulation, type ProjectionSimInput, type SimSeed } from "./projection-sim";
@@ -70,7 +70,7 @@ describe("scheduled Amplicons", () => {
     expect(r.scheduledStarts.r).toBeGreaterThanOrEqual(6);
   });
 
-  it("an LTI pays its flat coupon for its term and nothing after", () => {
+  it("an LTI pays its flat coupon for its term, its face value back in the last month, then nothing", () => {
     const r = runSimulation({
       ...base,
       seed: seed({ book: [], nextDrawSize: 0, scheduled: [{ id: "r", investment: lti }] }),
@@ -79,9 +79,25 @@ describe("scheduled Amplicons", () => {
     expect(s).toBe(6); // $0 balance: the slot is free on its date
     expect(r.series[s - 1].distributionCashFlow).toBe(0);
     expect(r.series[s].distributionCashFlow).toBeCloseTo(100000 * 0.04 / 12, 6);
-    expect(r.series[s + 119].distributionCashFlow).toBeCloseTo(100000 * 0.04 / 12, 6);
+    expect(r.series[s + 118].distributionCashFlow).toBeCloseTo(100000 * 0.04 / 12, 6);
+    expect(r.series[s + 119].distributionCashFlow).toBeCloseTo(100000 * 0.04 / 12 + 100000, 6);
     expect(r.series[s + 120].distributionCashFlow).toBe(0);
     expect(r.series[s].distributionInterest).toBeCloseTo(r.series[s].distributionCashFlow, 10);
+    // The returned face value is principal, not taxable interest.
+    expect(r.series[s + 119].distributionInterest).toBeCloseTo(100000 * 0.04 / 12, 6);
+  });
+
+  it("an LTI's book value counts its face value until it is paid back", () => {
+    const r = runSimulation({
+      ...base,
+      seed: seed({ book: [], nextDrawSize: 0, scheduled: [{ id: "r", investment: lti }] }),
+    });
+    const s = r.scheduledStarts.r;
+    const debt = (m: number) => r.series[m].outstandingAmount;
+    // After the first payment: 119 coupons + the face value still to come.
+    expect(r.series[s].expectedFuturePayments + debt(s)).toBeCloseTo(119 * (100000 * 0.04 / 12) + 100000, 4);
+    // After the last payment: nothing left.
+    expect(r.series[s + 119].expectedFuturePayments + debt(s + 119)).toBeCloseTo(0, 4);
   });
 
   it("is not free money: a funded LTI delays the flywheel versus no LTI", () => {

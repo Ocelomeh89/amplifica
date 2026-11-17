@@ -97,4 +97,18 @@ describe("seedFromTracked", () => {
       expect(sim.series[i].distributionCashFlow).toBeCloseTo(dash[i]?.cashFlow ?? 0, 6);
     }
   });
+
+  it("a future-dated Bonus LTI goes into the book on its date, with no draw", () => {
+    const bonus: AmpliconLite = { ...a("b", 30000, "2027-01", 240, 0.1), incomeType: "LTI", bonus: true };
+    const seed = seedFromTracked([bonus], TODAY, null);
+    expect(seed.scheduled).toEqual([]);
+    expect(seed.book).toHaveLength(1);
+    expect(seed.book[0]).toMatchObject({ kind: "lti", startMonth: 3, faceValue: 30000 });
+  });
+
+  it("Bonus only applies to LTIs: a Bonus-flagged STI is still funded by a draw", () => {
+    const seed = seedFromTracked([{ ...a("s", 5000, "2027-01"), bonus: true }], TODAY, null);
+    expect(seed.book).toEqual([]);
+    expect(seed.scheduled).toHaveLength(1);
+  });
 });

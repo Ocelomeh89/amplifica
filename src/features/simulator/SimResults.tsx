@@ -105,7 +105,7 @@ export default function SimResults({ sim, incomeMarkerMonth, variant = "editor" 
               <span className="font-medium">Financial optionality: </span>
               stop saving and draw {fmtCurrency(values.withdrawalAmount)}/mo from{" "}
               <span className="font-bold text-aqua">month {fi.month} (~{(fi.month / 12).toFixed(1)} yr)</span>{" "}
-              — the total holds, ending at {fmtCurrency(fi.expectedFuturePaymentsAtEnd ?? 0)}.
+              — the money invested, net of the line, never shrinks and ends at {fmtCurrency(fi.capitalAtEnd ?? 0)}.
             </>
           ) : (
             <span className="text-sub">Financial optionality: drawing {fmtCurrency(values.withdrawalAmount)}/mo is not sustainable within 30 years at these inputs.</span>

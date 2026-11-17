@@ -193,9 +193,10 @@ export default async function Home() {
             </h2>
             <p className="mt-4 text-sm text-sub leading-relaxed">
               One benchmark: a $2,000 monthly contribution, investments amortizing at
-              8%, a line of credit costing 10%. These are model outputs under fixed
-              assumptions. They describe the model, not your account, and we promise
-              no return.
+              10% over 30 months, a line of credit costing 7%. These are model outputs
+              under fixed assumptions. They describe the model, not your account, and
+              we promise no return. Change one assumption, a lower rate or a missed
+              payment, and every date below moves.
             </p>
             <Link
               href="/calculator"
@@ -210,12 +211,12 @@ export default async function Home() {
                 System cash flow (investment payments alone, excluding your
                 contribution) first crosses $45,000 a month
               </dt>
-              <dd className="font-display text-3xl tabular-nums">~15 yrs</dd>
+              <dd className="font-display text-3xl tabular-nums">~11.5 yrs</dd>
             </div>
             <div className="py-6 flex items-baseline justify-between gap-6 flex-wrap">
               <dt className="text-sm text-sub max-w-sm">
-                With short terms, stop contributing at year ten and the system
-                sustains itself. Cash flow keeps compounding on its own
+                Stop contributing at year ten and the system sustains itself. Cash
+                flow keeps compounding on its own
               </dt>
               <dd className="font-display text-3xl tabular-nums text-aqua">Year 10</dd>
             </div>

@@ -4,14 +4,21 @@ import { monthlyPayoutOf, isActiveAt } from "@/shared/finance/projection";
 import Card from "@/shared/ui/Card";
 import NewAmpliconForm from "@/features/amplicons/ui/NewAmpliconForm";
 import AmpliconRow from "@/features/amplicons/ui/AmpliconRow";
+import { groupSplits } from "@/shared/splits";
 
 export default async function AmpliconsPage() {
   const { supabase } = await requireUser();
 
-  const { data: amplicons } = await supabase
-    .from("amplicons")
-    .select("*")
-    .order("start_date", { ascending: false });
+  const [{ data: amplicons }, { data: optionRows }, { data: splitRows }, { data: allocRows }] = await Promise.all([
+    supabase.from("amplicons").select("*").order("start_date", { ascending: false }),
+    // Missing tables (migration 0019 not applied) read as empty: no split UI rows.
+    supabase.from("investment_options").select("id, name").order("name"),
+    supabase.from("amplicon_splits").select("id, seq, amplicon_id, created_at"),
+    supabase.from("amplicon_allocations").select("split_id, investment_option_id, pct"),
+  ]);
+  const options = optionRows ?? [];
+  const history = groupSplits(splitRows ?? [], allocRows ?? []);
+  const versionsOf = (id: string) => history.get(id) ?? [];
 
   const todayMonth = new Date().toISOString().slice(0, 7);
 
@@ -19,7 +26,7 @@ export default async function AmpliconsPage() {
     <div className="max-w-5xl">
       <h1 className="text-xl font-semibold mb-4">Amplicons</h1>
 
-      <NewAmpliconForm />
+      <NewAmpliconForm options={options} />
 
       <Card>
         {!amplicons || amplicons.length === 0 ? (
@@ -52,6 +59,7 @@ export default async function AmpliconsPage() {
                   termMonths: a.term_months,
                   startMonth,
                   incomeType: a.income_type,
+                  bonus: a.is_bonus ?? false,
                 };
                 const monthly = monthlyPayoutOf(lite);
                 const active = isActiveAt(lite, todayMonth);
@@ -63,6 +71,7 @@ export default async function AmpliconsPage() {
                       name: a.name,
                       ai_type: a.ai_type,
                       income_type: a.income_type,
+                      is_bonus: a.is_bonus ?? false,
                       face_value: a.face_value,
                       interest_pct: a.interest_pct,
                       term_months: a.term_months,
@@ -71,6 +80,8 @@ export default async function AmpliconsPage() {
                     monthly={monthly}
                     endMonth={endMonth}
                     active={active}
+                    options={options}
+                    versions={versionsOf(a.id)}
                   />
                 );
               })}

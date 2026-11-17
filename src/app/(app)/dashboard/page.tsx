@@ -3,6 +3,7 @@ import { fmtUSD0, fmtKUSD, fmtMonth } from "@/shared/format";
 import { isoToYearMonth, currentYearMonth } from "@/shared/finance/dates";
 import {
   monthlyPayoutOf,
+  incomeAtMonth,
   isActiveAt,
   remainingValueAtMonth,
   buildSeries,
@@ -16,6 +17,9 @@ import { buildDashboardProjection, mergeProjection } from "@/features/dashboard/
 import { defaultNextDrawSize, type LocLite } from "@/shared/finance/dashboard-seed";
 import OptionalityMeter from "@/features/dashboard/ui/OptionalityMeter";
 import ProjectionSettingsPanel from "@/features/dashboard/ui/ProjectionSettingsPanel";
+import { runFundCheck } from "@/shared/finance/fund-check";
+import { loadFundCheckInput } from "@/features/investments/data/load";
+import FundCheckCard from "@/features/investments/ui/FundCheckCard";
 
 export default async function DashboardPage() {
   const { supabase, user } = await requireUser();
@@ -32,7 +36,7 @@ export default async function DashboardPage() {
     id: l.id,
     size: Number(l.size),
     utilization: Number(l.utilization),
-    interestPct: Number(l.interest_pct ?? 0.1),
+    interestPct: Number(l.interest_pct ?? 0.07),
   }));
   const projectionSettings = settingsFromRow(projectionRow ?? null);
 
@@ -44,11 +48,14 @@ export default async function DashboardPage() {
     termMonths: a.term_months,
     startMonth: isoToYearMonth(a.start_date),
     incomeType: a.income_type ?? "STI",
+    bonus: a.is_bonus ?? false,
   }));
   const nameById = new Map((amplicons ?? []).map((a) => [a.id, a.name]));
 
   const activeNow = lites.filter((a) => isActiveAt(a, todayMonth));
   const currentMonthlyCashflow = activeNow.reduce((s, a) => s + monthlyPayoutOf(a), 0);
+  // The income part (STI interest + LTI coupons): what the optionality meter tracks.
+  const currentMonthlyIncome = activeNow.reduce((s, a) => s + incomeAtMonth(a, todayMonth), 0);
 
   // Expected future payments = nominal value of all remaining Amplicon payments
   // (face value, no discounting). Never per-Amplicon. External assets removed in
@@ -60,7 +67,6 @@ export default async function DashboardPage() {
   const currentExpectedFuturePayments = totalRemainingUSD;
 
   const cashflowGoalUSD = (profile?.monthly_cashflow_goal ?? 0) * 1_000;
-  const expectedFuturePaymentsGoalUSD = (profile?.net_worth_goal ?? 0) * 1_000_000;
 
   const ampliconsCount = lites.length;
   // Active = producing cashflow today (within its term). Matured Amplicons no longer count.
@@ -90,10 +96,15 @@ export default async function DashboardPage() {
     settings: projectionSettings,
     msc: monthlyContribution,
     cashflowGoalUSD,
-    currentMonthlyCashflow,
+    currentMonthlyIncome,
     locs,
   });
   const optionalityMonth = projection.optionality.kind === "reached" ? projection.optionality.month : null;
+
+  // Fund check: warning-only, reads the same Amplicon schedules, changes no number above.
+  const fundCheck = runFundCheck(await loadFundCheckInput(supabase, todayMonth));
+  // The fund's dollar figures show only once the STI engine is off (no STI paying today).
+  const stiPaying = activeNow.some((a) => (a.incomeType ?? "STI") === "STI");
 
   return (
     <div className="max-w-5xl">
@@ -150,10 +161,10 @@ export default async function DashboardPage() {
           <div className="text-[10px] text-sub uppercase tracking-wide font-semibold mb-1 h-4">Target</div>
           <div className="flex-1 grid grid-cols-2 rounded-lg border border-edge divide-x divide-edge bg-card">
             <div className="p-4 flex flex-col">
-              <div className="text-[10px] text-sub uppercase tracking-wide">Monthly cashflow</div>
+              <div className="text-[10px] text-sub uppercase tracking-wide">Monthly Withdrawal</div>
               <div className="text-xl font-bold mt-auto pt-3">{fmtUSD0(cashflowGoalUSD)}</div>
             </div>
-            <OptionalityMeter status={projection.optionality} goalUSD={cashflowGoalUSD} currentMonthlyCashflowUSD={currentMonthlyCashflow} />
+            <OptionalityMeter status={projection.optionality} goalUSD={cashflowGoalUSD} currentMonthlyIncomeUSD={currentMonthlyIncome} />
           </div>
         </div>
       </div>
@@ -181,21 +192,24 @@ export default async function DashboardPage() {
           ))}
           {projection.overLimit && (
             <p>
-              From {fmtMonth(projection.overLimit.month)} the projection borrows more than your lines of credit allow, by
-              up to {fmtUSD0(projection.overLimit.peakExcess)}. You&apos;d need that much more credit to follow it.
+              In {fmtMonth(projection.overLimit.month)} you&apos;ll need to raise your line of credit from{" "}
+              {fmtUSD0(projection.overLimit.fromLimit)} to {fmtUSD0(projection.overLimit.toLimit)}.
             </p>
           )}
         </div>
       )}
 
+      <FundCheckCard result={fundCheck} showAmounts={!stiPaying} />
+
       <ChartPair
         inceptionSeries={inceptionSeries}
         currentSeries={currentSeries}
         cashflowTargetUSD={cashflowGoalUSD}
-        expectedFuturePaymentsTargetUSD={expectedFuturePaymentsGoalUSD}
         inceptionProjected={mergeProjection(inceptionSeries, projection.series, todayMonth)}
         currentProjected={mergeProjection(currentSeries, projection.series, todayMonth)}
         optionalityMonth={optionalityMonth}
+        fundMonths={fundCheck.months}
+        today={todayMonth}
         controls={
           <ProjectionSettingsPanel
             settings={projectionSettings}

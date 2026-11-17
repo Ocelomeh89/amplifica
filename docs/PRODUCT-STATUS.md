@@ -210,6 +210,17 @@ Unique index on `(lower(email), source)` — repeat submits are idempotent (2350
 | `created_at` | timestamptz | |
 Email is **not** unique: a retake adds a row (`leads` still dedupes by email). **RLS enabled with no policies**, like `leads`; only the service-role client reads or writes it. Applied by hand in the Supabase SQL editor.
 
+### Investment options and the fund check — migration 0019
+Five user-owned tables (RLS self CRUD, `touch_updated_at`). A `null` option id in `fund_moves` / `holding_checkins` means the built-in **Default growth** holding (code constant: 10% appreciation, infinite, liquid).
+| Table | What |
+|---|---|
+| `investment_options` | `id`, `user_id`, `name` |
+| `investment_option_versions` | an option's terms from `effective_month` on: `option_type` (`amortized` / `interest_only` / `appreciation`), `rate_pct` (annual decimal), `term_months` (null = infinite), `liquid`. Unique `(option_id, effective_month)`. Edits only look forward. |
+| `amplicon_allocations` | where an Amplicon's face value went: ≤ 3 rows, `pct` sums to 1 (action-enforced). Cascades with the Amplicon; `restrict` on the option. No rows = Default growth. |
+| `fund_moves` | "move `amount` from A to B in `move_month`". `restrict` on both options. |
+| `holding_checkins` | the actual `value` of a holding in `checkin_month`; the fund check continues from it. |
+Applied by hand in the Supabase SQL editor.
+
 **Triggers/functions (0001):** `touch_updated_at()` (auto `updated_at`), `handle_new_user()` (auto-insert profile on signup, `security definer`).
 
 **TypeScript mirror:** `src/shared/supabase/database.types.ts` mirrors all tables as `Row`/`Insert`/`Update`; exported aliases `Projection`, `Amplicon`, `LoC`, `Profile`, `Lead`, `QuizSubmission`.
@@ -234,6 +245,8 @@ Email is **not** unique: a retake adds a row (`leads` still dedupes by email). *
 
 ---
 
+**Fund check (`fund-check.ts`, 2026-11):** `runFundCheck` replays the user's fund month by month from the tracked Amplicons: deposits in each launch month (start − 1) per split, dated moves (capped at the source balance; illiquid sources can't be sold), growth and income per option type (`stepLot`), value check-ins, then the month's Amplicon payments (`monthlyPayoutOf`): income first, surplus leaves to repay the LoC, shortfall sold from liquid holdings lowest-rate first. Status: `short-now` (this month uncovered), `runs-out` (first future uncovered month), else `ok`. Past shortfalls are ignored. **Warning-only: it changes no engine number.**
+
 ## 6. The flywheel simulator (`projection-sim.ts`) — model spec
 
 `runSimulation(input: ProjectionSimInput): ProjectionSimResult`. Pure; default horizon
@@ -251,7 +264,7 @@ so month 0 is the draw alone.
 2. Collect inflow = MSC share + payouts of all active Amplicons (term = amortizing payment; perpetual = flat coupon `face × yield/12`).
 3. Apply `inflow − withdrawal` to the LoC: surplus banks as cash; a shortfall is covered from cash, then re-borrowed.
 4. **Redeploy trigger (V1.0):** when the post-payment balance drops **below one month's payment** (this month's net inflow), the line is effectively clear and the engine redeploys — the **leftover balance stays owed and rolls into the fresh draw** (capital is conserved: nothing is written off, no "leftover absorption"). The launch itself happens **only when its payoff — reaching that same trigger — is predicted in fewer than `payoffUpgradeMonths` months** (V1.0 predictive gate). The forecast uses the actual book's payout schedule (expiries included), the candidate's own payout, the MSC/withdrawal schedule, LoC accrual, and banked cash applied against the draw. The **stepped-up size (×`locIncrease`) is tried first** (allowed only when the retired loan itself cleared within the gate), then the **current size** as fallback; if neither qualifies the flywheel **waits, banking surplus as cash**, re-evaluating monthly. Once size ≥ `perpetualTriggerSize`, a `perpetualMix` fraction of launches become **perpetual** (chosen by a leaky-bucket accumulator → a clean cadence, e.g. 0.25 ⇒ ~1 in 4). Deploy banked cash against the fresh draw. Continuous mode (`payoffUpgradeMonths = Infinity`) bypasses the prediction (always launch, always step up) but keeps the early-redeploy trigger.
-5. Net outstanding cashflow (engine field `expectedFuturePayments`) = Σ remaining nominal payouts (all Amplicons) − outstanding (nominal future cash, not a discounted present value). Cash is excluded since 2026-10-20; the optionality search still judges sustainability on this plus cash.
+5. Net outstanding cashflow (engine field `expectedFuturePayments`) = Σ remaining nominal payouts (all Amplicons) − outstanding (nominal future cash, not a discounted present value). Cash is excluded since 2026-10-20. The optionality search no longer uses it (see the capital rule below).
 6. Roll the no-leverage benchmarks (`contributedCapital`, `marketBaseline`).
 
 **Key inputs** (defaults in parens): `msc`, `investmentSizeFactor`, `termMonths`,
@@ -270,7 +283,7 @@ so month 0 is the draw alone.
 
 **Two growth modes (engine):** *fixed* (gate 3 or 4 — step up only when payoff is faster than the gate; default 4) vs *continuous* (`Infinity` — step up on every payoff), persisted to `payoff_upgrade_months` + `continuous_growth`. **As of V0.7 the UI controls for both are removed (parked — see §11);** the editor runs the engine default (fixed, gate 4). The engine and DB columns are retained, so re-enabling is a UI-only change.
 
-**Two finish lines (`projection-fi.ts`):** *Income FI* (expected future payments never erode while drawing — you live off income) and *Wealth FI* (they also keep growing). The FI surface is **non-monotone** (flywheel saw-tooth) — the solver uses a linear scan, not binary search.
+**Two finish lines (`projection-fi.ts`), both on the capital rule (every surface since 2026-11-17):** the measure is capital still invested (an STI's unpaid principal, an LTI's face value until paid back) + cash − LoC. *Income FI* = that never falls below its level at the switch while drawing, so only income (STI interest + LTI coupons) pays the withdrawal; *Wealth FI* = it also ends higher. Capital rather than every future payment at face value (the old "book" rule), because at optionality STI capital can be moved into LTIs. The FI surface is **non-monotone** (flywheel saw-tooth) — the solver uses a linear scan, not binary search.
 
 **Validated findings baked into the product's guidance** (from the exploration summarized in `docs/parked-ideas.md`): the leverage spread (investment return vs LoC cost) dominates the FI date; a return-above-amortization gap is the cheapest accelerator; perpetuals are a *post-retirement durable-income* layer (deploy late + light), not an FI accelerator.
 
@@ -292,6 +305,7 @@ so month 0 is the draw alone.
 **Authenticated `(app)`** (shared `Sidebar` layout):
 - `/dashboard` — net-worth & cash-flow charts over time (`ChartPair`), driven by the user's Amplicons via `projection.ts`. A "Project forward" toggle adds a dashed projection; the gear saves per-user settings (`dashboard_projection_settings`); the optionality meter shows today's cash flow as a share of the cash flow at the optionality month.
 - `/amplicons` — list + inline create/edit/delete (`AmpliconRow`, `NewAmpliconForm`, shared `AmpliconFields` with the STI/LTI dropdown; FormData contract in `data/parse.ts`).
+- `/investment-options` — the user's investment options (create, forward-only edit with a fund-check preview and "Save anyway", delete blocked while in use), "Update value" check-ins, and fund moves. The Amplicon form's "Invested in" section splits face value across up to 3 of them. The dashboard shows the fund check (`FundCheckCard`) above the charts.
 - `/loc` — list + create; `UtilizationCell` and `RateCell` for live utilization and rate edits (both feed the dashboard projection).
 - `/projections` — list + "New projection" button; `/[id]` opens `EditorForm` (the live simulator: inputs, perpetual + drawdown controls, **Expected future payments @ 5/10/15yr (accumulation)** card, **financial-optionality readout**, `SimCharts`, `FlywheelExplainer`). `EditorForm` is a thin composition over the shared simulator UI in `src/features/simulator/` (`useSimulation` hook + `SimInputsGrid` + `SimResults`); the grid's `name=` attributes carry the `updateProjection` FormData contract. The five expert inputs (perpetual yield/mix/trigger, stop-MSC, withdrawal) sit behind a collapsed **"Advanced" ribbon**; collapsed fields are CSS-hidden, not unmounted, so the save FormData still posts them. **UI copy says "financial optionality"** (renamed from "financial independence" — engine names like `projection-fi.ts` are internal and unchanged).
 - `/settings` — profile settings form + light/dark `ThemeToggle`.

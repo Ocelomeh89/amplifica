@@ -17,11 +17,13 @@ import clsx from "clsx";
 import { logout } from "@/features/auth/data/login";
 import { amortizationNavItem } from "@/features/amortization/nav";
 import { contentNavItem } from "@/features/content/nav";
+import { investmentOptionsNavItem } from "@/features/investments/nav";
 
 const items = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/amplicons", label: "Amplicons", icon: Coins },
   { to: "/loc", label: "Lines of Credit", icon: CreditCard },
+  investmentOptionsNavItem,
   { to: "/projections", label: "Projections", icon: TrendingUp },
   amortizationNavItem,
 ];
