@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { addCreatorAction } from "@/features/content/data/competitor-actions";
+import { addCreatorAction } from "@/features/content/data/competitors/competitor-actions";
 
 /** Adds a creator by username, or adds a removed one back when `username` is fixed. */
 export default function AddCreatorForm({ username, label }: { username?: string; label?: string }) {

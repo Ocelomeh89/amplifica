@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { requireContentOwner } from "@/features/content/data/owner";
-import { loadPostDetail } from "@/features/content/data/post-detail";
+import { loadPostDetail } from "@/features/content/data/recreate/post-detail";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import PostFigures from "@/features/content/ui/PostFigures";
 import PostTags from "@/features/content/ui/PostTags";

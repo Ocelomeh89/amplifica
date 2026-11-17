@@ -1,18 +1,19 @@
-# Investment Comparison Tool — status and resume point
+# Investment Comparison Tool — decisions and known gaps
 
-**Last worked:** 2026-09-05 · **Branch:** `feat/investment-comparison` (unmerged, ~85 commits ahead of `main`) · **Tests:** 520 passing, typecheck clean, `pnpm build` green
+**Merged to `main` on 2026-09-05.** Code: `src/features/compare/` (read its CLAUDE.md first).
 
-Read this first when picking the work back up. The spec and plans carry the
-design; this file carries what they cannot — what is done, what is decided,
-what is deliberately wrong, and what must be settled before the next builder.
+The spec and plans carry the design; this file carries what they cannot: what is
+decided, what is deliberately wrong, and what is still unbuilt. The "Results"
+section is a 2026-09-05 snapshot, not current output (defaults changed since,
+e.g. 0025 on 2026-11-17).
 
 - Spec: `docs/superpowers/specs/2026-08-29-investment-comparison-design.md`
-- Plan A (engine core): `docs/superpowers/plans/2026-08-29-comparison-engine-core.md` — **complete**
-- Plan B (rental): `docs/superpowers/plans/2026-08-30-rental-real-estate-builder.md` — **complete**
-- Plan C (flywheel + metric fixes): `docs/superpowers/plans/2026-08-30-flywheel-builder.md` — **complete**
+- Plan A (engine core): `docs/superpowers/plans/done/2026-08-29-comparison-engine-core.md` — **complete**
+- Plan B (rental): `docs/superpowers/plans/done/2026-08-30-rental-real-estate-builder.md` — **complete**
+- Plan C (flywheel + metric fixes): `docs/superpowers/plans/done/2026-08-30-flywheel-builder.md` — **complete**
 - Plan D (capital contract + rate-driven builders):
-  `docs/superpowers/plans/2026-09-05-capital-contract-and-rate-driven-builders.md` — **complete**
-- Plan E (the UI): `docs/superpowers/plans/2026-09-05-compare-ui.md` — **complete**
+  `docs/superpowers/plans/done/2026-09-05-capital-contract-and-rate-driven-builders.md` — **complete**
+- Plan E (the UI): `docs/superpowers/plans/done/2026-09-05-compare-ui.md` — **complete**
 
 ## What the tool does today
 
@@ -50,7 +51,7 @@ pnpm vitest run src/features/compare/engine/scenario.manual.test.ts
 asserts nothing and prints comparison tables. Edit the specs at the bottom and
 re-run. It is deliberately not a test — do not add assertions to it.
 
-## Results as of 2026-09-05
+## Results as of 2026-09-05 (historical snapshot)
 
 Miguel's profile: MFJ, ~$400k gross, no state income tax → 24% federal +
 3.8% NIIT = **27.8% effective** on ordinary investment income. At 3% inflation
@@ -223,22 +224,8 @@ forwarded; basis is now correct per position but the path has thin coverage).
 
 ## Loose ends
 
-- **Commit `8a5bbc2`** — "spec: the HYSA control-experiment course", a 241-line
-  design doc — was committed to this branch by a **different Claude Code
-  session** sharing the working directory. It is unrelated to this work and
-  will ride along into any merge. Decide before merging.
-- The work happens in a worktree at `.claude/worktrees/investment-comparison`,
-  because another Claude Code session took the shared checkout to
-  `site/circle-sign-in` mid-session. That path is excluded via
-  `.git/info/exclude` rather than `.gitignore`, so the other session's branch
-  was never touched.
 - **Inputs are lost on reload.** `serialize.ts` and the versioned JSON
   export/import are specced and unbuilt.
-- The worktree needs `.env.local` copied in from the main checkout before
-  `pnpm dev` will boot — it is gitignored, so it does not travel with the
-  branch.
-- The branch has never been merged or pushed. `superpowers:finishing-a-development-branch`
-  was deliberately deferred until the requested work is done.
 - Interactive tax explorer (private artifact): https://claude.ai/code/artifact/e7a71e60-0170-4fda-8e52-e218a0e4d24b
   — a faithful JS port of the tax engine, verified against the tested code. It
   predates the flywheel and models cash only.

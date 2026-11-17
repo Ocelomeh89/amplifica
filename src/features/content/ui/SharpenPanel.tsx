@@ -6,8 +6,8 @@ import {
   pickSharpenAction,
   retrySharpenAction,
   startSharpenAction,
-} from "@/features/content/data/sharpen-actions";
-import type { SharpenRow } from "@/features/content/data/sharpen";
+} from "@/features/content/data/sharpen/sharpen-actions";
+import type { SharpenRow } from "@/features/content/data/sharpen/sharpen";
 import { SHARPEN_CHIPS } from "@/features/content/engine/taste";
 import AutoRefresh from "./AutoRefresh";
 

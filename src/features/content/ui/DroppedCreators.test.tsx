@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import DroppedCreators from "./DroppedCreators";
 
-vi.mock("@/features/content/data/competitor-actions", () => ({ addCreatorAction: vi.fn(), removeCreatorAction: vi.fn() }));
+vi.mock("@/features/content/data/competitors/competitor-actions", () => ({ addCreatorAction: vi.fn(), removeCreatorAction: vi.fn() }));
 
 const rows = [
   { username: "bigaccount", outcome: "out_of_band" as const, reason: "900k followers is 112x yours; the band is 2x to 20x", lookedAt: "2026-11-16T12:00:00.000Z" },

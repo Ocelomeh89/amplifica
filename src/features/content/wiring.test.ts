@@ -22,16 +22,16 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/tests/page.tsx",
       "src/app/(app)/content/ideas/[id]/page.tsx",
       "src/app/(app)/content/sources/page.tsx",
-      "src/features/content/data/test-lab-actions.ts",
+      "src/features/content/data/test-lab/test-lab-actions.ts",
       "src/features/content/data/actions.ts",
-      "src/features/content/data/competitor-actions.ts",
-      "src/features/content/data/sharpen-actions.ts",
-      "src/features/content/data/taste-actions.ts",
-      "src/features/content/data/tag-actions.ts",
-      "src/features/content/data/recreate-actions.ts",
-      "src/features/content/data/today-actions.ts",
-      "src/features/content/data/review-actions.ts",
-      "src/features/content/data/discovery-actions.ts",
+      "src/features/content/data/competitors/competitor-actions.ts",
+      "src/features/content/data/sharpen/sharpen-actions.ts",
+      "src/features/content/data/taste/taste-actions.ts",
+      "src/features/content/data/tags/tag-actions.ts",
+      "src/features/content/data/recreate/recreate-actions.ts",
+      "src/features/content/data/today/today-actions.ts",
+      "src/features/content/data/review/review-actions.ts",
+      "src/features/content/data/discovery/discovery-actions.ts",
     ];
     for (const f of files) expect(read(f), f).toContain("requireContentOwner()");
   });
@@ -169,9 +169,9 @@ describe("content stays owner-only", () => {
     expect(ingest).toContain("batch: ");
     expect(ingest).toContain("sweepInBackground(");
     expect(read("src/features/content/data/actions.ts")).toContain("sweepInBackground(");
-    expect(read("src/features/content/data/gate-run.ts")).not.toContain('"use server"');
+    expect(read("src/features/content/data/gate/gate-run.ts")).not.toContain('"use server"');
     // The digest goes out as soon as the background sweep settles the batch, not at the next cron.
-    expect(read("src/features/content/data/gate-run.ts").indexOf("postDigests(")).toBeGreaterThan(read("src/features/content/data/gate-run.ts").indexOf("runGateSweep("));
+    expect(read("src/features/content/data/gate/gate-run.ts").indexOf("postDigests(")).toBeGreaterThan(read("src/features/content/data/gate/gate-run.ts").indexOf("runGateSweep("));
   });
 
   it("the backfill runs only on request, dry unless asked to run", () => {
@@ -183,7 +183,7 @@ describe("content stays owner-only", () => {
 
   it("routes that run the brand gate allow 300 seconds and give Claude explicit timeouts", () => {
     for (const f of ["src/app/api/content/ingest/route.ts", "src/app/api/content/drafts/route.ts"]) expect(read(f), f).toContain("export const maxDuration = 300;");
-    expect(read("src/features/content/data/gate-run.ts")).toContain("anthropicToolCaller({ timeoutMs: 60_000, maxRetries: 0 })");
+    expect(read("src/features/content/data/gate/gate-run.ts")).toContain("anthropicToolCaller({ timeoutMs: 60_000, maxRetries: 0 })");
     expect(read("src/app/api/content/drafts/route.ts")).toContain("anthropicToolCaller({ timeoutMs: 40_000, maxRetries: 0 })");
   });
 
@@ -196,32 +196,33 @@ describe("content stays owner-only", () => {
   it("a Pass stores its reason as a note, and background helpers stay out of the 'use server' files", () => {
     expect(read("src/features/content/data/actions.ts")).toContain("recordPassNote(");
     // Every export of a "use server" file is a callable endpoint; the helper lives in a plain module.
-    for (const f of ["src/features/content/data/sharpen-actions.ts", "src/features/content/data/taste-actions.ts", "src/features/content/data/discovery-actions.ts"]) {
+    for (const f of ["src/features/content/data/sharpen/sharpen-actions.ts", "src/features/content/data/taste/taste-actions.ts", "src/features/content/data/discovery/discovery-actions.ts"]) {
       const exports = read(f).match(/^export (?:async )?(?:function|const) (\w+)/gm) ?? [];
       expect(exports.every((e) => /export async function \w+Action\b/.test(e)), f).toBe(true);
     }
-    expect(read("src/features/content/data/taste-run.ts")).not.toContain('"use server"');
-    expect(read("src/features/content/data/discovery-run.ts")).not.toContain('"use server"');
+    expect(read("src/features/content/data/taste/taste-run.ts")).not.toContain('"use server"');
+    expect(read("src/features/content/data/discovery/discovery-run.ts")).not.toContain('"use server"');
   });
 
   it("every direct reader of content_posts is on the list", () => {
     // A new reader fails here until it is classified: either it goes through loadPostsForMath
     // (which leaves Trial Reel test posts out by default) or it is not a baseline, review list or winner.
     const dir = "src/features/content/data";
-    const readers = readdirSync(dir)
+    const readers = (readdirSync(dir, { recursive: true }) as string[])
+      .map((f) => f.split("\\").join("/"))
       .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && !f.endsWith(".fake.ts"))
       .filter((f) => read(`${dir}/${f}`).includes('from("content_posts")'))
       .sort();
     expect(readers).toEqual([
       "actions.ts",
-      "mark-posted-brief.ts",
-      "performance.ts",
+      "metrics/performance.ts",
       "queries.ts",
+      "recreate/supabase-recreate-db.ts",
       "supabase-db.ts",
-      "supabase-recreate-db.ts",
-      "supabase-tags-db.ts",
-      "supabase-tests-db.ts",
-      "supabase-today-db.ts",
+      "tags/supabase-tags-db.ts",
+      "test-lab/supabase-tests-db.ts",
+      "today/mark-posted-brief.ts",
+      "today/supabase-today-db.ts",
     ]);
     expect(read(`${dir}/queries.ts`)).toContain('.eq("is_test", false)');
   });
@@ -232,12 +233,12 @@ describe("content stays owner-only", () => {
     expect(route).not.toContain("export async function GET(");
     expect(route).toContain("maxDuration = 300");
     expect(route).toContain('dynamic = "force-dynamic"');
-    const run = read("src/features/content/data/test-lab-run.ts");
+    const run = read("src/features/content/data/test-lab/test-lab-run.ts");
     expect(run).not.toContain('"use server"');
     expect(run).toContain("anthropicToolCaller({ timeoutMs: 60_000, maxRetries: 0 })");
     expect(run).toContain("waitUntil(");
     // Every export of a "use server" file is a callable endpoint: only actions may live in it.
-    const exports = read("src/features/content/data/test-lab-actions.ts").match(/^export (?:async )?(?:function|const) (\w+)/gm) ?? [];
+    const exports = read("src/features/content/data/test-lab/test-lab-actions.ts").match(/^export (?:async )?(?:function|const) (\w+)/gm) ?? [];
     expect(exports.length).toBeGreaterThan(0);
     expect(exports.every((e) => /export async function \w+Action\b/.test(e))).toBe(true);
   });
@@ -248,11 +249,11 @@ describe("content stays owner-only", () => {
     expect(step).toBeGreaterThan(route.indexOf("runMetricsCron("));
     expect(step).toBeLessThan(route.indexOf("runCompetitorCron("));
     expect(route).toMatch(/\.\.\.report, [^}]*tests/);
-    expect(read("src/features/content/data/test-lab-cron.ts")).not.toContain("anthropic");
+    expect(read("src/features/content/data/test-lab/test-lab-cron.ts")).not.toContain("anthropic");
   });
 
   it("creator discovery makes no Claude call on the cron", () => {
-    const cron = read("src/features/content/data/discovery-cron.ts");
+    const cron = read("src/features/content/data/discovery/discovery-cron.ts");
     expect(cron).not.toContain("ToolCaller");
     expect(cron).not.toContain("anthropicToolCaller");
     const route = read("src/app/api/content/cron/metrics/route.ts");
@@ -264,12 +265,12 @@ describe("content stays owner-only", () => {
     const discover = read("src/app/api/content/creators/discover/route.ts");
     expect(discover).toContain("export const maxDuration = 300;");
     expect(discover).toContain("runDiscovery(");
-    expect(read("src/features/content/data/discovery-run.ts")).not.toContain("use server");
+    expect(read("src/features/content/data/discovery/discovery-run.ts")).not.toContain("use server");
   });
 
   it("the Creators page has the 300 second budget its background search runs under, and the button logs before it starts", () => {
     expect(read("src/app/(app)/content/creators/page.tsx")).toContain("export const maxDuration = 300;");
-    const actions = read("src/features/content/data/discovery-actions.ts");
+    const actions = read("src/features/content/data/discovery/discovery-actions.ts");
     expect(actions.indexOf("logCall(")).toBeGreaterThan(-1);
     expect(actions.indexOf("logCall(")).toBeLessThan(actions.indexOf("waitUntil("));
   });

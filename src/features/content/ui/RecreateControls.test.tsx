@@ -4,7 +4,7 @@ import RecreateControls from "./RecreateControls";
 
 type Result = { error: string | null; message?: string; liveId?: string };
 const startRecreate = vi.fn(async (_fd: FormData): Promise<Result> => ({ error: null, message: "3 options on the way to your Inbox." }));
-vi.mock("@/features/content/data/recreate-actions", () => ({ startRecreate: (fd: FormData) => startRecreate(fd) }));
+vi.mock("@/features/content/data/recreate/recreate-actions", () => ({ startRecreate: (fd: FormData) => startRecreate(fd) }));
 
 const NONE = { "same-recipe": null, adjacent: null };
 

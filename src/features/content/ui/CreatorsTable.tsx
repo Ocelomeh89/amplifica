@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { removeCreatorAction } from "@/features/content/data/competitor-actions";
-import type { CreatorsPage } from "@/features/content/data/competitors";
+import { removeCreatorAction } from "@/features/content/data/competitors/competitor-actions";
+import type { CreatorsPage } from "@/features/content/data/competitors/competitors";
 import AddCreatorForm from "./AddCreatorForm";
 
 const chicagoDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Chicago" });

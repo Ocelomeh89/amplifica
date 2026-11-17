@@ -1,6 +1,6 @@
 import { requireContentOwner } from "@/features/content/data/owner";
 import { loadGateFailed, loadReview, loadReviewSkips } from "@/features/content/data/queries";
-import { loadSuggestionsSection, loadTestSection } from "@/features/content/data/review-sections";
+import { loadSuggestionsSection, loadTestSection } from "@/features/content/data/review/review-sections";
 import { loadTopics } from "@/features/content/data/topics";
 import { chicagoIsoDate } from "@/features/content/engine/best-times";
 import { addDays } from "@/features/content/engine/review";

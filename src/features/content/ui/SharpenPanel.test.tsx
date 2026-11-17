@@ -2,13 +2,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import SharpenPanel from "./SharpenPanel";
-import type { SharpenRow } from "@/features/content/data/sharpen";
+import type { SharpenRow } from "@/features/content/data/sharpen/sharpen";
 
 const startSharpenAction = vi.fn(async (_fd: FormData) => ({ error: null as string | null, message: "3 rewrites on the way. About a minute." }));
 const pickSharpenAction = vi.fn(async (_fd: FormData) => ({ error: null as string | null }));
 const retrySharpenAction = vi.fn(async (_fd: FormData) => ({ error: null as string | null }));
 const cancelSharpenAction = vi.fn(async (_fd: FormData) => ({ error: null as string | null }));
-vi.mock("@/features/content/data/sharpen-actions", () => ({
+vi.mock("@/features/content/data/sharpen/sharpen-actions", () => ({
   startSharpenAction: (fd: FormData) => startSharpenAction(fd),
   pickSharpenAction: (fd: FormData) => pickSharpenAction(fd),
   retrySharpenAction: (fd: FormData) => retrySharpenAction(fd),

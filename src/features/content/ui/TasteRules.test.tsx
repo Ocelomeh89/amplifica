@@ -2,14 +2,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import TasteRules from "./TasteRules";
-import type { NoteRow, RuleRow, TastePage } from "@/features/content/data/taste";
+import type { NoteRow, RuleRow, TastePage } from "@/features/content/data/taste/taste";
 
 const approveRuleAction = vi.fn(async (_fd: FormData) => ({ error: null as string | null }));
 const rejectRuleAction = vi.fn(async (_fd: FormData) => ({ error: null as string | null }));
 const setRuleOnAction = vi.fn(async (_fd: FormData) => ({ error: null as string | null }));
 const addRuleAction = vi.fn(async (_fd: FormData) => ({ error: null as string | null }));
 const proposeRulesAction = vi.fn(async () => ({ error: null as string | null }));
-vi.mock("@/features/content/data/taste-actions", () => ({
+vi.mock("@/features/content/data/taste/taste-actions", () => ({
   approveRuleAction: (fd: FormData) => approveRuleAction(fd),
   rejectRuleAction: (fd: FormData) => rejectRuleAction(fd),
   setRuleOnAction: (fd: FormData) => setRuleOnAction(fd),

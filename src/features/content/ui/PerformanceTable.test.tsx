@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import PerformanceTable, { type TableRow } from "./PerformanceTable";
 
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams("window=30&tag=hook_type:question") }));
-vi.mock("@/features/content/data/tag-actions", () => ({ saveTagCorrection: vi.fn() }));
+vi.mock("@/features/content/data/tags/tag-actions", () => ({ saveTagCorrection: vi.fn() }));
 
 const row = (id: string, over: Partial<TableRow> = {}): TableRow =>
   ({

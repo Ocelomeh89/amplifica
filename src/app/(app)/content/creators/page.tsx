@@ -1,6 +1,6 @@
 import { requireContentOwner } from "@/features/content/data/owner";
-import { supabaseCompetitorsDb } from "@/features/content/data/supabase-competitors-db";
-import { supabaseDiscoveryDb } from "@/features/content/data/supabase-discovery-db";
+import { supabaseCompetitorsDb } from "@/features/content/data/competitors/supabase-competitors-db";
+import { supabaseDiscoveryDb } from "@/features/content/data/discovery/supabase-discovery-db";
 import AddCreatorForm from "@/features/content/ui/AddCreatorForm";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import CreatorsTable from "@/features/content/ui/CreatorsTable";

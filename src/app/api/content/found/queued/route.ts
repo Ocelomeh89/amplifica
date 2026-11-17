@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/shared/supabase/admin";
 import { authorizeRoutine } from "@/features/content/data/api-auth";
-import { getQueued } from "@/features/content/data/found-queue";
+import { getQueued } from "@/features/content/data/found/found-queue";
 import { supabaseFoundQueueDb } from "@/features/content/data/supabase-db";
 
 export const dynamic = "force-dynamic";

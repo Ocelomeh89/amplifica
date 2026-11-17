@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { startRecreate } from "@/features/content/data/recreate-actions";
+import { startRecreate } from "@/features/content/data/recreate/recreate-actions";
 import { MODE_LABEL, RECREATE_MODES, type RecreateMode } from "@/features/content/engine/recreate";
 
 type Live = { id: string; status: "pending" | "ready" } | null;

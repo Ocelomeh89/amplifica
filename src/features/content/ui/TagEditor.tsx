@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { saveTagCorrection } from "@/features/content/data/tag-actions";
+import { saveTagCorrection } from "@/features/content/data/tags/tag-actions";
 import type { Topic } from "@/features/content/data/topics";
 import { topicLabel } from "@/features/content/engine/brand";
 import {

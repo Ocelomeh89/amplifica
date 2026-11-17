@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { BriefView } from "@/features/content/data/today";
+import type { BriefView } from "@/features/content/data/today/today";
 import { VERDICT_LABEL, testInWords } from "./BriefCard";
 
 const times = (n: unknown) => (typeof n === "number" ? `${n.toFixed(2)}×` : "no figure");

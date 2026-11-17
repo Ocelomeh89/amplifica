@@ -1,5 +1,5 @@
 import AddCreatorForm from "./AddCreatorForm";
-import type { DroppedRow } from "@/features/content/data/discovery";
+import type { DroppedRow } from "@/features/content/data/discovery/discovery";
 
 /** Accounts the engine looked at and set aside, with why. Any of them can still be added by hand. */
 export default function DroppedCreators({ dropped }: { dropped: DroppedRow[] }) {

@@ -1,7 +1,7 @@
 import { chicagoIsoDate } from "@/features/content/engine/best-times";
 import { requireContentOwner } from "@/features/content/data/owner";
-import { supabaseTodayDb } from "@/features/content/data/supabase-today-db";
-import { EMPTY_INBOX } from "@/features/content/data/today";
+import { supabaseTodayDb } from "@/features/content/data/today/supabase-today-db";
+import { EMPTY_INBOX } from "@/features/content/data/today/today";
 import AutoRefresh from "@/features/content/ui/AutoRefresh";
 import BriefCard from "@/features/content/ui/BriefCard";
 import ContentTabs from "@/features/content/ui/ContentTabs";

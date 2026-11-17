@@ -39,7 +39,7 @@ vi.mock("@/features/content/data/owner", () => ({
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("@/features/content/data/supabase-drafts-db", () => ({
+vi.mock("@/features/content/data/drafts/supabase-drafts-db", () => ({
   deleteIdeaDrafts: (...args: unknown[]) => {
     order.push("deleteIdeaDrafts");
     return deleteIdeaDrafts(...args);

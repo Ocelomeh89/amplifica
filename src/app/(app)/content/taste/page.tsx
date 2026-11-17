@@ -1,5 +1,5 @@
 import { requireContentOwner } from "@/features/content/data/owner";
-import { supabaseTasteDb } from "@/features/content/data/supabase-taste-db";
+import { supabaseTasteDb } from "@/features/content/data/taste/supabase-taste-db";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import TasteRules from "@/features/content/ui/TasteRules";
 import Card from "@/shared/ui/Card";

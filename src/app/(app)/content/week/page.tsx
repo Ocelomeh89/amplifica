@@ -1,5 +1,5 @@
 import { requireContentOwner } from "@/features/content/data/owner";
-import { loadPostsForMath } from "@/features/content/data/performance";
+import { loadPostsForMath } from "@/features/content/data/metrics/performance";
 import { loadQueued } from "@/features/content/data/queries";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import Heatmap from "@/features/content/ui/Heatmap";

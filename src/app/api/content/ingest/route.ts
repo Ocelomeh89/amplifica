@@ -4,7 +4,7 @@ import { authorizeRoutine } from "@/features/content/data/api-auth";
 import { ingestSchema } from "@/features/content/engine/schema";
 import { ingestPayload } from "@/features/content/data/ingest";
 import { supabaseIngestDb } from "@/features/content/data/supabase-db";
-import { sweepInBackground } from "@/features/content/data/gate-run";
+import { sweepInBackground } from "@/features/content/data/gate/gate-run";
 
 export const dynamic = "force-dynamic";
 // The brand gate sweeps the batch after the response (waitUntil lives as long as the function).

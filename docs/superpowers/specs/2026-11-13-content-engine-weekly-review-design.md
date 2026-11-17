@@ -91,7 +91,7 @@ is not offered for 90 days.
 
 Route `/content/review` (newest week), `/content/review/[weekStart]` for earlier weeks. A new tab
 in `ContentTabs`. Six sections, top to bottom, as approved in the mockup
-(`2026-11-13-content-engine-weekly-review-mockup.html` beside this file; a content fragment with
+(`specs/assets/2026-11-13-content-engine-weekly-review-mockup.html` beside this file; a content fragment with
 made-up numbers, for layout only):
 
 1. **The week in one line.** Post count, how many beat the usual views, how many were far below.
