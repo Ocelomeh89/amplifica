@@ -16,7 +16,7 @@ describe("0012_dashboard_projection_settings.sql", () => {
     expect(sql).not.toMatch(/alter table public\.(profiles|amplicons|locs|projections)/i);
   });
 
-  it("column defaults match DEFAULT_PROJECTION_SETTINGS (rates and term superseded by 0024)", () => {
+  it("column defaults match DEFAULT_PROJECTION_SETTINGS (rates and term superseded by 0025)", () => {
     const d = DEFAULT_PROJECTION_SETTINGS;
     expect(sql).toContain(`investment_interest_pct numeric(5, 4) not null default 0.08`);
     expect(sql).toContain(`term_months integer not null default 36`);

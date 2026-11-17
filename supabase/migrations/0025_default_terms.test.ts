@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { DEFAULT_PROJECTION_SETTINGS } from "@/features/dashboard/settings";
 
-describe("0024_default_terms.sql", () => {
-  const sql = readFileSync("supabase/migrations/0024_default_terms.sql", "utf8");
+describe("0025_default_terms.sql", () => {
+  const sql = readFileSync("supabase/migrations/0025_default_terms.sql", "utf8");
 
   it("sets STI defaults to 30 months at 10% and LoC to 7% on both tables", () => {
     for (const table of ["public.projections", "public.dashboard_projection_settings"]) {

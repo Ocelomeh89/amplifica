@@ -1,4 +1,4 @@
--- 0024: new defaults (2026-11-17, decided by Miguel). STI Amplicons default to
+-- 0025: new defaults (2026-11-17, decided by Miguel). STI Amplicons default to
 -- 30 months at 10%; every line of credit defaults to 7%. Column defaults only:
 -- existing rows keep their saved values.
 -- Rollback:
