@@ -44,7 +44,7 @@ describe("buildDashboardProjection", () => {
       locIncrease: 1.5, locInterestPct: 0.07, totalMonths: 360,
       seed: { ...s, startDelayMonths: 0 },
     };
-    const fi = earliestSustainableWithdrawal(input, 3000, { requireGrowth: false, minStartMonth: 0, measure: "capital" });
+    const fi = earliestSustainableWithdrawal(input, 3000, { requireGrowth: false, minStartMonth: 0 });
     expect(optionality.month).toBe(addMonths(TODAY, fi.month!));
     const atSwitch = runSimulation({ ...input, mscEndMonth: fi.month!, withdrawalStartMonth: fi.month!, monthlyWithdrawal: 3000 });
     expect(optionality.incomeAtOptionality).toBeCloseTo(atSwitch.series[fi.month!].distributionInterest, 6);

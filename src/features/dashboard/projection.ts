@@ -140,8 +140,6 @@ export function buildDashboardProjection(args: {
   const fi = earliestSustainableWithdrawal(input, cashflowGoalUSD, {
     requireGrowth: false,
     minStartMonth: 0,
-    // Optionality = income covers the withdrawal and the capital is never spent.
-    measure: "capital",
   });
   if (fi.month == null) {
     return { ...base, optionality: { kind: "not-reached", horizonYears: Math.round(settings.horizonMonths / 12) } };

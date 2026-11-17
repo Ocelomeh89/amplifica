@@ -4,20 +4,15 @@ import { capitalOfBook } from "./sim-book";
 export interface FiResult {
   month: number | null;
   monthlyWithdrawal: number;
-  expectedFuturePaymentsAtSwitch: number | null;
-  expectedFuturePaymentsAtEnd: number | null;
+  // The measure that must never fall: capital still invested + cash − LoC.
+  capitalAtSwitch: number | null;
+  capitalAtEnd: number | null;
 }
 
 export interface FiOptions {
   requireGrowth?: boolean; // false = income FI (no erosion); true = wealth FI (ends higher)
   minRunwayMonths?: number;
   minStartMonth?: number; // earliest month the switch may happen (dashboard start delay)
-  // What must never fall after the switch, net of the LoC and plus cash:
-  // "book" (default) = every future payment at face value, so only future STI
-  // interest offsets a withdrawal; "capital" (dashboard, 2026-11-14) = the
-  // money still invested, so income (STI interest + LTI coupons) pays the
-  // withdrawal and the capital, and with it the flywheel, is never spent.
-  measure?: "book" | "capital";
 }
 
 function sustained(efpSeries: number[], from: number, requireGrowth: boolean): boolean {
@@ -32,6 +27,14 @@ function sustained(efpSeries: number[], from: number, requireGrowth: boolean): b
 
 // Earliest month to stop MSC AND start drawing `monthlyWithdrawal` sustainably.
 // The FI surface is non-monotone (flywheel saw-tooth) — use a linear scan.
+//
+// The capital rule (every surface since 2026-11-17; the dashboard since
+// 2026-11-14): after the switch, capital still invested + cash − LoC must never
+// fall below its level at the switch. So income (STI interest + LTI coupons)
+// pays the withdrawal and the capital, and with it the flywheel, is never
+// spent. Capital, not every payment owed, because at optionality STI capital
+// can be moved into LTIs: what matters is the money, not its schedule.
+// (Replaced the "book" rule, which held every future payment at face value.)
 export function earliestSustainableWithdrawal(
   base: ProjectionSimInput,
   monthlyWithdrawal: number = base.monthlyWithdrawal ?? DEFAULT_MONTHLY_WITHDRAWAL,
@@ -44,15 +47,11 @@ export function earliestSustainableWithdrawal(
   const maxStart = totalMonths - minRunwayMonths;
   for (let t = minStartMonth; t <= maxStart; t++) {
     const r = runSimulation({ ...base, mscEndMonth: t, withdrawalStartMonth: t, monthlyWithdrawal });
-    // Withdrawals leave through the cash bucket, so sustainability is judged on
-    // the book plus cash, net of the LoC — not on expectedFuturePayments alone.
-    const nw =
-      options.measure === "capital"
-        ? r.series.map((s, m) => capitalOfBook(r.bookByMonth[m], m + 1) + s.cash - s.outstandingAmount)
-        : r.series.map((s) => s.expectedFuturePayments + s.cash);
+    // Withdrawals leave through the cash bucket, so cash counts, net of the LoC.
+    const nw = r.series.map((s, m) => capitalOfBook(r.bookByMonth[m], m + 1) + s.cash - s.outstandingAmount);
     if (sustained(nw, t, requireGrowth)) {
-      return { month: t, monthlyWithdrawal, expectedFuturePaymentsAtSwitch: nw[t], expectedFuturePaymentsAtEnd: nw[nw.length - 1] };
+      return { month: t, monthlyWithdrawal, capitalAtSwitch: nw[t], capitalAtEnd: nw[nw.length - 1] };
     }
   }
-  return { month: null, monthlyWithdrawal, expectedFuturePaymentsAtSwitch: null, expectedFuturePaymentsAtEnd: null };
+  return { month: null, monthlyWithdrawal, capitalAtSwitch: null, capitalAtEnd: null };
 }
