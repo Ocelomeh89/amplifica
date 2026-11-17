@@ -40,7 +40,7 @@ export default function AmpliconFields({
 }) {
   const [type, setType] = useState<IncomeType>(d.income_type ?? "STI");
   const [face, setFace] = useState(String(d.face_value ?? 25000));
-  const [ratePct, setRatePct] = useState(String(d.interest_pct != null ? +(d.interest_pct * 100).toFixed(4) : type === "LTI" ? 4 : 8));
+  const [ratePct, setRatePct] = useState(String(d.interest_pct != null ? +(d.interest_pct * 100).toFixed(4) : type === "LTI" ? 4 : 10));
   const lti = type === "LTI";
   const monthly = (Number(face) || 0) * ((Number(ratePct) || 0) / 100 / 12);
 
@@ -76,7 +76,7 @@ export default function AmpliconFields({
         </Field>
       ) : (
         <Field label="Term (months)">
-          <input key="term_months" name="term_months" type="number" min={1} step={1} required defaultValue={d.term_months ?? 36} className={input} />
+          <input key="term_months" name="term_months" type="number" min={1} step={1} required defaultValue={d.term_months ?? 30} className={input} />
         </Field>
       )}
       <Field

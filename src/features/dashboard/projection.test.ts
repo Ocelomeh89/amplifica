@@ -27,8 +27,8 @@ describe("buildDashboardProjection", () => {
     expect(series).toHaveLength(360);
     const s = seedFromTracked(amps, TODAY, null);
     const direct = runSimulation({
-      msc: 2000, investmentSizeFactor: 0, termMonths: 36, investmentInterestPct: 0.08,
-      locIncrease: 1.5, locInterestPct: 0.1, totalMonths: 360,
+      msc: 2000, investmentSizeFactor: 0, termMonths: 30, investmentInterestPct: 0.1,
+      locIncrease: 1.5, locInterestPct: 0.07, totalMonths: 360,
       seed: { ...s, startDelayMonths: 0 },
     });
     expect(series).toEqual(direct.series);
@@ -40,8 +40,8 @@ describe("buildDashboardProjection", () => {
     if (optionality.kind !== "reached") return;
     const s = seedFromTracked(amps, TODAY, null);
     const input = {
-      msc: 2000, investmentSizeFactor: 0, termMonths: 36, investmentInterestPct: 0.08,
-      locIncrease: 1.5, locInterestPct: 0.1, totalMonths: 360,
+      msc: 2000, investmentSizeFactor: 0, termMonths: 30, investmentInterestPct: 0.1,
+      locIncrease: 1.5, locInterestPct: 0.07, totalMonths: 360,
       seed: { ...s, startDelayMonths: 0 },
     };
     const fi = earliestSustainableWithdrawal(input, 3000, { requireGrowth: false, minStartMonth: 0, measure: "capital" });

@@ -50,7 +50,7 @@ export default function NewLoCForm() {
             <NumberInput name="utilization" defaultValue={0} min={0} step={1000} />
           </Field>
           <Field label="Interest rate (%)" hint="Annual. The dashboard projection accrues this line's balance at this rate.">
-            <NumberInput name="interest_pct" defaultValue={10} min={0} step={0.1} required />
+            <NumberInput name="interest_pct" defaultValue={7} min={0} step={0.1} required />
           </Field>
         </div>
         <div className="flex gap-2 mt-2">

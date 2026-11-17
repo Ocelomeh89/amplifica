@@ -23,9 +23,9 @@ export interface ProjectionSettings {
 
 export const DEFAULT_PROJECTION_SETTINGS: ProjectionSettings = {
   nextDrawSize: null,
-  investmentInterestPct: 0.08,
-  termMonths: 36,
-  locInterestPct: 0.1,
+  investmentInterestPct: 0.1,
+  termMonths: 30,
+  locInterestPct: 0.07,
   locIncrease: 1.5,
   horizonMonths: 360,
 };

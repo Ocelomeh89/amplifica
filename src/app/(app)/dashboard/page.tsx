@@ -36,7 +36,7 @@ export default async function DashboardPage() {
     id: l.id,
     size: Number(l.size),
     utilization: Number(l.utilization),
-    interestPct: Number(l.interest_pct ?? 0.1),
+    interestPct: Number(l.interest_pct ?? 0.07),
   }));
   const projectionSettings = settingsFromRow(projectionRow ?? null);
 

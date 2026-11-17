@@ -16,11 +16,11 @@ describe("0012_dashboard_projection_settings.sql", () => {
     expect(sql).not.toMatch(/alter table public\.(profiles|amplicons|locs|projections)/i);
   });
 
-  it("column defaults match DEFAULT_PROJECTION_SETTINGS", () => {
+  it("column defaults match DEFAULT_PROJECTION_SETTINGS (rates and term superseded by 0024)", () => {
     const d = DEFAULT_PROJECTION_SETTINGS;
-    expect(sql).toContain(`investment_interest_pct numeric(5, 4) not null default ${d.investmentInterestPct.toFixed(2)}`);
-    expect(sql).toContain(`term_months integer not null default ${d.termMonths}`);
-    expect(sql).toContain(`loc_interest_pct numeric(5, 4) not null default ${d.locInterestPct.toFixed(2)}`);
+    expect(sql).toContain(`investment_interest_pct numeric(5, 4) not null default 0.08`);
+    expect(sql).toContain(`term_months integer not null default 36`);
+    expect(sql).toContain(`loc_interest_pct numeric(5, 4) not null default 0.10`);
     expect(sql).toContain(`loc_increase numeric(4, 2) not null default ${d.locIncrease.toFixed(2)}`);
     expect(sql).toContain(`horizon_months integer not null default ${d.horizonMonths}`);
     // Start delay retired 2026-11; the column keeps its 0 default.
