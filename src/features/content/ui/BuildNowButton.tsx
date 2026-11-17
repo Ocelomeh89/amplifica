@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { buildNowAction } from "@/features/content/data/review-actions";
+import { buildNowAction } from "@/features/content/data/review/review-actions";
 
 /** Builds the newest finished week's review. Takes up to a minute while Claude writes the explanations. */
 export default function BuildNowButton() {

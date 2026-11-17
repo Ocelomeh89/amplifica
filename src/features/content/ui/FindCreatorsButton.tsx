@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { findCreatorsNowAction } from "@/features/content/data/discovery-actions";
+import { findCreatorsNowAction } from "@/features/content/data/discovery/discovery-actions";
 
 /** Starts a search for new creators. The work runs after the response, so the page refreshes while it does. */
 export default function FindCreatorsButton({ left, lastNote }: { left: number; lastNote: { note: string; at: string } | null }) {

@@ -2,11 +2,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import VerdictsList from "./VerdictsList";
-import type { BriefView } from "@/features/content/data/today";
+import type { BriefView } from "@/features/content/data/today/today";
 
 vi.mock("next/link", () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }));
 vi.mock("@/features/content/data/actions", () => ({ markPosted: vi.fn() }));
-vi.mock("@/features/content/data/today-actions", () => ({ swapBrief: vi.fn(), skipBriefAction: vi.fn() }));
+vi.mock("@/features/content/data/today/today-actions", () => ({ swapBrief: vi.fn(), skipBriefAction: vi.fn() }));
 
 const b = (over: Partial<BriefView>): BriefView =>
   ({

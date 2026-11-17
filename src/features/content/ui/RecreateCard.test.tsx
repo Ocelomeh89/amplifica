@@ -5,7 +5,7 @@ import RecreateCard, { type OpenRecreation } from "./RecreateCard";
 const pickRecreateOption = vi.fn(async (_fd: FormData): Promise<{ error: string | null; ideaId?: string }> => ({ error: null, ideaId: "i1" }));
 const regenerateRecreate = vi.fn(async (_fd: FormData) => ({ error: null as string | null }));
 const retryRecreate = vi.fn(async (_fd: FormData) => ({ error: null as string | null }));
-vi.mock("@/features/content/data/recreate-actions", () => ({
+vi.mock("@/features/content/data/recreate/recreate-actions", () => ({
   pickRecreateOption: (fd: FormData) => pickRecreateOption(fd),
   regenerateRecreate: (fd: FormData) => regenerateRecreate(fd),
   retryRecreate: (fd: FormData) => retryRecreate(fd),

@@ -1,7 +1,7 @@
 import { topicLabel } from "@/features/content/engine/brand";
 import type { FocusEntry } from "@/features/content/engine/focus";
 import { TAG_LABELS } from "@/features/content/engine/tags";
-import type { FocusRow } from "@/features/content/data/focus";
+import type { FocusRow } from "@/features/content/data/review/focus";
 import type { Topic } from "@/features/content/data/topics";
 import BringBackButton from "./BringBackButton";
 import Card from "@/shared/ui/Card";

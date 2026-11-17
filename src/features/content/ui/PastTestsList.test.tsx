@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import PastTestsList from "./PastTestsList";
-import type { TestView } from "@/features/content/data/test-lab";
+import type { TestView } from "@/features/content/data/test-lab/test-lab";
 
 const t = (id: string, over: Partial<TestView>): TestView =>
   ({ id, question: `Question ${id}?`, status: "judged", verdict_line: "", conclusion: "", skip_reason: "", error: "", judged_at: null, closed_at: null, created_at: "2026-11-01T00:00:00Z", versions: [], ...over }) as TestView;

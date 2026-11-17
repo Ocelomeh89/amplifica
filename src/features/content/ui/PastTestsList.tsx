@@ -1,4 +1,4 @@
-import type { TestView } from "@/features/content/data/test-lab";
+import type { TestView } from "@/features/content/data/test-lab/test-lab";
 import Card from "@/shared/ui/Card";
 
 const when = (t: TestView) => t.judged_at ?? t.closed_at ?? t.created_at;

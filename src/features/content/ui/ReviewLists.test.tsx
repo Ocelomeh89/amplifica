@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { DoubleDownList, SkipList } from "./ReviewLists";
-import type { FocusRow } from "@/features/content/data/focus";
+import type { FocusRow } from "@/features/content/data/review/focus";
 
-vi.mock("@/features/content/data/review-actions", () => ({ bringBackAction: vi.fn(), buildNowAction: vi.fn() }));
+vi.mock("@/features/content/data/review/review-actions", () => ({ bringBackAction: vi.fn(), buildNowAction: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 const skip = (over: Partial<FocusRow>): FocusRow => ({

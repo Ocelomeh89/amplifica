@@ -4,7 +4,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import ProposeTestButton from "./ProposeTestButton";
 
 const proposeTestAction = vi.fn(async () => ({ error: null as string | null, message: "A test is on the way. This takes a few minutes." }));
-vi.mock("@/features/content/data/test-lab-actions", () => ({ proposeTestAction: () => proposeTestAction() }));
+vi.mock("@/features/content/data/test-lab/test-lab-actions", () => ({ proposeTestAction: () => proposeTestAction() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 describe("ProposeTestButton", () => {

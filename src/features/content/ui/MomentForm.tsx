@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { submitMoment } from "@/features/content/data/today-actions";
+import { submitMoment } from "@/features/content/data/today/today-actions";
 
 // Slot 3: Miguel types a moment from his day; the brief is built around it.
 export default function MomentForm() {

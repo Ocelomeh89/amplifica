@@ -8,8 +8,8 @@ import {
   proposeRulesAction,
   rejectRuleAction,
   setRuleOnAction,
-} from "@/features/content/data/taste-actions";
-import type { NoteRow, RuleRow, TastePage } from "@/features/content/data/taste";
+} from "@/features/content/data/taste/taste-actions";
+import type { NoteRow, RuleRow, TastePage } from "@/features/content/data/taste/taste";
 
 const btn = "min-h-11 px-4 rounded-lg border border-edge bg-card text-sm hover:bg-edge/60 disabled:opacity-50 disabled:cursor-not-allowed";
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Chicago" });

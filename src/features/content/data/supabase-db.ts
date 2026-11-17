@@ -6,11 +6,11 @@ import type { IngestDb } from "./ingest";
 import { FORMATS, type Format } from "@/features/content/engine/types";
 import type { ContextDb } from "./context";
 import { loadTopics } from "./topics";
-import { activeFocus } from "./focus";
-import { supabaseFocusDb } from "./supabase-focus-db";
-import type { MetricsDb } from "./metrics";
-import type { FoundDeps, StoredSource } from "./found";
-import type { QueueDb } from "./found-queue";
+import { activeFocus } from "./review/focus";
+import { supabaseFocusDb } from "./review/supabase-focus-db";
+import type { MetricsDb } from "./metrics/metrics";
+import type { FoundDeps, StoredSource } from "./found/found";
+import type { QueueDb } from "./found/found-queue";
 
 type Client = SupabaseClient<Database>;
 

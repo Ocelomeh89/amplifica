@@ -1,5 +1,5 @@
 import { requireContentOwner } from "@/features/content/data/owner";
-import { loadPostsForMath } from "@/features/content/data/performance";
+import { loadPostsForMath } from "@/features/content/data/metrics/performance";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import AttributionPanels from "@/features/content/ui/AttributionPanels";
 import OverviewCards from "@/features/content/ui/OverviewCards";

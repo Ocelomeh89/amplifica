@@ -26,7 +26,7 @@ description: Pick the content engine build back up. Use when Miguel says "/conte
    before merging code that needs it.
 6. **Brand strategy first (2026-11-03).** Before brainstorming any build, read the `brand-writing` skill
    (`~/.claude/skills/brand-writing/SKILL.md`) and the vault note `C - Writing/Brand Content Pillars`.
-   The brand gate (`data/brand-gate.ts`, standard in `engine/brand.ts`) now checks every idea. Any new
+   The brand gate (`data/gate/brand-gate.ts`, standard in `engine/brand.ts`) now checks every idea. Any new
    build that produces, rewrites or ranks content must go through `gatePiece` or `gateOptions`, never
    around them. Pillars are the five slugs in `engine/brand.ts` (`PILLAR_SLUGS`). When the skill
    changes, update `engine/brand.ts` with it.

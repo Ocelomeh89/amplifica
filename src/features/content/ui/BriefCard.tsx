@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { markPosted } from "@/features/content/data/actions";
-import { skipBriefAction, swapBrief } from "@/features/content/data/today-actions";
-import type { BriefView } from "@/features/content/data/today";
+import { skipBriefAction, swapBrief } from "@/features/content/data/today/today-actions";
+import type { BriefView } from "@/features/content/data/today/today";
 import { HELD_STILL, NEW_FORMAT, VARIABLE_LABEL, valueLabel } from "@/features/content/engine/experiments";
 
 const btn = "min-h-11 px-4 rounded-lg border border-edge bg-card text-sm hover:bg-edge/60 disabled:opacity-50 disabled:cursor-not-allowed";

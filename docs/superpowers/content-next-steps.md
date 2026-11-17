@@ -1,7 +1,7 @@
 # Content engine: where we stopped and what to build next
 
-Last updated 2026-11-15. The weekly review and the Trial Reel tests (PR #27) are merged and live; creator suggestions are built on
-`feat/content-creator-suggestions` and wait for Miguel (see below). Resume with `/content-resume` in a fresh session. It reads this file.
+Last updated 2026-11-17. The weekly review, the Trial Reel tests (PR #27) and creator suggestions (PR #28) are merged and live.
+Resume with `/content-resume` in a fresh session. It reads this file.
 
 ## Live today
 
@@ -13,12 +13,12 @@ Last updated 2026-11-15. The weekly review and the Trial Reel tests (PR #27) are
 | Today, three briefs a day (slice 5) | `/content/today` | `specs/2026-10-27-content-engine-today-design.md` |
 | Competitor Reels as Today briefs (slice 6) | `/content/creators`, Today slot 2 | `specs/2026-11-01-content-engine-competitors-design.md` |
 | Sharpen and the taste loop (4c) | idea cards, `/content/taste` | `specs/2026-11-01-content-engine-taste-sharpen-design.md` |
-| **Weekly review** (live; Monday routine created 2026-11-14) | `/content/review`, Monday routine, the skip and double-down lists in Today and the Inbox | `specs/2026-11-13-content-engine-weekly-review-design.md`, plan `plans/2026-11-13-content-engine-weekly-review.md` |
-| **Trial Reel tests** (2026-11-15, PR #27 merged, migration 0022 applied) | `/content/tests`, the Monday routine's middle step, "This week's test" on the review | `specs/2026-11-13-content-engine-test-lab-design.md`, plan `plans/2026-11-13-content-engine-test-lab.md` |
-| **Creator suggestions** (2026-11-15, built, not merged) | `/content/creators` "Suggested", the review's "New creator suggestions", the Monday routine's discovery step | `specs/2026-11-13-content-engine-creator-suggestions-design.md`, plan `plans/2026-11-13-content-engine-creator-suggestions.md` |
+| **Weekly review** (live; Monday routine created 2026-11-14) | `/content/review`, Monday routine, the skip and double-down lists in Today and the Inbox | `specs/2026-11-13-content-engine-weekly-review-design.md`, plan `plans/done/2026-11-13-content-engine-weekly-review.md` |
+| **Trial Reel tests** (2026-11-15, PR #27 merged, migration 0022 applied) | `/content/tests`, the Monday routine's middle step, "This week's test" on the review | `specs/2026-11-13-content-engine-test-lab-design.md`, plan `plans/done/2026-11-13-content-engine-test-lab.md` |
+| **Creator suggestions** (PR #28 merged 2026-11-15, migration 0023 applied) | `/content/creators` "Suggested", the review's "New creator suggestions", the Monday routine's discovery step | `specs/2026-11-13-content-engine-creator-suggestions-design.md`, plan `plans/done/2026-11-13-content-engine-creator-suggestions.md` |
 | **Brand gate** (PR #22, 2026-11-10) | every idea; card line; idea page; Performance "Didn't pass" | `specs/2026-11-10-content-engine-brand-gate-design.md` |
 
-Migrations are applied through **0022** (0019 belongs to the investment-options branch; 0023 is creator suggestions, not applied). The feature
+Migrations are applied through **0025** (checked against production on 2026-11-17; 0019, 0024 and 0025 are investment options, PR #29). The feature
 map and invariants are in `src/features/content/CLAUDE.md`, including the brand gate's.
 
 What the brand gate does, in one paragraph:
@@ -47,8 +47,6 @@ The 2026-09-20 positioning taste rule (retired saver audience) was turned off.
    a ClickUp message listing the passed ideas.
 3. **Retag in flight:** on 2026-11-10, 115 Instagram posts were re-queued (`tagged_at = null`). The next weekly tagging run assigns
    pillar `message` tags. Spot-check a few on Performance after it runs.
-4. **The local `main` in the shared checkout diverged.** Do not build on it. Use a worktree from `origin/main`. Ask Miguel
-   before resetting it, because another session may be using that checkout.
 
 ## Check first (acceptance not yet seen)
 
@@ -75,7 +73,7 @@ and `C - Writing/Brand Content Pillars`.
 - Everything the engine produces is Amplifica, so the Amplifica layer applies on top.
 
 The brand gate now enforces this on every idea. Any new build that produces, rewrites or ranks content
-must go through `gatePiece` or `gateOptions` in `data/brand-gate.ts`. When the skill changes, update
+must go through `gatePiece` or `gateOptions` in `data/gate/brand-gate.ts`. When the skill changes, update
 `engine/brand.ts` in the same change.
 
 ## The weekly review: what waits for Miguel
@@ -97,28 +95,19 @@ Instagram's media list 17 minutes after posting, so the card takes typed numbers
 
 ## Creator suggestions: what waits for Miguel
 
-Built and tested on `feat/content-creator-suggestions` (cut from `origin/main` after slices A and B); nothing below has run. The
+Merged (PR #28) and deployed on 2026-11-15, migration 0023 applied; `content_discovery_runs` had 5 rows on 2026-11-17. The
 discovery spike ran on 2026-11-14 (about $0.22 of the $0.50 approved) and the keyword search won: `related` found nothing and
 `mentions` found three accounts. The audience judge also requires at least 4 Reels in the last 30 days, because the spike's
-candidates were name matches that often post no Reels. In order:
-1. Apply migration `0023_content_creator_suggestions.sql` in the Supabase SQL editor, **before the merge**. It widens the creator
-   status check, adds three columns to `content_creators` and three tables (`content_creator_candidates`,
-   `content_discovery_runs`, `content_discovery_calls`). The merged code reads `content_discovery_runs` on every metrics cron run.
-2. Merge and deploy. The weekly routine reads `routines/content-weekly.md` from the checkout, so its new "Advance creator discovery"
-   step needs no routine edit and its network allowlist (the app host) is unchanged. No new env var.
-3. **The first real run**, with Miguel's go-ahead for the Apify spend (capped at $1.00 a week): call the metrics cron with
-   `?creators=now&competitors=now`, wait a few minutes, then press **Find creators now** on `/content/creators`. Check: the Apify
+candidates were name matches that often post no Reels. Left:
+1. **Review the first real runs** (Apify spend capped at $1.00 a week). Check: the Apify
    console shows the discovery runs under $1.00 for the week; each card's reason and quotes make sense to him; a declined
    creator's reason shows in the next run's "Considered and dropped" or changes who is suggested. Record what he said here.
 
 ## Next builds, in order
 
-The three designs and plans were written and approved (specs and plans dated 2026-11-13). All three are built; the weekly review
-and the Trial Reel tests are merged.
+The three slices designed on 2026-11-13 (weekly review, Trial Reel tests, creator suggestions) are all merged.
 
-1. **Slice B: Trial Reel tests**: merged (see above).
-2. **Slice C: creator suggestions**: built, waiting on migration 0023 and the merge (see above).
-3. **Debugging pass** after the last merge, with a week or two of real runs: the brand gate polish list, the parked minors,
+1. **Debugging pass** after the last merge, with a week or two of real runs: the brand gate polish list, the parked minors,
    and the open acceptance checks (taste loop, Monday competitor pull, tagging routine).
 
 ## Parked

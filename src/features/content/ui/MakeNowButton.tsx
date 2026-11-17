@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { makeBriefsNow } from "@/features/content/data/today-actions";
+import { makeBriefsNow } from "@/features/content/data/today/today-actions";
 
 export default function MakeNowButton() {
   const [busy, setBusy] = useState(false);

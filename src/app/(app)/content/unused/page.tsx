@@ -1,6 +1,6 @@
 import { requireContentOwner } from "@/features/content/data/owner";
 import { loadUnused } from "@/features/content/data/queries";
-import { loadActiveFocus } from "@/features/content/data/focus";
+import { loadActiveFocus } from "@/features/content/data/review/focus";
 import { chicagoIsoDate } from "@/features/content/engine/best-times";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import UnusedCard from "@/features/content/ui/UnusedCard";

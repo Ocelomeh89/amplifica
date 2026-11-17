@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeRoutine } from "@/features/content/data/api-auth";
-import { startProposalInBackground } from "@/features/content/data/test-lab-run";
+import { startProposalInBackground } from "@/features/content/data/test-lab/test-lab-run";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;

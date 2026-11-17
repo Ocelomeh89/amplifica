@@ -4,7 +4,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import FindCreatorsButton from "./FindCreatorsButton";
 
 const findCreatorsNowAction = vi.fn(async () => ({ error: null as string | null }));
-vi.mock("@/features/content/data/discovery-actions", () => ({ findCreatorsNowAction: () => findCreatorsNowAction() }));
+vi.mock("@/features/content/data/discovery/discovery-actions", () => ({ findCreatorsNowAction: () => findCreatorsNowAction() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 describe("FindCreatorsButton", () => {

@@ -2,9 +2,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import SuggestedCreators from "./SuggestedCreators";
-import type { SuggestionCard } from "@/features/content/data/discovery";
+import type { SuggestionCard } from "@/features/content/data/discovery/discovery";
 
-vi.mock("@/features/content/data/discovery-actions", () => ({ addSuggestedAction: vi.fn(), declineSuggestedAction: vi.fn() }));
+vi.mock("@/features/content/data/discovery/discovery-actions", () => ({ addSuggestedAction: vi.fn(), declineSuggestedAction: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 const card = (over: Partial<SuggestionCard> = {}): SuggestionCard => ({

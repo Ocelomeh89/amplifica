@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/shared/supabase/admin";
 import { authorizeRoutine } from "@/features/content/data/api-auth";
-import { storeTags } from "@/features/content/data/tags";
-import { supabaseTagsDb } from "@/features/content/data/supabase-tags-db";
+import { storeTags } from "@/features/content/data/tags/tags";
+import { supabaseTagsDb } from "@/features/content/data/tags/supabase-tags-db";
 
 export const dynamic = "force-dynamic";
 

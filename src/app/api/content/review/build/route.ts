@@ -3,8 +3,8 @@ import { z } from "zod";
 import { createAdminClient } from "@/shared/supabase/admin";
 import { authorizeRoutine } from "@/features/content/data/api-auth";
 import { MissingApiKeyError, anthropicToolCaller, type ToolCaller } from "@/features/content/data/claude";
-import { buildReview } from "@/features/content/data/review";
-import { supabaseReviewDb } from "@/features/content/data/supabase-review-db";
+import { buildReview } from "@/features/content/data/review/review";
+import { supabaseReviewDb } from "@/features/content/data/review/supabase-review-db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;

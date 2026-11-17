@@ -4,7 +4,7 @@ import ReviewPage, { type ReviewPageProps } from "./ReviewPage";
 import type { ContentReview } from "@/shared/supabase/database.types";
 import type { ReviewData, ReviewPost } from "@/features/content/engine/review";
 
-vi.mock("@/features/content/data/review-actions", () => ({ bringBackAction: vi.fn(), buildNowAction: vi.fn() }));
+vi.mock("@/features/content/data/review/review-actions", () => ({ bringBackAction: vi.fn(), buildNowAction: vi.fn() }));
 vi.mock("@/features/content/data/actions", () => ({ archiveIdea: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 

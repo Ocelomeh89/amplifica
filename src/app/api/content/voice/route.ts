@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/shared/supabase/admin";
 import { authorizeRoutine } from "@/features/content/data/api-auth";
-import { getVoice, postVoice } from "@/features/content/data/voice";
-import { supabaseVoiceDb } from "@/features/content/data/supabase-drafts-db";
+import { getVoice, postVoice } from "@/features/content/data/drafts/voice";
+import { supabaseVoiceDb } from "@/features/content/data/drafts/supabase-drafts-db";
 
 export const dynamic = "force-dynamic";
 // Next 14 still caches GET fetches here (the Supabase reads) without this; see wiring.test.ts.

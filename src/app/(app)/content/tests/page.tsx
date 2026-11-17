@@ -1,5 +1,5 @@
 import { requireContentOwner } from "@/features/content/data/owner";
-import { supabaseTestsDb } from "@/features/content/data/supabase-tests-db";
+import { supabaseTestsDb } from "@/features/content/data/test-lab/supabase-tests-db";
 import AutoRefresh from "@/features/content/ui/AutoRefresh";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import PastTestsList from "@/features/content/ui/PastTestsList";

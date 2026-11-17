@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import TagEditor from "./TagEditor";
 import type { PostTags } from "@/features/content/engine/tags";
 
-vi.mock("@/features/content/data/tag-actions", () => ({ saveTagCorrection: vi.fn() }));
+vi.mock("@/features/content/data/tags/tag-actions", () => ({ saveTagCorrection: vi.fn() }));
 
 const row: PostTags = {
   hook_type: "question",

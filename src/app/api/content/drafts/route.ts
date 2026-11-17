@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/shared/supabase/admin";
 import { authorizeRoutine } from "@/features/content/data/api-auth";
-import { postDraft } from "@/features/content/data/drafts";
-import { supabaseDraftsDb } from "@/features/content/data/supabase-drafts-db";
-import { gatePiece, type GateOutcome } from "@/features/content/data/brand-gate";
+import { postDraft } from "@/features/content/data/drafts/drafts";
+import { supabaseDraftsDb } from "@/features/content/data/drafts/supabase-drafts-db";
+import { gatePiece, type GateOutcome } from "@/features/content/data/gate/brand-gate";
 import { anthropicToolCaller } from "@/features/content/data/claude";
 import type { GateFields } from "@/features/content/engine/brand";
 

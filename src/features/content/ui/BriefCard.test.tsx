@@ -2,11 +2,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import BriefCard from "./BriefCard";
-import type { BriefView } from "@/features/content/data/today";
+import type { BriefView } from "@/features/content/data/today/today";
 
 const swapBrief = vi.fn(async (_fd: FormData) => ({ error: null as string | null, message: "A new test is on the way." }));
 const skipBriefAction = vi.fn(async (_fd: FormData) => ({ error: null as string | null }));
-vi.mock("@/features/content/data/today-actions", () => ({
+vi.mock("@/features/content/data/today/today-actions", () => ({
   swapBrief: (fd: FormData) => swapBrief(fd),
   skipBriefAction: (fd: FormData) => skipBriefAction(fd),
 }));

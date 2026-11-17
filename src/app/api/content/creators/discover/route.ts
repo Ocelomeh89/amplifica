@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authorizeRoutine } from "@/features/content/data/api-auth";
-import { runDiscovery } from "@/features/content/data/discovery-run";
+import { runDiscovery } from "@/features/content/data/discovery/discovery-run";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;

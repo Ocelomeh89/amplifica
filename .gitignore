@@ -17,9 +17,6 @@ next-env.d.ts
 supabase/.branches
 supabase/.temp
 
-# Legacy vite artifacts (parked branch)
-vite.config.js
-vite.config.d.ts
 .vercel
 .env*
 

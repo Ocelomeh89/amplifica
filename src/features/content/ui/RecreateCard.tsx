@@ -5,8 +5,8 @@ import {
   pickRecreateOption,
   regenerateRecreate,
   retryRecreate,
-} from "@/features/content/data/recreate-actions";
-import type { OpenRecreation } from "@/features/content/data/recreate";
+} from "@/features/content/data/recreate/recreate-actions";
+import type { OpenRecreation } from "@/features/content/data/recreate/recreate";
 import { MODE_LABEL } from "@/features/content/engine/recreate";
 import { TAG_LABELS } from "@/features/content/engine/tags";
 

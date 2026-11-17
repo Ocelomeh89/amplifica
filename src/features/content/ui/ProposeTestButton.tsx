@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { proposeTestAction } from "@/features/content/data/test-lab-actions";
+import { proposeTestAction } from "@/features/content/data/test-lab/test-lab-actions";
 
 const CAP_TEXT = "That's 3 test proposals today. Try again tomorrow.";
 

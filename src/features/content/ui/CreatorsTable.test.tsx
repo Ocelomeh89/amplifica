@@ -2,9 +2,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import CreatorsTable from "./CreatorsTable";
-import type { CreatorsPage } from "@/features/content/data/competitors";
+import type { CreatorsPage } from "@/features/content/data/competitors/competitors";
 
-vi.mock("@/features/content/data/competitor-actions", () => ({ addCreatorAction: vi.fn(), removeCreatorAction: vi.fn() }));
+vi.mock("@/features/content/data/competitors/competitor-actions", () => ({ addCreatorAction: vi.fn(), removeCreatorAction: vi.fn() }));
 
 const page = (over: Partial<CreatorsPage> = {}): CreatorsPage => ({
   creators: [

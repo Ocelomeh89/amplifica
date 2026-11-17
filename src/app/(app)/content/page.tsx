@@ -12,7 +12,7 @@ import FoundContentForm from "@/features/content/ui/FoundContentForm";
 import { foundBadge } from "@/features/content/engine/angle";
 import { filterByFormat, formatCounts, parseFormatParam, rankIdeas } from "@/features/content/engine/inbox";
 import { focusTier } from "@/features/content/engine/focus";
-import { loadActiveFocus } from "@/features/content/data/focus";
+import { loadActiveFocus } from "@/features/content/data/review/focus";
 import { chicagoIsoDate } from "@/features/content/engine/best-times";
 
 export const maxDuration = 300;

@@ -8,8 +8,8 @@ import { join, relative, resolve, dirname } from "node:path";
 
 const SRC = join(process.cwd(), "src");
 const FORBIDDEN = [
-  "engine/found", "engine/readable", "data/found", "data/fetch-page",
-  "data/claude", "data/found-form", "data/youtube-meta", "data/supabase-db",
+  "engine/found", "engine/readable", "data/found/found", "data/found/fetch-page",
+  "data/claude", "data/found/found-form", "data/metrics/youtube-meta", "data/supabase-db",
 ];
 
 function files(dir = SRC): string[] {

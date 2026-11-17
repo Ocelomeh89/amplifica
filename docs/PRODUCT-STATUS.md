@@ -66,7 +66,7 @@ src/
     layout.tsx  page.tsx  globals.css  robots.ts  sitemap.ts
 
   features/             # one folder per product surface: engine/ ui/ data/
-    compare/            # investment comparison (see investment-comparison-STATUS.md)
+    compare/            # investment comparison (see its CLAUDE.md and docs/superpowers/investment-comparison-STATUS.md)
       engine/           #   run, types, metrics, present, defaults, inflation
         builders/       #   six option builders + sleeve/depreciation helpers
         tax/            #   brackets, engine, exit, passive

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/shared/supabase/admin";
 import { authorizeRoutine } from "@/features/content/data/api-auth";
-import { getTagQueue } from "@/features/content/data/tags";
-import { igMediaUrlLookup, supabaseTagsDb } from "@/features/content/data/supabase-tags-db";
+import { getTagQueue } from "@/features/content/data/tags/tags";
+import { igMediaUrlLookup, supabaseTagsDb } from "@/features/content/data/tags/supabase-tags-db";
 
 export const dynamic = "force-dynamic";
 // Next 14 still caches GET fetches here (the Supabase reads) without this; see wiring.test.ts.

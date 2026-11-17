@@ -6,14 +6,14 @@ import type { Format } from "@/features/content/engine/types";
 import { partitionUnused } from "@/features/content/engine/unused";
 import { splitHidden } from "@/features/content/engine/inbox";
 import type { ActiveFocus } from "@/features/content/engine/focus";
-import type { FocusRow } from "./focus";
+import type { FocusRow } from "./review/focus";
 import type { ContentReview } from "@/shared/supabase/database.types";
 import { summarizeDraft, type DraftState } from "@/features/content/engine/drafts";
 import type { RecreateOption } from "@/features/content/engine/recreate";
 import { STALE_PENDING_MINUTES } from "@/features/content/engine/recreate";
-import type { OpenRecreation } from "./recreate";
-import type { SharpenRow } from "./sharpen";
-import { supabaseSharpenDb } from "./supabase-sharpen-db";
+import type { OpenRecreation } from "./recreate/recreate";
+import type { SharpenRow } from "./sharpen/sharpen";
+import { supabaseSharpenDb } from "./sharpen/supabase-sharpen-db";
 import { PILLAR_SLUGS, pillarBalance, type PillarSlug } from "@/features/content/engine/brand";
 
 

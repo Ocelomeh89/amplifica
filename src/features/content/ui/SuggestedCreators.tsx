@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { addSuggestedAction, declineSuggestedAction } from "@/features/content/data/discovery-actions";
-import type { SuggestionCard } from "@/features/content/data/discovery";
+import { addSuggestedAction, declineSuggestedAction } from "@/features/content/data/discovery/discovery-actions";
+import type { SuggestionCard } from "@/features/content/data/discovery/discovery";
 import { DECLINE_CHIPS } from "@/features/content/engine/discovery";
 
 /** Up to three creators the engine found, each with why. Add watches them; Decline needs a reason. */

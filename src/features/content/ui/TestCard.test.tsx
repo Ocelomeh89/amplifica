@@ -3,12 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import TestCard from "./TestCard";
 import { POSTING_NOTE } from "@/features/content/engine/test-lab-card";
-import type { TestView, VersionRow } from "@/features/content/data/test-lab";
+import type { TestView, VersionRow } from "@/features/content/data/test-lab/test-lab";
 
 const saveNumbersAction = vi.fn(async (_fd: FormData) => ({ error: null as string | null, judged: false }));
 const readResultAction = vi.fn(async (_fd: FormData) => ({ error: null as string | null }));
 const skipTestAction = vi.fn(async (_fd: FormData) => ({ error: null as string | null }));
-vi.mock("@/features/content/data/test-lab-actions", () => ({
+vi.mock("@/features/content/data/test-lab/test-lab-actions", () => ({
   saveNumbersAction: (fd: FormData) => saveNumbersAction(fd),
   skipTestAction: (fd: FormData) => skipTestAction(fd),
   readResultAction: (fd: FormData) => readResultAction(fd),

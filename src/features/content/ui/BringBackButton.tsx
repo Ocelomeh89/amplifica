@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { bringBackAction } from "@/features/content/data/review-actions";
+import { bringBackAction } from "@/features/content/data/review/review-actions";
 
 /** Ends a running skip. The value is allowed back and is not skipped again for 90 days. */
 export default function BringBackButton({ id }: { id: string }) {

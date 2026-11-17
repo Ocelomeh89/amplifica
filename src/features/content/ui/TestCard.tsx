@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { readResultAction, saveNumbersAction, skipTestAction } from "@/features/content/data/test-lab-actions";
-import type { TestView, VersionRow } from "@/features/content/data/test-lab";
+import { readResultAction, saveNumbersAction, skipTestAction } from "@/features/content/data/test-lab/test-lab-actions";
+import type { TestView, VersionRow } from "@/features/content/data/test-lab/test-lab";
 import { topicLabel } from "@/features/content/engine/brand";
 import { valueLabel } from "@/features/content/engine/experiments";
 import { POSTING_NOTE } from "@/features/content/engine/test-lab-card";
