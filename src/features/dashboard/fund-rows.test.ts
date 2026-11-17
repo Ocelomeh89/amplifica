@@ -3,7 +3,7 @@ import type { FundMonth } from "@/shared/finance/fund-check";
 import { alignFundRows } from "./fund-rows";
 
 const fm = (month: string, liquidValue: number, illiquidValue = 0): FundMonth => ({
-  month, income: 0, payments: 0, soldToCover: 0, uncovered: 0, liquidValue, illiquidValue,
+  month, income: 0, payments: 0, reinvested: 0, soldToCover: 0, uncovered: 0, liquidValue, illiquidValue,
 });
 
 describe("alignFundRows", () => {

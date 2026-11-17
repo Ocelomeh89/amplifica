@@ -138,6 +138,7 @@ export interface FundMonth {
   month: YearMonth;
   income: number;
   payments: number;
+  reinvested: number; // income left after payments, put back into the fund
   soldToCover: number;
   uncovered: number;
   liquidValue: number;
@@ -275,10 +276,26 @@ export function runFundCheck(input: FundCheckInput): FundCheckResult {
     }
 
     // 5. Payments: income first, then sell liquid holdings, lowest rate first.
+    //    A surplus stays in the fund, split by each holding's value (all of it
+    //    to Default growth when nothing is left). New lots start earning next month.
     let payments = 0;
     for (const a of amplicons) payments += payoutAtMonth(a, m);
     let shortfall = Math.max(payments - income, 0);
     let soldToCover = 0;
+    const reinvested = Math.max(income - payments, 0);
+    if (reinvested > EPS) {
+      const weights: [string, number][] = [];
+      let fundTotal = 0;
+      for (const [id, lots] of holdings) {
+        const v = totalOf(lots);
+        if (v > 0) {
+          weights.push([id, v]);
+          fundTotal += v;
+        }
+      }
+      if (fundTotal <= 0) lotsOf(DEFAULT_GROWTH_ID).push({ principal: reinvested, startMonth: m });
+      else for (const [id, v] of weights) lotsOf(id).push({ principal: (reinvested * v) / fundTotal, startMonth: m });
+    }
     if (shortfall > 0) {
       const sellable = [...holdings.keys()]
         .filter((id) => termsFor(id, m).liquid)
@@ -301,7 +318,7 @@ export function runFundCheck(input: FundCheckInput): FundCheckResult {
       if (termsFor(id, m).liquid) liquidValue += v;
       else illiquidValue += v;
     }
-    months.push({ month: m, income, payments, soldToCover, uncovered: shortfall, liquidValue, illiquidValue });
+    months.push({ month: m, income, payments, reinvested, soldToCover, uncovered: shortfall, liquidValue, illiquidValue });
     if (m === today) holdingsToday = byOption;
     if (i === n && today > endMonth) holdingsToday = byOption;
   }

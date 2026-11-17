@@ -143,7 +143,7 @@ This is a new pure module in `shared/finance/`, so it gets the same no-I/O and b
 4. **Payments due:** the sum of every tracked Amplicon's payment for month m, using the existing `monthlyPayoutOf` / `isActiveAt` from `shared/finance/projection.ts`, so this is the same schedule the dashboard already shows.
 5. **Cover the payments:**
    - Income and returned principal go first.
-   - Any **surplus** leaves the fund to repay the line of credit. It doesn't stay in the fund or compound. (Its effect on the line is not modelled here; see Non-goals.)
+   - Any **surplus** stays in the fund *(revised 2026-11-17)*. It is reinvested across the holdings in proportion to each one's value after the month's payments, illiquid ones included, and starts earning the next month. If nothing is left in the fund, it all goes to Default growth. Recorded as `reinvested`.
    - Any **shortfall** is covered by selling liquid Appreciation and liquid Interest-only holdings. Order: lowest-rate holding first, so the best earners are kept *(builder's call, changeable)*.
 6. **Record the month:** fund value (liquid and illiquid), income, payments, shortfall covered by sales, and any shortfall still uncovered.
 
@@ -180,7 +180,7 @@ This is a new pure module in `shared/finance/`, so it gets the same no-I/O and b
 
 - Three option types: amortized, interest-only, appreciation. Term can be infinite. Liquid yes/no.
 - An Amplicon split has up to 3 options and must sum to 100%.
-- Income covers the payments first; surplus repays the line; liquid principal is sold only to cover a gap.
+- Income covers the payments first; surplus is reinvested in the fund by its current split (revised 2026-11-17); liquid principal is sold only to cover a gap.
 - Illiquid holdings contribute income only.
 - Unallocated Amplicons default to appreciation at 10%, infinite, liquid.
 - Warn on (a) can't cover this month, (b) projected to run out of liquid money before the schedules finish. Shrinking is expected and not a warning.
@@ -206,7 +206,7 @@ This is a new pure module in `shared/finance/`, so it gets the same no-I/O and b
 
 ## Later
 
-- Feeding fund surplus into the flywheel projection (a math change, so it needs Miguel's sign-off).
+- ~~Feeding fund surplus into the flywheel projection.~~ Decided 2026-11-17: surplus stays in the fund instead; the flywheel is still untouched.
 - Volatility or stress scenarios for appreciation holdings.
 
 ## Revision 2026-11-10b (decided by Miguel after the first build)

@@ -245,3 +245,44 @@ describe("LTI payback", () => {
     expect(r.runOutMonth).toBe("2026-04");
   });
 });
+
+describe("surplus income stays in the fund", () => {
+  // 12000 STI at 0% over 12 months = 1000/month from Feb 2026.
+  const rich = opt("rich", { optionType: "interest_only", ratePct: 1.2, termMonths: null, liquid: false }); // 1200/month on 12000
+
+  it("reinvests the surplus instead of dropping it", () => {
+    const r = run({ amplicons: [amp([{ optionId: "rich", pct: 1 }])], options: [rich] });
+    const feb = r.months.find((m) => m.month === "2026-02")!;
+    expect(feb.income).toBeCloseTo(1200, 6);
+    expect(feb.reinvested).toBeCloseTo(200, 6);
+    expect(feb.illiquidValue).toBeCloseTo(12200, 6);
+    expect(r.status).toBe("ok");
+  });
+
+  it("splits the surplus by each holding's value after payments", () => {
+    // 9000 in rich (900/month) + 3000 in idx0 (0%).
+    const r = run({
+      amplicons: [{ ...amp([{ optionId: "rich", pct: 0.75 }, { optionId: "idx0", pct: 0.25 }]), faceValue: 12000, termMonths: 24 }],
+      options: [rich, idx0],
+    });
+    // 12000 over 24 months at 0% = 500/month. Feb income 900, surplus 400.
+    // Weights after payments: rich 9000, idx0 3000 → 300 to rich, 100 to idx0.
+    const feb = r.months.find((m) => m.month === "2026-02")!;
+    expect(feb.reinvested).toBeCloseTo(400, 6);
+    expect(feb.illiquidValue).toBeCloseTo(9300, 6);
+    expect(feb.liquidValue).toBeCloseTo(3100, 6);
+  });
+
+  it("a surplus with nothing left in the fund goes to Default growth", () => {
+    // Check-in empties the holding; the matured cash has nowhere to go but Default growth.
+    const short = opt("short", { optionType: "interest_only", ratePct: 0, termMonths: 1, liquid: true });
+    const r = run({
+      amplicons: [{ ...amp([{ optionId: "short", pct: 1 }]), termMonths: 24 }],
+      options: [short],
+      today: "2026-02",
+    });
+    // Feb: the 12000 lot matures (12000 cash), payment 500, surplus 11500, fund otherwise empty.
+    expect(r.holdingsToday[DEFAULT_GROWTH_ID]).toBeCloseTo(11500, 6);
+    expect(r.holdingsToday["short"]).toBeUndefined();
+  });
+});

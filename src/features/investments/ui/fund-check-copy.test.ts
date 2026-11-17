@@ -11,7 +11,7 @@ const base: FundCheckResult = {
   unallocatedCount: 0,
   cappedMoveIds: [],
   holdingsToday: {},
-  months: [{ month: "2026-11", income: 0, payments: 0, soldToCover: 0, uncovered: 0, liquidValue: 0, illiquidValue: 0 }],
+  months: [{ month: "2026-11", income: 0, payments: 0, reinvested: 0, soldToCover: 0, uncovered: 0, liquidValue: 0, illiquidValue: 0 }],
 };
 
 describe("fundCheckLines", () => {
