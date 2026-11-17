@@ -9,6 +9,7 @@ import { RECREATE_MODES, STALE_PENDING_MINUTES, type RecreateMode } from "@/feat
 import { winnerInsights, type WinnerInsights, type WinnerPost } from "@/features/content/engine/winners";
 import { loadPostsForMath, type PostRowForView } from "./performance";
 import { supabaseRecreateDb } from "./supabase-recreate-db";
+import { loadTopics, type Topic } from "./topics";
 
 export type PostDetail = {
   post: Omit<PostRowForView, "series">;
@@ -17,6 +18,10 @@ export type PostDetail = {
   live: Record<RecreateMode, { id: string; status: "pending" | "ready" } | null>;
   recreations: { ideaId: string; hook: string; status: string; multiplier: number | null }[];
   sourceMultiplier: number | null;
+  /** The owner's topic list, for the tag chips and the editor. */
+  topics: Topic[];
+  /** A Trial Reel test post: no figures, no winners block, no Recreate. */
+  isTest: boolean;
 };
 
 const DAY = 86_400_000;
@@ -27,9 +32,25 @@ export async function loadPostDetail(
   postId: string,
   now: Date
 ): Promise<PostDetail | null> {
-  const posts = await loadPostsForMath(supabase, userId);
-  const found = posts.find((p) => p.id === postId);
+  // Test posts are loaded so their page opens, but only the normal posts are scored and compared.
+  const all = await loadPostsForMath(supabase, userId, { includeTests: true });
+  const found = all.find((p) => p.id === postId);
   if (!found) return null;
+  const posts = all.filter((p) => !p.is_test);
+  if (found.is_test) {
+    const { series: _s, ...post } = found;
+    void _s;
+    return {
+      post,
+      figures: [],
+      insights: { state: "untagged" },
+      live: { "same-recipe": null, adjacent: null },
+      recreations: [],
+      sourceMultiplier: null,
+      topics: await loadTopics(supabase, userId),
+      isTest: true,
+    };
+  }
 
   const { scores } = scorePosts(posts, now);
   const scoreMap = new Map(scores.map((s) => [s.id, s]));
@@ -67,5 +88,5 @@ export async function loadPostDetail(
 
   const { series: _series, ...post } = found;
   void _series;
-  return { post, figures, insights, live, recreations, sourceMultiplier: multiplier.n_views };
+  return { post, figures, insights, live, recreations, sourceMultiplier: multiplier.n_views, topics: await loadTopics(supabase, userId), isTest: false };
 }

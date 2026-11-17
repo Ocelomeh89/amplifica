@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildContext, type ContextDb } from "./context";
+import { EMPTY_FOCUS } from "@/features/content/engine/focus";
 
 function fakeDb(overrides: Partial<ContextDb> = {}): ContextDb {
   return {
@@ -13,6 +14,8 @@ function fakeDb(overrides: Partial<ContextDb> = {}): ContextDb {
     sourceRules: async () => [{ kind: "allow", field: "title", pattern: "amplifica" }],
     sourceRuns: async () => [{ kind: "granola", created_at: "2026-09-17T11:00:00Z" }],
     voiceSummary: async () => null,
+    focus: async () => EMPTY_FOCUS,
+    topics: async () => [],
     knownSources: async () => [
       { kind: "plaud", external_id: "p1", title: "Walk with Jackie", status: "allowed", requested_at: "2026-09-16T20:00:00Z", mined_at: null },
       { kind: "plaud", external_id: "p2", title: "Old one", status: "mined", requested_at: "2026-09-10T20:00:00Z", mined_at: "2026-09-11T11:00:00Z" },
@@ -90,5 +93,30 @@ describe("buildContext", () => {
     const ctx = await buildContext(db, now);
     expect(ctx.known_sources.map((s) => s.kind)).toEqual(["plaud"]);
     expect(ctx.requested_sources.map((s) => s.kind)).toEqual(["plaud"]);
+  });
+});
+
+describe("buildContext focus", () => {
+  const now = new Date("2026-09-17T12:00:00Z");
+  it("carries the skip and double-down lists with topic labels", async () => {
+    const db = fakeDb({
+      focus: async () => ({ skip: { hook_type: ["promise"], topic: ["lifestyle-inflation"] }, doubleDown: { hook_type: ["question"], topic: ["custom-topic", "predictable-income"] } }),
+      topics: async () => [{ slug: "custom-topic", label: "A topic the routine added", pillar: "w2-advantage" }],
+    });
+    const ctx = await buildContext(db, now);
+    expect(ctx.focus.skip).toEqual({ hook_type: ["promise"], topic: [{ slug: "lifestyle-inflation", label: "How lifestyle inflation affects career flexibility" }] });
+    expect(ctx.focus.double_down.topic).toEqual([
+      { slug: "custom-topic", label: "A topic the routine added" },
+      { slug: "predictable-income", label: "Why predictable income supports long-term investing" },
+    ]);
+  });
+  it("an empty focus gives four empty lists", async () => {
+    const ctx = await buildContext(fakeDb(), now);
+    expect(ctx.focus).toEqual({ skip: { hook_type: [], topic: [] }, double_down: { hook_type: [], topic: [] } });
+  });
+  it("asks for the lists on the Chicago day", async () => {
+    let seen = "";
+    await buildContext(fakeDb({ focus: async (d) => ((seen = d), EMPTY_FOCUS) }), new Date("2026-09-18T03:00:00Z"));
+    expect(seen).toBe("2026-09-17");
   });
 });

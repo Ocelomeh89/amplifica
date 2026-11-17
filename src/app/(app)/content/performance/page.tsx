@@ -11,12 +11,16 @@ import { filteredCards } from "@/features/content/engine/performance-view";
 import { parseWindow } from "@/features/content/engine/overview";
 import { parseTagFilters } from "@/features/content/engine/tags";
 import TagFilters from "@/features/content/ui/TagFilters";
+import { loadPillarBalance } from "@/features/content/data/queries";
+import { PILLARS } from "@/features/content/engine/brand";
+import { loadTopics } from "@/features/content/data/topics";
 
 export default async function ContentPerformancePage({ searchParams }: { searchParams: { window?: string; tag?: string | string[] } }) {
   const { supabase, user } = await requireContentOwner();
   const window = parseWindow(searchParams.window);
   const now = new Date();
   const posts = await loadPostsForMath(supabase, user.id);
+  const [balance, topics] = await Promise.all([loadPillarBalance(supabase, user.id, now), loadTopics(supabase, user.id)]);
   const byId = new Map(posts.map((p) => [p.id, p]));
   const normalized = normalizePosts(posts, now);
   const { groups, doubleDown, stop } = attribute(normalized);
@@ -37,6 +41,7 @@ export default async function ContentPerformancePage({ searchParams }: { searchP
       idea_id: p.idea_id,
       onscreen_text: p.onscreen_text,
       message: p.message,
+      topic: p.topic,
       cta_type: p.cta_type,
       post_style: p.post_style,
       cover_face: p.cover_face,
@@ -61,6 +66,9 @@ export default async function ContentPerformancePage({ searchParams }: { searchP
     <div className="max-w-5xl">
       <h1 className="text-xl font-semibold mb-2">Content</h1>
       <ContentTabs />
+      <p className="text-xs text-sub mb-3">
+        This week by pillar: {PILLARS.map((p) => `${p.name} ${balance[p.slug]}`).join(" · ")}
+      </p>
       {posts.length === 0 ? (
         <p className="text-sm text-sub">No posts yet. The metrics cron fills this every morning; Mark posted on a queued idea adds one by hand.</p>
       ) : (
@@ -69,7 +77,7 @@ export default async function ContentPerformancePage({ searchParams }: { searchP
           <AttributionPanels groups={groups} doubleDown={doubleDown} stop={stop} />
           <Card title={`Posts (${rows.length})`}>
             <TagFilters filters={filters} />
-            <PerformanceTable rows={rows} />
+            <PerformanceTable rows={rows} topics={topics} />
           </Card>
         </>
       )}

@@ -5,6 +5,8 @@ import { buildContext } from "@/features/content/data/context";
 import { supabaseContextDb } from "@/features/content/data/supabase-db";
 
 export const dynamic = "force-dynamic";
+// Next 14 still caches GET fetches here (the Supabase reads) without this; see wiring.test.ts.
+export const fetchCache = "force-no-store";
 
 // The routines' read path: taste, feedback, queue depth, dedupe titles,
 // source rules, last-run times.

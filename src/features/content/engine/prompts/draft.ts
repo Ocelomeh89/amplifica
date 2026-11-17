@@ -1,3 +1,4 @@
+import { brandBrief } from "../brand";
 import type { Format } from "../types";
 
 // What the first-draft pass is told. The headings below are a contract with
@@ -11,7 +12,7 @@ export const BRAND_GUARDRAILS = `Brand guardrails (hard rules):
 - Avoid the word "leverage" unless it is inside a quotation.
 - Use the CYCLE framing (Credit, Yield, Collect, Liberate, Expand) when describing the flywheel. Never say a payoff funds a larger deployment.
 - Use Miguel's real numbers and his own dollars. Admit failures plainly.
-- Write for a saver who wants more from their money, in Miguel's voice from the voice profile and exemplars.`;
+- Write for Daniel or Stephen (below), in Miguel's voice from the voice profile and exemplars. The piece serves the idea's pillar.`;
 
 export const FORMAT_TEMPLATES: Record<Format, string> = {
   reel: `Reel. Use exactly these headings:
@@ -52,6 +53,8 @@ Concede the orthodoxy's real merit. Isolate the one variable. Prove it with Migu
 export const DRAFT_PROMPT = `You write the first draft of one piece of content for Miguel Graf from an idea (hook, outline, quote, belief attacked). Use the voice profile and exemplars you were given. Follow the template for the idea's format exactly, headings included.
 
 ${BRAND_GUARDRAILS}
+
+${brandBrief()}
 
 Templates by format:
 

@@ -1,12 +1,15 @@
 import { requireContentOwner } from "@/features/content/data/owner";
 import { loadUnused } from "@/features/content/data/queries";
+import { loadActiveFocus } from "@/features/content/data/focus";
+import { chicagoIsoDate } from "@/features/content/engine/best-times";
 import ContentTabs from "@/features/content/ui/ContentTabs";
 import UnusedCard from "@/features/content/ui/UnusedCard";
 import { UNPOSTED_DAYS, UNREVIEWED_DAYS } from "@/features/content/engine/unused";
 
 export default async function ContentUnusedPage() {
   const { supabase, user } = await requireContentOwner();
-  const { ideas, drafts } = await loadUnused(supabase, user.id);
+  const focus = await loadActiveFocus(user.id, chicagoIsoDate(new Date()));
+  const { ideas, drafts } = await loadUnused(supabase, user.id, focus);
 
   return (
     <div className="max-w-3xl">

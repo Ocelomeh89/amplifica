@@ -5,6 +5,8 @@ import { getQueued } from "@/features/content/data/found-queue";
 import { supabaseFoundQueueDb } from "@/features/content/data/supabase-db";
 
 export const dynamic = "force-dynamic";
+// Next 14 still caches GET fetches here (the Supabase reads) without this; see wiring.test.ts.
+export const fetchCache = "force-no-store";
 
 // The found-content routine's read path: queued links and text uploads with
 // their text, oldest first, a few at a time so one run fits a Claude Code

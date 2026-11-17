@@ -137,6 +137,15 @@ export async function listIgMedia(env: Required<ComposioEnv>, fetchImpl: typeof 
   return media;
 }
 
+/** The account's total follower count (INSTAGRAM_GET_USER_INFO, recorded 2026-11-13). Null when the env is unset or no count came back; throws on a Composio failure. */
+export async function pullIgFollowers(env: ComposioEnv, fetchImpl: typeof fetch = fetch): Promise<number | null> {
+  if (!env.apiKey || !env.connectionId) return null;
+  const full: Required<ComposioEnv> = { apiKey: env.apiKey, connectionId: env.connectionId, userId: env.userId ?? DEFAULT_COMPOSIO_USER_ID };
+  const info = await composioExecute<{ followers_count?: unknown }>("INSTAGRAM_GET_USER_INFO", { ig_user_id: "me", fields: "followers_count" }, full, fetchImpl);
+  const n = info?.followers_count;
+  return typeof n === "number" && Number.isFinite(n) && n >= 0 ? n : null;
+}
+
 export async function pullInstagram(env: ComposioEnv, fetchImpl: typeof fetch = fetch, now: Date = new Date()): Promise<Pull> {
   if (!env.apiKey || !env.connectionId) {
     console.warn("instagram: COMPOSIO_API_KEY / COMPOSIO_IG_CONNECTION_ID not set; skipping pull");

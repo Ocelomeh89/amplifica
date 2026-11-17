@@ -5,6 +5,8 @@ import { getDraftQueue } from "@/features/content/data/drafts";
 import { supabaseDraftsDb } from "@/features/content/data/supabase-drafts-db";
 
 export const dynamic = "force-dynamic";
+// Next 14 still caches GET fetches here (the Supabase reads) without this; see wiring.test.ts.
+export const fetchCache = "force-no-store";
 
 // /content-draft's read path: queued ideas with no draft (or one idea by ?id=),
 // plus the voice profile, the prompts, and whether the voice is stale.

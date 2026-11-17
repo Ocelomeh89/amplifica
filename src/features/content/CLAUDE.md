@@ -55,7 +55,7 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
   `GET|POST /api/content/voice`.
 - `ui/UnusedCard.tsx` renders the Never used page (`/content/unused`), not
   `IdeaCard`; the tab has no count badge.
-- `engine/tags.ts` — the six tags' value lists (`HOOK_TYPES` is shared with ideas), caption
+- `engine/tags.ts` — the six tags' value lists, plus `topic` as a seventh (`POST_TAG_NAMES`; `TAG_NAMES` stays the six, because competitor tagging needs a confidence for every one) (`HOOK_TYPES` is shared with ideas), caption
   length, cover summary, `parseTagFilters`/`filterByTags` and the tag endpoint's zod schema.
   `engine/performance-view.ts` — Overview cards for the filtered posts, baselines from all.
   `data/tags.ts` (`getTagQueue`, `storeTags`, `correctTags`) over `TagsDb`;
@@ -90,6 +90,38 @@ every page and action opens with `requireContentOwner()` from `data/owner.ts`.
   Server Actions; `taste-run.ts` starts a proposal in the background (a plain module: every export of a
   server-action file is an endpoint). UI: `SharpenPanel` (built by the pages and passed to the cards as a slot),
   `TasteRules`. `loadSharpenStates` in `queries.ts` feeds the pages. Route `/content/taste`.
+- The brand gate: `engine/brand.ts` (pure) holds the standard copied from the `brand-writing` skill (readers,
+  six-line test, voice pairs, five personal and four Amplifica pillars, guardrails, Amplifica layer, retired words),
+  `VERIFIED_FIGURES`, `BRAND_FACTS`, `brandBrief()`, the check/rewrite prompt and schemas, `pillarBalance`, `gateLine`.
+  `prompts/ideas.ts` exports `BRAND_CONTEXT` (brief plus facts), which every generator prompt embeds. `data/brand-gate.ts`
+  is the flow (`gatePiece`: check, one rewrite, re-check; `gateOptions`: check-only, parallel; `gateRecord`,
+  `gateColumns`). `data/gate-sweep.ts` releases `gating` ideas (`GateDb`, `gate.fake.ts`); `gate-run.ts` sweeps a fresh
+  batch after the response and posts its digest; `gate-digest.ts` is the ClickUp digest; `gate-backfill.ts` the
+  one-time backfill; `supabase-gate-db.ts` the three adapters. UI: `GateCheck` (idea page), `GateFailedList`
+  (Performance). `loadGateFailed` and `loadPillarBalance` in `queries.ts`.
+- The weekly review (slice 4 + PR 5): `engine/focus.ts` (pure: `focusCounts` per hook type and topic, `decideFocus` for the
+  double-down and skip lists, `isSkipped`, `focusTier`, `orderForToday`, `evidenceWithoutSkipped`, `focusBrief`/`reviewBlock`
+  for prompts, `skipEnd`) and `engine/review.ts` (pure: the week and its Chicago-midnight dates, `weekPosts`, `accountTiles`,
+  `pillarSpread`, `gateWeek`, `summaryLine`, and the why call's prompt, schema and `groundedWhy`). `data/focus.ts` is the
+  stored lists over `FocusDb` (`focus.fake.ts`, `supabase-focus-db.ts`: `applyReviewFocus`, `bringBack`, `releaseEndedSkips`,
+  `activeFocus`, `loadActiveFocus`, `addTestDoubleDown`); `data/review.ts` is `buildReview` over `ReviewDb` (`review.fake.ts`,
+  `supabase-review-db.ts`); `data/review-sections.ts` holds the seams the Trial Reel tests and the creator suggestions fill
+  (`loadExtraOutcomes`, `loadTestSection`, `loadSuggestionsSection`: all three filled); `data/review-actions.ts`
+  is Build now and Bring back. `data/topics.ts` (topic list, `resolveTopic`) and `data/topic-backfill.ts` (one-time topics for
+  existing ideas, `?topics=dry|run` on the metrics cron; pass `&after=<next_after>` from the last report to continue past ideas the model answered none for) give posts and ideas a topic; `PILLAR_TOPICS` in `engine/brand.ts`
+  is the seed. `data/account-stats.ts` stores one follower reading a day (the metrics cron) for the follows tile. UI:
+  `ReviewPage`, `ReviewLists`, `BuildNowButton`, `BringBackButton`. Pages `/content/review` and `/content/review/[weekStart]`;
+  route `POST /api/content/review/build`; `routines/content-weekly.md` (Monday 07:30, after tagging).
+- Trial Reel tests (slice B, migration 0022): `engine/test-lab-picker.ts` (pure: `pickQuestions` runs the five rules, `currentBest`),
+  `engine/test-lab-verdict.ts` (pure: the constants, `testVerdict`, `shouldPromote`, `readingStart`, `median24h`, `staleReason`,
+  `verdictLine`, `outcomesOf`, `owesOf`) and `engine/test-lab-card.ts` (pure: card prompt and schemas, `cardStyleOf`, `oneDifference`,
+  the rewrite check, the conclusion prompt) with `viewsAtOrAfter` in `engine/baseline.ts`. `data/test-lab.ts` is the flow over
+  `TestsDb` (`test-lab.fake.ts`, `supabase-tests-db.ts`): `startProposal`, `runProposal`, `gateVersion`, `skipTest`, `saveNumbers`,
+  `judgeTest`, `applyEffects`, `writeConclusions`; `test-lab-cron.ts` is the cron step (`runTestsCron`); `test-lab-run.ts` starts a
+  proposal or the conclusions in the background (a plain module); `test-lab-actions.ts` holds the Server Actions (propose, skip,
+  save numbers); `review-sections.ts` fills the review's two seams from the judged tests. UI: `TestCard`, `PastTestsList`,
+  `ProposeTestButton`. Page `/content/tests` (tab after Review); route `POST /api/content/tests/propose`; the weekly routine's
+  middle step calls it. Tables `content_tests` and `content_test_versions`, and `content_posts.is_test`.
 - `routines/` (repo root) — routine instructions and README; `.claude/skills/`
   holds the local companions `/content-plaud`, `/content-daily`, `/content-draft` and
   `/content-voice`.
@@ -104,9 +136,9 @@ these are all the places that know it exists:
 - `src/app/robots.ts` — `/content` disallow; `src/app/content-route.test.ts` asserts it and the sitemap.
 - `vercel.json` — the daily metrics cron. `next.config.mjs` — `jsdom` external package.
 - `package.json` — `jsdom`, `@mozilla/readability`, `@anthropic-ai/sdk` are used only here.
-- `supabase/migrations/0008`, `0009`, `0011`, `0013`, `0014`, `0015`, `0016`, `0017`, `0018` and the `content_*` types in `shared/supabase/database.types.ts`.
+- `supabase/migrations/0008`, `0009`, `0011`, `0013`, `0014`, `0015`, `0016`, `0017`, `0018`, `0020`, `0021`, `0022`, `0023` and the `content_*` types in `shared/supabase/database.types.ts`.
 - `routines/`, `.claude/skills/content-*` (incl. `content-draft`, `content-voice`), `docs/superpowers/**` — the routines and their docs.
-- Env: `CONTENT_OWNER_USER_ID`, `CONTENT_ENGINE_SECRET`, `CRON_SECRET`, `COMPOSIO_APIFY_CONNECTION_ID`, and the platform keys in `docs/PRODUCT-STATUS.md`.
+- Env: `CONTENT_OWNER_USER_ID`, `CONTENT_ENGINE_SECRET`, `CRON_SECRET`, `COMPOSIO_APIFY_CONNECTION_ID`, `CLICKUP_WORKSPACE_ID` (the digest), and the platform keys in `docs/PRODUCT-STATUS.md`.
 
 ## Invariants
 
@@ -165,8 +197,7 @@ these are all the places that know it exists:
 - The cron refreshes `media_type` and `thumbnail_url` on existing posts and nothing else; `upsertPosts` stays insert-ignore.
 - Every baseline uses `WINDOW_DAYS` (90) and `baselineGroup`; there is no second window.
 - `loadPostsForMath` pages the snapshot read in 1,000s; PostgREST caps a single response at 1,000 rows.
-- Tagging never writes `pillar` (the idea routine's content pillar). `message` is the canon
-  argument. A hook type copied onto a post by `markPosted` is not locked: the routine
+- Tagging never writes `pillar` (the idea routine's content pillar). `message` is the personal pillar slug (the old canon values are legacy). `topic` is a `content_topics` slug under that pillar. A hook type copied onto a post by `markPosted` is not locked: the routine
   replaces it with what the post did.
 - `storeTags` skips any field named in `tag_locks`; `correctTags` locks each tag it writes at
   confidence 1 and leaves `tagged_at` alone, so a corrected post is still queued for its
@@ -205,7 +236,7 @@ these are all the places that know it exists:
   sets `last_pull_status` but keeps `last_pulled_at` (the last successful pull), so a creator whose first pull
   failed still gets 90 days. A re-pull updates views; no snapshots. Popular is 3x the creator's 90-day median
   (thin under 8 Reels); fresh is 14 days. Only popular fresh posts are tagged, by Claude from caption and
-  thumbnail, at most five per cron and only while the Today tail keeps 90 seconds. A post seeds at most one brief
+  thumbnail, at most five per cron and only while the Today tail keeps 150 seconds. A post seeds at most one brief
   ever (`briefed_at`, set even when both copy checks fail), always in slot 2, and the competitor brief is picked
   first so slot 1 and the moment avoid its variable. Swap turns it into a proposed brief and clears the link; a
   topic brief's swap takes a fresh Inbox idea. `new-format` is a recipe value only: Mark posted leaves
@@ -225,6 +256,112 @@ these are all the places that know it exists:
   stripping punctuation: evidence for an active or proposed one, nothing for a rejected or turned-off one. Approved
   rules reach the daily routine (context endpoint), Today's brief writer and Sharpen; Recreate does not use them.
 - `content_voice.built_from` is `{ files: [{path, mtime, bytes}], previous_profile_md }`.
+- Every GET `/api/content` route exports `fetchCache = "force-no-store"` beside `dynamic = "force-dynamic"`.
+  Next 14 caches a GET route handler's fetches (every Supabase read) without it, and Vercel keeps that
+  cache across requests: a query whose URL never changes (pending runs, active taste rules) is served
+  stale indefinitely. `wiring.test.ts` asserts it; a new GET route goes on that list.
+- Brand gate (2026-11-10): every idea is checked before Miguel sees it. Ingest writes ideas as `gating`; every list
+  filters on `inbox` or `queued`, so a gating idea is never shown. The sweep moves a pass to `inbox` (rewritten in
+  place when the gate rewrote it, old hook to `hook_alt`, the original in `gate_original`) and a second fail to
+  `gate_failed`; a gate error leaves it `gating` and bumps `gate_attempts` (fewest attempts are swept first), and the
+  third error moves it to `gate_failed` with the error as its reason: an idea never reaches the Inbox unchecked, and
+  never waits unseen. A rewrite that adds a figure the original and `VERIFIED_FIGURES` lack fails (`addedFigures`).
+  Every outcome write is conditional on `status = 'gating'`. Like, Pass and Mark posted refuse `gating` and
+  `gate_failed`; Archive refuses only `gating`. The idea's `pillar` is the gate's personal pillar slug.
+- The cron's gate sweep runs after Today, on the time Today leaves (30-second calls, 70-second reserve); the
+  background sweep after ingest does most of the work. Today gates its slots in parallel. The snapshot a failed Today
+  run restores includes `gate` and `pillar`.
+- Today briefs are checked with one rewrite before the claimed idea is patched; a brief whose gate pillar differs from
+  its `message` fails; a failed slot stays empty and its idea untouched. Sharpen and Recreate options are checked once
+  (no rewrite) and failing ones are dropped; a pick refuses an option with no gate result (a card from before the
+  gate). A posted draft is checked with no rewrite and its result nests under `gate.draft`, leaving the idea's check
+  alone: the first fail is a 422 `brand_gate`, the second (`gate.draft.fails`) is final and moves the idea to
+  `gate_failed`. The idea card offers no Like or Pass on `gating` or `gate_failed` ideas; chain badges skip `gating`.
+- The ClickUp digest lists only a routine batch's passed ideas (by `ingest_batch`), once every idea in it is settled;
+  found content (url and upload sources) never gets one. `digest_posted_at` stamps a posted batch.
+- A post's `message` tag and Today's `message` variable are the five personal pillar slugs (`MESSAGES`); the old
+  canon values are `LEGACY_MESSAGES`, valid on history and locked tags, never written, and skipped by the tally.
+- The standard in `engine/brand.ts` is a hand copy of the `brand-writing` skill: change both together.
+
+- Weekly review lists: a hook type or a topic needs `FOCUS_MIN_POSTS` (3) eligible Instagram Reels in the 90-day window. Double
+  down: at least half won and more won than lost. Skip: none won and at least half lost. A value under a running skip is not
+  re-evaluated. The lists run on settled numbers (`isEligible`, so a post counts about a week after it goes up); the page's
+  section 2 is looser and labels young posts "early read".
+- While any eligible Reel in the window is untagged (`untaggedEligible`), a review decides no new skip (`holdSkips`; existing skip rows are left as they are) and the page says so: a 90-day skip must not rest on a half-tagged sample. The lists are applied after the review is saved, so a failed build leaves no skip behind. The tag queue also returns tagged posts that only lack a topic (a pillar, an unlocked topic), so Reels made from a Today brief still get one.
+- The lists act on ideas whose format is `reel` only; newsletter, YouTube, Story and X ideas are never hidden or re-ranked by
+  them. Queued ideas are never hidden (in the queues or in Never used). A skipped idea in the Inbox is hidden, not deleted.
+- A skip lasts `SKIP_DAYS` (90) from the review day and its dates never move: a rebuild of the same week may add or withdraw
+  skips that week started, and never touches an earlier week's. A lifted skip is never touched. Bring back ends a skip at once
+  and protects the value for `BRING_BACK_PROTECT_DAYS` (90). Double-downs are replaced only by the newest week's review; a
+  `source = 'test'` double-down is never touched by a review.
+- `content_ideas.inbox_since` restarts the Never-used clock (null means `batch_date`): Bring back and `releaseEndedSkips` (in
+  the metrics cron before Today) set it, so a hidden idea gets its 14 days back in the Inbox. A clock only moves forward, and an
+  idea another running skip still hides keeps its clock.
+- A review is a snapshot as of its Monday 00:00 America/Chicago (`asOfFor`): `loadPostsForMath(…, { before })` leaves out later
+  posts and snapshots, so Build now on a Wednesday gives Monday's lists. The why call (one Claude call, `groundedWhy` checks each
+  sentence names a tag or count) can fail without losing the review or the lists: `why: "failed"`, every why is "No clear reason."
+  The review writes no content, so nothing it produces goes through the brand gate; what it changes is the order and choice
+  of already-gated ideas.
+- Creator suggestions (slice C, migration 0023): `engine/discovery.ts` (pure: the constants, `inBand`, `sizeOutcome`, `budgetLeft`,
+  `newCandidates`, `isActive`, `popularCount`, `bestReels`, `rankFits`, `nextRunKind`, `followersLine`), `engine/discovery-judge.ts`
+  (pure: the audience judge's prompt over `brandBrief()`, schema, `quotesAreReal`, `judgeOutcome`) and `engine/discovery-items.ts`
+  (pure: Apify inputs and mappers for the profile, search and Reel actors). `data/discovery.ts` is the flow over `DiscoveryDb`
+  (`discovery.fake.ts`, `supabase-discovery-db.ts`): `lapseStale`, `collectDiscoveryRuns`, `startNextRun`, `judgeSampled`,
+  `suggestFits`, `advanceDiscovery`, `addSuggestion`, `declineSuggestion`, `buildDiscoveryPage`; `discovery-cron.ts` is the metrics
+  cron step (`runDiscoveryCron`, no Claude); `discovery-run.ts` runs one call for the routine and the button (a plain module);
+  `discovery-actions.ts` holds the Server Actions (add, decline, Find creators now). Route `POST /api/content/creators/discover`.
+  UI: `SuggestedCreators`, `DroppedCreators`, `FindCreatorsButton` on `/content/creators`; the review's "New creator suggestions"
+  line comes from `loadSuggestionsSection`.
+- A post made from a Today brief is tagged at Mark posted and never reaches the tagging routine, so `linkBriefExperiment` copies
+  the idea's topic. The gate picks an idea's topic from the offered list under its own pillar and never proposes a new one;
+  the tagging routine may propose a label (`topic_label`), which is added and used at once.
+- To re-queue existing posts for the tagging routine after a list change (the topic rollout does this once):
+  `update content_posts set tagged_at = null where platform = 'instagram' and posted_at >= now() - interval '90 days' and not ('topic' = any(tag_locks));`
+  Until the routine finishes, untagged posts are not counted, so Today's evidence and the lists are thin.
+
+- Trial Reel tests: at most one test is live (`proposing` or `open`, a partial unique index), with exactly two versions, `a` and `b`,
+  that differ in one thing: two hook types, two card styles or two topics, never two openings of one hook type. Both versions pass
+  `gatePiece` with one rewrite, and a rewrite that changes the tested value (a hook type, a topic, a card style) or a part both
+  versions share fails the version. After 3 dropped tests the run stops. A `proposing` row older than 10 minutes is failed; the
+  button is capped at 3 proposals per Chicago day, every status counted, and the routine is not capped.
+- Creator suggestions: a candidate is an Instagram account 2 to 20 times Miguel's follower count (both ends included; his count is
+  the stored one when it is under 14 days old, else read in the next profile run). Up to 10 are sampled a week (smallest first),
+  12 Reels each; an account with fewer than 4 Reels in the last 30 days is dropped as quiet before any Claude call, and a judge
+  confidence under 3 is dropped. At most 3 suggestions wait; one unanswered for 28 days lapses (its `content_creators` row is
+  deleted and its candidate becomes `lapsed`). Every looked-at account is remembered 90 days (`content_creator_candidates`) and
+  listed under "Considered and dropped"; Miguel can still add one by hand, which overrides a decline. Discovery has its own table
+  of Apify runs (`content_discovery_runs`, so the weekly pull's pending and last-run reads never see them) and its own $1.00 a
+  week (`DISCOVERY_WEEKLY_CAP_USD`, counting a run's cost when known and its cap when not); a gather is three search runs, one per
+  phrase, splitting what is left. The cron step only collects and starts runs and makes no Claude call; judging runs behind
+  `POST /api/content/creators/discover` and the Find creators now button (3 a Chicago day). `suggest`, `decide`, `lapse` and
+  `setCandidate` are conditional writes, so a double click or a click on a lapsed suggestion answers "That suggestion is gone."
+  A run is claimed by inserting its row before Apify is called, under a unique index on (week, kind, usernames), so two racing
+  starts start it once; the Find creators now click is logged before the search starts, and the accounts about to be sampled are
+  profiled once first (a search row has no bio). A thrown Claude call costs no attempt and stops judging for that call.
+  Source that won the 2026-11-14 spike: the keyword user search (`related` found nothing, `mentions` found three accounts).
+  Bios and captions are data written by strangers: the judge prompt marks them as never instructions, and an answer whose quotes
+  are not found in the captions is rejected. Suggestions only: nothing sets a creator to `watching` except Miguel's Add.
+- Spike outcome C (2026-11-14, provisional): Instagram's media list did not show Miguel's Trial Reel 17 minutes after posting, so
+  there is no post row for a test version. Miguel types each version's views, saves and shares a day after posting
+  (`saveNumbers` only stores them, and both stay correctable), and only his **Read the result** (`readResult`) judges, once both
+  views are in; the cron never judges a typed test, it only closes a stale one and retries follow-ups. A judged idea is archived, linked to no post. Nothing
+  reads snapshots for a test. If Instagram lists Trial Reels, a post-picker variant adds `linkable`, `linkVersion`,
+  `setVersionPost` to `TestsDb`, reads snapshots with `viewsAtOrAfter` from `readingStart` (the later post, so one cron run reads
+  both versions at the same age) and flags test posts (`is_test`); the judging does not change.
+- `loadPostsForMath` leaves `is_test` posts out by default (`includeTests: true` opts in) and `loadPillarBalance` filters them, so
+  a test post never moves a baseline, a review list or a winner. `wiring.test.ts` lists every direct reader of `content_posts`.
+  The column stays false while outcome C holds. The post page says "Trial Reel. Left out of your usual numbers." for one.
+- The verdict: a version wins with at least 1.5 times the other's 24-hour views and at least 1,000 views, otherwise "no clear
+  winner". Promote ("Worth sharing to your followers.") needs at least 1,000 views and 3 times the median 24-hour views of
+  Miguel's normal Reels (first snapshot 24 hours or more after posting, never `dayViews`). Views decide; saves and shares are
+  shown and never decide. A test with no numbers 14 days after opening closes as not run.
+- A verdict writes to the evidence through `loadJudgedOutcomes` (a win and a loss, or a flat for each; a topic test counts for
+  the topic list only) and puts a winning hook or topic on the double-down list for at least 4 weeks (`addTestDoubleDown`). A
+  card-style win and a tie write nothing; a loss is one miss and never writes a skip. The follow-ups retry through `effects_at`
+  (null until applied) and cannot double-apply.
+- A test holds its two ideas while it is `proposing` or `open`; they stay `inbox` and untouched, and Today's picker and the test
+  picker leave them out (`unclaimedInboxIdeas`, `pickerInput`). A skipped, failed or not-run test frees them without a write. The
+  conclusion (two sentences, no figure the numbers lack) skips the gate: it is analysis for Miguel, not content.
 
 ## Seeding by hand
 

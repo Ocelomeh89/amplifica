@@ -5,6 +5,8 @@ import { getTagQueue } from "@/features/content/data/tags";
 import { igMediaUrlLookup, supabaseTagsDb } from "@/features/content/data/supabase-tags-db";
 
 export const dynamic = "force-dynamic";
+// Next 14 still caches GET fetches here (the Supabase reads) without this; see wiring.test.ts.
+export const fetchCache = "force-no-store";
 
 // /content-tag's read path: untagged Instagram posts from the last 90 days with a
 // fresh media URL each, plus how many are still waiting.

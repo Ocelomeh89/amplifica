@@ -32,7 +32,7 @@ export default async function PostPage({
   if (!z.string().uuid().safeParse(params.postId).success) notFound();
   const detail = await loadPostDetail(supabase, user.id, params.postId, new Date());
   if (!detail) notFound();
-  const { post, figures, insights, live, recreations, sourceMultiplier } = detail;
+  const { post, figures, insights, live, recreations, sourceMultiplier, topics, isTest } = detail;
   const firstLine = post.caption.split("\n")[0].slice(0, 140);
 
   return (
@@ -60,25 +60,33 @@ export default async function PostPage({
           </div>
         </div>
         <div className="mt-3">
-          <PostTags id={post.id} row={post} />
+          <PostTags id={post.id} row={post} topics={topics} />
         </div>
       </Card>
 
-      <Card title="How it did">
-        <PostFigures figures={figures} />
-      </Card>
+      {isTest ? (
+        <Card>
+          <p className="text-sm">Trial Reel. Left out of your usual numbers.</p>
+        </Card>
+      ) : (
+        <>
+        <Card title="How it did">
+          <PostFigures figures={figures} />
+        </Card>
 
-      <Card title="What it shares with your winners">
-        <WinnersBlock insights={insights} />
-      </Card>
+        <Card title="What it shares with your winners">
+          <WinnersBlock insights={insights} />
+        </Card>
 
-      <Card title="Recreate">
-        <RecreateControls postId={post.id} tagged={post.tagged_at !== null} live={live} />
-      </Card>
+        <Card title="Recreate">
+          <RecreateControls postId={post.id} tagged={post.tagged_at !== null} live={live} />
+        </Card>
 
-      <Card title="Made from this post">
-        <RecreationsList items={recreations} sourceMultiplier={sourceMultiplier} />
-      </Card>
+        <Card title="Made from this post">
+          <RecreationsList items={recreations} sourceMultiplier={sourceMultiplier} />
+        </Card>
+        </>
+      )}
     </div>
   );
 }

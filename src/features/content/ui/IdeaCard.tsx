@@ -8,6 +8,7 @@ import type { ContentIdea } from "@/shared/supabase/database.types";
 import type { Format, OutlineBeat } from "@/features/content/engine/types";
 import { likeIdea, passIdea } from "@/features/content/data/actions";
 import FormatBadge from "./FormatBadge";
+import { gateLine } from "@/features/content/engine/brand";
 
 export type IdeaCardProps = {
   idea: ContentIdea;
@@ -42,7 +43,11 @@ export default function IdeaCard({ idea, sourceUrl, siblings, focused, passOpen,
         {rank !== undefined && <span className="text-[11px] font-semibold text-sub">#{rank}</span>}
         <FormatBadge format={idea.format} />
         {badge && <span className="text-[10px] uppercase tracking-wide text-purple">{badge}</span>}
-        {idea.pillar && <span className="text-[10px] text-sub uppercase tracking-wide">{idea.pillar}</span>}
+        {gateLine(idea.gate) ? (
+          <span className="text-[10px] text-sub">{gateLine(idea.gate)}</span>
+        ) : (
+          idea.pillar && <span className="text-[10px] text-sub uppercase tracking-wide">{idea.pillar}</span>
+        )}
         {idea.hook_type && <span className="text-[10px] text-sub">{idea.hook_type}</span>}
         <span className="ml-auto text-[10px] text-sub">score {idea.score.toFixed(2)}</span>
       </div>
@@ -95,8 +100,13 @@ export default function IdeaCard({ idea, sourceUrl, siblings, focused, passOpen,
         </div>
       )}
 
-      <div className="flex items-start gap-2">
-        <form action={likeIdea}>
+      {idea.status === "gating" || idea.status === "gate_failed" ? (
+        <p className="text-sm text-sub">
+          {idea.status === "gating" ? "Waiting for the brand check." : "Didn't pass the brand check. Archive it from Performance."}
+        </p>
+      ) : (
+        <div className="flex items-start gap-2">
+          <form action={likeIdea}>
           <input type="hidden" name="id" value={idea.id} />
           <button
             type="submit"
@@ -126,7 +136,8 @@ export default function IdeaCard({ idea, sourceUrl, siblings, focused, passOpen,
             <button type="button" onClick={() => setOpen(false)} className="text-xs text-sub hover:underline">Cancel</button>
           </form>
         )}
-      </div>
+        </div>
+      )}
       {sharpenSlot}
     </article>
   );

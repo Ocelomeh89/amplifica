@@ -8,7 +8,8 @@ variables named at its top and the connectors it lists.
 |---|---|---|
 | `content-daily.md` | 06:00 daily (`0 11 * * *` UTC) | Granola, Wispr-Flow, Plaud, ClickUp |
 | `content-found.md` | Mon 06:30 (`30 11 * * 1` UTC); also `/content-found` | none |
-| `content-tag.md` | Mon 07:00 (`0 12 * * 1` UTC); also `/content-tag` | none |
+| `content-tag.md` | Mon 06:55 (`CRON_TZ=America/Chicago 55 6 * * 1`); also `/content-tag` | none |
+| `content-weekly.md` | Mon 07:30 (`CRON_TZ=America/Chicago 30 7 * * 1`) | ClickUp |
 
 ## Setting one up
 
@@ -97,16 +98,15 @@ allowlist. The first backfill tags up to 100 posts per run.
 
 ## Messaging
 
-`CONTENT_POSITIONING` in `src/features/content/engine/prompts/ideas.ts` is the
-canonical audience, founder-story, evidence, and offer brief, embedded in
-`IDEAS_PROMPT`. Keep the owner's dated manual positioning rule in
-`content_taste_rules` in sync when changing it: the context API supplies that
-rule to live routines, including those running an older checkout. Updating a
-local prompt alone does not update a cloud routine's checkout.
-
-The current brief centers on employed $1,000-$2,000/month savers building the
-freedom to say no, not a requirement to quit. Proposed onboarding, refunds,
-and unconfirmed prices are not live offers.
+`BRAND_CONTEXT` in `src/features/content/engine/prompts/ideas.ts` is the brand
+every generator writes to: the two readers (Daniel and Stephen), the five
+pillars and the voice from `engine/brand.ts`, plus `BRAND_FACTS` (founder
+evidence, offer boundaries, borrowing and risk framing). It replaced the
+2026-09-20 positioning and its saver audience on 2026-11-10; the matching manual
+taste rule was turned off. The source of the brand is the `brand-writing` skill;
+change both together. A cloud routine reads the prompt from its checkout, so it
+picks up a change on merge. Proposed onboarding, refunds, and unconfirmed prices
+are not live offers. Every idea goes through the app's brand gate after ingest.
 
 Refreshing existing ideas is separate from the daily run. Back up the rows,
 review inbox/queued ideas, and update only their copy with owner and
@@ -120,3 +120,20 @@ Ingest inserts new rows and must not be used to rewrite existing ones.
 `/content-voice` skills on Miguel's Mac, because they read and create files in his
 Obsidian vault. They are not scheduled. `/content-draft` checks the voice first and
 runs the voice refresh when it is out of date.
+
+## Weekly review run
+
+`content-weekly.md` asks the app to build last week's review (what worked, what to double down on and skip, the pillar
+spread and the brand gate's week) and posts one ClickUp line with the link. Set it up like the daily routine, with the
+ClickUp connector and the message: "Read routines/content-weekly.md in this checkout and run it."
+
+- It must run after `content-tag.md`, so last week's posts have their tags. It is scheduled at 07:30 America/Chicago all
+  year, 35 minutes after tagging.
+- Its middle step asks the app to propose a Trial Reel test when none is open (`POST /api/content/tests/propose`). A failure
+  there never stops the run; the ClickUp line ends with the result (`Test: started`, `open`, `busy`, `cap` or `failed`).
+- Its next step advances creator discovery (`POST /api/content/creators/discover`): each call collects a finished Apify run, starts
+  the next, judges and suggests, and the routine calls again every 90 seconds while the reply's `stage` is `waiting_on_apify` or
+  `judging`, at most 6 calls. A failure there never stops the run; the reply's `note` goes in the run's final report, not in ClickUp.
+- Network access: the `CONTENT_API_BASE` host only (an allowlist).
+- A missed Monday is fixed with **Build now** on `/content/review`; a missed test with **Propose next test** on `/content/tests`;
+  missed discovery with **Find creators now** on `/content/creators`.

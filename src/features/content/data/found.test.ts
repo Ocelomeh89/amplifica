@@ -57,7 +57,7 @@ describe("mineFound: a URL", () => {
   it("fetches, generates with the shared prompt and the angle, writes through ingest, and marks mined", async () => {
     const t = setup();
     const r = await mineFound(t.deps, "owner-1", url("https://example.com/post"));
-    expect(r).toEqual({ ok: true, count: 2, sourceId: "src-0" });
+    expect(r).toEqual({ ok: true, count: 2, sourceId: "src-0", ideaIds: ["idea-0", "idea-1"] });
     const call = t.generate.mock.calls[0][0];
     expect(call.system).toBe(IDEAS_PROMPT);
     expect(call.text).toContain(angleBlock("counterpoint", "Ramit"));
@@ -66,7 +66,7 @@ describe("mineFound: a URL", () => {
     expect(t.sources[0]).toMatchObject({ kind: "url", external_id: "https://example.com/post", status: "allowed", user_id: "owner-1" });
     expect(t.sources[0].meta).toMatchObject({ angle: "counterpoint", competitor: "Ramit", note: "saw this today" });
     expect(t.ideas).toHaveLength(2);
-    expect(t.ideas[0]).toMatchObject({ source_id: "src-0", batch_date: "2026-10-01", status: "inbox", quote_ref: "https://example.com/post" });
+    expect(t.ideas[0]).toMatchObject({ source_id: "src-0", batch_date: "2026-10-01", status: "gating", quote_ref: "https://example.com/post" });
     expect(t.mined).toEqual([{ kind: "url", external_id: "https://example.com/post", mined_at: NOW.toISOString() }]);
   });
 

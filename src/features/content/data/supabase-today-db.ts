@@ -9,7 +9,12 @@ import { RECENT_HOOK_DAYS } from "@/features/content/engine/recreate";
 import type { WinnerPost } from "@/features/content/engine/winners";
 import { loadPostsForMath } from "./performance";
 import { loadQueued } from "./queries";
+import { loadTopics } from "./topics";
+import { orderForToday, type ActiveFocus } from "@/features/content/engine/focus";
+import { activeFocus } from "./focus";
+import { supabaseFocusDb } from "./supabase-focus-db";
 import { supabaseCompetitorsDb } from "./supabase-competitors-db";
+import { loadJudgedOutcomes } from "./supabase-tests-db";
 import { STALE_RUN_MINUTES, type BriefView, type CompetitorCandidate, type ExperimentRow, type IdeaLite, type NewExperiment, type RunRow, type TodayDb } from "./today";
 
 type Client = SupabaseClient<Database>;
@@ -21,7 +26,7 @@ const LIVE = ["open", "posted", "judged", "unjudged"] as const;
 const EXP_COLUMNS =
   "id, idea_id, day, slot, kind, moment, variable, value, recipe, reason, status, post_id, judge_at, verdict, judge_metrics, judged_at, competitor_post_id, created_at";
 const RUN_COLUMNS = "id, day, kind, status, experiment_id, error, created_at";
-const IDEA_COLUMNS = "id, title, hook, pillar, hook_alt, status";
+const IDEA_COLUMNS = "id, title, hook, pillar, hook_alt, status, hook_type, topic";
 
 const toExp = (r: Record<string, unknown>): ExperimentRow => r as unknown as ExperimentRow;
 const toRun = (r: Record<string, unknown>): RunRow => r as unknown as RunRow;
@@ -32,6 +37,8 @@ const toIdea = (r: Record<string, unknown>): IdeaLite => ({
   pillar: (r.pillar ?? "") as string,
   hook_alt: (r.hook_alt ?? null) as string | null,
   status: (r.status ?? "") as string,
+  hook_type: (r.hook_type ?? "") as string,
+  topic: (r.topic ?? "") as string,
 });
 
 /**
@@ -69,6 +76,7 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
 
   const db: TodayDb & { postSources: typeof postSources } = {
     postSources,
+    topics: () => loadTopics(client, userId),
 
     async evidence(now) {
       const loaded = await loadPostsForMath(client, userId);
@@ -77,7 +85,8 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
       const { scores } = scorePosts(posts, now);
       const scoreMap = new Map(scores.map((s) => [s.id, s]));
       const windowStart = new Date(now.getTime() - WINDOW_DAYS * DAY);
-      const ev = evidenceCounts(posts as WinnerPost[], scoreMap, windowStart);
+      // A judged Trial Reel test counts for its variable beside the normal posts.
+      const ev = evidenceCounts(posts as WinnerPost[], scoreMap, windowStart, await loadJudgedOutcomes(client, userId, windowStart));
 
       const hookOf = (p: { hook_spoken: string; hook_onscreen: string; hook_used: string }) => p.hook_spoken || p.hook_onscreen || p.hook_used;
       const winnerHooks = posts
@@ -117,11 +126,24 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
       return (data ?? []).map((r) => toExp(r as unknown as Record<string, unknown>));
     },
 
-    async unclaimedInboxIdeas(limit) {
+    async focus(day) {
+      return activeFocus(await supabaseFocusDb(client, userId).rows(), day);
+    },
+
+    async unclaimedInboxIdeas(limit, focus: ActiveFocus) {
       // Any experiment, live or not: an expired or skipped brief stays in the Inbox but is not picked again.
       const { data: claimed, error: claimedError } = await experiments().select("idea_id").eq("user_id", userId);
       if (claimedError) throw new Error(`today claimed: ${claimedError.message}`);
       const taken = new Set((claimed ?? []).map((c) => (c as { idea_id: string }).idea_id));
+      // An idea a proposing or open Trial Reel test holds stays in the Inbox, but Today leaves it alone.
+      const { data: liveTests, error: liveError } = await client.from("content_tests").select("id").eq("user_id", userId).in("status", ["proposing", "open"]);
+      if (liveError) throw new Error(`today held tests: ${liveError.message}`);
+      const liveIds = (liveTests ?? []).map((t) => (t as { id: string }).id);
+      if (liveIds.length > 0) {
+        const { data: held, error: heldError } = await client.from("content_test_versions").select("idea_id").eq("user_id", userId).in("test_id", liveIds);
+        if (heldError) throw new Error(`today held ideas: ${heldError.message}`);
+        for (const h of held ?? []) if ((h as { idea_id: string | null }).idea_id) taken.add((h as { idea_id: string }).idea_id);
+      }
       const { data, error } = await ideas()
         .select(IDEA_COLUMNS)
         .eq("user_id", userId)
@@ -131,10 +153,8 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
         .order("created_at", { ascending: false })
         .limit(100);
       if (error) throw new Error(`today inbox: ${error.message}`);
-      return (data ?? [])
-        .map((r) => toIdea(r as unknown as Record<string, unknown>))
-        .filter((i) => !taken.has(i.id))
-        .slice(0, limit);
+      const free = (data ?? []).map((r) => toIdea(r as unknown as Record<string, unknown>)).filter((i) => !taken.has(i.id));
+      return orderForToday(free, focus).slice(0, limit);
     },
 
     async idea(id) {
@@ -169,7 +189,7 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
 
     async patchIdea(id, patch) {
       const { data: before, error: readError } = await ideas()
-        .select("hook, hook_alt, hook_type, title, outline, status, score")
+        .select("hook, hook_alt, hook_type, title, outline, status, score, gate, pillar, topic")
         .eq("id", id)
         .eq("user_id", userId)
         .in("status", ["inbox", "queued"])
@@ -189,7 +209,7 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
 
     async restoreIdea(id, snapshot) {
       const { error } = await ideas()
-        .update({ ...snapshot, outline: snapshot.outline as Json, status: snapshot.status as "inbox" | "queued" })
+        .update({ ...snapshot, outline: snapshot.outline as Json, gate: (snapshot.gate ?? null) as Json, status: snapshot.status as "inbox" | "queued" })
         .eq("id", id)
         .eq("user_id", userId);
       if (error) throw new Error(`today idea restore: ${error.message}`);
@@ -211,7 +231,7 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
       return id;
     },
 
-    async insertMomentIdea(idea) {
+    async insertMomentIdea(idea, gate) {
       const { data, error } = await ideas()
         .insert({
           user_id: userId,
@@ -231,6 +251,7 @@ export function supabaseTodayDb(client: Client, userId: string): TodayDb {
           score: idea.score,
           batch_date: idea.batch_date,
           status: "queued",
+          ...(gate ? { gate: gate as unknown as Json, pillar: gate.result.pillar ?? idea.pillar, topic: gate.result.topic ?? "" } : {}),
         })
         .select("id");
       if (error) throw new Error(`today moment idea: ${error.message}`);

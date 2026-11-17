@@ -7,7 +7,7 @@ import type { PostTags } from "@/features/content/engine/tags";
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams("window=30&tag=hook_type:paradox") }));
 
 const row = (over: Partial<PostTags> = {}): PostTags & { caption: string } => ({
-  hook_type: "", onscreen_text: "", message: "", cta_type: "", post_style: "",
+  hook_type: "", onscreen_text: "", message: "", topic: "", cta_type: "", post_style: "",
   cover_face: null, cover_text: null, cover_number: null, hook_spoken: "", hook_onscreen: "",
   tag_confidence: {}, tag_locks: [], tagged_at: null, caption: "short caption", ...over,
 });
@@ -30,10 +30,16 @@ describe("TagChips", () => {
 
   it("fades a low-confidence chip with a question mark and marks a locked one", () => {
     render(
-      <TagChips row={row({ message: "velocity", hook_type: "question", tag_confidence: { message: 0.3 }, tag_locks: ["hook_type"] })} />
+      <TagChips row={row({ message: "w2-advantage", hook_type: "question", tag_confidence: { message: 0.3 }, tag_locks: ["hook_type"] })} />
     );
-    expect(screen.getByRole("link", { name: /Velocity/ }).textContent).toContain("?");
+    expect(screen.getByRole("link", { name: /The W-2 Advantage/ }).textContent).toContain("?");
     expect(screen.getByRole("link", { name: /Question/ }).querySelector("[aria-label='corrected']")).not.toBeNull();
+  });
+
+  it("shows the topic by its label, as plain text with no filter link", () => {
+    render(<TagChips row={row({ topic: "mechanics-of-leverage", tag_locks: ["topic"] })} />);
+    expect(screen.getByText("The mechanics of leverage")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /The mechanics of leverage/ })).toBeNull();
   });
 
   it("says tagging is next Monday on an untagged row but still shows caption length", () => {

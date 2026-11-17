@@ -8,6 +8,7 @@ import SharpenPanel from "@/features/content/ui/SharpenPanel";
 import DraftPanel from "@/features/content/ui/DraftPanel";
 import FormatBadge from "@/features/content/ui/FormatBadge";
 import MetricsPanel from "@/features/content/ui/MetricsPanel";
+import GateCheck from "@/features/content/ui/GateCheck";
 import Card from "@/shared/ui/Card";
 import { fmtDate } from "@/shared/format";
 
@@ -39,6 +40,8 @@ export default async function ContentIdeaPage({ params }: { params: { id: string
           }
         />
       </div>
+
+      <GateCheck gate={idea.gate} original={idea.gate_original} />
 
       <Card title="Status">
         <dl className="text-sm grid grid-cols-2 gap-2">

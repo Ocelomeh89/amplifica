@@ -21,6 +21,7 @@ import {
   pullWindowDays,
   type CompetitorPostIn,
   type CreatorMedian,
+  type CreatorStatus,
 } from "@/features/content/engine/competitors";
 import type { ToolCaller } from "./claude";
 import type { ApifyClient } from "./pulls/apify";
@@ -37,7 +38,7 @@ export const TAG_PER_RUN = 5;
 /** Seconds one tagging call is allowed, on top of what the Today tail keeps. */
 export const TAG_SECONDS = 45;
 
-export type CreatorRow = { id: string; username: string; status: "watching" | "removed"; last_pulled_at: string | null; last_pull_status: "ready" | "failed" | null };
+export type CreatorRow = { id: string; username: string; status: CreatorStatus; last_pulled_at: string | null; last_pull_status: "ready" | "failed" | null };
 export type CompetitorRunRow = {
   id: string;
   apify_run_id: string;
@@ -211,7 +212,7 @@ export async function tagPopular(db: CompetitorsDb, caller: ToolCaller, now: Dat
 /** Each creator with their median and their popular posts in the window; removed creators last. */
 export function buildCreatorsPage(creators: CreatorRow[], posts: CompetitorPostRow[], lastRun: CompetitorRunRow | null, now: Date): CreatorsPage {
   const medians = creatorMedians(posts, now);
-  const rows = creators.map((c) => {
+  const rows = creators.filter((c) => c.status === "watching" || c.status === "removed").map((c) => {
     const m = medians.get(c.id) ?? { median: null, count: 0, thin: true };
     const popular = posts
       .filter((p) => p.creator_id === c.id)

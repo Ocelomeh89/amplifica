@@ -20,9 +20,9 @@ const base: OpenRecreation = {
   idea_id: null,
   created_at: "2026-10-26T15:04:00Z",
   options: [
-    { hook: "Hook one", angle: "Angle one", topic: "Topic one", message: "velocity" },
-    { hook: "Hook two", angle: "Angle two", topic: "Topic two", message: "velocity" },
-    { hook: "Hook three", angle: "Angle three", topic: "Topic three", message: "velocity" },
+    { hook: "Hook one", angle: "Angle one", topic: "Topic one", message: "w2-advantage" },
+    { hook: "Hook two", angle: "Angle two", topic: "Topic two", message: "w2-advantage" },
+    { hook: "Hook three", angle: "Angle three", topic: "Topic three", message: "w2-advantage" },
   ],
   source: { id: "p1", thumbnail_url: "https://cdn/x.jpg", caption: "Original caption\nmore" },
 };
@@ -42,9 +42,9 @@ describe("RecreateCard", () => {
   });
 
   it("adjacent options show their message as a chip", () => {
-    render(<RecreateCard item={{ ...base, mode: "adjacent", options: base.options.map((o, i) => ({ ...o, message: i === 0 ? "scoreboard" : "forced-sale" })) }} />);
-    expect(screen.getByText("Scoreboard")).toBeInTheDocument();
-    expect(screen.getAllByText("Forced sale")).toHaveLength(2);
+    render(<RecreateCard item={{ ...base, mode: "adjacent", options: base.options.map((o, i) => ({ ...o, message: i === 0 ? "physics-of-wealth" : "expensive-tuition" })) }} />);
+    expect(screen.getByText("The Physics of Wealth")).toBeInTheDocument();
+    expect(screen.getAllByText("Expensive Tuition")).toHaveLength(2);
   });
 
   it("shows the source thumbnail and the mode label", () => {

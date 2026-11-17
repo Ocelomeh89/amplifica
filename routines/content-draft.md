@@ -64,6 +64,9 @@ For each idea, in the session:
    idea's hook, outline, quote and belief. Keep the template's headings exactly.
 2. **Humanize.** Apply `prompts.humanize` to the raw draft with the voice profile in
    view. Minimum effective edit; keep the headings.
+   Then check it against the brand: run the `brand-writing` skill in audit mode on the
+   humanized draft (the piece is Amplifica) and fix every ❌ before posting. The app's
+   brand gate checks the same standard when the draft is posted.
 3. **Pick the file name.** Each idea in the response carries
    `suggested_obsidian_path`; the server built it (format folder, Chicago date, hook
    slug), so do not build or edit the name by hand. Before posting, check whether that
@@ -81,7 +84,13 @@ curl -sS --max-time 60 -o /tmp/draft-result.json -w '%{http_code}' -X POST "$CON
 ```
 
 Not 200: report the error from the response and do not touch the vault for this
-idea. 409 `draft_exists`: tell Miguel and suggest `--redo`. Continue with the next idea.
+idea. 409 `draft_exists`: tell Miguel and suggest `--redo`.
+422 `brand_gate`: the draft missed the brand standard; `failed` lists the items with a
+reason each. If `final` is false, fix exactly those items in the humanized draft and
+POST once more. If `final` is true (the second miss), stop: nothing was stored, the idea
+has left the queue for the "Didn't pass" list on Performance, and you tell Miguel which
+items failed. 503 `brand_gate_unavailable`: the check could not run; tell Miguel and try
+this idea again later. Continue with the next idea.
 
 ## 4. Write the vault file, after the POST succeeds
 

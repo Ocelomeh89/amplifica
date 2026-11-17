@@ -19,6 +19,13 @@ describe("routines/content-tag.md", () => {
     }
   });
 
+  it("names topic, topic_label and the queue's topics list", () => {
+    expect(routine).toContain("`topic`");
+    expect(routine).toContain("`topic_label`");
+    expect(routine).toMatch(/`topics`/);
+    expect(routine).toMatch(/topic labels .*data/i);
+  });
+
   it("calls both endpoints and leaves the low-confidence threshold to the app", () => {
     expect(routine).toContain("/api/content/tags/queue");
     expect(routine).toContain("/api/content/tags`");
@@ -32,7 +39,7 @@ describe("routines/content-tag.md", () => {
 
   it("is scheduled weekly in the README and has a local skill", () => {
     const readme = read("routines/README.md");
-    expect(readme).toMatch(/content-tag\.md.*0 12 \* \* 1/);
+    expect(readme).toMatch(/content-tag\.md.*55 6 \* \* 1/);
     expect(read(".claude/skills/content-tag/SKILL.md")).toContain("routines/content-tag.md");
   });
 });

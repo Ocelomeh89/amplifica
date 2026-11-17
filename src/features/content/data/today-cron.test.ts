@@ -3,11 +3,11 @@ vi.mock("server-only", () => ({}));
 import type { ToolCaller } from "./claude";
 import { MissingApiKeyError } from "./claude";
 import { runTodayCron } from "./today-cron";
-import { NOW, exp, fakeDb, idea } from "./today.fake";
+import { NOW, exp, fakeDb, gatePassing, idea } from "./today.fake";
 
-const okCaller: ToolCaller = {
-  call: async () => ({ briefs: [{ slot: 1, title: "T", hook: "H", say: ["a", "b", "c"], message: "velocity" }] }),
-};
+const okCaller: ToolCaller = gatePassing<ToolCaller>({
+  call: async () => ({ briefs: [{ slot: 1, title: "T", hook: "H", say: ["a", "b", "c"], message: "w2-advantage" }] }),
+});
 
 /** A clock that reads `usedSeconds` after the start. */
 const clockAt = (usedSeconds: number) => () => new Date(NOW.getTime() + usedSeconds * 1000);
@@ -28,10 +28,10 @@ describe("runTodayCron", () => {
     expect(timeouts).toEqual([200_000]);
   });
 
-  it("with under 90 seconds left builds no caller and records a failed run", async () => {
+  it("with under 150 seconds left (the brand gate needs time too) builds no caller and records a failed run", async () => {
     const f = fakeDb({ ideas: [idea("i1")] });
     const callerFor = vi.fn(() => okCaller);
-    const report = await runTodayCron({ db: f.db, callerFor, startedAt: NOW, now: NOW, clock: clockAt(200) });
+    const report = await runTodayCron({ db: f.db, callerFor, startedAt: NOW, now: NOW, clock: clockAt(140) });
     expect(callerFor).not.toHaveBeenCalled();
     expect(report).toMatchObject({ briefs: 0, error: "ran out of time" });
     expect(f.runs[0]).toMatchObject({ kind: "cron", status: "failed", error: "ran out of time" });

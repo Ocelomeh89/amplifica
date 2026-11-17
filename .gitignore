@@ -22,3 +22,6 @@ vite.config.js
 vite.config.d.ts
 .vercel
 .env*
+
+# The weekly review route lives in a folder named build; keep it tracked.
+!src/app/api/content/review/build/

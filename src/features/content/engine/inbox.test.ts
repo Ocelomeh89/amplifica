@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { filterByFormat, formatCounts, parseFormatParam, rankIdeas, type Rankable } from "./inbox";
+import { filterByFormat, formatCounts, parseFormatParam, rankIdeas, splitHidden, type Rankable } from "./inbox";
+import { EMPTY_FOCUS, focusTier, type ActiveFocus } from "./focus";
 
 const idea = (id: string, format: Rankable["format"], score: number, created_at: string): Rankable => ({ id, format, score, created_at });
 
@@ -54,5 +55,40 @@ describe("filterByFormat and formatCounts", () => {
   it("counts every format, including zeros, and the total", () => {
     expect(formatCounts(ideas)).toEqual({ all: 3, reel: 2, youtube: 0, newsletter: 0, story: 1, x: 0 });
     expect(formatCounts([])).toEqual({ all: 0, reel: 0, youtube: 0, newsletter: 0, story: 0, x: 0 });
+  });
+});
+
+describe("the skip and double-down lists in the Inbox", () => {
+  const focus: ActiveFocus = {
+    skip: { hook_type: ["promise"], topic: [] },
+    doubleDown: { hook_type: ["question"], topic: ["predictable-income"] },
+  };
+  type T = Rankable & { hook_type: string; topic: string };
+  const t = (id: string, format: Rankable["format"], hook_type: string, topic: string, score = 0.5, created_at = "2026-10-01T10:00:00Z"): T => ({ id, format, score, created_at, hook_type, topic });
+
+  it("a skipped hook's Reel idea is hidden and a newsletter idea with the same hook is not", () => {
+    const { shown, hidden } = splitHidden([t("a", "reel", "promise", ""), t("b", "newsletter", "promise", ""), t("c", "reel", "question", "")], focus);
+    expect(hidden.map((i) => i.id)).toEqual(["a"]);
+    expect(shown.map((i) => i.id)).toEqual(["b", "c"]);
+    expect(splitHidden([t("a", "reel", "promise", "")], EMPTY_FOCUS).hidden).toEqual([]);
+  });
+
+  it("double-down ideas rank first: both, then either, then the rest, existing order inside each group", () => {
+    const ideas = [
+      t("rest-high", "reel", "x", "y", 0.9),
+      t("hook-only", "reel", "question", "y", 0.4),
+      t("both", "reel", "question", "predictable-income", 0.1),
+      t("rest-low", "reel", "x", "y", 0.2),
+      t("topic-only", "reel", "x", "predictable-income", 0.6),
+      t("news", "newsletter", "question", "predictable-income", 0.95),
+    ];
+    const tier = (i: T) => (i.format === "reel" ? focusTier(focus, i) : 0);
+    expect(rankIdeas(ideas, tier).map((i) => i.id)).toEqual(["both", "topic-only", "hook-only", "news", "rest-high", "rest-low"]);
+  });
+
+  it("rankIdeas with no tier is unchanged", () => {
+    const ideas = [t("a", "reel", "x", "y", 0.2), t("b", "reel", "x", "y", 0.9)];
+    expect(rankIdeas(ideas)).toEqual(rankIdeas(ideas, undefined));
+    expect(rankIdeas(ideas).map((i) => i.id)).toEqual(["b", "a"]);
   });
 });

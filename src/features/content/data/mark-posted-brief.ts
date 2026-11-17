@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/shared/supabase/database.types";
-import { JUDGE_DAY, tagsFromRecipe } from "@/features/content/engine/experiments";
+import { BRIEF_TAG_CONFIDENCE, JUDGE_DAY, tagsFromRecipe } from "@/features/content/engine/experiments";
 
 const DAY = 86_400_000;
 
@@ -42,7 +42,11 @@ export async function linkBriefExperiment(
   if (error) throw new Error(error.message);
 
   if (a.platform === "instagram" && post.tagged_at === null) {
-    const tags = tagsFromRecipe((exp.recipe ?? {}) as Record<string, string>, post.hook_used, a.now);
+    const base = tagsFromRecipe((exp.recipe ?? {}) as Record<string, string>, post.hook_used, a.now);
+    // A post made from a brief is tagged here and never reaches the tagging routine, so it takes its idea's topic now.
+    const { data: idea } = await supabase.from("content_ideas").select("topic").eq("id", a.ideaId).eq("user_id", userId).maybeSingle();
+    const topic = idea?.topic ?? "";
+    const tags = { ...base, topic, tag_confidence: topic ? { ...base.tag_confidence, topic: BRIEF_TAG_CONFIDENCE } : base.tag_confidence };
     const { error: tagError } = await supabase.from("content_posts").update(tags).eq("id", post.id).eq("user_id", userId);
     if (tagError) throw new Error(tagError.message);
   }

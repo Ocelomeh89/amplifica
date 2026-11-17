@@ -28,7 +28,8 @@ export async function ingestPayload(
   db: IngestDb,
   payload: IngestPayload,
   userId: string,
-  newId: () => string = randomUUID
+  newId: () => string = randomUUID,
+  opts: { batch?: string } = {}
 ): Promise<{
   sources: { id: string; kind: string; external_id: string }[];
   ideas: { id: string; format: string; title: string; hook: string }[];
@@ -87,7 +88,9 @@ export async function ingestPayload(
       chain_id: chainIdFor(i.chain_key),
       score: i.score,
       batch_date: i.batch_date,
-      status: "inbox",
+      // Held until the brand gate passes it to the Inbox (data/gate-sweep.ts).
+      status: "gating",
+      ingest_batch: opts.batch ?? null,
     };
   });
 

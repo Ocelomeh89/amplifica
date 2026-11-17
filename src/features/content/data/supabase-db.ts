@@ -5,6 +5,9 @@ import type { ContentSourceInsert, Database, Json } from "@/shared/supabase/data
 import type { IngestDb } from "./ingest";
 import { FORMATS, type Format } from "@/features/content/engine/types";
 import type { ContextDb } from "./context";
+import { loadTopics } from "./topics";
+import { activeFocus } from "./focus";
+import { supabaseFocusDb } from "./supabase-focus-db";
 import type { MetricsDb } from "./metrics";
 import type { FoundDeps, StoredSource } from "./found";
 import type { QueueDb } from "./found-queue";
@@ -142,6 +145,11 @@ export function supabaseContextDb(client: Client, userId: string): ContextDb {
       if (error) throw fail("source runs", error.message);
       return data ?? [];
     },
+    async focus(day) {
+      return activeFocus(await supabaseFocusDb(client, userId).rows(), day);
+    },
+    topics: () => loadTopics(client, userId),
+
     async voiceSummary() {
       const { data, error } = await client
         .from("content_voice")

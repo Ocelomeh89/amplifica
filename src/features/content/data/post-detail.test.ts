@@ -21,8 +21,8 @@ function fakeClient(tables: Record<string, unknown[]>) {
 const post = (over: Record<string, unknown> = {}) => ({
   id: "p1", platform: "instagram", format: "reel", media_type: "reel", thumbnail_url: "t", pillar: "", hook_type: "question",
   hook_used: "", caption: "Cap", url: "https://instagram.com/reel/x", idea_id: null, posted_at: "2026-10-25T00:00:00Z",
-  onscreen_text: "", message: "velocity", cta_type: "", post_style: "talking-head-text", cover_face: true, cover_text: null,
-  cover_number: null, hook_spoken: "Spoken", hook_onscreen: "", tag_confidence: {}, tag_locks: [], tagged_at: "2026-10-26T00:00:00Z", ...over,
+  onscreen_text: "", message: "w2-advantage", cta_type: "", post_style: "talking-head-text", cover_face: true, cover_text: null,
+  cover_number: null, hook_spoken: "Spoken", hook_onscreen: "", tag_confidence: {}, tag_locks: [], tagged_at: "2026-10-26T00:00:00Z", is_test: false, ...over,
 });
 
 const NOW = new Date("2026-10-26T15:00:00Z");
@@ -59,5 +59,30 @@ describe("loadPostDetail", () => {
       "u1", "p1", NOW
     );
     expect(d?.recreations).toEqual([{ ideaId: "i1", hook: "New hook", status: "inbox", multiplier: null }]);
+  });
+
+  it("a test post loads with no figures and does not move a normal post's multiplier", async () => {
+    const normals = Array.from({ length: 6 }, (_, i) => post({ id: `n${i}`, posted_at: `2026-09-${10 + i}T00:00:00Z`, external_id: `n${i}` }));
+    const snaps = (ids: string[], views: number[]) =>
+      ids.map((id, i) => ({ post_id: id, captured_at: "2026-10-20T00:00:00Z", metrics: { views: views[i], saves: 1, shares: 1 } }));
+    const normalViews = [1000, 1100, 900, 1200, 800, 1000];
+    const metrics = snaps(normals.map((n) => n.id), normalViews);
+    const testPost = post({ id: "t1", posted_at: "2026-09-20T00:00:00Z", is_test: true });
+    const without = await loadPostDetail(fakeClient({ content_posts: normals, content_metrics: metrics }), "u1", "n0", NOW);
+    const withTest = await loadPostDetail(
+      fakeClient({ content_posts: [...normals, testPost], content_metrics: [...metrics, ...snaps(["t1"], [90000])] }),
+      "u1", "n0", NOW
+    );
+    expect(withTest?.sourceMultiplier).toBe(without?.sourceMultiplier);
+    expect(withTest?.figures).toEqual(without?.figures);
+    expect(withTest?.isTest).toBe(false);
+
+    const asTest = await loadPostDetail(
+      fakeClient({ content_posts: [...normals, testPost], content_metrics: [...metrics, ...snaps(["t1"], [90000])] }),
+      "u1", "t1", NOW
+    );
+    expect(asTest?.isTest).toBe(true);
+    expect(asTest?.figures).toEqual([]);
+    expect(asTest?.insights).toEqual({ state: "untagged" });
   });
 });

@@ -85,3 +85,11 @@ describe("sharpenIdeaPatch", () => {
     expect(patch.outline).toEqual([{ beat: "State the belief." }, { beat: "Give the 6-figure number." }, { beat: "Say what to check instead." }]);
   });
 });
+
+describe("the review block in the sharpen prompt", () => {
+  it("is carried when given and the prompt is unchanged when not", () => {
+    const block = "## From the weekly review\nPrefer these hook types: Question.";
+    expect(sharpenSystemPrompt([], block)).toContain(block);
+    expect(sharpenSystemPrompt(["r"], "")).toBe(sharpenSystemPrompt(["r"]));
+  });
+});

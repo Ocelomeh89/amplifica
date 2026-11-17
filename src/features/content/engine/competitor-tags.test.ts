@@ -61,3 +61,12 @@ describe("prompt", () => {
     expect(t).toContain("31 seconds");
   });
 });
+
+describe("competitor message is a pillar", () => {
+  it("accepts a pillar slug and rejects an old canon message", async () => {
+    const { competitorTagToolSchema } = await import("./competitor-tags");
+    const schema = competitorTagToolSchema() as { properties: { message: { enum: string[] } } };
+    expect(schema.properties.message.enum).toContain("w2-advantage");
+    expect(schema.properties.message.enum).not.toContain("velocity");
+  });
+});

@@ -30,7 +30,7 @@ function Row({ source, canGenerate }: { source: FoundSourceRow; canGenerate: boo
     try {
       const result = await regenerateFound(fd);
       if (result.error) setError(result.error);
-      else setDone(`${result.count} idea${result.count === 1 ? "" : "s"} added to the Inbox.`);
+      else setDone(`${result.count} idea${result.count === 1 ? "" : "s"} written. They reach the Inbox once they pass the brand check.`);
     } catch {
       setError("Something went wrong. Nothing was saved; try again.");
     } finally {

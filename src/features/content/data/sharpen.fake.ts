@@ -1,3 +1,4 @@
+import { EMPTY_FOCUS } from "@/features/content/engine/focus";
 import type { SharpenOption } from "@/features/content/engine/sharpen";
 import type { IdeaForSharpen, SharpenDb, SharpenRow } from "./sharpen";
 
@@ -39,6 +40,12 @@ export function fakeSharpenDb(opts: { ideas?: IdeaForSharpen[]; rules?: string[]
   const calls = { patched: [] as string[], patches: [] as unknown[], unclaimed: 0 };
   let seq = 0;
   const db: SharpenDb = {
+    async topics() {
+      return [];
+    },
+    async focus() {
+      return EMPTY_FOCUS;
+    },
     async idea(id) {
       return ideas.get(id) ?? null;
     },

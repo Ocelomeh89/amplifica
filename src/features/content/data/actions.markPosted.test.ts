@@ -18,6 +18,7 @@ function fakeClient() {
       const b: Record<string, unknown> = {
         select: () => b,
         eq: () => b,
+        not: () => b,
         update: (v: Record<string, unknown>) => {
           op = "update";
           if (table === "content_posts") postUpdate = v;

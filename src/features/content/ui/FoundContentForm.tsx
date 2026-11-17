@@ -32,7 +32,7 @@ export default function FoundContentForm({ canGenerate }: { canGenerate: boolean
       const result = canGenerate ? await addFoundContent(fd) : await queueFoundContent(fd);
       if (result.error) setError(result.error);
       else {
-        setDone(result.message ?? `${result.count} idea${result.count === 1 ? "" : "s"} added to the Inbox.`);
+        setDone(result.message ?? `${result.count} idea${result.count === 1 ? "" : "s"} written. They reach the Inbox once they pass the brand check.`);
         formRef.current?.reset();
       }
     } catch {

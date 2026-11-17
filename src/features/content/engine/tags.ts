@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PILLAR_SLUGS, pillarName } from "./brand";
 
 // The six choices Miguel makes on a post, as values the tagging routine, the
 // endpoint, the migration checks and the Performance page all share. Slices 3
@@ -17,7 +18,10 @@ export const HOOK_TYPES = [
   "warning",
 ] as const;
 export const ONSCREEN_TEXT = ["repeats-hook", "adds-to-hook", "none"] as const;
-export const MESSAGES = [
+/** A post's message is its personal brand pillar (brand gate, 2026-11-10). */
+export const MESSAGES = [...PILLAR_SLUGS, "none"] as const;
+/** The old canon arguments: kept on history and hand-locked tags, never written again. */
+export const LEGACY_MESSAGES = [
   "scoreboard",
   "velocity",
   "dollars-not-yourself",
@@ -25,7 +29,6 @@ export const MESSAGES = [
   "credit-ladder",
   "system-over-willpower",
   "forced-sale",
-  "none",
 ] as const;
 export const CTA_TYPES = ["comment-keyword", "save", "share", "follow", "link-in-bio", "none"] as const;
 export const POST_STYLES = [
@@ -56,6 +59,20 @@ export const TAG_NAMES = [
 ] as const;
 export type TagName = (typeof TAG_NAMES)[number];
 
+/** The seven tags a post carries. Topic is a content_topics slug, not a fixed list, so it is not in TAG_NAMES (competitor tagging requires a confidence for every TAG_NAMES entry). */
+export const POST_TAG_NAMES = [...TAG_NAMES, "topic"] as const;
+export type PostTagName = (typeof POST_TAG_NAMES)[number];
+
+/** A topic label as a slug: lowercase, runs of non-alphanumerics to one hyphen, trimmed, at most 60 characters. */
+export function slugifyTopic(label: string): string {
+  return label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60)
+    .replace(/-+$/g, "");
+}
+
 const COVER_NAMES = ["cover_face", "cover_text", "cover_number"] as const;
 const LISTS = {
   hook_type: HOOK_TYPES,
@@ -67,16 +84,20 @@ const LISTS = {
 
 const titleCase = (slug: string) => slug.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
 /** Slug to display label. Slugs shared by lists (none) read the same in each. */
-export const TAG_LABELS: Record<string, string> = Object.fromEntries(
-  Object.values(LISTS)
+export const TAG_LABELS: Record<string, string> = Object.fromEntries([
+  ...Object.values(LISTS)
     .flat()
-    .map((s) => [s, titleCase(s)])
-);
+    .map((s) => [s, titleCase(s)]),
+  ...PILLAR_SLUGS.map((s) => [s, pillarName(s)]),
+  ...LEGACY_MESSAGES.map((s) => [s, `${titleCase(s)} (old)`]),
+]);
 
 export type PostTags = {
   hook_type: string;
   onscreen_text: string;
   message: string;
+  /** A content_topics slug, '' until the tagging routine or Mark posted sets it. Not in TAG_NAMES (see POST_TAG_NAMES). */
+  topic: string;
   cta_type: string;
   post_style: string;
   cover_face: boolean | null;
@@ -92,7 +113,7 @@ export type PostTags = {
 export const LOW_CONFIDENCE = 0.6;
 
 /** True when the routine reported a confidence under the threshold for this tag. */
-export function isLowConfidence(t: Pick<PostTags, "tag_confidence">, name: TagName): boolean {
+export function isLowConfidence(t: Pick<PostTags, "tag_confidence">, name: PostTagName): boolean {
   const c = t.tag_confidence[name];
   return c !== undefined && c < LOW_CONFIDENCE;
 }
@@ -156,7 +177,7 @@ export function filterByTags<T extends PostTags & { caption: string }>(posts: T[
 const hookText = z.string().max(500);
 // A record keyed by an enum demands every key, so confidence is a partial strict object.
 const confidenceSchema = z
-  .object(Object.fromEntries(TAG_NAMES.map((n) => [n, z.number().min(0).max(1).optional()])) as Record<TagName, z.ZodOptional<z.ZodNumber>>)
+  .object(Object.fromEntries(POST_TAG_NAMES.map((n) => [n, z.number().min(0).max(1).optional()])) as Record<PostTagName, z.ZodOptional<z.ZodNumber>>)
   .strict();
 
 export const tagPostSchema = z
@@ -165,6 +186,9 @@ export const tagPostSchema = z
     hook_type: z.enum(HOOK_TYPES).optional(),
     onscreen_text: z.enum(ONSCREEN_TEXT).optional(),
     message: z.enum(MESSAGES).optional(),
+    /** A topic slug from the queue's list, or topic_label for a new topic when none fits. */
+    topic: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(60).optional(),
+    topic_label: z.string().trim().min(3).max(80).optional(),
     cta_type: z.enum(CTA_TYPES).optional(),
     post_style: z.enum(POST_STYLES).optional(),
     cover_face: z.boolean().optional(),

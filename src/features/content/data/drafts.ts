@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { draftFilename, draftPostSchema, parseVaultPath, VAULT_FOLDER, vaultPath } from "@/features/content/engine/drafts";
 import { lintDraft, type LintHit } from "@/features/content/engine/lint";
+import type { GateFields, GateResult } from "@/features/content/engine/brand";
+import { gateRecord, type GateOutcome, type GateRecord } from "./brand-gate";
+
+/** A draft that fails the brand gate this many times takes its idea out of the queue. */
+export const DRAFT_GATE_TRIES = 2;
 import { DRAFT_PROMPT } from "@/features/content/engine/prompts/draft";
 import { HUMANIZE_PROMPT } from "@/features/content/engine/prompts/humanize";
 import { voiceStale, type VoiceRow } from "@/features/content/engine/voice";
@@ -28,7 +33,12 @@ export type DraftIdea = {
   hook_type: string;
   status: string;
   has_draft: boolean;
+  /** How many times the brand gate failed a posted draft of this idea. */
+  draft_gate_fails: number;
 };
+
+/** The brand gate's check of a posted draft (no rewrite: the Obsidian file is the final). */
+export type DraftCheck = (format: string, fields: GateFields) => Promise<GateOutcome>;
 
 export class DraftStoreError extends Error {
   constructor(public code: "idea_not_queued" | "draft_exists") {
@@ -54,6 +64,10 @@ export interface DraftsDb {
   voice(): Promise<VoiceRow | null>;
   /** Atomic. Throws DraftStoreError for the two expected conflicts. */
   storeDraft(args: StoreDraftArgs): Promise<void>;
+  /** The draft passed: the idea takes the gate record. */
+  setGate(ideaId: string, record: GateRecord): Promise<void>;
+  /** The draft failed for the `fails`-th time; a final fail takes the idea out of the queue to gate_failed. */
+  gateFail(ideaId: string, result: GateResult, fails: number, final: boolean): Promise<void>;
 }
 
 export type Result = { status: number; body: unknown };
@@ -91,7 +105,7 @@ export async function getDraftQueue(db: DraftsDb, rawId: string | null, now: Dat
   };
 }
 
-export async function postDraft(db: DraftsDb, input: unknown): Promise<Result> {
+export async function postDraft(db: DraftsDb, input: unknown, check: DraftCheck): Promise<Result> {
   const parsed = draftPostSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -106,6 +120,16 @@ export async function postDraft(db: DraftsDb, input: unknown): Promise<Result> {
   if (idea.has_draft && !d.redo) return { status: 409, body: { error: "draft_exists" } };
   if (parseVaultPath(d.obsidian_path)?.format !== idea.format) {
     return { status: 400, body: { error: `obsidian_path folder must be ${VAULT_FOLDER}/${idea.format}/` } };
+  }
+
+  // The brand gate, before anything is stored. One resubmit is allowed after a fail.
+  const gate = await check(idea.format, { title: idea.title, hook: idea.hook, draft: d.humanized });
+  if (gate.status === "error") return { status: 503, body: { ok: false, error: "brand_gate_unavailable" } };
+  if (gate.status === "failed") {
+    const fails = idea.draft_gate_fails + 1;
+    const final = fails >= DRAFT_GATE_TRIES;
+    await db.gateFail(idea.id, gate.result, fails, final);
+    return { status: 422, body: { ok: false, error: "brand_gate", failed: gate.result.failed, final } };
   }
 
   const lint = lintDraft(idea.format, d.humanized);
@@ -123,5 +147,6 @@ export async function postDraft(db: DraftsDb, input: unknown): Promise<Result> {
     if (e instanceof DraftStoreError) return { status: 409, body: { error: e.code } };
     throw e;
   }
+  await db.setGate(idea.id, gateRecord(gate.result, false, new Date()));
   return { status: 200, body: { ok: true, lint } };
 }

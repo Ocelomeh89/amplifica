@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { CTA_TYPES, HOOK_TYPES, MESSAGES, ONSCREEN_TEXT, POST_STYLES } from "@/features/content/engine/tags";
+import { CTA_TYPES, HOOK_TYPES, LEGACY_MESSAGES, ONSCREEN_TEXT, POST_STYLES } from "@/features/content/engine/tags";
 
 describe("0014_content_post_tags.sql", () => {
   const sql = readFileSync("supabase/migrations/0014_content_post_tags.sql", "utf8");
@@ -11,7 +11,8 @@ describe("0014_content_post_tags.sql", () => {
 
   it.each([
     ["onscreen_text", ONSCREEN_TEXT, 1],
-    ["message", MESSAGES, 1],
+    // 0014 holds the old canon list; 0020 replaced its check with the pillars.
+    ["message", [...LEGACY_MESSAGES, "none"], 1],
     ["cta_type", CTA_TYPES, 1],
     ["post_style", POST_STYLES, 1],
     ["hook_type", HOOK_TYPES, 2],

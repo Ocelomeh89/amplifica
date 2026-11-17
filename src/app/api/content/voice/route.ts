@@ -5,6 +5,8 @@ import { getVoice, postVoice } from "@/features/content/data/voice";
 import { supabaseVoiceDb } from "@/features/content/data/supabase-drafts-db";
 
 export const dynamic = "force-dynamic";
+// Next 14 still caches GET fetches here (the Supabase reads) without this; see wiring.test.ts.
+export const fetchCache = "force-no-store";
 
 // /content-voice's endpoints: read the current profile (with the file list it
 // was built from, so the skill can compare it to the vault), and replace it.

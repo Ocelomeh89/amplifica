@@ -4,12 +4,18 @@ import type { Database } from "@/shared/supabase/database.types";
 import { pickSnapshots } from "@/features/content/engine/snapshots";
 import type { Format } from "@/features/content/engine/types";
 import { partitionUnused } from "@/features/content/engine/unused";
+import { splitHidden } from "@/features/content/engine/inbox";
+import type { ActiveFocus } from "@/features/content/engine/focus";
+import type { FocusRow } from "./focus";
+import type { ContentReview } from "@/shared/supabase/database.types";
 import { summarizeDraft, type DraftState } from "@/features/content/engine/drafts";
 import type { RecreateOption } from "@/features/content/engine/recreate";
 import { STALE_PENDING_MINUTES } from "@/features/content/engine/recreate";
 import type { OpenRecreation } from "./recreate";
 import type { SharpenRow } from "./sharpen";
 import { supabaseSharpenDb } from "./supabase-sharpen-db";
+import { PILLAR_SLUGS, pillarBalance, type PillarSlug } from "@/features/content/engine/brand";
+
 
 // Reads behind the /content pages. Every query is scoped to the user as well
 // as to RLS. The pages stay routing and layout; the Supabase calls live here.
@@ -21,13 +27,15 @@ const must = <T>(res: { data: T }): T => res.data;
 
 // ---- Inbox ----------------------------------------------------------------
 
-export async function loadInbox(db: Db, userId: string) {
+/** The Inbox minus ideas the skip list hides (`hidden` counts them, fresh or old) and minus ideas that aged out. */
+export async function loadInbox(db: Db, userId: string, focus: ActiveFocus) {
   const [ideas, pending] = await Promise.all([
     db.from("content_ideas").select("*").eq("user_id", userId).eq("status", "inbox").order("created_at", { ascending: false }),
     loadPendingSources(db, userId),
   ]);
   // Stale inbox ideas live in the Never used view, not here.
-  return { ideas: partitionUnused(must(ideas) ?? [], new Date()).fresh, pending };
+  const { shown, hidden } = splitHidden(must(ideas) ?? [], focus);
+  return { ideas: partitionUnused(shown, new Date()).fresh, pending, hidden: hidden.length };
 }
 
 export async function loadPendingSources(db: Db, userId: string) {
@@ -47,7 +55,7 @@ export async function loadInboxLinks(db: Db, userId: string, sourceIds: string[]
       ? db.from("content_sources").select("id, url, kind, angle:meta->>angle").eq("user_id", userId).in("id", sourceIds)
       : Promise.resolve({ data: [] as { id: string; url: string | null; kind: string; angle: string | null }[], error: null }),
     chainIds.length
-      ? db.from("content_ideas").select("id, format, chain_id").eq("user_id", userId).in("chain_id", chainIds)
+      ? db.from("content_ideas").select("id, format, chain_id").eq("user_id", userId).in("chain_id", chainIds).neq("status", "gating")
       : Promise.resolve({ data: [] as { id: string; format: Format; chain_id: string | null }[], error: null }),
   ]);
   return { sources: must(sources) ?? [], chainMates: must(chainMates) ?? [] };
@@ -89,6 +97,7 @@ export async function loadIdeaContext(db: Db, userId: string, idea: IdeaRow) {
           .eq("chain_id", idea.chain_id)
           .eq("user_id", userId)
           .neq("id", idea.id)
+          .neq("status", "gating")
       : Promise.resolve({ data: [] as { id: string; format: Format; hook: string; status: string }[], error: null }),
     db
       .from("content_posts")
@@ -141,9 +150,11 @@ export async function loadSourcesPage(db: Db, userId: string) {
 // ---- Never used and drafts ---------------------------------------------------
 
 /** Inbox and queued ideas that aged out unused, newest first, with their draft state. */
-export async function loadUnused(db: Db, userId: string) {
+export async function loadUnused(db: Db, userId: string, focus: ActiveFocus) {
   const res = await db.from("content_ideas").select("*").eq("user_id", userId).in("status", ["inbox", "queued"]);
-  const { unused } = partitionUnused(must(res) ?? [], new Date());
+  // A Reel idea the skip list hides is not listed here; queued ideas never are hidden.
+  const rows = (must(res) ?? []).filter((i) => i.status !== "inbox" || !splitHidden([i], focus).hidden.length);
+  const { unused } = partitionUnused(rows, new Date());
   const drafts = await loadDraftStates(db, userId, unused.map((i) => i.id));
   return { ideas: unused, drafts };
 }
@@ -243,4 +254,84 @@ export async function loadOpenRecreations(db: Db, userId: string, now: Date): Pr
       source: { id: r.source_post_id, thumbnail_url: post?.thumbnail_url ?? "", caption: post?.caption ?? "" },
     };
   });
+}
+
+export type GateFailedRow = { id: string; title: string; format: Format; source: string | null; failed: { item: string; reason: string }[] };
+
+/** The gate's failed items; a check that never ran gives its error as a reason with no item. */
+function failedOf(gate: unknown): { item: string; reason: string }[] {
+  const g = gate as { result?: { failed?: { item: string; reason: string }[] }; error?: string } | null;
+  const failed = (g?.result?.failed ?? []).map((f) => ({ item: f.item, reason: f.reason }));
+  return failed.length === 0 && g?.error ? [{ item: "", reason: g.error }] : failed;
+}
+
+/** Ideas the brand gate held back, newest first, with their source title and the failed items. */
+export async function loadGateFailed(db: Db, userId: string): Promise<GateFailedRow[]> {
+  const { data, error } = await db
+    .from("content_ideas")
+    .select("id, title, format, source_id, gate")
+    .eq("user_id", userId)
+    .eq("status", "gate_failed")
+    .order("updated_at", { ascending: false })
+    .limit(50);
+  if (error) throw new Error(`gate failed ideas: ${error.message}`);
+  const rows = (data ?? []) as { id: string; title: string; format: Format; source_id: string | null; gate: unknown }[];
+  const sourceIds = Array.from(new Set(rows.map((r) => r.source_id).filter((x): x is string => x !== null)));
+  const titles = new Map<string, string>();
+  if (sourceIds.length > 0) {
+    const { data: sources, error: e2 } = await db.from("content_sources").select("id, title").eq("user_id", userId).in("id", sourceIds);
+    if (e2) throw new Error(`gate failed sources: ${e2.message}`);
+    for (const s of (sources ?? []) as { id: string; title: string }[]) titles.set(s.id, s.title);
+  }
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    format: r.format,
+    source: r.source_id ? titles.get(r.source_id) ?? null : null,
+    failed: failedOf(r.gate),
+  }));
+}
+
+/** This Chicago week's passed ideas and posted pieces, per personal pillar. */
+export async function loadPillarBalance(db: Db, userId: string, now: Date): Promise<Record<PillarSlug, number>> {
+  const since = new Date(now.getTime() - 8 * 86_400_000).toISOString();
+  const [ideas, posts] = await Promise.all([
+    db.from("content_ideas").select("pillar, gate").eq("user_id", userId).in("pillar", [...PILLAR_SLUGS]).gte("updated_at", since),
+    db.from("content_posts").select("message, posted_at").eq("user_id", userId).eq("is_test", false).in("message", [...PILLAR_SLUGS]).gte("posted_at", since),
+  ]);
+  if (ideas.error) throw new Error(`pillar balance ideas: ${ideas.error.message}`);
+  if (posts.error) throw new Error(`pillar balance posts: ${posts.error.message}`);
+  const rows = [
+    ...((ideas.data ?? []) as { pillar: string; gate: { checked_at?: string; result?: { verdict?: string } } | null }[])
+      .filter((i) => i.gate?.result?.verdict === "pass" && i.gate.checked_at)
+      .map((i) => ({ pillar: i.pillar, at: i.gate!.checked_at! })),
+    ...((posts.data ?? []) as { message: string; posted_at: string }[]).map((p) => ({ pillar: p.message, at: p.posted_at })),
+  ];
+  return pillarBalance(rows, now);
+}
+
+// ---- The weekly review ------------------------------------------------------------------------------------------
+
+/** The given week's stored review, or the newest; `weeks` lists the stored week starts, newest first, up to 12. */
+export async function loadReview(db: Db, userId: string, weekStart: string | null): Promise<{ row: ContentReview | null; weeks: string[] }> {
+  const res = await db.from("content_reviews").select("*").eq("user_id", userId).order("week_start", { ascending: false }).limit(12);
+  const rows = (must(res) ?? []) as ContentReview[];
+  const weeks = rows.map((r) => r.week_start);
+  if (weekStart === null) return { row: rows[0] ?? null, weeks };
+  const listed = rows.find((r) => r.week_start === weekStart);
+  if (listed) return { row: listed, weeks };
+  const one = await db.from("content_reviews").select("*").eq("user_id", userId).eq("week_start", weekStart).limit(1);
+  return { row: ((must(one) ?? []) as ContentReview[])[0] ?? null, weeks };
+}
+
+/** Skips running on the review day, lifted ones included (the page offers Bring back on the rest), hooks first. */
+export async function loadReviewSkips(db: Db, userId: string, reviewDay: string): Promise<FocusRow[]> {
+  const res = await db
+    .from("content_focus")
+    .select("id, kind, dimension, value, won, lost, flat, total, source, review_week, starts_on, ends_on, lifted_at, protected_until")
+    .eq("user_id", userId)
+    .eq("kind", "skip")
+    .lte("starts_on", reviewDay)
+    .gt("ends_on", reviewDay);
+  return ((must(res) ?? []) as FocusRow[]).sort((a, b) => (a.dimension === b.dimension ? b.total - a.total || a.value.localeCompare(b.value) : a.dimension === "hook_type" ? -1 : 1));
 }

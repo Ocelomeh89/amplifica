@@ -1,6 +1,10 @@
+import type { Topic } from "./topics";
+import { EMPTY_FOCUS, orderForToday, type ActiveFocus } from "@/features/content/engine/focus";
 import { evidenceCounts, type Evidence, type LiveTest } from "@/features/content/engine/experiments";
 import type { Multiplier } from "@/features/content/engine/baseline";
 import type { CompetitorCandidate, ExperimentRow, IdeaLite, RunRow, TodayDb } from "./today";
+import type { ToolCaller, ToolCallInput } from "./claude";
+import { GATE_TOOL_NAME } from "@/features/content/engine/brand";
 
 // An in-memory TodayDb for the Today tests.
 
@@ -24,7 +28,7 @@ function evidence(): Evidence {
 
 type Snapshot = { hook: string; hook_alt: string | null; hook_type: string; title: string; outline: unknown; status: string; score: number };
 
-export function fakeDb(opts: { updateFails?: boolean; ideas?: IdeaLite[]; patchFails?: string[]; experiments?: ExperimentRow[]; runs?: RunRow[]; posted?: { exp: ExperimentRow; posted_at: string }[]; math?: Map<string, { multiplier: Multiplier; normalized: null }>; candidate?: CompetitorCandidate | null; rules?: string[] } = {}) {
+export function fakeDb(opts: { updateFails?: boolean; ideas?: IdeaLite[]; patchFails?: string[]; experiments?: ExperimentRow[]; runs?: RunRow[]; posted?: { exp: ExperimentRow; posted_at: string }[]; math?: Map<string, { multiplier: Multiplier; normalized: null }>; candidate?: CompetitorCandidate | null; rules?: string[]; topics?: Topic[]; focus?: ActiveFocus; ev?: Evidence } = {}) {
   const ideas = new Map<string, IdeaLite & { hook_alt: string | null; status: string }>();
   for (const i of opts.ideas ?? []) ideas.set(i.id, { ...i, hook_alt: null, status: "inbox" });
   const experiments: ExperimentRow[] = [...(opts.experiments ?? [])];
@@ -32,8 +36,11 @@ export function fakeDb(opts: { updateFails?: boolean; ideas?: IdeaLite[]; patchF
   const calls = { patch: [] as string[], restore: [] as string[], inbox: [] as string[], sources: [] as string[], momentIdeas: [] as unknown[], runsInserted: 0, briefed: [] as string[], discarded: [] as string[], competitorSources: [] as { shortcode: string; angle: string }[] };
   let seq = 0;
   const impl: Partial<TodayDb> = {
+    async topics() {
+      return opts.topics ?? [];
+    },
     async evidence() {
-      return { ev: evidence(), winnerHooks: ["W"], recentHooks: ["R"] };
+      return { ev: opts.ev ?? evidence(), winnerHooks: ["W"], recentHooks: ["R"] };
     },
     async liveTests(): Promise<LiveTest[]> {
       return experiments.filter((e) => e.status === "open" || e.status === "posted").map((e) => ({ variable: e.variable, value: e.value }));
@@ -41,9 +48,12 @@ export function fakeDb(opts: { updateFails?: boolean; ideas?: IdeaLite[]; patchF
     async liveSlots(day) {
       return experiments.filter((e) => e.day === day && ["open", "posted", "judged", "unjudged"].includes(e.status));
     },
-    async unclaimedInboxIdeas(limit) {
+    async focus() {
+      return opts.focus ?? EMPTY_FOCUS;
+    },
+    async unclaimedInboxIdeas(limit, focus) {
       const briefed = new Set(experiments.map((e) => e.idea_id));
-      return [...ideas.values()].filter((i) => i.status === "inbox" && !briefed.has(i.id)).slice(0, limit);
+      return orderForToday([...ideas.values()].filter((i) => i.status === "inbox" && !briefed.has(i.id)), focus).slice(0, limit);
     },
     async idea(id) {
       return ideas.get(id) ?? null;
@@ -85,7 +95,7 @@ export function fakeDb(opts: { updateFails?: boolean; ideas?: IdeaLite[]; patchF
     async insertMomentIdea(idea) {
       calls.momentIdeas.push(idea);
       const id = `idea-m${++seq}`;
-      ideas.set(id, { id, title: idea.title, hook: idea.hook, pillar: "", hook_alt: null, status: "queued" });
+      ideas.set(id, { id, title: idea.title, hook: idea.hook, pillar: "", hook_alt: null, status: "queued", hook_type: "", topic: "" });
       return id;
     },
     async activeRules() {
@@ -138,7 +148,7 @@ export function fakeDb(opts: { updateFails?: boolean; ideas?: IdeaLite[]; patchF
   return { db, ideas, experiments, runs, calls };
 }
 
-export const idea = (id: string, title = `Idea ${id}`): IdeaLite => ({ id, title, hook: `Hook ${id}`, pillar: "method", hook_alt: null, status: "inbox" });
+export const idea = (id: string, title = `Idea ${id}`): IdeaLite => ({ id, title, hook: `Hook ${id}`, pillar: "method", hook_alt: null, status: "inbox", hook_type: "", topic: "" });
 export const exp = (over: Partial<ExperimentRow> = {}): ExperimentRow => ({
   id: "e0",
   idea_id: "i1",
@@ -198,3 +208,32 @@ export const candidate = (over: Partial<CompetitorCandidate["post"]> = {}, meta:
   },
 });
 
+
+/**
+ * Wraps a test caller so brand-gate calls pass: the verdict's pillar is the message of the brief
+ * whose hook the gate is checking, from the briefs the wrapped caller last returned. Override a
+ * hook's verdict with `verdicts` (keyed by hook). Gate calls are not recorded in the base caller.
+ */
+export function gatePassing<T extends ToolCaller>(base: T, verdicts: Record<string, unknown> = {}): T & { gateCalls: string[] } {
+  let lastBriefs: { hook: string; message: string }[] = [];
+  const gateCalls: string[] = [];
+  return {
+    ...base,
+    gateCalls,
+    async call(input: ToolCallInput) {
+      if (input.tool.name === GATE_TOOL_NAME) {
+        gateCalls.push(input.text);
+        const b = lastBriefs.find((x) => input.text.includes(x.hook));
+        if (b && verdicts[b.hook] !== undefined) {
+          const v = verdicts[b.hook];
+          if (v instanceof Error) throw v;
+          return v;
+        }
+        return { verdict: "pass", reader: "daniel", pillar: b?.message ?? "w2-advantage", amplifica_pillar: "the-numbers", failed: [] };
+      }
+      const out = (await base.call(input)) as { briefs?: { hook: string; message: string }[] };
+      if (out && Array.isArray(out.briefs)) lastBriefs = [...out.briefs, ...lastBriefs];
+      return out;
+    },
+  };
+}

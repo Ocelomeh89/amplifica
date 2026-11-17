@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 // Source-level guards for the content feature and its routes. They read files
 // rather than import them, so the feature does not reach into app/.
@@ -17,8 +17,12 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/today/page.tsx",
       "src/app/(app)/content/creators/page.tsx",
       "src/app/(app)/content/taste/page.tsx",
+      "src/app/(app)/content/review/page.tsx",
+      "src/app/(app)/content/review/[weekStart]/page.tsx",
+      "src/app/(app)/content/tests/page.tsx",
       "src/app/(app)/content/ideas/[id]/page.tsx",
       "src/app/(app)/content/sources/page.tsx",
+      "src/features/content/data/test-lab-actions.ts",
       "src/features/content/data/actions.ts",
       "src/features/content/data/competitor-actions.ts",
       "src/features/content/data/sharpen-actions.ts",
@@ -26,6 +30,8 @@ describe("content stays owner-only", () => {
       "src/features/content/data/tag-actions.ts",
       "src/features/content/data/recreate-actions.ts",
       "src/features/content/data/today-actions.ts",
+      "src/features/content/data/review-actions.ts",
+      "src/features/content/data/discovery-actions.ts",
     ];
     for (const f of files) expect(read(f), f).toContain("requireContentOwner()");
   });
@@ -41,8 +47,26 @@ describe("content stays owner-only", () => {
       "src/app/api/content/tags/route.ts",
       "src/app/api/content/cron/metrics/route.ts",
       "src/app/api/content/voice/route.ts",
+      "src/app/api/content/review/build/route.ts",
+      "src/app/api/content/tests/propose/route.ts",
+      "src/app/api/content/creators/discover/route.ts",
     ];
     for (const f of routes) expect(read(f), f).toContain("authorizeRoutine(req, process.env.");
+  });
+
+  it("every GET /api/content route opts out of Next's fetch cache", () => {
+    // Next 14 caches GET fetches in a route handler (the Supabase reads) even with
+    // dynamic = "force-dynamic"; on Vercel that served a stale "no pending runs" to the
+    // cron for days and stale taste rules to the routines (2026-11-10).
+    const getRoutes = [
+      "src/app/api/content/context/route.ts",
+      "src/app/api/content/found/queued/route.ts",
+      "src/app/api/content/drafts/queue/route.ts",
+      "src/app/api/content/tags/queue/route.ts",
+      "src/app/api/content/cron/metrics/route.ts",
+      "src/app/api/content/voice/route.ts",
+    ];
+    for (const f of getRoutes) expect(read(f), f).toContain('export const fetchCache = "force-no-store";');
   });
 
   it("pages hold no Supabase queries: reads live in data/queries.ts", () => {
@@ -56,8 +80,20 @@ describe("content stays owner-only", () => {
       "src/app/(app)/content/today/page.tsx",
       "src/app/(app)/content/creators/page.tsx",
       "src/app/(app)/content/taste/page.tsx",
+      "src/app/(app)/content/review/page.tsx",
+      "src/app/(app)/content/review/[weekStart]/page.tsx",
+      "src/app/(app)/content/tests/page.tsx",
     ];
     for (const f of pages) expect(read(f), f).not.toMatch(/supabase\s*\.from\(/);
+  });
+
+  it("Performance no longer renders GateFailedList; the weekly review does", () => {
+    expect(read("src/app/(app)/content/performance/page.tsx")).not.toContain("GateFailedList");
+    expect(read("src/features/content/ui/ReviewPage.tsx")).toContain("GateFailedList");
+  });
+
+  it("the review actions each open with the owner gate and the page routes set the 300 second budget", () => {
+    for (const f of ["src/app/(app)/content/review/page.tsx", "src/app/(app)/content/review/[weekStart]/page.tsx"]) expect(read(f), f).toContain("maxDuration = 300");
   });
 
   it("comments do not crowd the routine's dedup window or the Sources page", () => {
@@ -65,6 +101,13 @@ describe("content stays owner-only", () => {
     expect(db.match(/\.neq\("kind", "comment"\)/g)?.length).toBe(2);
     const queries = read("src/features/content/data/queries.ts");
     expect(queries.match(/\.neq\("kind", "comment"\)/g)?.length).toBe(1);
+  });
+
+  it("idea actions never act on an idea the brand gate holds", () => {
+    const src = read("src/features/content/data/actions.ts");
+    const body = (name: string) => src.slice(src.indexOf(`export async function ${name}(`), src.indexOf("\nexport ", src.indexOf(`export async function ${name}(`) + 1));
+    for (const name of ["likeIdea", "passIdea", "markPosted"]) expect(body(name), name).toContain("GATE_HELD");
+    expect(body("archiveIdea")).toContain('.neq("status", "gating")');
   });
 
   it("the metrics cron is bearer-protected by CRON_SECRET and scheduled once", () => {
@@ -82,13 +125,165 @@ describe("content stays owner-only", () => {
     expect(competitors).toBeLessThan(route.indexOf("runTodayCron("));
   });
 
+  it("the review route is a POST with a 300 second budget and an explicit Claude timeout", () => {
+    const route = read("src/app/api/content/review/build/route.ts");
+    expect(route).toContain("export async function POST(");
+    expect(route).not.toContain("export async function GET(");
+    expect(route).toContain("maxDuration = 300");
+    expect(route).toContain("timeoutMs: 120_000");
+    expect(route).toContain("maxRetries: 0");
+    expect(route).toContain('dynamic = "force-dynamic"');
+  });
+
+  it("the topic backfill runs only on request, dry unless asked to run", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    expect(route).toContain('params.get("topics")');
+    expect(route).toContain('dryRun: topics !== "run"');
+    expect(route.indexOf("runTopicBackfill(")).toBeGreaterThan(-1);
+    expect(route.indexOf("runTopicBackfill(")).toBeLessThan(route.indexOf("runMetricsCron("));
+  });
+
+  it("ended skips are released before Today picks ideas", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    expect(route.indexOf("releaseEndedSkips(")).toBeGreaterThan(route.indexOf("runMetricsCron("));
+    expect(route.indexOf("releaseEndedSkips(")).toBeLessThan(route.indexOf("runTodayCron("));
+  });
+
+  it("the follower count is stored after the pulls and before the competitor step", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    const store = route.indexOf("storeFollowers(");
+    expect(store).toBeGreaterThan(route.indexOf("runMetricsCron("));
+    expect(store).toBeLessThan(route.indexOf("runCompetitorCron("));
+  });
+
+  it("the cron's brand gate sweep runs after Today, on the time Today leaves, then the digest", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    const sweep = route.indexOf("runGateSweep(");
+    expect(sweep).toBeGreaterThan(route.indexOf("runTodayCron("));
+    expect(route.indexOf("postDigests(")).toBeGreaterThan(sweep);
+    expect(route).toContain("timeoutMs: GATE_CALL_SECONDS * 1000");
+  });
+
+  it("every new idea is swept by the brand gate right after it is written", () => {
+    const ingest = read("src/app/api/content/ingest/route.ts");
+    expect(ingest).toContain("batch: ");
+    expect(ingest).toContain("sweepInBackground(");
+    expect(read("src/features/content/data/actions.ts")).toContain("sweepInBackground(");
+    expect(read("src/features/content/data/gate-run.ts")).not.toContain('"use server"');
+    // The digest goes out as soon as the background sweep settles the batch, not at the next cron.
+    expect(read("src/features/content/data/gate-run.ts").indexOf("postDigests(")).toBeGreaterThan(read("src/features/content/data/gate-run.ts").indexOf("runGateSweep("));
+  });
+
+  it("the backfill runs only on request, dry unless asked to run", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    expect(route).toContain('params.get("backfill")');
+    expect(route).toContain('dryRun: backfill !== "run"');
+    expect(route.indexOf("runBackfill(")).toBeLessThan(route.indexOf("runMetricsCron("));
+  });
+
+  it("routes that run the brand gate allow 300 seconds and give Claude explicit timeouts", () => {
+    for (const f of ["src/app/api/content/ingest/route.ts", "src/app/api/content/drafts/route.ts"]) expect(read(f), f).toContain("export const maxDuration = 300;");
+    expect(read("src/features/content/data/gate-run.ts")).toContain("anthropicToolCaller({ timeoutMs: 60_000, maxRetries: 0 })");
+    expect(read("src/app/api/content/drafts/route.ts")).toContain("anthropicToolCaller({ timeoutMs: 40_000, maxRetries: 0 })");
+  });
+
+  it("a posted draft is checked by the brand gate without a rewrite", () => {
+    const route = read("src/app/api/content/drafts/route.ts");
+    expect(route).toContain("gatePiece(");
+    expect(route).toContain("rewrite: false");
+  });
+
   it("a Pass stores its reason as a note, and background helpers stay out of the 'use server' files", () => {
     expect(read("src/features/content/data/actions.ts")).toContain("recordPassNote(");
     // Every export of a "use server" file is a callable endpoint; the helper lives in a plain module.
-    for (const f of ["src/features/content/data/sharpen-actions.ts", "src/features/content/data/taste-actions.ts"]) {
+    for (const f of ["src/features/content/data/sharpen-actions.ts", "src/features/content/data/taste-actions.ts", "src/features/content/data/discovery-actions.ts"]) {
       const exports = read(f).match(/^export (?:async )?(?:function|const) (\w+)/gm) ?? [];
       expect(exports.every((e) => /export async function \w+Action\b/.test(e)), f).toBe(true);
     }
     expect(read("src/features/content/data/taste-run.ts")).not.toContain('"use server"');
+    expect(read("src/features/content/data/discovery-run.ts")).not.toContain('"use server"');
+  });
+
+  it("every direct reader of content_posts is on the list", () => {
+    // A new reader fails here until it is classified: either it goes through loadPostsForMath
+    // (which leaves Trial Reel test posts out by default) or it is not a baseline, review list or winner.
+    const dir = "src/features/content/data";
+    const readers = readdirSync(dir)
+      .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts") && !f.endsWith(".fake.ts"))
+      .filter((f) => read(`${dir}/${f}`).includes('from("content_posts")'))
+      .sort();
+    expect(readers).toEqual([
+      "actions.ts",
+      "mark-posted-brief.ts",
+      "performance.ts",
+      "queries.ts",
+      "supabase-db.ts",
+      "supabase-recreate-db.ts",
+      "supabase-tags-db.ts",
+      "supabase-tests-db.ts",
+      "supabase-today-db.ts",
+    ]);
+    expect(read(`${dir}/queries.ts`)).toContain('.eq("is_test", false)');
+  });
+
+  it("the test proposal route is a POST with a 300 second budget, and its background starter is a plain module", () => {
+    const route = read("src/app/api/content/tests/propose/route.ts");
+    expect(route).toContain("export async function POST(");
+    expect(route).not.toContain("export async function GET(");
+    expect(route).toContain("maxDuration = 300");
+    expect(route).toContain('dynamic = "force-dynamic"');
+    const run = read("src/features/content/data/test-lab-run.ts");
+    expect(run).not.toContain('"use server"');
+    expect(run).toContain("anthropicToolCaller({ timeoutMs: 60_000, maxRetries: 0 })");
+    expect(run).toContain("waitUntil(");
+    // Every export of a "use server" file is a callable endpoint: only actions may live in it.
+    const exports = read("src/features/content/data/test-lab-actions.ts").match(/^export (?:async )?(?:function|const) (\w+)/gm) ?? [];
+    expect(exports.length).toBeGreaterThan(0);
+    expect(exports.every((e) => /export async function \w+Action\b/.test(e))).toBe(true);
+  });
+
+  it("the Trial Reel tests' cron step runs after the pulls and before the competitor step, and makes no Claude call", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    const step = route.indexOf("runTestsCron(");
+    expect(step).toBeGreaterThan(route.indexOf("runMetricsCron("));
+    expect(step).toBeLessThan(route.indexOf("runCompetitorCron("));
+    expect(route).toMatch(/\.\.\.report, [^}]*tests/);
+    expect(read("src/features/content/data/test-lab-cron.ts")).not.toContain("anthropic");
+  });
+
+  it("creator discovery makes no Claude call on the cron", () => {
+    const cron = read("src/features/content/data/discovery-cron.ts");
+    expect(cron).not.toContain("ToolCaller");
+    expect(cron).not.toContain("anthropicToolCaller");
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    const step = route.indexOf("runDiscoveryCron(");
+    expect(step).toBeGreaterThan(route.indexOf("runCompetitorCron("));
+    expect(step).toBeLessThan(route.indexOf("runTodayCron("));
+    expect(route).toMatch(/\.\.\.report, [^}]*discovery/);
+    expect(route).toContain('params.get("creators") === "now"');
+    const discover = read("src/app/api/content/creators/discover/route.ts");
+    expect(discover).toContain("export const maxDuration = 300;");
+    expect(discover).toContain("runDiscovery(");
+    expect(read("src/features/content/data/discovery-run.ts")).not.toContain("use server");
+  });
+
+  it("the Creators page has the 300 second budget its background search runs under, and the button logs before it starts", () => {
+    expect(read("src/app/(app)/content/creators/page.tsx")).toContain("export const maxDuration = 300;");
+    const actions = read("src/features/content/data/discovery-actions.ts");
+    expect(actions.indexOf("logCall(")).toBeGreaterThan(-1);
+    expect(actions.indexOf("logCall(")).toBeLessThan(actions.indexOf("waitUntil("));
+  });
+
+  it("the conclusions are written after the digest, with a 30 second Claude timeout", () => {
+    const route = read("src/app/api/content/cron/metrics/route.ts");
+    expect(route.indexOf("writeConclusions(")).toBeGreaterThan(route.indexOf("postDigests("));
+    expect(route).toContain("timeoutMs: 30_000, maxRetries: 0");
+  });
+
+  it("the Tests page has the 300 second budget and a tab after Review", () => {
+    expect(read("src/app/(app)/content/tests/page.tsx")).toContain("maxDuration = 300");
+    const tabs = read("src/features/content/ui/ContentTabs.tsx");
+    expect(tabs.indexOf('"/content/tests"')).toBeGreaterThan(tabs.indexOf('"/content/review"'));
+    expect(tabs.indexOf('"/content/tests"')).toBeLessThan(tabs.indexOf('"/content/creators"'));
   });
 });

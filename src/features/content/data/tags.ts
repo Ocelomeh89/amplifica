@@ -1,4 +1,5 @@
-import { TAG_NAMES, tagBodySchema, type PostTags, type TagName } from "@/features/content/engine/tags";
+import { POST_TAG_NAMES, tagBodySchema, type PostTagName, type PostTags } from "@/features/content/engine/tags";
+import { resolveTopic, type Topic } from "./topics";
 import { WINDOW_DAYS } from "@/features/content/engine/baseline";
 
 // What the tagging routine reads and writes, and what the Performance page's
@@ -36,6 +37,10 @@ export type StoredTags = {
 };
 
 export interface TagsDb {
+  /** The owner's topic list: the queue hands it to the routine, and storeTags resolves a post's topic against it. */
+  topics(): Promise<Topic[]>;
+  /** Insert-ignore. */
+  addTopic(t: Topic): Promise<void>;
   /** Owner's Instagram posts with tagged_at null, in the window, taggable media, newest first; plus how many such posts exist. */
   untagged(limit: number, since: Date): Promise<{ posts: QueueRow[]; total: number }>;
   /** Only the owner's Instagram posts appear in the map. */
@@ -47,7 +52,7 @@ export interface TagsDb {
 /** Shortcode to a fresh video or image URL. Instagram's CDN links expire, so this is asked at request time. */
 export type MediaUrlLookup = (shortcodes: string[]) => Promise<Map<string, string>>;
 
-const isTagName = (k: string): k is TagName => (TAG_NAMES as readonly string[]).includes(k);
+const isTagName = (k: string): k is PostTagName => (POST_TAG_NAMES as readonly string[]).includes(k);
 
 export function pickLocked(values: Partial<PostTags>, locks: string[]): Partial<PostTags> {
   const out: Record<string, unknown> = {};
@@ -63,7 +68,7 @@ export async function getTagQueue(db: TagsDb, lookup: MediaUrlLookup, rawLimit: 
     limit = Math.min(n, QUEUE_MAX);
   }
   const since = new Date(now.getTime() - WINDOW_DAYS * 86_400_000);
-  const { posts, total } = await db.untagged(limit, since);
+  const [{ posts, total }, topics] = await Promise.all([db.untagged(limit, since), db.topics()]);
   let urls = new Map<string, string>();
   if (posts.length > 0) {
     try {
@@ -74,22 +79,40 @@ export async function getTagQueue(db: TagsDb, lookup: MediaUrlLookup, rawLimit: 
     }
   }
   const out: QueuePost[] = posts.map((p) => ({ ...p, media_url: urls.get(p.external_id) ?? "" }));
-  return { status: 200, body: { posts: out, remaining: Math.max(0, total - posts.length) } };
+  return { status: 200, body: { posts: out, remaining: Math.max(0, total - posts.length), topics } };
 }
 
 export async function storeTags(db: TagsDb, input: unknown, now: Date): Promise<Result> {
   const parsed = tagBodySchema.safeParse(input);
   if (!parsed.success) return { status: 400, body: { error: "invalid_body", issues: parsed.error.issues } };
   const stored = await db.locksFor(parsed.data.posts.map((p) => p.id));
-  const results: { id: string; written?: string[]; skipped_locked?: string[]; error?: string }[] = [];
+  const results: { id: string; written?: string[]; skipped_locked?: string[]; topic_skipped?: string; error?: string }[] = [];
+  // The topic list is read once, and a proposed topic joins it so a later post in the batch reuses it.
+  const wantsTopic = parsed.data.posts.some((p) => p.topic || p.topic_label);
+  const topics = wantsTopic ? await db.topics() : [];
   for (const post of parsed.data.posts) {
     let existing = stored.get(post.id);
     if (!existing) {
       results.push({ id: post.id, error: "not_found" });
       continue;
     }
-    const { id, tag_confidence, ...fields } = post;
+    const { id, tag_confidence, topic, topic_label, ...fields } = post;
     let outcome: { written: string[]; skipped_locked: string[] } | null = null;
+    // The topic is judged against the post's pillar: the message in this body, or the locked one stored.
+    let topicSlug: string | null = null;
+    let topicSkipped: string | undefined;
+    if (topic || topic_label) {
+      const pillar = existing.tag_locks.includes("message") ? existing.values.message : (fields.message ?? existing.values.message);
+      const res = resolveTopic(topics, { topic, topic_label, pillar: pillar ?? "" });
+      if ("skip" in res) topicSkipped = res.skip;
+      else {
+        topicSlug = res.slug;
+        if (res.add) {
+          await db.addTopic(res.add);
+          topics.push(res.add);
+        }
+      }
+    }
     // The lock list can change under us (Miguel corrects a tag while the routine runs),
     // so the write is conditional on the version read; one re-read and retry on a miss.
     for (let attempt = 0; attempt < 2 && existing && !outcome; attempt++) {
@@ -104,8 +127,15 @@ export async function storeTags(db: TagsDb, input: unknown, now: Date): Promise<
           written.push(k);
         }
       }
+      if (topicSlug !== null) {
+        if (existing.tag_locks.includes("topic")) skipped_locked.push("topic");
+        else {
+          patch.topic = topicSlug;
+          written.push("topic");
+        }
+      }
       const confidence = Object.fromEntries(
-        Object.entries(tag_confidence ?? {}).filter(([k, v]) => v !== undefined && !existing!.tag_locks.includes(k))
+        Object.entries(tag_confidence ?? {}).filter(([k, v]) => v !== undefined && !existing!.tag_locks.includes(k) && !(k === "topic" && patch.topic === undefined))
       );
       const ok = await db.writeTags(
         id,
@@ -115,7 +145,7 @@ export async function storeTags(db: TagsDb, input: unknown, now: Date): Promise<
       if (ok) outcome = { written, skipped_locked };
       else existing = (await db.locksFor([id])).get(id);
     }
-    results.push(outcome ? { id, ...outcome } : { id, error: existing ? "conflict" : "not_found" });
+    results.push(outcome ? { id, ...outcome, ...(topicSkipped ? { topic_skipped: topicSkipped } : {}) } : { id, error: existing ? "conflict" : "not_found" });
   }
   return { status: 200, body: { results } };
 }

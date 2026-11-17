@@ -92,7 +92,7 @@ export default function CreatorsTable({ page }: { page: CreatorsPage }) {
                   )}
                 </td>
                 <td className="py-2">
-                  {c.status === "watching" ? <RemoveButton id={c.id} username={c.username} /> : <AddCreatorForm username={c.username} label="Add back" />}
+                  {c.status === "watching" ? <RemoveButton id={c.id} username={c.username} /> : c.status === "removed" ? <AddCreatorForm username={c.username} label="Add back" /> : null}
                 </td>
               </tr>
             ))}

@@ -1,3 +1,4 @@
+import { EMPTY_FOCUS } from "@/features/content/engine/focus";
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/shared/supabase/database.types";
@@ -63,11 +64,57 @@ describe("supabaseTodayDb", () => {
     expect(log).toContainEqual(["content_ideas.eq", "user_id", "u1"]);
   });
 
+  it("patchIdea snapshots the gate record and pillar, and restoreIdea puts them back", async () => {
+    const before = { hook: "h0", hook_alt: null, hook_type: "", title: "t0", outline: [], status: "inbox", score: 1, gate: { result: { pillar: "life-by-design" } }, pillar: "life-by-design" };
+    const { client, log } = fakeClient({ content_ideas: { data: [before] } });
+    const db = supabaseTodayDb(client, "u1");
+    const snap = await db.patchIdea("i1", { hook: "h", hook_alt: "o", hook_type: "", title: "t", outline: [], status: "queued", score: 1 });
+    expect(snap).toMatchObject({ gate: before.gate, pillar: "life-by-design" });
+    const select = log.find((c) => c[0] === "content_ideas.select")![1] as string;
+    expect(select).toContain("gate");
+    expect(select).toContain("pillar");
+    await db.restoreIdea("i1", snap!);
+    const restore = log.filter((c) => c[0] === "content_ideas.update").pop()![1] as Record<string, unknown>;
+    expect(restore).toMatchObject({ gate: before.gate, pillar: "life-by-design" });
+  });
+
+  it("insertMomentIdea stores the brand gate record and its pillar", async () => {
+    const { client, log } = fakeClient({ content_ideas: { data: [{ id: "m1" }] } });
+    const result = { verdict: "pass" as const, reader: "stephen" as const, pillar: "expensive-tuition" as const, amplifica_pillar: "the-numbers" as const, failed: [] };
+    const idea = { source_id: "11111111-1111-4111-8111-111111111111", format: "reel" as const, title: "T", hook: "H", hook_alt: null, belief_attacked: "", value_to_listener: "", why_it_stops: "", outline: [], quote: "", quote_ref: "", pillar: "", hook_type: "", score: 1, batch_date: "2026-10-27" };
+    await supabaseTodayDb(client, "u1").insertMomentIdea(idea as never, { result, rewritten: false, checked_at: "2026-10-27T15:00:00.000Z" });
+    const insert = log.find((c) => c[0] === "content_ideas.insert")![1] as Record<string, unknown>;
+    expect(insert).toMatchObject({ pillar: "expensive-tuition", gate: { result } });
+  });
+
+  it("unclaimedInboxIdeas drops skipped ideas and puts a double-down topic first, before the cut", async () => {
+    const row = (id: string, hook_type: string, topic: string) => ({ id, title: "t", hook: "h", pillar: "", hook_alt: null, status: "inbox", hook_type, topic });
+    const { client } = fakeClient({ content_experiments: { data: [] }, content_ideas: { data: [row("a", "x", ""), row("b", "promise", ""), row("c", "x", "predictable-income")] } });
+    const focus = { skip: { hook_type: ["promise"], topic: [] }, doubleDown: { hook_type: [], topic: ["predictable-income"] } };
+    const out = await supabaseTodayDb(client, "u1").unclaimedInboxIdeas(2, focus);
+    expect(out.map((i) => i.id)).toEqual(["c", "a"]);
+  });
+
   it("unclaimedInboxIdeas excludes every idea that ever had an experiment, not only live ones", async () => {
     const { client, log } = fakeClient({ content_experiments: { data: [{ idea_id: "i1" }] }, content_ideas: { data: [{ id: "i1", title: "t", hook: "h", pillar: "", hook_alt: null, status: "inbox" }, { id: "i2", title: "t", hook: "h", pillar: "", hook_alt: null, status: "inbox" }] } });
-    const out = await supabaseTodayDb(client, "u1").unclaimedInboxIdeas(5);
+    const out = await supabaseTodayDb(client, "u1").unclaimedInboxIdeas(5, EMPTY_FOCUS);
     expect(out.map((i) => i.id)).toEqual(["i2"]);
     expect(log.some((c) => c[0] === "content_experiments.in" && c[1] === "status")).toBe(false);
+  });
+
+  it("Today leaves alone an idea held by an open test", async () => {
+    const idea = (id: string) => ({ id, title: "t", hook: "h", pillar: "", hook_alt: null, status: "inbox" });
+    const { client, log } = fakeClient({
+      content_experiments: { data: [] },
+      content_tests: { data: [{ id: "t1" }] },
+      content_test_versions: { data: [{ idea_id: "i1" }, { idea_id: null }] },
+      content_ideas: { data: [idea("i1"), idea("i2")] },
+    });
+    const out = await supabaseTodayDb(client, "u1").unclaimedInboxIdeas(5, EMPTY_FOCUS);
+    expect(out.map((i) => i.id)).toEqual(["i2"]);
+    expect(log).toContainEqual(["content_tests.in", "status", ["proposing", "open"]]);
+    expect(log).toContainEqual(["content_tests.eq", "user_id", "u1"]);
+    expect(log).toContainEqual(["content_test_versions.eq", "user_id", "u1"]);
   });
 
   it("page reports today's failed swap and moment runs, newest first, and not the make-now counters", async () => {
@@ -100,6 +147,16 @@ describe("supabaseTodayDb", () => {
     expect(c?.post.id).toBe("d");
     expect(c).toMatchObject({ username: "micro.investing", multiple: 5, thin: false });
     expect(log.filter((l) => l[0] === "content_competitor_posts.eq" && l[1] === "user_id" && l[2] === "u1").length).toBeGreaterThan(0);
+  });
+
+  it("evidence counts a judged Trial Reel test: its extras reach the tally", async () => {
+    const { client, log } = fakeClient({
+      content_tests: { data: [{ variable: "onscreen_text", value_a: "none", value_b: "repeats-hook", verdict: "a", judged_at: new Date().toISOString() }] },
+    });
+    const out = await supabaseTodayDb(client, "u1").evidence(new Date());
+    expect(out.ev.onscreen_text.find((r) => r.value === "none")).toMatchObject({ won: 1, total: 1 });
+    expect(log).toContainEqual(["content_tests.eq", "user_id", "u1"]);
+    expect(log).toContainEqual(["content_tests.eq", "status", "judged"]);
   });
 
   it("evidence marks a post whose idea has a competitor source with its angle", async () => {

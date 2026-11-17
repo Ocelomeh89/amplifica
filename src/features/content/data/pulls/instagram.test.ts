@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { composioExecute, igFormat, igMediaType, insightMetricsFor, mapIgMedia, mapInsights, pullInstagram, type IgMedia } from "./instagram";
+import { composioExecute, igFormat, igMediaType, insightMetricsFor, mapIgMedia, mapInsights, pullIgFollowers, pullInstagram, type IgMedia } from "./instagram";
 
 const reel: IgMedia = {
   id: "17958519123208964",
@@ -178,5 +178,24 @@ describe("media fields and the 90-day window", () => {
     expect(out.posts).toHaveLength(1);
     expect(insightCalls).toEqual(["fresh"]);
     expect(fetchImpl.mock.calls.filter(([u]) => String(u).endsWith("INSTAGRAM_GET_IG_USER_MEDIA"))).toHaveLength(1);
+  });
+});
+
+describe("pullIgFollowers", () => {
+  const env = { apiKey: "key", connectionId: "ca_1", userId: "u1" };
+  it("reads the count from the recorded response", async () => {
+    // Recorded 2026-11-13: INSTAGRAM_GET_USER_INFO, ig_user_id "me", fields followers_count. The count sits at data.followers_count.
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ successful: true, data: { followers_count: 4812, id: "1", media_count: 9, username: "u" }, error: null }), { status: 200 }));
+    expect(await pullIgFollowers(env, fetchImpl as unknown as typeof fetch)).toBe(4812);
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toContain("INSTAGRAM_GET_USER_INFO");
+    expect(JSON.parse(init.body as string).arguments).toMatchObject({ ig_user_id: "me", fields: "followers_count" });
+  });
+  it("is null when the key is unset", async () => {
+    expect(await pullIgFollowers({ connectionId: "ca_1" })).toBeNull();
+  });
+  it("is null when the response has no count", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ successful: true, data: {}, error: null }), { status: 200 }));
+    expect(await pullIgFollowers(env, fetchImpl as unknown as typeof fetch)).toBeNull();
   });
 });

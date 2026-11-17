@@ -28,7 +28,7 @@ describe("FoundContentForm with an API key", () => {
     fireEvent.change(screen.getByLabelText("URL"), { target: { value: "https://example.com/a" } });
     fireEvent.change(screen.getByLabelText("Angle"), { target: { value: "twist" } });
     fireEvent.submit(screen.getByRole("button", { name: /Generate ideas/ }).closest("form")!);
-    await waitFor(() => expect(screen.getByText("2 ideas added to the Inbox.")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("2 ideas written. They reach the Inbox once they pass the brand check.")).toBeInTheDocument());
     const fd = addFoundContent.mock.calls[0][0];
     expect(fd.get("url")).toBe("https://example.com/a");
     expect(fd.get("angle")).toBe("twist");
