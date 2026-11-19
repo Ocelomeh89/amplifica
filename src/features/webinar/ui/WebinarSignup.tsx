@@ -2,6 +2,7 @@
 
 import { useFormState, useFormStatus } from "react-dom";
 import { registerForWebinar, type RegisterState } from "@/features/webinar/data/actions";
+import { WEBINAR } from "@/features/webinar/event";
 
 const initialState: RegisterState = { error: null, done: false };
 
@@ -32,7 +33,7 @@ export default function WebinarSignup({ utm }: { utm: Utm }) {
       <div role="status" className="w-full max-w-md bg-card border border-edge rounded-lg p-6">
         <h2 className="text-xl font-semibold mb-1">You&apos;re registered</h2>
         <p className="text-sm text-sub">
-          December 7 at 6 pm Central. We&apos;ll email you the link before we start.
+          {WEBINAR.when}. We&apos;ll email you the link before we start.
         </p>
       </div>
     );
