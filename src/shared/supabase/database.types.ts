@@ -293,10 +293,12 @@ export type Database = {
           utm_campaign: string | null;
           user_agent: string | null;
           beehiiv_synced: boolean;
+          name: string | null;
           created_at: string;
         };
         Insert: {
           email: string;
+          name?: string | null;
           source?: string;
           utm_source?: string | null;
           utm_medium?: string | null;
