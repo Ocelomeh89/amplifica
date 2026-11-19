@@ -34,10 +34,12 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // /calculator and /quiz are intentionally public (email-gated lead-gen
+  // /calculator, /quiz and /webinar are intentionally public (lead-gen
   // surfaces). Skip the auth round-trip entirely; session refresh happens on
   // any other route, so logged-in visitors lose nothing.
-  if (pathname.startsWith("/calculator") || pathname.startsWith("/quiz")) {
+  if (pathname.startsWith("/calculator") ||
+    pathname.startsWith("/quiz") ||
+    pathname.startsWith("/webinar")) {
     return NextResponse.next({ request });
   }
 

@@ -9,6 +9,7 @@ import { INSTAGRAM_URL, NEWSLETTER_URL, YOUTUBE_URL } from "@/shared/links";
 const PAGES = [
   "src/app/page.tsx",
   "src/app/calculator/page.tsx",
+  "src/app/webinar/page.tsx",
   "src/features/quiz/ui/QuizShell.tsx",
 ];
 
