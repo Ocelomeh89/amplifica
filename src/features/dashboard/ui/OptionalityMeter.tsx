@@ -5,21 +5,21 @@ import { meterColor } from "../meter";
 import type { OptionalityStatus } from "../projection";
 
 // The Target box's second cell. Server-renderable: no state, no effects.
-export default function OptionalityMeter({ status, currentMonthlyIncomeUSD }: { status: OptionalityStatus; goalUSD: number; currentMonthlyIncomeUSD: number }) {
+export default function OptionalityMeter({ status, currentMonthlyCashflowUSD }: { status: OptionalityStatus; goalUSD: number; currentMonthlyCashflowUSD: number }) {
   return (
     <div className="p-4 flex flex-col">
       <div className="text-[10px] text-sub uppercase tracking-wide">
         Optionality
         <InfoBox
-          message="Target Date and Income to sustain monthly withdrawal from system"
+          message="Target date, and the monthly cash flow the flywheel must generate (interest + principal) to sustain your withdrawal from then on"
         />
       </div>
-      <MeterBody status={status} currentMonthlyIncomeUSD={currentMonthlyIncomeUSD} />
+      <MeterBody status={status} currentMonthlyCashflowUSD={currentMonthlyCashflowUSD} />
     </div>
   );
 }
 
-function MeterBody({ status, currentMonthlyIncomeUSD }: { status: OptionalityStatus; currentMonthlyIncomeUSD: number }) {
+function MeterBody({ status, currentMonthlyCashflowUSD }: { status: OptionalityStatus; currentMonthlyCashflowUSD: number }) {
   if (status.kind === "no-amplicons") {
     return (
       <Link href="/amplicons" className="text-xs text-purple mt-auto pt-3">
@@ -55,7 +55,7 @@ function MeterBody({ status, currentMonthlyIncomeUSD }: { status: OptionalitySta
         <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
       </div>
       <div className="text-[10px] text-sub mt-1">
-        {fmtKUSD(currentMonthlyIncomeUSD)} of {fmtKUSD(status.incomeAtOptionality)}/mo income
+        {fmtKUSD(currentMonthlyCashflowUSD)} of {fmtKUSD(status.cashflowAtOptionality)}/mo cash flow
       </div>
     </div>
   );

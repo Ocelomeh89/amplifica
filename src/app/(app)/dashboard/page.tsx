@@ -3,7 +3,6 @@ import { fmtUSD0, fmtKUSD, fmtMonth } from "@/shared/format";
 import { isoToYearMonth, currentYearMonth } from "@/shared/finance/dates";
 import {
   monthlyPayoutOf,
-  incomeAtMonth,
   isActiveAt,
   remainingValueAtMonth,
   buildSeries,
@@ -54,8 +53,6 @@ export default async function DashboardPage() {
 
   const activeNow = lites.filter((a) => isActiveAt(a, todayMonth));
   const currentMonthlyCashflow = activeNow.reduce((s, a) => s + monthlyPayoutOf(a), 0);
-  // The income part (STI interest + LTI coupons): what the optionality meter tracks.
-  const currentMonthlyIncome = activeNow.reduce((s, a) => s + incomeAtMonth(a, todayMonth), 0);
 
   // Expected future payments = nominal value of all remaining Amplicon payments
   // (face value, no discounting). Never per-Amplicon. External assets removed in
@@ -96,7 +93,7 @@ export default async function DashboardPage() {
     settings: projectionSettings,
     msc: monthlyContribution,
     cashflowGoalUSD,
-    currentMonthlyIncome,
+    currentMonthlyCashflow,
     locs,
   });
   const optionalityMonth = projection.optionality.kind === "reached" ? projection.optionality.month : null;
@@ -164,7 +161,7 @@ export default async function DashboardPage() {
               <div className="text-[10px] text-sub uppercase tracking-wide">Monthly Withdrawal</div>
               <div className="text-xl font-bold mt-auto pt-3">{fmtUSD0(cashflowGoalUSD)}</div>
             </div>
-            <OptionalityMeter status={projection.optionality} goalUSD={cashflowGoalUSD} currentMonthlyIncomeUSD={currentMonthlyIncome} />
+            <OptionalityMeter status={projection.optionality} goalUSD={cashflowGoalUSD} currentMonthlyCashflowUSD={currentMonthlyCashflow} />
           </div>
         </div>
       </div>
