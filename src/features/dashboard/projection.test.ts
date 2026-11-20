@@ -3,7 +3,7 @@ import { buildDashboardProjection, mergeProjection, optionalityInRange } from ".
 import { DEFAULT_PROJECTION_SETTINGS } from "./settings";
 import { buildSeries, type AmpliconLite } from "@/shared/finance/projection";
 import { runSimulation } from "@/shared/finance/projection-sim";
-import { earliestSustainableWithdrawal } from "@/shared/finance/projection-fi";
+import { earliestSustainableWithdrawal, maxSustainableWithdrawal } from "@/shared/finance/projection-fi";
 import { seedFromTracked } from "@/shared/finance/dashboard-seed";
 import { addMonths } from "@/shared/finance/dates";
 
@@ -18,7 +18,6 @@ const args = {
   settings: DEFAULT_PROJECTION_SETTINGS,
   msc: 2000,
   cashflowGoalUSD: 3000,
-  currentMonthlyCashflow: 600,
 };
 
 describe("buildDashboardProjection", () => {
@@ -34,7 +33,7 @@ describe("buildDashboardProjection", () => {
     expect(series).toEqual(direct.series);
   });
 
-  it("finds optionality on the capital measure, and measures income progress at that month", () => {
+  it("finds optionality on the capital measure, and measures today's sustainable withdrawal against the target", () => {
     const { optionality } = buildDashboardProjection(args);
     expect(optionality.kind).toBe("reached");
     if (optionality.kind !== "reached") return;
@@ -46,9 +45,10 @@ describe("buildDashboardProjection", () => {
     };
     const fi = earliestSustainableWithdrawal(input, 3000, { requireGrowth: false, minStartMonth: 0 });
     expect(optionality.month).toBe(addMonths(TODAY, fi.month!));
-    const atSwitch = runSimulation({ ...input, mscEndMonth: fi.month!, withdrawalStartMonth: fi.month!, monthlyWithdrawal: 3000 });
-    expect(optionality.cashflowAtOptionality).toBeCloseTo(atSwitch.series[fi.month!].distributionCashFlow, 6);
-    expect(optionality.progress).toBeCloseTo(Math.min(600 / optionality.cashflowAtOptionality, 1), 10);
+    expect(fi.month).toBeGreaterThan(0);
+    expect(optionality.sustainableWithdrawalToday).toBeCloseTo(maxSustainableWithdrawal(input, 3000, { startMonth: 0 }), 6);
+    expect(optionality.sustainableWithdrawalToday).toBeLessThan(3000);
+    expect(optionality.progress).toBeCloseTo(optionality.sustainableWithdrawalToday / 3000, 10);
   });
 
   it("an LTI's income counts toward the withdrawal: a Bonus LTI brings optionality forward", () => {

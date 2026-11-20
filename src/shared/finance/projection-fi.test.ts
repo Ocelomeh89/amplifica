@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { earliestSustainableWithdrawal } from "./projection-fi";
+import { earliestSustainableWithdrawal, maxSustainableWithdrawal } from "./projection-fi";
 import { runSimulation, type ProjectionSimInput } from "./projection-sim";
 import { capitalOfBook } from "./sim-book";
 
@@ -64,5 +64,20 @@ describe("the capital rule: income pays the withdrawal", () => {
 
   it("a withdrawal above the income eats capital and is never sustainable", () => {
     expect(earliestSustainableWithdrawal(lti, 15000).month).toBeNull();
+  });
+});
+
+describe("maxSustainableWithdrawal", () => {
+  const t = earliestSustainableWithdrawal(profitable, 4500).month!;
+  it("returns the cap when the cap is sustainable, 0 for a non-positive cap", () => {
+    expect(maxSustainableWithdrawal(profitable, 4500, { startMonth: t })).toBe(4500);
+    expect(maxSustainableWithdrawal(profitable, 0, { startMonth: t })).toBe(0);
+  });
+  it("finds the boundary: the answer is sustainable, \$2 more is not", () => {
+    const w = maxSustainableWithdrawal(profitable, 1_000_000, { startMonth: t });
+    expect(w).toBeGreaterThanOrEqual(4500);
+    expect(w).toBeLessThan(1_000_000);
+    expect(maxSustainableWithdrawal(profitable, w, { startMonth: t })).toBe(w);
+    expect(maxSustainableWithdrawal(profitable, w + 2, { startMonth: t })).toBeLessThan(w + 2);
   });
 });
