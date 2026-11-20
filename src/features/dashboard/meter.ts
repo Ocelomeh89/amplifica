@@ -1,6 +1,6 @@
-// Optionality meter math. Progress = today's monthly income (STI interest +
-// LTI coupons) as a share of the income projected for the optionality month
-// (2026-11-14; was total cash flow).
+// Optionality meter math. Progress = today's total monthly cash flow from the
+// flywheel (interest + principal) as a share of the cash flow projected for the
+// optionality month (back to total cash flow 2026-11-20; income-only 11-14 to 11-20).
 
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
 

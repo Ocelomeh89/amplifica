@@ -18,7 +18,7 @@ const args = {
   settings: DEFAULT_PROJECTION_SETTINGS,
   msc: 2000,
   cashflowGoalUSD: 3000,
-  currentMonthlyIncome: 600,
+  currentMonthlyCashflow: 600,
 };
 
 describe("buildDashboardProjection", () => {
@@ -47,8 +47,8 @@ describe("buildDashboardProjection", () => {
     const fi = earliestSustainableWithdrawal(input, 3000, { requireGrowth: false, minStartMonth: 0 });
     expect(optionality.month).toBe(addMonths(TODAY, fi.month!));
     const atSwitch = runSimulation({ ...input, mscEndMonth: fi.month!, withdrawalStartMonth: fi.month!, monthlyWithdrawal: 3000 });
-    expect(optionality.incomeAtOptionality).toBeCloseTo(atSwitch.series[fi.month!].distributionInterest, 6);
-    expect(optionality.progress).toBeCloseTo(Math.min(600 / optionality.incomeAtOptionality, 1), 10);
+    expect(optionality.cashflowAtOptionality).toBeCloseTo(atSwitch.series[fi.month!].distributionCashFlow, 6);
+    expect(optionality.progress).toBeCloseTo(Math.min(600 / optionality.cashflowAtOptionality, 1), 10);
   });
 
   it("an LTI's income counts toward the withdrawal: a Bonus LTI brings optionality forward", () => {

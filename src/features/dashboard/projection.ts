@@ -14,7 +14,7 @@ export type OptionalityStatus =
   | { kind: "no-amplicons" }
   | { kind: "no-goal" }
   | { kind: "not-reached"; horizonYears: number }
-  | { kind: "reached"; month: YearMonth; progress: number; incomeAtOptionality: number };
+  | { kind: "reached"; month: YearMonth; progress: number; cashflowAtOptionality: number };
 
 // A future-dated Amplicon whose projected first payment lands later than the
 // date the user entered, because it waits for the flywheel's next launch slot.
@@ -60,7 +60,7 @@ export function buildDashboardProjection(args: {
   settings: ProjectionSettings;
   msc: number;
   cashflowGoalUSD: number;
-  currentMonthlyIncome: number; // STI interest + LTI coupons this month
+  currentMonthlyCashflow: number; // all Amplicon payouts this month (interest + principal)
   locs?: LocLite[];
 }): {
   series: ProjectionSimPoint[];
@@ -69,7 +69,7 @@ export function buildDashboardProjection(args: {
   overLimit: OverLimit | null;
   oversizedLtis: OversizedLti[];
 } {
-  const { amplicons, today, settings, msc, cashflowGoalUSD, currentMonthlyIncome, locs } = args;
+  const { amplicons, today, settings, msc, cashflowGoalUSD, currentMonthlyCashflow, locs } = args;
   const seed = seedFromTracked(amplicons, today, settings.nextDrawSize, locs);
   const input: ProjectionSimInput = {
     msc,
@@ -154,15 +154,15 @@ export function buildDashboardProjection(args: {
     withdrawalStartMonth: fi.month,
     monthlyWithdrawal: cashflowGoalUSD,
   });
-  const incomeAtOptionality = atSwitch.series[fi.month].distributionInterest;
+  const cashflowAtOptionality = atSwitch.series[fi.month].distributionCashFlow;
   return {
     ...base,
     optionality: {
       kind: "reached",
       month: addMonths(today, fi.month),
       // Optionality today means 100%, whatever the payout reads.
-      progress: fi.month === 0 ? 1 : optionalityProgress(currentMonthlyIncome, incomeAtOptionality),
-      incomeAtOptionality,
+      progress: fi.month === 0 ? 1 : optionalityProgress(currentMonthlyCashflow, cashflowAtOptionality),
+      cashflowAtOptionality,
     },
   };
 }

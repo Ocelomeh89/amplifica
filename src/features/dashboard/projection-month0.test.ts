@@ -17,7 +17,7 @@ describe("optionality at month 0", () => {
       settings: DEFAULT_PROJECTION_SETTINGS,
       msc: 2000,
       cashflowGoalUSD: 3000,
-      currentMonthlyIncome: 1,
+      currentMonthlyCashflow: 1,
     });
     expect(optionality.kind).toBe("reached");
     if (optionality.kind !== "reached") return;
