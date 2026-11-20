@@ -13,4 +13,6 @@ Spec: `docs/superpowers/specs/2026-11-10-investment-options-fund-check-design.md
 - `features/amplicons` gets the option list as props from `app/`, never by importing this feature.
 - **Gated** to the user ids in `INVESTMENTS_USER_IDS` (`shared/investments-access.ts`): the sidebar tab, the
   page (404), every action here, the Amplicon split fields and actions, and the dashboard fund card + chart.
-  Unset means nobody sees it.
+  Unset means nobody sees it. Allow-listed users get a "My view / Everyone else" toggle
+  at the top of every app page (`app/(app)/ViewToggle.tsx`, cookie `amp_view`); pages and actions read
+  `investmentsOn()` from `shared/view-mode.ts`, which honours it.

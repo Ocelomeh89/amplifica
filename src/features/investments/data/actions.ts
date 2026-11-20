@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/shared/supabase/auth";
-import { canUseInvestments } from "@/shared/investments-access";
+import { investmentsOn } from "@/shared/view-mode";
 import { str } from "@/shared/forms";
 import { currentYearMonth, type YearMonth } from "@/shared/finance/dates";
 import { isWorse, runFundCheck, termsAt, type FundStatus } from "@/shared/finance/fund-check";
@@ -13,7 +13,7 @@ import { loadFundCheckInput } from "./load";
 // requireUser(), then the investments gate. Others get an error: the UI never offers them these actions.
 async function requireInvestmentsUser() {
   const ctx = await requireUser();
-  if (!canUseInvestments(ctx.user.id)) throw new Error("Not available.");
+  if (!investmentsOn(ctx.user.id)) throw new Error("Not available.");
   return ctx;
 }
 
