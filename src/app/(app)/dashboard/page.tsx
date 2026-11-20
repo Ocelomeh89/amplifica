@@ -94,7 +94,6 @@ export default async function DashboardPage() {
     settings: projectionSettings,
     msc: monthlyContribution,
     cashflowGoalUSD,
-    currentMonthlyCashflow,
     locs,
   });
   const optionalityMonth = projection.optionality.kind === "reached" ? projection.optionality.month : null;
@@ -155,15 +154,15 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Target — goals, same units as Current for comparison */}
+        {/* Future — goals, same units as Current for comparison */}
         <div className="md:col-span-2 flex flex-col">
-          <div className="text-[10px] text-sub uppercase tracking-wide font-semibold mb-1 h-4">Target</div>
+          <div className="text-[10px] text-sub uppercase tracking-wide font-semibold mb-1 h-4">Future</div>
           <div className="flex-1 grid grid-cols-2 rounded-lg border border-edge divide-x divide-edge bg-card">
             <div className="p-4 flex flex-col">
-              <div className="text-[10px] text-sub uppercase tracking-wide">Monthly Withdrawal</div>
+              <div className="text-[10px] text-sub uppercase tracking-wide">Monthly Withdrawal Target</div>
               <div className="text-xl font-bold mt-auto pt-3">{fmtUSD0(cashflowGoalUSD)}</div>
             </div>
-            <OptionalityMeter status={projection.optionality} goalUSD={cashflowGoalUSD} currentMonthlyCashflowUSD={currentMonthlyCashflow} />
+            <OptionalityMeter status={projection.optionality} goalUSD={cashflowGoalUSD} />
           </div>
         </div>
       </div>

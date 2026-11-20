@@ -5,7 +5,7 @@
 import { addMonths, monthsBetween, type YearMonth } from "@/shared/finance/dates";
 import type { AmpliconLite, ProjectionPoint } from "@/shared/finance/projection";
 import { runSimulation, type ProjectionSimInput, type ProjectionSimPoint } from "@/shared/finance/projection-sim";
-import { earliestSustainableWithdrawal } from "@/shared/finance/projection-fi";
+import { earliestSustainableWithdrawal, maxSustainableWithdrawal } from "@/shared/finance/projection-fi";
 import { seedFromTracked, type LocLite } from "@/shared/finance/dashboard-seed";
 import type { ProjectionSettings } from "./settings";
 import { optionalityProgress } from "./meter";
@@ -14,7 +14,7 @@ export type OptionalityStatus =
   | { kind: "no-amplicons" }
   | { kind: "no-goal" }
   | { kind: "not-reached"; horizonYears: number }
-  | { kind: "reached"; month: YearMonth; progress: number; cashflowAtOptionality: number };
+  | { kind: "reached"; month: YearMonth; progress: number; sustainableWithdrawalToday: number };
 
 // A future-dated Amplicon whose projected first payment lands later than the
 // date the user entered, because it waits for the flywheel's next launch slot.
@@ -60,7 +60,6 @@ export function buildDashboardProjection(args: {
   settings: ProjectionSettings;
   msc: number;
   cashflowGoalUSD: number;
-  currentMonthlyCashflow: number; // all Amplicon payouts this month (interest + principal)
   locs?: LocLite[];
 }): {
   series: ProjectionSimPoint[];
@@ -69,7 +68,7 @@ export function buildDashboardProjection(args: {
   overLimit: OverLimit | null;
   oversizedLtis: OversizedLti[];
 } {
-  const { amplicons, today, settings, msc, cashflowGoalUSD, currentMonthlyCashflow, locs } = args;
+  const { amplicons, today, settings, msc, cashflowGoalUSD, locs } = args;
   const seed = seedFromTracked(amplicons, today, settings.nextDrawSize, locs);
   const input: ProjectionSimInput = {
     msc,
@@ -145,24 +144,18 @@ export function buildDashboardProjection(args: {
     return { ...base, optionality: { kind: "not-reached", horizonYears: Math.round(settings.horizonMonths / 12) } };
   }
 
-  // Read the income from the run that actually switches at fi.month: the
-  // payoff gate looks ahead at MSC and withdrawals, so launches before the
-  // switch can differ from the plain projection's.
-  const atSwitch = runSimulation({
-    ...input,
-    mscEndMonth: fi.month,
-    withdrawalStartMonth: fi.month,
-    monthlyWithdrawal: cashflowGoalUSD,
-  });
-  const cashflowAtOptionality = atSwitch.series[fi.month].distributionCashFlow;
+  // The meter: the most you could draw a month if you stopped MSC and started
+  // withdrawing today, on the same capital rule, against the withdrawal target.
+  const sustainableWithdrawalToday =
+    fi.month === 0 ? cashflowGoalUSD : maxSustainableWithdrawal(input, cashflowGoalUSD, { startMonth: 0 });
   return {
     ...base,
     optionality: {
       kind: "reached",
       month: addMonths(today, fi.month),
-      // Optionality today means 100%, whatever the payout reads.
-      progress: fi.month === 0 ? 1 : optionalityProgress(currentMonthlyCashflow, cashflowAtOptionality),
-      cashflowAtOptionality,
+      // Optionality today means 100%.
+      progress: fi.month === 0 ? 1 : optionalityProgress(sustainableWithdrawalToday, cashflowGoalUSD),
+      sustainableWithdrawalToday,
     },
   };
 }

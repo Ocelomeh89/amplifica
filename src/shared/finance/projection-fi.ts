@@ -46,12 +46,43 @@ export function earliestSustainableWithdrawal(
   const totalMonths = base.totalMonths ?? 480;
   const maxStart = totalMonths - minRunwayMonths;
   for (let t = minStartMonth; t <= maxStart; t++) {
-    const r = runSimulation({ ...base, mscEndMonth: t, withdrawalStartMonth: t, monthlyWithdrawal });
-    // Withdrawals leave through the cash bucket, so cash counts, net of the LoC.
-    const nw = r.series.map((s, m) => capitalOfBook(r.bookByMonth[m], m + 1) + s.cash - s.outstandingAmount);
+    const nw = capitalSeries(base, t, monthlyWithdrawal);
     if (sustained(nw, t, requireGrowth)) {
       return { month: t, monthlyWithdrawal, capitalAtSwitch: nw[t], capitalAtEnd: nw[nw.length - 1] };
     }
   }
   return { month: null, monthlyWithdrawal, capitalAtSwitch: null, capitalAtEnd: null };
+}
+
+// Capital still invested + cash − LoC, month by month, when MSC stops and the
+// withdrawal starts at month t. Withdrawals leave through the cash bucket, so
+// cash counts, net of the LoC.
+function capitalSeries(base: ProjectionSimInput, t: number, monthlyWithdrawal: number): number[] {
+  const r = runSimulation({ ...base, mscEndMonth: t, withdrawalStartMonth: t, monthlyWithdrawal });
+  return r.series.map((s, m) => capitalOfBook(r.bookByMonth[m], m + 1) + s.cash - s.outstandingAmount);
+}
+
+// The largest monthly withdrawal, up to `cap`, that meets the capital rule if
+// MSC stops and the withdrawal starts at `startMonth` (0 = today). Bisection to
+// `precision` dollars; returns `cap` when the cap itself is sustainable.
+export function maxSustainableWithdrawal(
+  base: ProjectionSimInput,
+  cap: number,
+  options: { startMonth?: number; requireGrowth?: boolean; precision?: number } = {}
+): number {
+  const t = options.startMonth ?? 0;
+  const requireGrowth = options.requireGrowth ?? false;
+  const precision = options.precision ?? 1;
+  const ok = (w: number) => sustained(capitalSeries(base, t, w), t, requireGrowth);
+  if (!(cap > 0)) return 0;
+  if (ok(cap)) return cap;
+  if (!ok(0)) return 0;
+  let lo = 0;
+  let hi = cap;
+  while (hi - lo > precision) {
+    const mid = (lo + hi) / 2;
+    if (ok(mid)) lo = mid;
+    else hi = mid;
+  }
+  return lo;
 }

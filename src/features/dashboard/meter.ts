@@ -1,6 +1,6 @@
-// Optionality meter math. Progress = today's total monthly cash flow from the
-// flywheel (interest + principal) as a share of the cash flow projected for the
-// optionality month (back to total cash flow 2026-11-20; income-only 11-14 to 11-20).
+// Optionality meter math. Progress = the largest monthly withdrawal that is
+// sustainable if you stop MSC and start drawing today (capital rule), as a share
+// of the withdrawal target (2026-11-20; before: total cash flow, and before that income).
 
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
 
