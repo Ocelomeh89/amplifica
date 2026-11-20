@@ -23,7 +23,6 @@ const items = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/amplicons", label: "Amplicons", icon: Coins },
   { to: "/loc", label: "Lines of Credit", icon: CreditCard },
-  investmentOptionsNavItem,
   { to: "/projections", label: "Projections", icon: TrendingUp },
   amortizationNavItem,
 ];
@@ -50,7 +49,15 @@ function AmplitudeMark() {
   );
 }
 
-export default function Sidebar({ email, showContent }: { email: string; showContent: boolean }) {
+export default function Sidebar({
+  email,
+  showContent,
+  showInvestments,
+}: {
+  email: string;
+  showContent: boolean;
+  showInvestments: boolean;
+}) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -101,7 +108,12 @@ export default function Sidebar({ email, showContent }: { email: string; showCon
       {!collapsed && <div className="text-xs text-white/40 mb-6 px-2 truncate">{email}</div>}
       {collapsed && <div className="mb-6" />}
 
-      {[...items, ...(showContent ? [contentNavItem] : [])].map((item) => {
+      {[
+        ...items.slice(0, 3),
+        ...(showInvestments ? [investmentOptionsNavItem] : []),
+        ...items.slice(3),
+        ...(showContent ? [contentNavItem] : []),
+      ].map((item) => {
         const isActive = pathname.startsWith(item.to);
         return (
           <Link

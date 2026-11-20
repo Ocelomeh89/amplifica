@@ -1,4 +1,5 @@
 import { requireUser } from "@/shared/supabase/auth";
+import { canUseInvestments } from "@/shared/investments-access";
 import { isoToYearMonth, addMonths } from "@/shared/finance/dates";
 import { monthlyPayoutOf, isActiveAt } from "@/shared/finance/projection";
 import Card from "@/shared/ui/Card";
@@ -7,7 +8,9 @@ import AmpliconRow from "@/features/amplicons/ui/AmpliconRow";
 import { groupSplits } from "@/shared/splits";
 
 export default async function AmpliconsPage() {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
+  // Splits are part of investment options, gated to INVESTMENTS_USER_IDS.
+  const splits = canUseInvestments(user.id);
 
   const [{ data: amplicons }, { data: optionRows }, { data: splitRows }, { data: allocRows }] = await Promise.all([
     supabase.from("amplicons").select("*").order("start_date", { ascending: false }),
@@ -16,9 +19,9 @@ export default async function AmpliconsPage() {
     supabase.from("amplicon_splits").select("id, seq, amplicon_id, created_at"),
     supabase.from("amplicon_allocations").select("split_id, investment_option_id, pct"),
   ]);
-  const options = optionRows ?? [];
+  const options = splits ? optionRows ?? [] : [];
   const history = groupSplits(splitRows ?? [], allocRows ?? []);
-  const versionsOf = (id: string) => history.get(id) ?? [];
+  const versionsOf = (id: string) => (splits ? history.get(id) ?? [] : []);
 
   const todayMonth = new Date().toISOString().slice(0, 7);
 
@@ -26,7 +29,7 @@ export default async function AmpliconsPage() {
     <div className="max-w-5xl">
       <h1 className="text-xl font-semibold mb-4">Amplicons</h1>
 
-      <NewAmpliconForm options={options} />
+      <NewAmpliconForm options={options} splits={splits} />
 
       <Card>
         {!amplicons || amplicons.length === 0 ? (
@@ -82,6 +85,7 @@ export default async function AmpliconsPage() {
                     active={active}
                     options={options}
                     versions={versionsOf(a.id)}
+                    splits={splits}
                   />
                 );
               })}

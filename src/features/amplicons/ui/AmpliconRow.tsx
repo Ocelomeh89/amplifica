@@ -27,6 +27,7 @@ export default function AmpliconRow({
   active,
   options,
   versions,
+  splits = true,
 }: {
   amplicon: AmpliconRowData;
   monthly: number;
@@ -34,6 +35,7 @@ export default function AmpliconRow({
   active: boolean;
   options: AllocationOption[];
   versions: SplitVersion[]; // oldest first; the last is current
+  splits?: boolean; // false hides the split UI (investments gate)
 }) {
   const [editing, setEditing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -57,7 +59,7 @@ export default function AmpliconRow({
             className="space-y-3"
           >
             <input type="hidden" name="id" value={a.id} />
-            <AmpliconFields d={a} cols={3} options={options} allocations={current?.allocations ?? []} />
+            <AmpliconFields d={a} cols={3} options={options} allocations={current?.allocations ?? []} splits={splits} />
             <div className="flex gap-2">
               <button
                 type="submit"

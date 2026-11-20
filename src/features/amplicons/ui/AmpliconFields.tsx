@@ -32,11 +32,13 @@ export default function AmpliconFields({
   cols = 2,
   options = [],
   allocations = [],
+  splits = true,
 }: {
   d?: AmpliconFieldDefaults;
   cols?: 2 | 3;
   options?: AllocationOption[];
   allocations?: { investment_option_id: string; pct: number }[];
+  splits?: boolean; // false hides "Invested in" (investments gate)
 }) {
   const [type, setType] = useState<IncomeType>(d.income_type ?? "STI");
   const [face, setFace] = useState(String(d.face_value ?? 25000));
@@ -95,7 +97,7 @@ export default function AmpliconFields({
           <InfoBox message={BONUS_INFO} />
         </label>
       )}
-      <AllocationFields options={options} initial={allocations} />
+      {splits && <AllocationFields options={options} initial={allocations} />}
       {lti && (
         <p className="sm:col-span-full text-[11px] text-sub -mt-1">
           The projection treats this cash flow as steady for the whole term and pays the amount invested back with
