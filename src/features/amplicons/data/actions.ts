@@ -2,7 +2,7 @@
 
 import { createClient } from "@/shared/supabase/server";
 import { requireUser } from "@/shared/supabase/auth";
-import { canUseInvestments } from "@/shared/investments-access";
+import { investmentsOn } from "@/shared/view-mode";
 import { revalidatePath } from "next/cache";
 import { str } from "@/shared/forms";
 import { parseAmpliconForm, parseAllocations } from "./parse";
@@ -19,7 +19,7 @@ export async function createAmplicon(formData: FormData) {
     .select("id")
     .single();
   if (error || !data) throw new Error(error?.message ?? "Could not save the Amplicon.");
-  if (canUseInvestments(user.id)) await saveSplit(supabase, data.id, allocs);
+  if (investmentsOn(user.id)) await saveSplit(supabase, data.id, allocs);
 
   revalidatePath("/amplicons");
   revalidatePath("/dashboard");
@@ -40,7 +40,7 @@ export async function editAmplicon(formData: FormData) {
     .eq("id", id);
   if (error) throw new Error(error.message);
   // Users without the investments gate never see the split fields; leave their splits untouched.
-  if (canUseInvestments(user.id)) await saveSplit(supabase, id, allocs);
+  if (investmentsOn(user.id)) await saveSplit(supabase, id, allocs);
 
   revalidatePath("/amplicons");
   revalidatePath("/dashboard");
@@ -88,7 +88,7 @@ export async function duplicateAmplicon(formData: FormData) {
 // a new version. Nothing is deleted, so a restore can itself be undone.
 export async function restoreSplit(formData: FormData) {
   const { supabase, user } = await requireUser();
-  if (!canUseInvestments(user.id)) return;
+  if (!investmentsOn(user.id)) return;
   const splitId = str(formData, "split_id");
   if (!splitId) return;
   const { data: split, error } = await supabase

@@ -1,5 +1,5 @@
 import { requireUser } from "@/shared/supabase/auth";
-import { canUseInvestments } from "@/shared/investments-access";
+import { investmentsOn } from "@/shared/view-mode";
 import { isoToYearMonth, addMonths } from "@/shared/finance/dates";
 import { monthlyPayoutOf, isActiveAt } from "@/shared/finance/projection";
 import Card from "@/shared/ui/Card";
@@ -10,7 +10,7 @@ import { groupSplits } from "@/shared/splits";
 export default async function AmpliconsPage() {
   const { supabase, user } = await requireUser();
   // Splits are part of investment options, gated to INVESTMENTS_USER_IDS.
-  const splits = canUseInvestments(user.id);
+  const splits = investmentsOn(user.id);
 
   const [{ data: amplicons }, { data: optionRows }, { data: splitRows }, { data: allocRows }] = await Promise.all([
     supabase.from("amplicons").select("*").order("start_date", { ascending: false }),

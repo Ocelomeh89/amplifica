@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/shared/supabase/auth";
-import { canUseInvestments } from "@/shared/investments-access";
+import { investmentsOn } from "@/shared/view-mode";
 import { currentYearMonth } from "@/shared/finance/dates";
 import { DEFAULT_GROWTH, DEFAULT_GROWTH_ID, runFundCheck, termsAt } from "@/shared/finance/fund-check";
 import Card from "@/shared/ui/Card";
@@ -12,7 +12,7 @@ import CheckinsCard from "@/features/investments/ui/CheckinsCard";
 
 export default async function InvestmentOptionsPage() {
   const { supabase, user } = await requireUser();
-  if (!canUseInvestments(user.id)) notFound();
+  if (!investmentsOn(user.id)) notFound();
   const today = currentYearMonth();
   const data = await loadFundCheckInput(supabase, today);
   const result = runFundCheck(data);

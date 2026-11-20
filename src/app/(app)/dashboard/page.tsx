@@ -19,7 +19,7 @@ import ProjectionSettingsPanel from "@/features/dashboard/ui/ProjectionSettingsP
 import { runFundCheck } from "@/shared/finance/fund-check";
 import { loadFundCheckInput } from "@/features/investments/data/load";
 import FundCheckCard from "@/features/investments/ui/FundCheckCard";
-import { canUseInvestments } from "@/shared/investments-access";
+import { investmentsOn } from "@/shared/view-mode";
 
 export default async function DashboardPage() {
   const { supabase, user } = await requireUser();
@@ -101,7 +101,7 @@ export default async function DashboardPage() {
 
   // Fund check: warning-only, reads the same Amplicon schedules, changes no number above.
   // Gated with investment options (INVESTMENTS_USER_IDS); others get no card and no fund chart.
-  const fundCheck = canUseInvestments(user.id) ? runFundCheck(await loadFundCheckInput(supabase, todayMonth)) : null;
+  const fundCheck = investmentsOn(user.id) ? runFundCheck(await loadFundCheckInput(supabase, todayMonth)) : null;
   // The fund's dollar figures show only once the STI engine is off (no STI paying today).
   const stiPaying = activeNow.some((a) => (a.incomeType ?? "STI") === "STI");
 
