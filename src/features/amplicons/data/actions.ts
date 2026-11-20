@@ -2,6 +2,7 @@
 
 import { createClient } from "@/shared/supabase/server";
 import { requireUser } from "@/shared/supabase/auth";
+import { canUseInvestments } from "@/shared/investments-access";
 import { revalidatePath } from "next/cache";
 import { str } from "@/shared/forms";
 import { parseAmpliconForm, parseAllocations } from "./parse";
@@ -18,7 +19,7 @@ export async function createAmplicon(formData: FormData) {
     .select("id")
     .single();
   if (error || !data) throw new Error(error?.message ?? "Could not save the Amplicon.");
-  await saveSplit(supabase, data.id, allocs);
+  if (canUseInvestments(user.id)) await saveSplit(supabase, data.id, allocs);
 
   revalidatePath("/amplicons");
   revalidatePath("/dashboard");
@@ -26,7 +27,7 @@ export async function createAmplicon(formData: FormData) {
 }
 
 export async function editAmplicon(formData: FormData) {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
 
   const id = str(formData, "id");
   if (!id) throw new Error("Missing amplicon id");
@@ -38,7 +39,8 @@ export async function editAmplicon(formData: FormData) {
     .update(fields)
     .eq("id", id);
   if (error) throw new Error(error.message);
-  await saveSplit(supabase, id, allocs);
+  // Users without the investments gate never see the split fields; leave their splits untouched.
+  if (canUseInvestments(user.id)) await saveSplit(supabase, id, allocs);
 
   revalidatePath("/amplicons");
   revalidatePath("/dashboard");
@@ -85,7 +87,8 @@ export async function duplicateAmplicon(formData: FormData) {
 // Undo / History: make an earlier split version current again, by saving it as
 // a new version. Nothing is deleted, so a restore can itself be undone.
 export async function restoreSplit(formData: FormData) {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
+  if (!canUseInvestments(user.id)) return;
   const splitId = str(formData, "split_id");
   if (!splitId) return;
   const { data: split, error } = await supabase

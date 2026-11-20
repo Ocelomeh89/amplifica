@@ -29,6 +29,7 @@ interface Props {
   optionalityMonth: YearMonth | null;
   controls?: React.ReactNode;
   fundMonths?: FundMonth[];
+  showFund?: boolean; // false hides the fund balance chart (investments gate)
   today?: YearMonth;
 }
 
@@ -41,6 +42,7 @@ export default function ChartPair({
   optionalityMonth,
   controls,
   fundMonths = [],
+  showFund = true,
   today,
 }: Props) {
   const [range, setRange] = useState<"inception" | "current">("current");
@@ -162,7 +164,7 @@ export default function ChartPair({
         </div>
       </div>
 
-      {today && <FundBalanceChart rows={alignFundRows(rows, fundMonths)} today={today} tickInterval={tickInterval} />}
+      {showFund && today && <FundBalanceChart rows={alignFundRows(rows, fundMonths)} today={today} tickInterval={tickInterval} />}
     </div>
   );
 }

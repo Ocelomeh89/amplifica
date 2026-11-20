@@ -11,3 +11,6 @@ Spec: `docs/superpowers/specs/2026-11-10-investment-options-fund-check-design.md
   first of the current month. Never rewrite an older version.
 - The fund check is warning-only. Nothing here may change a flywheel number.
 - `features/amplicons` gets the option list as props from `app/`, never by importing this feature.
+- **Gated** to the user ids in `INVESTMENTS_USER_IDS` (`shared/investments-access.ts`): the sidebar tab, the
+  page (404), every action here, the Amplicon split fields and actions, and the dashboard fund card + chart.
+  Unset means nobody sees it.

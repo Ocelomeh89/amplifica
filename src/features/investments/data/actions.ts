@@ -2,12 +2,20 @@
 
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/shared/supabase/auth";
+import { canUseInvestments } from "@/shared/investments-access";
 import { str } from "@/shared/forms";
 import { currentYearMonth, type YearMonth } from "@/shared/finance/dates";
 import { isWorse, runFundCheck, termsAt, type FundStatus } from "@/shared/finance/fund-check";
 import { fmtMonth } from "@/shared/format";
 import { parseOptionForm, versionRow, monthStart, parseMoveForm, parseCheckinForm } from "./parse";
 import { loadFundCheckInput } from "./load";
+
+// requireUser(), then the investments gate. Others get an error: the UI never offers them these actions.
+async function requireInvestmentsUser() {
+  const ctx = await requireUser();
+  if (!canUseInvestments(ctx.user.id)) throw new Error("Not available.");
+  return ctx;
+}
 
 function refresh() {
   revalidatePath("/investment-options");
@@ -16,7 +24,7 @@ function refresh() {
 }
 
 export async function createInvestmentOption(fd: FormData): Promise<void> {
-  const { supabase, user } = await requireUser();
+  const { supabase, user } = await requireInvestmentsUser();
   const f = parseOptionForm(fd);
   const { data, error } = await supabase
     .from("investment_options")
@@ -39,7 +47,7 @@ export async function createInvestmentOption(fd: FormData): Promise<void> {
 export async function previewOptionEdit(
   fd: FormData
 ): Promise<{ worse: boolean; status: FundStatus; runOutMonth: YearMonth | null }> {
-  const { supabase } = await requireUser();
+  const { supabase } = await requireInvestmentsUser();
   const id = str(fd, "id");
   const f = parseOptionForm(fd);
   const today = currentYearMonth();
@@ -64,7 +72,7 @@ export async function previewOptionEdit(
 // replaces that month's version. The fund status never blocks it (the form
 // asks for a second click instead).
 export async function editInvestmentOption(fd: FormData): Promise<void> {
-  const { supabase, user } = await requireUser();
+  const { supabase, user } = await requireInvestmentsUser();
   const id = str(fd, "id");
   if (!id) throw new Error("Missing option id");
   const f = parseOptionForm(fd);
@@ -97,7 +105,7 @@ export async function editInvestmentOption(fd: FormData): Promise<void> {
 }
 
 export async function deleteInvestmentOption(fd: FormData): Promise<{ error: string | null }> {
-  const { supabase, user } = await requireUser();
+  const { supabase, user } = await requireInvestmentsUser();
   const id = str(fd, "id");
   if (!id) return { error: null };
   const { error } = await supabase.from("investment_options").delete().eq("id", id).eq("user_id", user.id);
@@ -108,7 +116,7 @@ export async function deleteInvestmentOption(fd: FormData): Promise<{ error: str
 }
 
 export async function createFundMove(fd: FormData): Promise<void> {
-  const { supabase, user } = await requireUser();
+  const { supabase, user } = await requireInvestmentsUser();
   const f = parseMoveForm(fd);
   if (f.from_option_id) {
     const input = await loadFundCheckInput(supabase, currentYearMonth());
@@ -124,7 +132,7 @@ export async function createFundMove(fd: FormData): Promise<void> {
 // "Deleting" a move strands it: the money still left the source that month, but
 // it now sits in Default growth. Can't be undone (the UI says so first).
 export async function strandFundMove(fd: FormData): Promise<void> {
-  const { supabase, user } = await requireUser();
+  const { supabase, user } = await requireInvestmentsUser();
   const id = str(fd, "id");
   if (!id) return;
   const { error } = await supabase
@@ -138,7 +146,7 @@ export async function strandFundMove(fd: FormData): Promise<void> {
 }
 
 export async function createCheckin(fd: FormData): Promise<void> {
-  const { supabase, user } = await requireUser();
+  const { supabase, user } = await requireInvestmentsUser();
   const f = parseCheckinForm(fd, currentYearMonth());
   const { error } = await supabase.from("holding_checkins").insert({ user_id: user.id, ...f });
   if (error) throw new Error(error.message);
@@ -148,7 +156,7 @@ export async function createCheckin(fd: FormData): Promise<void> {
 // "Deleting" a check-in strands it: the holding is still set to the checked-in
 // value that month, then that whole value moves to Default growth. Can't be undone.
 export async function strandCheckin(fd: FormData): Promise<void> {
-  const { supabase, user } = await requireUser();
+  const { supabase, user } = await requireInvestmentsUser();
   const id = str(fd, "id");
   if (!id) return;
   const { error } = await supabase

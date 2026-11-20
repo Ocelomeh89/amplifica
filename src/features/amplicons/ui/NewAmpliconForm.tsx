@@ -7,7 +7,7 @@ import Card from "@/shared/ui/Card";
 import AmpliconFields from "./AmpliconFields";
 import type { AllocationOption } from "./AllocationFields";
 
-export default function NewAmpliconForm({ options }: { options: AllocationOption[] }) {
+export default function NewAmpliconForm({ options, splits = true }: { options: AllocationOption[]; splits?: boolean }) {
   const [open, setOpen] = useState(false);
 
   if (!open) {
@@ -24,7 +24,7 @@ export default function NewAmpliconForm({ options }: { options: AllocationOption
   return (
     <Card title="New Amplicon">
       <form action={async (fd) => { await createAmplicon(fd); setOpen(false); }} className="space-y-3">
-        <AmpliconFields options={options} />
+        <AmpliconFields options={options} splits={splits} />
         <div className="flex gap-2 mt-2">
           <button type="submit" className="bg-purple hover:bg-purple/90 transition-colors text-white text-sm px-4 py-1.5 rounded">
             Add Amplicon
