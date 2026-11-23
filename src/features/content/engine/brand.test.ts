@@ -41,6 +41,11 @@ describe("brand standard", () => {
     for (const g of GATE_ITEMS) expect(p).toContain(g.item);
   });
 
+  it("carries the three hook frameworks into the gate and the generator brief", () => {
+    for (const s of ["Stat:", "Rhetorical Question:", "Controversial Opinion:", "See more"]) expect(gateSystemPrompt()).toContain(s);
+    for (const s of ["Hook:", "Stat", "Rhetorical Question", "Controversial Opinion"]) expect(brandBrief()).toContain(s);
+  });
+
   it("requires a full rewrite on a fail only when rewriting", () => {
     const keys = ["title", "hook", "outline"];
     expect(gateOutputSchema(keys, true).safeParse(failBody).success).toBe(false);
