@@ -7,7 +7,7 @@ const result = { verdict: "pass", reader: "daniel", pillar: "w2-advantage", ampl
 describe("GateCheck", () => {
   it("ticks every item for a pass and names both pillars", () => {
     render(<GateCheck gate={{ result, rewritten: false, checked_at: "2026-11-10T12:00:00Z" }} original={null} />);
-    expect(screen.getAllByText("✓").length).toBe(11);
+    expect(screen.getAllByText("✓").length).toBe(12);
     expect(screen.getByText(/The W-2 Advantage/)).toBeInTheDocument();
     expect(screen.getByText(/The Numbers/)).toBeInTheDocument();
   });

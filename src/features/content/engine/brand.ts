@@ -88,6 +88,7 @@ export const GATE_ITEMS = [
   { item: "why-before-how", label: "Why before how" },
   { item: "downside", label: "The downside is on the page" },
   { item: "plain-terms", label: "Every term is plain to an HVAC owner" },
+  { item: "hook", label: "The hook stops the scroll" },
   { item: "voice", label: "The five voice pairs" },
   { item: "pillar", label: "Exactly one pillar" },
   { item: "guardrails", label: "Guardrails" },
@@ -220,6 +221,15 @@ const VOICE_TEXT = `
 - Candid, not self-deprecating: what happened, my responsibility, the lesson. No punchline, no sympathy.
 `.trim();
 
+/** The hook standard: brand-writing → "The hook" (Miguel's Hook Auditor prompt, 2026-11-22). */
+const HOOK_TEXT = `
+The opener (the hook field, else the first line; for video the first words spoken) uses one of three frameworks:
+  - Stat: leads with the number itself, not a setup ("Did you know" is a setup); surprising, tied to the reader's world, real and verifiable.
+  - Rhetorical Question: the question is sentence one, in Daniel's or Stephen's own words with a concrete detail (a number, his situation). A question anyone can answer "not really" fails.
+  - Controversial Opinion: states the opposite of a belief widely held in the niche as a flat claim, no hedging, no off-topic shock; attacks the belief, never the camp; the reasoning follows in the next line. A "Most people think X. Y." shape is allowed here, in the hook only.
+  And it passes four rules: no warm-up before the point; sentence one is the pattern interrupt; the value is obvious at once (clever without relevance fails); it fits the platform (LinkedIn: lands before "See more", about 200 characters; X: inside the limit; Instagram caption: about 125 characters; Reel or YouTube: the first words spoken, agreeing with the title and on-screen text).
+`.trim();
+
 export function brandBrief(): string {
   return [
     "## Brand (Amplifica Wealth, Miguel Graf)",
@@ -229,6 +239,7 @@ export function brandBrief(): string {
     "Every piece serves exactly one pillar (give its slug):",
     ...PILLARS.map((p) => `- ${p.slug}: ${p.name} (${p.question})`),
     "Voice: confident not arrogant, provocative not combative, analytical not overcomplicated, ambitious not reckless, candid not self-deprecating.",
+    "Hook: open with one of three frameworks (Stat: the real number first; Rhetorical Question: the reader's own question with a concrete detail; Controversial Opinion: the opposite of a widely held belief, stated flat, reasoning next line). No warm-up; sentence one is the interrupt; never invent the stat.",
     "Why before how; the downside on the page; no promised returns; name the belief, not the camp. The Amplifica layer applies: optionality, investing capacity, cash flow; never passive income, retire early or quit your 9-5.",
   ].join("\n");
 }
@@ -249,6 +260,7 @@ Neither reader would say "that's me" → fail item "reader".
 - [why-before-how] Says why it matters, with one practical example, before any mechanics. Never opens with a rate, a formula or a tool.
 - [downside] The risk is on the page and what happens if the assumption is wrong. On a short idea card the outline may carry it.
 - [plain-terms] An HVAC owner would follow every term. Unclear is a fail.
+- [hook] ${HOOK_TEXT}
 - [voice] The five voice pairs:
 ${VOICE_TEXT}
 - [pillar] Exactly one personal pillar, and the Amplifica pillar it sits under. Personal pillars (slug: name — question):
